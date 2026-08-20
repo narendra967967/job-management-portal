@@ -10,6 +10,8 @@ import {
   type LeadStatus,
 } from "@/lib/types";
 import { StatusBadge } from "@/components/leads/status-badge";
+import { LeadActions } from "@/components/leads/lead-actions";
+import { mockResumes } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 
 type StatusFilter = "all" | LeadStatus;
@@ -19,6 +21,14 @@ export function LeadsBrowser({ leads }: { leads: JobLead[] }) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [remoteOnly, setRemoteOnly] = useState(false);
   const [sort, setSort] = useState<Sort>("newest");
+  // Local status overrides so "Change status" from the row menu reflects live.
+  const [overrides, setOverrides] = useState<Record<string, LeadStatus>>({});
+
+  const statusOf = (lead: JobLead): LeadStatus =>
+    overrides[lead.id] ?? lead.status;
+
+  const setStatus = (id: string, status: LeadStatus) =>
+    setOverrides((prev) => ({ ...prev, [id]: status }));
 
   const counts = useMemo(() => {
     const c: Record<LeadStatus, number> = {
@@ -27,13 +37,15 @@ export function LeadsBrowser({ leads }: { leads: JobLead[] }) {
       applied: 0,
       discarded: 0,
     };
-    for (const l of leads) c[l.status]++;
+    for (const l of leads) c[statusOf(l)]++;
     return c;
-  }, [leads]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leads, overrides]);
 
   const visible = useMemo(() => {
     let out = leads.slice();
-    if (statusFilter !== "all") out = out.filter((l) => l.status === statusFilter);
+    if (statusFilter !== "all")
+      out = out.filter((l) => statusOf(l) === statusFilter);
     if (remoteOnly) out = out.filter((l) => l.remote);
     out.sort((a, b) =>
       sort === "newest"
@@ -41,7 +53,8 @@ export function LeadsBrowser({ leads }: { leads: JobLead[] }) {
         : a.capturedAt.localeCompare(b.capturedAt),
     );
     return out;
-  }, [leads, statusFilter, remoteOnly, sort]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leads, statusFilter, remoteOnly, sort, overrides]);
 
   return (
     <div className="space-y-4">
@@ -94,7 +107,11 @@ export function LeadsBrowser({ leads }: { leads: JobLead[] }) {
           <ul className="space-y-2.5 md:hidden">
             {visible.map((lead) => (
               <li key={lead.id}>
-                <LeadCard lead={lead} />
+                <LeadCard
+                  lead={lead}
+                  status={statusOf(lead)}
+                  onStatusChange={(s) => setStatus(lead.id, s)}
+                />
               </li>
             ))}
           </ul>
@@ -109,6 +126,9 @@ export function LeadsBrowser({ leads }: { leads: JobLead[] }) {
                   <th className="px-4 py-3 font-medium">Status</th>
                   <th className="px-4 py-3 font-medium">Contacts</th>
                   <th className="px-4 py-3 font-medium">Captured</th>
+                  <th className="w-12 px-2 py-3">
+                    <span className="sr-only">Actions</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -138,13 +158,21 @@ export function LeadsBrowser({ leads }: { leads: JobLead[] }) {
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <StatusBadge status={lead.status} />
+                      <StatusBadge status={statusOf(lead)} />
                     </td>
                     <td className="px-4 py-3 tabular-nums text-muted-foreground">
                       {lead.contactCount}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
                       {lead.postedRelative}
+                    </td>
+                    <td className="px-2 py-2 text-right">
+                      <LeadActions
+                        lead={lead}
+                        resumes={mockResumes}
+                        status={statusOf(lead)}
+                        onStatusChange={(s) => setStatus(lead.id, s)}
+                      />
                     </td>
                   </tr>
                 ))}
@@ -182,21 +210,42 @@ function Chip({
   );
 }
 
-function LeadCard({ lead }: { lead: JobLead }) {
+function LeadCard({
+  lead,
+  status,
+  onStatusChange,
+}: {
+  lead: JobLead;
+  status: LeadStatus;
+  onStatusChange: (status: LeadStatus) => void;
+}) {
   return (
-    <Link
-      href={`/leads/${lead.id}`}
-      className="block rounded-xl border bg-card p-3.5 transition-colors hover:border-primary/40"
-    >
-      <div className="flex items-start justify-between gap-2">
+    <div className="relative rounded-xl border bg-card p-3.5 transition-colors hover:border-primary/40">
+      {/* Stretched link: makes the whole card tappable to open the lead,
+          while the actions button (z-10) stays independently clickable. */}
+      <Link
+        href={`/leads/${lead.id}`}
+        aria-label={`Open ${lead.title}`}
+        className="absolute inset-0 rounded-xl"
+      />
+      <div className="relative flex items-start justify-between gap-2">
         <h3 className="text-sm leading-snug font-medium">{lead.title}</h3>
-        <StatusBadge status={lead.status} />
+        <div className="relative z-10 flex shrink-0 items-center gap-1">
+          <StatusBadge status={status} />
+          <LeadActions
+            lead={lead}
+            resumes={mockResumes}
+            status={status}
+            onStatusChange={onStatusChange}
+            className="-mr-1 size-8"
+          />
+        </div>
       </div>
       <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
         <MapPin className="size-3.5 shrink-0" aria-hidden />
         {lead.company} · {lead.location}
       </p>
-      <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+      <div className="relative mt-2.5 flex flex-wrap items-center gap-1.5">
         {lead.tags.map((tag) => (
           <span
             key={tag}
@@ -226,6 +275,6 @@ function LeadCard({ lead }: { lead: JobLead }) {
           {lead.postedRelative}
         </span>
       </div>
-    </Link>
+    </div>
   );
 }

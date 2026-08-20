@@ -1,6 +1,11 @@
 import { Bell, Search } from "lucide-react";
 import { Logo } from "@/components/app-shell/logo";
-import { SidebarNav, BottomNav } from "@/components/app-shell/main-nav";
+import {
+  SidebarNav,
+  SidebarFooter,
+  AccountMenu,
+  BottomNav,
+} from "@/components/app-shell/main-nav";
 import { Input } from "@/components/ui/input";
 
 export default function DashboardLayout({
@@ -16,6 +21,7 @@ export default function DashboardLayout({
           <Logo />
         </div>
         <SidebarNav />
+        <SidebarFooter />
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
@@ -44,6 +50,10 @@ export default function DashboardLayout({
             >
               <Bell className="size-5" aria-hidden />
             </button>
+            {/* Account (Settings / Log out) — mobile only; desktop uses the sidebar footer. */}
+            <div className="md:hidden">
+              <AccountMenu />
+            </div>
           </div>
         </header>
 

@@ -4,9 +4,11 @@
 
 import type {
   Contact,
+  GoogleConnection,
   JobLead,
   JobLeadDetail,
   OutreachMessage,
+  Profile,
   Reminder,
   Resume,
 } from "@/lib/types";
@@ -173,6 +175,7 @@ export const mockReminders: Reminder[] = [
     sequence: 1,
     dueDate: "2026-08-18",
     outcome: "pending",
+    manual: false,
   },
 ];
 
@@ -181,6 +184,19 @@ export const mockResumes: Resume[] = [
   { id: "resume-2", label: "Eng Leadership", updatedAt: "2026-07-20" },
   { id: "resume-3", label: "General / Program Mgmt", updatedAt: "2026-06-30" },
 ];
+
+export const mockProfile: Profile = {
+  name: "Narendra Gupta",
+  email: "narendra@example.com",
+  mobile: "+1 (555) 018-2245",
+};
+
+// Default state for the Settings → Google integration. Read-only always.
+export const mockGoogleConnection: GoogleConnection = {
+  connected: false,
+  email: null,
+  scope: "gmail.readonly",
+};
 
 // ---- Lookup helpers (mock stand-ins for Phase 3 queries) ----
 

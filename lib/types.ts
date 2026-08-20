@@ -101,15 +101,31 @@ export interface OutreachMessage {
 
 export interface Reminder {
   id: string;
-  outreachMessageId: string;
+  // null when the user adds a reminder manually against a lead (not tied to a
+  // specific sent message). Auto-scheduled reminders reference the message.
+  outreachMessageId: string | null;
   leadId: string;
   sequence: number; // 1 = Reminder 1, 2 = Reminder 2, ...
   dueDate: string; // ISO date
   outcome: ReminderOutcome;
+  label?: string; // optional note for manual reminders
+  manual: boolean;
 }
 
 export interface Resume {
   id: string;
   label: string;
   updatedAt: string;
+}
+
+export interface Profile {
+  name: string;
+  email: string;
+  mobile: string;
+}
+
+export interface GoogleConnection {
+  connected: boolean;
+  email: string | null;
+  scope: string; // always read-only
 }

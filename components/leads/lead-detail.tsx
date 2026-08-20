@@ -13,21 +13,19 @@ import {
 } from "lucide-react";
 import {
   CONNECTION_TYPE_LABELS,
-  LEAD_STATUSES,
-  LEAD_STATUS_LABELS,
   OUTREACH_KIND_LABELS,
   REMINDER_OUTCOME_LABELS,
   type Contact,
   type JobLead,
   type JobLeadDetail,
   type LeadStatus,
-  type OutreachKind,
   type OutreachMessage,
   type Reminder,
   type ReminderOutcome,
   type Resume,
 } from "@/lib/types";
 import { StatusBadge } from "@/components/leads/status-badge";
+import { LeadActions } from "@/components/leads/lead-actions";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -51,13 +49,12 @@ interface Props {
 export function LeadDetail({
   lead,
   detail,
-  contacts: initialContacts,
+  contacts,
   outreach,
   reminders,
   resumes,
 }: Props) {
   const [status, setStatus] = useState<LeadStatus>(lead.status);
-  const [contacts, setContacts] = useState<Contact[]>(initialContacts);
 
   return (
     <div className="mx-auto max-w-3xl space-y-5">
@@ -81,7 +78,15 @@ export function LeadDetail({
               {lead.company} · {lead.location}
             </p>
           </div>
-          <StatusBadge status={status} />
+          <div className="flex shrink-0 items-center gap-1.5">
+            <StatusBadge status={status} />
+            <LeadActions
+              lead={lead}
+              resumes={resumes}
+              status={status}
+              onStatusChange={setStatus}
+            />
+          </div>
         </div>
 
         <div className="mt-3 flex flex-wrap items-center gap-1.5">
@@ -98,22 +103,7 @@ export function LeadDetail({
           </span>
         </div>
 
-        <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
-          <Select
-            value={status}
-            onValueChange={(v) => setStatus(v as LeadStatus)}
-          >
-            <SelectTrigger className="w-full sm:w-48" aria-label="Lead status">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {LEAD_STATUSES.map((s) => (
-                <SelectItem key={s} value={s}>
-                  {LEAD_STATUS_LABELS[s]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="mt-4">
           <a
             href={lead.canonicalJobUrl}
             target="_blank"
@@ -126,7 +116,7 @@ export function LeadDetail({
         </div>
       </div>
 
-      {/* Tabbed sections */}
+      {/* Tabbed sections — read views. Adding is done via the actions menu. */}
       <Tabs defaultValue="overview">
         <TabsList className="w-full justify-start overflow-x-auto">
           <TabsTrigger value="overview">Overview</TabsTrigger>
@@ -146,14 +136,10 @@ export function LeadDetail({
           <OverviewTab detail={detail} />
         </TabsContent>
         <TabsContent value="contacts" className="mt-4">
-          <ContactsTab contacts={contacts} onAdd={setContacts} />
+          <ContactsTab contacts={contacts} />
         </TabsContent>
         <TabsContent value="outreach" className="mt-4">
-          <OutreachTab
-            outreach={outreach}
-            contacts={contacts}
-            resumes={resumes}
-          />
+          <OutreachTab outreach={outreach} />
         </TabsContent>
         <TabsContent value="reminders" className="mt-4">
           <RemindersTab reminders={reminders} />
@@ -163,18 +149,7 @@ export function LeadDetail({
   );
 }
 
-/* ---------------- AI hint banner ---------------- */
-
-function AiHint({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="flex items-start gap-1.5 text-xs text-ai">
-      <Sparkles className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-      <span>{children}</span>
-    </p>
-  );
-}
-
-/* ---------------- Overview: JD + paste-and-parse ---------------- */
+/* ---------------- Overview: JD paste (FR-3.1) + AI summary ---------------- */
 
 function OverviewTab({ detail }: { detail?: JobLeadDetail }) {
   const [jd, setJd] = useState(detail?.jdText ?? "");
@@ -189,7 +164,6 @@ function OverviewTab({ detail }: { detail?: JobLeadDetail }) {
     }
     setError("");
     setBusy(true);
-    // Mock AI: Phase 3 replaces this with an OpenAI Server Action.
     setTimeout(() => {
       setSummary(
         "AI summary appears here once wired: a 2–3 line scan of the role, seniority, and location pulled from the pasted JD.",
@@ -222,7 +196,10 @@ function OverviewTab({ detail }: { detail?: JobLeadDetail }) {
             <Sparkles className="size-4" aria-hidden />
             {busy ? "Summarizing…" : "Summarize with AI"}
           </button>
-          <AiHint>You review everything — nothing is saved automatically.</AiHint>
+          <p className="flex items-start gap-1.5 text-xs text-ai">
+            <Sparkles className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+            You review everything — nothing is saved automatically.
+          </p>
         </div>
       </section>
 
@@ -239,95 +216,26 @@ function OverviewTab({ detail }: { detail?: JobLeadDetail }) {
   );
 }
 
-/* ---------------- Contacts ---------------- */
+/* ---------------- Contacts (read list) ---------------- */
 
-function ContactsTab({
-  contacts,
-  onAdd,
-}: {
-  contacts: Contact[];
-  onAdd: React.Dispatch<React.SetStateAction<Contact[]>>;
-}) {
-  const [pasted, setPasted] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-
-  function parse() {
-    if (!pasted.trim()) {
-      setError("Paste the hiring-team or referral text first.");
-      return;
-    }
-    setError("");
-    setBusy(true);
-    // Mock AI parse: Phase 3 replaces with an OpenAI Server Action.
-    setTimeout(() => {
-      onAdd((prev) => [
-        ...prev,
-        {
-          id: `contact-parsed-${prev.length + 1}`,
-          leadId: contacts[0]?.leadId ?? "",
-          name: "Parsed contact",
-          title: "Structured from pasted text",
-          linkedinUrl: null,
-          connectionType: "recruiter",
-          aiParsed: true,
-        },
-      ]);
-      setPasted("");
-      setBusy(false);
-    }, 700);
+function ContactsTab({ contacts }: { contacts: Contact[] }) {
+  if (contacts.length === 0) {
+    return (
+      <EmptyState
+        icon={<Users className="size-5" aria-hidden />}
+        title="No contacts yet"
+        body="Use the actions menu (⋯) above to add a recruiter or referral."
+      />
+    );
   }
-
   return (
-    <div className="space-y-4">
-      <section className="rounded-xl border bg-card p-4">
-        <h2 className="text-sm font-medium">Add contacts</h2>
-        <p className="mt-0.5 text-xs text-muted-foreground">
-          Paste the hiring team or a referral connection from LinkedIn — AI
-          structures it into contact records for you to review.
-        </p>
-        <Textarea
-          value={pasted}
-          onChange={(e) => setPasted(e.target.value)}
-          placeholder="e.g. Dana Ortiz — Engineering Manager · linkedin.com/in/…"
-          className="mt-3 min-h-24"
-        />
-        {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={parse}
-            disabled={busy}
-            className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-ai px-3.5 text-sm font-medium text-ai-foreground hover:bg-ai/90 disabled:opacity-60"
-          >
-            <Sparkles className="size-4" aria-hidden />
-            {busy ? "Structuring…" : "Structure with AI"}
-          </button>
-          <button
-            type="button"
-            className="inline-flex min-h-10 items-center rounded-lg border px-3.5 text-sm font-medium hover:bg-muted"
-          >
-            Add manually
-          </button>
-        </div>
-      </section>
-
-      {contacts.length === 0 ? (
-        <EmptyState
-          icon={<Users className="size-5" aria-hidden />}
-          title="No contacts yet"
-          body="Capture a recruiter or referral to start outreach."
-        />
-      ) : (
-        <ul className="space-y-2.5">
-          {contacts.map((c) => (
-            <li key={c.id}>
-              <ContactCard contact={c} />
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
+    <ul className="space-y-2.5">
+      {contacts.map((c) => (
+        <li key={c.id}>
+          <ContactCard contact={c} />
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -361,148 +269,47 @@ function ContactCard({ contact }: { contact: Contact }) {
   );
 }
 
-/* ---------------- Outreach ---------------- */
+/* ---------------- Outreach (read history) ---------------- */
 
-function OutreachTab({
-  outreach,
-  contacts,
-  resumes,
-}: {
-  outreach: OutreachMessage[];
-  contacts: Contact[];
-  resumes: Resume[];
-}) {
-  const [kind, setKind] = useState<OutreachKind>("referral-ask");
-  const [contactId, setContactId] = useState(contacts[0]?.id ?? "");
-  const [resumeId, setResumeId] = useState(resumes[0]?.id ?? "");
-  const [draft, setDraft] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-
-  function generate() {
-    if (!contactId) {
-      setError("Add a contact first, then draft a message.");
-      return;
-    }
-    setError("");
-    setBusy(true);
-    // Mock AI draft: Phase 3 replaces with an OpenAI Server Action.
-    setTimeout(() => {
-      const c = contacts.find((x) => x.id === contactId);
-      setDraft(
-        `Hi ${c?.name.split(" ")[0] ?? "there"},\n\nA ${OUTREACH_KIND_LABELS[
-          kind
-        ].toLowerCase()} draft appears here once AI is wired — grounded in the JD, your selected resume, and this contact. You review and edit before anything is sent.`,
-      );
-      setBusy(false);
-    }, 700);
+function OutreachTab({ outreach }: { outreach: OutreachMessage[] }) {
+  if (outreach.length === 0) {
+    return (
+      <EmptyState
+        icon={<Send className="size-5" aria-hidden />}
+        title="No messages yet"
+        body="Use the actions menu (⋯) above to draft outreach for a contact."
+      />
+    );
   }
-
   return (
-    <div className="space-y-4">
-      <section className="rounded-xl border bg-card p-4">
-        <h2 className="text-sm font-medium">Draft a message</h2>
-        <div className="mt-3 grid gap-2 sm:grid-cols-3">
-          <LabeledSelect
-            label="Type"
-            value={kind}
-            onValueChange={(v) => setKind(v as OutreachKind)}
-            options={Object.entries(OUTREACH_KIND_LABELS).map(([v, l]) => ({
-              value: v,
-              label: l,
-            }))}
-          />
-          <LabeledSelect
-            label="Contact"
-            value={contactId}
-            onValueChange={setContactId}
-            placeholder="Select"
-            options={contacts.map((c) => ({ value: c.id, label: c.name }))}
-          />
-          <LabeledSelect
-            label="Resume"
-            value={resumeId}
-            onValueChange={setResumeId}
-            options={resumes.map((r) => ({ value: r.id, label: r.label }))}
-          />
-        </div>
-        {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
-        <div className="mt-3">
-          <button
-            type="button"
-            onClick={generate}
-            disabled={busy}
-            className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-ai px-3.5 text-sm font-medium text-ai-foreground hover:bg-ai/90 disabled:opacity-60"
-          >
-            <Sparkles className="size-4" aria-hidden />
-            {busy ? "Drafting…" : "Draft with AI"}
-          </button>
-        </div>
-
-        {draft && (
-          <div className="mt-4">
-            <Textarea
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              className="min-h-40"
-            />
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-primary px-3.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-              >
-                <Send className="size-4" aria-hidden />
-                Mark as sent
-              </button>
-              <AiHint>
-                JMP never sends for you — copy the final text and send it
-                yourself, then mark it sent to start the follow-up clock.
-              </AiHint>
-            </div>
+    <ul className="space-y-2.5">
+      {outreach.map((m) => (
+        <li key={m.id} className="rounded-xl border bg-card p-4">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-sm font-medium">
+              {OUTREACH_KIND_LABELS[m.kind]} · {m.channel}
+            </span>
+            <span
+              className={cn(
+                "rounded-full px-2 py-0.5 text-[11px] font-medium",
+                m.status === "sent"
+                  ? "bg-status-applied text-status-applied-foreground"
+                  : "bg-muted text-muted-foreground",
+              )}
+            >
+              {m.status === "sent" ? "Sent" : "Draft"}
+            </span>
           </div>
-        )}
-      </section>
-
-      <div>
-        <h2 className="mb-2 text-sm font-medium">History</h2>
-        {outreach.length === 0 ? (
-          <EmptyState
-            icon={<Send className="size-5" aria-hidden />}
-            title="No messages yet"
-            body="Drafted and sent messages are kept here per contact."
-          />
-        ) : (
-          <ul className="space-y-2.5">
-            {outreach.map((m) => (
-              <li key={m.id} className="rounded-xl border bg-card p-4">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm font-medium">
-                    {OUTREACH_KIND_LABELS[m.kind]} · {m.channel}
-                  </span>
-                  <span
-                    className={cn(
-                      "rounded-full px-2 py-0.5 text-[11px] font-medium",
-                      m.status === "sent"
-                        ? "bg-status-applied text-status-applied-foreground"
-                        : "bg-muted text-muted-foreground",
-                    )}
-                  >
-                    {m.status === "sent" ? "Sent" : "Draft"}
-                  </span>
-                </div>
-                <p className="mt-2 line-clamp-3 text-sm whitespace-pre-line text-muted-foreground">
-                  {m.sentBody ?? m.draftBody}
-                </p>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    </div>
+          <p className="mt-2 text-sm whitespace-pre-line text-muted-foreground">
+            {m.sentBody ?? m.draftBody}
+          </p>
+        </li>
+      ))}
+    </ul>
   );
 }
 
-/* ---------------- Reminders ---------------- */
+/* ---------------- Reminders (read list + outcome) ---------------- */
 
 function RemindersTab({ reminders }: { reminders: Reminder[] }) {
   if (reminders.length === 0) {
@@ -510,7 +317,7 @@ function RemindersTab({ reminders }: { reminders: Reminder[] }) {
       <EmptyState
         icon={<Clock className="size-5" aria-hidden />}
         title="No reminders"
-        body="A follow-up reminder is scheduled automatically once you mark a message sent."
+        body="One is scheduled automatically when you mark a message sent — or add one via the actions menu (⋯)."
       />
     );
   }
@@ -522,7 +329,9 @@ function RemindersTab({ reminders }: { reminders: Reminder[] }) {
           className="flex flex-col gap-3 rounded-xl border bg-card p-4 sm:flex-row sm:items-center sm:justify-between"
         >
           <div>
-            <p className="text-sm font-medium">Reminder {r.sequence}</p>
+            <p className="text-sm font-medium">
+              {r.manual ? r.label || "Manual reminder" : `Reminder ${r.sequence}`}
+            </p>
             <p className="text-xs text-muted-foreground">Due {r.dueDate}</p>
           </div>
           <ReminderOutcomeSelect initial={r.outcome} />
@@ -535,7 +344,7 @@ function RemindersTab({ reminders }: { reminders: Reminder[] }) {
 function ReminderOutcomeSelect({ initial }: { initial: ReminderOutcome }) {
   const [outcome, setOutcome] = useState<ReminderOutcome>(initial);
   return (
-    <Select value={outcome} onValueChange={(v) => setOutcome(v as ReminderOutcome)}>
+    <Select value={outcome} onValueChange={(v) => setOutcome((v as ReminderOutcome) ?? initial)}>
       <SelectTrigger className="w-full sm:w-52" aria-label="Reminder outcome">
         <SelectValue />
       </SelectTrigger>
@@ -550,41 +359,7 @@ function ReminderOutcomeSelect({ initial }: { initial: ReminderOutcome }) {
   );
 }
 
-/* ---------------- Shared bits ---------------- */
-
-function LabeledSelect({
-  label,
-  value,
-  onValueChange,
-  options,
-  placeholder,
-}: {
-  label: string;
-  value: string;
-  onValueChange: (v: string) => void;
-  options: { value: string; label: string }[];
-  placeholder?: string;
-}) {
-  return (
-    <label className="block">
-      <span className="mb-1 block text-xs font-medium text-muted-foreground">
-        {label}
-      </span>
-      <Select value={value} onValueChange={(v) => onValueChange(v ?? "")}>
-        <SelectTrigger className="w-full" aria-label={label}>
-          <SelectValue placeholder={placeholder} />
-        </SelectTrigger>
-        <SelectContent>
-          {options.map((o) => (
-            <SelectItem key={o.value} value={o.value}>
-              {o.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </label>
-  );
-}
+/* ---------------- Shared ---------------- */
 
 function EmptyState({
   icon,
