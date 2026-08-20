@@ -1,21 +1,51 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import {
   FileText,
-  Plus,
+  Upload,
   Trash2,
   Pencil,
   Check,
   X,
   ShieldCheck,
+  KeyRound,
   LogOut,
 } from "lucide-react";
-import { mockGoogleConnection, mockProfile, mockResumes } from "@/lib/mock-data";
-import type { Resume } from "@/lib/types";
+import {
+  mockAiSettings,
+  mockGoogleConnection,
+  mockProfile,
+  mockResumes,
+} from "@/lib/mock-data";
+import {
+  AI_PROVIDER_DEFAULT_MODEL,
+  AI_PROVIDER_LABELS,
+  RESUME_ACCEPT,
+  RESUME_ALLOWED_EXT,
+  RESUME_MAX_BYTES,
+  type AiProvider,
+  type Resume,
+} from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 
 export default function SettingsPage() {
   return (
@@ -29,6 +59,7 @@ export default function SettingsPage() {
 
       <ProfileCard />
       <GoogleCard />
+      <AiProviderCard />
       <ResumesCard />
       <AccountCard />
     </div>
@@ -140,26 +171,229 @@ function GoogleCard() {
   );
 }
 
+/* ---------------- AI provider & API key ---------------- */
+
+function AiProviderCard() {
+  const [provider, setProvider] = useState<AiProvider>(mockAiSettings.provider);
+  const [model, setModel] = useState(mockAiSettings.model);
+  const [keyConfigured, setKeyConfigured] = useState(
+    mockAiSettings.keyConfigured,
+  );
+  const [keyLast4, setKeyLast4] = useState<string | null>(
+    mockAiSettings.keyLast4,
+  );
+  const [keyInput, setKeyInput] = useState("");
+  const [editingKey, setEditingKey] = useState(!mockAiSettings.keyConfigured);
+  const [error, setError] = useState("");
+  const [saved, setSaved] = useState(false);
+
+  function saveKey() {
+    const key = keyInput.trim();
+    if (key.length < 8) {
+      setError("Enter a valid API key.");
+      return;
+    }
+    setError("");
+    // Mock: Phase 3 sends this to a Server Action that encrypts it at rest. The
+    // raw key is never stored in client state or read back to the browser.
+    setKeyLast4(key.slice(-4));
+    setKeyConfigured(true);
+    setKeyInput("");
+    setEditingKey(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1500);
+  }
+
+  function removeKey() {
+    setKeyConfigured(false);
+    setKeyLast4(null);
+    setKeyInput("");
+    setEditingKey(true);
+  }
+
+  return (
+    <section className="rounded-2xl border bg-card p-4 md:p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-medium">AI provider</h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Powers job-description summaries, contact structuring, and outreach
+            drafting.
+          </p>
+        </div>
+        <span
+          className={
+            keyConfigured
+              ? "rounded-full bg-status-applied px-2.5 py-0.5 text-[11px] font-medium text-status-applied-foreground"
+              : "rounded-full bg-muted px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground"
+          }
+        >
+          {keyConfigured ? "Configured" : "Not configured"}
+        </span>
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <Field label="Provider">
+          <Select
+            value={provider}
+            onValueChange={(v) => setProvider((v as AiProvider) ?? provider)}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {(Object.keys(AI_PROVIDER_LABELS) as AiProvider[]).map((p) => (
+                <SelectItem key={p} value={p}>
+                  {AI_PROVIDER_LABELS[p]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
+        <Field label="Model (optional)">
+          <Input
+            value={model}
+            onChange={(e) => setModel(e.target.value)}
+            placeholder={AI_PROVIDER_DEFAULT_MODEL[provider]}
+          />
+        </Field>
+      </div>
+
+      <div className="mt-3">
+        <span className="text-xs font-medium text-muted-foreground">
+          API key
+        </span>
+        {keyConfigured && !editingKey ? (
+          <div className="mt-1.5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <span className="inline-flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 font-mono text-sm">
+              <KeyRound className="size-4 text-muted-foreground" aria-hidden />
+              {provider === "openai" ? "sk" : "sk-ant"}-••••••••{keyLast4}
+            </span>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={() => setEditingKey(true)}>
+                Replace
+              </Button>
+              <Button variant="outline" onClick={removeKey}>
+                Remove
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-1.5 flex flex-col gap-2 sm:flex-row">
+            <Input
+              type="password"
+              value={keyInput}
+              onChange={(e) => setKeyInput(e.target.value)}
+              placeholder={
+                provider === "openai" ? "sk-…" : "sk-ant-…"
+              }
+              autoComplete="off"
+              className="flex-1 font-mono"
+            />
+            <div className="flex items-center gap-2">
+              <Button onClick={saveKey}>Save key</Button>
+              {keyConfigured && (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setEditingKey(false);
+                    setKeyInput("");
+                    setError("");
+                  }}
+                >
+                  Cancel
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+        {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
+        {saved && (
+          <p className="mt-2 text-xs text-status-applied-foreground">
+            API key saved
+          </p>
+        )}
+      </div>
+
+      <div className="mt-3 flex items-start gap-2 rounded-lg border border-ai/30 bg-ai-muted/40 p-3">
+        <ShieldCheck className="mt-0.5 size-4 shrink-0 text-ai" aria-hidden />
+        <p className="text-xs text-ai">
+          Stored encrypted and used only server-side for AI calls. Your key is
+          never sent to the browser or exposed in client code.
+        </p>
+      </div>
+    </section>
+  );
+}
+
 /* ---------------- Resumes ---------------- */
+
+function formatSize(kb: number) {
+  return kb >= 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${kb} KB`;
+}
+
+interface PendingFile {
+  fileName: string;
+  fileType: Resume["fileType"];
+  sizeKb: number;
+}
 
 function ResumesCard() {
   const [resumes, setResumes] = useState<Resume[]>(mockResumes);
-  const [newLabel, setNewLabel] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState("");
+  const [error, setError] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
+  // After a valid file is picked, we hold it here and ask for a display name.
+  const [pending, setPending] = useState<PendingFile | null>(null);
+  const [pendingName, setPendingName] = useState("");
+  const [nameError, setNameError] = useState("");
 
-  function add() {
-    const label = newLabel.trim();
-    if (!label) return;
+  function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const ext = (file.name.split(".").pop() ?? "").toLowerCase();
+    if (!(RESUME_ALLOWED_EXT as readonly string[]).includes(ext)) {
+      setError("Upload a PDF or Word document (.pdf, .doc, .docx).");
+    } else if (file.size > RESUME_MAX_BYTES) {
+      setError("File must be under 5 MB.");
+    } else {
+      setError("");
+      setPending({
+        fileName: file.name,
+        fileType: ext as Resume["fileType"],
+        sizeKb: Math.max(1, Math.round(file.size / 1024)),
+      });
+      // Pre-fill the name from the filename; the user can change it.
+      setPendingName(file.name.replace(/\.[^.]+$/, ""));
+      setNameError("");
+    }
+    // Reset so re-selecting the same file fires change again.
+    if (fileRef.current) fileRef.current.value = "";
+  }
+
+  function confirmUpload() {
+    if (!pending) return;
+    const label = pendingName.trim();
+    if (!label) {
+      setNameError("Give this resume a name.");
+      return;
+    }
+    // Mock: Phase 3 uploads the file to blob storage via a Server Action and
+    // stores its URL + metadata. Here we only capture the metadata.
     setResumes((r) => [
       ...r,
       {
         id: `resume-${Date.now()}`,
         label,
+        fileName: pending.fileName,
+        fileType: pending.fileType,
+        sizeKb: pending.sizeKb,
         updatedAt: new Date().toISOString().slice(0, 10),
       },
     ]);
-    setNewLabel("");
+    setPending(null);
+    setPendingName("");
   }
 
   function saveEdit(id: string) {
@@ -174,8 +408,7 @@ function ResumesCard() {
     <section className="rounded-2xl border bg-card p-4 md:p-5">
       <h2 className="text-sm font-medium">Resumes</h2>
       <p className="mt-0.5 text-xs text-muted-foreground">
-        Versions you can pick from when drafting outreach. PDF upload arrives with
-        the integration phase.
+        Upload PDF or Word files to pick from when drafting outreach.
       </p>
 
       <ul className="mt-4 space-y-2">
@@ -184,20 +417,22 @@ function ResumesCard() {
             key={r.id}
             className="flex items-center gap-3 rounded-lg border p-3"
           >
-            <FileText className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+              <FileText className="size-4" aria-hidden />
+            </span>
             {editingId === r.id ? (
               <>
                 <Input
                   value={editLabel}
                   onChange={(e) => setEditLabel(e.target.value)}
-                  className="h-8 flex-1"
+                  className="h-9 flex-1"
                   autoFocus
                 />
                 <button
                   type="button"
-                  aria-label="Save"
+                  aria-label="Save name"
                   onClick={() => saveEdit(r.id)}
-                  className="flex size-8 items-center justify-center rounded-md text-status-applied-foreground hover:bg-muted"
+                  className="flex size-9 items-center justify-center rounded-md text-status-applied-foreground hover:bg-muted"
                 >
                   <Check className="size-4" aria-hidden />
                 </button>
@@ -205,7 +440,7 @@ function ResumesCard() {
                   type="button"
                   aria-label="Cancel"
                   onClick={() => setEditingId(null)}
-                  className="flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted"
+                  className="flex size-9 items-center justify-center rounded-md text-muted-foreground hover:bg-muted"
                 >
                   <X className="size-4" aria-hidden />
                 </button>
@@ -214,8 +449,15 @@ function ResumesCard() {
               <>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{r.label}</p>
-                  <p className="text-[11px] text-muted-foreground">
-                    Updated {r.updatedAt}
+                  <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                    <span className="rounded bg-muted px-1.5 py-px font-medium uppercase">
+                      {r.fileType}
+                    </span>
+                    <span className="truncate">{r.fileName}</span>
+                    <span aria-hidden>·</span>
+                    <span className="whitespace-nowrap">
+                      {formatSize(r.sizeKb)}
+                    </span>
                   </p>
                 </div>
                 <button
@@ -225,7 +467,7 @@ function ResumesCard() {
                     setEditingId(r.id);
                     setEditLabel(r.label);
                   }}
-                  className="flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted"
+                  className="flex size-9 items-center justify-center rounded-md text-muted-foreground hover:bg-muted"
                 >
                   <Pencil className="size-4" aria-hidden />
                 </button>
@@ -235,7 +477,7 @@ function ResumesCard() {
                   onClick={() =>
                     setResumes((list) => list.filter((x) => x.id !== r.id))
                   }
-                  className="flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-destructive"
+                  className="flex size-9 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-destructive"
                 >
                   <Trash2 className="size-4" aria-hidden />
                 </button>
@@ -250,19 +492,93 @@ function ResumesCard() {
         )}
       </ul>
 
-      <div className="mt-3 flex items-center gap-2">
-        <Input
-          value={newLabel}
-          onChange={(e) => setNewLabel(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && add()}
-          placeholder="New resume label, e.g. PM — Fintech"
-          className="flex-1"
-        />
-        <Button variant="outline" onClick={add}>
-          <Plus className="size-4" aria-hidden />
-          Add
-        </Button>
-      </div>
+      <input
+        ref={fileRef}
+        type="file"
+        accept={RESUME_ACCEPT}
+        onChange={onFile}
+        className="hidden"
+      />
+      <Button
+        variant="outline"
+        onClick={() => fileRef.current?.click()}
+        className="mt-3"
+      >
+        <Upload className="size-4" aria-hidden />
+        Upload resume
+      </Button>
+      <p className="mt-2 text-[11px] text-muted-foreground">
+        PDF or Word (.pdf, .doc, .docx), up to 5 MB.
+      </p>
+      {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
+
+      <Dialog
+        open={pending !== null}
+        onOpenChange={(o) => {
+          if (!o) {
+            setPending(null);
+            setPendingName("");
+            setNameError("");
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Name this resume</DialogTitle>
+            <DialogDescription>
+              A short name to recognise it by when drafting outreach.
+            </DialogDescription>
+          </DialogHeader>
+
+          {pending && (
+            <div className="space-y-4 py-1">
+              <div className="flex items-center gap-3 rounded-lg border bg-muted/40 p-3">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                  <FileText className="size-4" aria-hidden />
+                </span>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">
+                    {pending.fileName}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    <span className="uppercase">{pending.fileType}</span> ·{" "}
+                    {formatSize(pending.sizeKb)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="resume-name">Resume name</Label>
+                <Input
+                  id="resume-name"
+                  value={pendingName}
+                  onChange={(e) => setPendingName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && confirmUpload()}
+                  placeholder="e.g. PM — Fintech"
+                  autoFocus
+                />
+                {nameError && (
+                  <p className="text-xs text-destructive">{nameError}</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setPending(null);
+                setPendingName("");
+                setNameError("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button onClick={confirmUpload}>Add resume</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }

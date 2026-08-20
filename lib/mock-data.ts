@@ -3,6 +3,8 @@
 // replaces these reads with Server Actions.
 
 import type {
+  AiSettings,
+  AppNotification,
   Contact,
   GoogleConnection,
   JobLead,
@@ -180,9 +182,30 @@ export const mockReminders: Reminder[] = [
 ];
 
 export const mockResumes: Resume[] = [
-  { id: "resume-1", label: "PM — Payments focus", updatedAt: "2026-08-01" },
-  { id: "resume-2", label: "Eng Leadership", updatedAt: "2026-07-20" },
-  { id: "resume-3", label: "General / Program Mgmt", updatedAt: "2026-06-30" },
+  {
+    id: "resume-1",
+    label: "PM — Payments focus",
+    fileName: "Gupta_PM_Payments.pdf",
+    fileType: "pdf",
+    sizeKb: 212,
+    updatedAt: "2026-08-01",
+  },
+  {
+    id: "resume-2",
+    label: "Eng Leadership",
+    fileName: "Gupta_Eng_Leadership.pdf",
+    fileType: "pdf",
+    sizeKb: 188,
+    updatedAt: "2026-07-20",
+  },
+  {
+    id: "resume-3",
+    label: "General / Program Mgmt",
+    fileName: "Gupta_Program_Mgmt.docx",
+    fileType: "docx",
+    sizeKb: 96,
+    updatedAt: "2026-06-30",
+  },
 ];
 
 export const mockProfile: Profile = {
@@ -197,6 +220,45 @@ export const mockGoogleConnection: GoogleConnection = {
   email: null,
   scope: "gmail.readonly",
 };
+
+// Default state for the Settings → AI provider section. No key set by default.
+export const mockAiSettings: AiSettings = {
+  provider: "openai",
+  model: "",
+  keyConfigured: false,
+  keyLast4: null,
+};
+
+// Notifications shown in the top-bar bell. Each links to a lead.
+export const mockNotifications: AppNotification[] = [
+  {
+    id: "n-1",
+    kind: "reminder-due",
+    title: "Follow-up due",
+    detail: "Engineering Lead, Platform · Datadog",
+    leadId: "lead-3",
+    time: "today",
+    unread: true,
+  },
+  {
+    id: "n-2",
+    kind: "new-lead",
+    title: "New lead captured",
+    detail: "Director of Program Management · Coinbase",
+    leadId: "lead-5",
+    time: "2d",
+    unread: true,
+  },
+  {
+    id: "n-3",
+    kind: "new-lead",
+    title: "New lead captured",
+    detail: "Delivery Manager · Optum",
+    leadId: "lead-1",
+    time: "3d",
+    unread: true,
+  },
+];
 
 // ---- Lookup helpers (mock stand-ins for Phase 3 queries) ----
 

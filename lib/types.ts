@@ -114,9 +114,16 @@ export interface Reminder {
 
 export interface Resume {
   id: string;
-  label: string;
+  label: string; // editable display name
+  fileName: string; // original uploaded file name
+  fileType: "pdf" | "doc" | "docx";
+  sizeKb: number;
   updatedAt: string;
 }
+
+export const RESUME_ACCEPT = ".pdf,.doc,.docx";
+export const RESUME_ALLOWED_EXT = ["pdf", "doc", "docx"] as const;
+export const RESUME_MAX_BYTES = 5 * 1024 * 1024; // 5 MB
 
 export interface Profile {
   name: string;
@@ -124,8 +131,42 @@ export interface Profile {
   mobile: string;
 }
 
+export type NotificationKind = "new-lead" | "reminder-due";
+
+export interface AppNotification {
+  id: string;
+  kind: NotificationKind;
+  title: string;
+  detail: string;
+  leadId: string; // clicking a notification always opens this lead
+  time: string; // relative, e.g. "3d"
+  unread: boolean;
+}
+
 export interface GoogleConnection {
   connected: boolean;
   email: string | null;
   scope: string; // always read-only
+}
+
+export type AiProvider = "openai" | "anthropic";
+
+export const AI_PROVIDER_LABELS: Record<AiProvider, string> = {
+  openai: "OpenAI",
+  anthropic: "Claude (Anthropic)",
+};
+
+// Suggested default model per provider, shown as a placeholder.
+export const AI_PROVIDER_DEFAULT_MODEL: Record<AiProvider, string> = {
+  openai: "gpt-4o-mini",
+  anthropic: "claude-sonnet-5",
+};
+
+export interface AiSettings {
+  provider: AiProvider;
+  model: string;
+  // Write-only on the client: the key itself is never sent back to the browser
+  // once saved. We only ever expose whether one is set and its last 4 chars.
+  keyConfigured: boolean;
+  keyLast4: string | null;
 }
