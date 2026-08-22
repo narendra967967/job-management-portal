@@ -10,7 +10,7 @@ export function Logo({
 }) {
   return (
     <div className={cn("flex items-center gap-2.5", className)}>
-      <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-[11px] font-medium tracking-wide text-primary-foreground">
+      <span className="flex size-8 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-[oklch(0.56_0.2_305)] text-[11px] font-semibold tracking-wide text-primary-foreground shadow-sm ring-1 ring-primary/20">
         JMP
       </span>
       {showName && (

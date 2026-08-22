@@ -24,24 +24,22 @@ export function TopBarStats({ className }: { className?: string }) {
     <div className={cn("flex items-center gap-1.5", className)}>
       <Link
         href="/leads"
-        className="inline-flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1.5 text-xs font-medium hover:bg-muted"
+        className="inline-flex items-center gap-1.5 rounded-lg border border-status-new/40 bg-status-new/40 px-2.5 py-1.5 text-xs font-medium text-status-new-foreground transition-colors hover:bg-status-new/70"
       >
-        <span className="text-muted-foreground">New</span>
-        <span className="tabular-nums text-status-new-foreground">
-          {newCount}
-        </span>
+        <span>New</span>
+        <span className="tabular-nums font-semibold">{newCount}</span>
       </Link>
       <Link
         href="/reminders"
         className={cn(
-          "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium hover:bg-muted",
+          "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors",
           dueCount > 0
-            ? "border-status-reviewing bg-status-reviewing text-status-reviewing-foreground"
-            : "bg-card text-muted-foreground",
+            ? "border-status-reviewing/50 bg-status-reviewing/60 text-status-reviewing-foreground hover:bg-status-reviewing"
+            : "border-border bg-card text-muted-foreground hover:bg-muted",
         )}
       >
-        <span className={dueCount > 0 ? "" : "text-muted-foreground"}>Due</span>
-        <span className="tabular-nums">{dueCount}</span>
+        <span>Due</span>
+        <span className="tabular-nums font-semibold">{dueCount}</span>
       </Link>
     </div>
   );

@@ -53,10 +53,10 @@ export function SidebarNav() {
             key={href}
             href={href}
             className={cn(
-              "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+              "relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
               active
-                ? "bg-primary/10 text-primary"
-                : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                ? "bg-gradient-to-r from-primary/12 to-primary/[0.03] font-semibold text-primary before:absolute before:top-1/2 before:left-0 before:h-5 before:w-1 before:-translate-y-1/2 before:rounded-r-full before:bg-primary"
+                : "font-medium text-muted-foreground hover:bg-sidebar-accent hover:text-foreground",
             )}
           >
             <Icon className="size-5 shrink-0" aria-hidden />
@@ -77,17 +77,17 @@ export function SidebarFooter() {
       <Link
         href="/settings"
         className={cn(
-          "mb-1 flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+          "relative mb-1 flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
           active
-            ? "bg-primary/10 text-primary"
-            : "text-muted-foreground hover:bg-muted hover:text-foreground",
+            ? "bg-gradient-to-r from-primary/12 to-primary/[0.03] font-semibold text-primary before:absolute before:top-1/2 before:left-0 before:h-5 before:w-1 before:-translate-y-1/2 before:rounded-r-full before:bg-primary"
+            : "font-medium text-muted-foreground hover:bg-sidebar-accent hover:text-foreground",
         )}
       >
         <Settings className="size-5 shrink-0" aria-hidden />
         Settings
       </Link>
       <div className="flex items-center gap-2.5 rounded-lg px-3 py-2">
-        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-medium text-primary">
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-[oklch(0.56_0.2_305)] text-[11px] font-semibold text-primary-foreground shadow-sm">
           {initials(mockProfile.name)}
         </span>
         <div className="min-w-0 flex-1">
@@ -115,7 +115,7 @@ export function AccountMenu() {
     <DropdownMenu>
       <DropdownMenuTrigger
         aria-label="Account menu"
-        className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-medium text-primary"
+        className="flex size-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-[oklch(0.56_0.2_305)] text-[11px] font-semibold text-primary-foreground shadow-sm"
       >
         {initials(mockProfile.name)}
       </DropdownMenuTrigger>

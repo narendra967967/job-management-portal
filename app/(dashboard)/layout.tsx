@@ -17,8 +17,8 @@ export default function DashboardLayout({
   return (
     <div className="min-h-dvh bg-background md:flex">
       {/* Desktop sidebar */}
-      <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r bg-card md:flex">
-        <div className="border-b p-4">
+      <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar md:flex">
+        <div className="border-b border-sidebar-border p-4">
           <Logo />
         </div>
         <SidebarNav />
@@ -27,7 +27,7 @@ export default function DashboardLayout({
 
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Top app bar */}
-        <header className="sticky top-0 z-30 border-b bg-card/80 backdrop-blur">
+        <header className="sticky top-0 z-30 border-b bg-card/70 shadow-[0_1px_2px_-1px_oklch(0.51_0.24_277_/_0.12)] backdrop-blur-md">
           <div className="flex items-center gap-2 px-4 py-2.5 md:gap-3 md:px-6">
             <div className="md:hidden">
               <Logo showName={false} />

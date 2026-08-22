@@ -39,12 +39,36 @@ const PAGE_SIZE = 15; // 3 columns × 5 rows on desktop.
 
 const STATUS_META: Record<
   LeadStatus,
-  { icon: typeof Sparkles; dot: string; text: string }
+  { icon: typeof Sparkles; bar: string; chip: string; num: string; tint: string }
 > = {
-  new: { icon: Sparkles, dot: "bg-status-new-foreground", text: "text-status-new-foreground" },
-  reviewing: { icon: Timer, dot: "bg-status-reviewing-foreground", text: "text-status-reviewing-foreground" },
-  applied: { icon: CheckCircle2, dot: "bg-status-applied-foreground", text: "text-status-applied-foreground" },
-  discarded: { icon: Archive, dot: "bg-status-discarded-foreground", text: "text-status-discarded-foreground" },
+  new: {
+    icon: Sparkles,
+    bar: "bg-status-new-foreground",
+    chip: "bg-status-new text-status-new-foreground",
+    num: "text-status-new-foreground",
+    tint: "from-status-new/40",
+  },
+  reviewing: {
+    icon: Timer,
+    bar: "bg-status-reviewing-foreground",
+    chip: "bg-status-reviewing text-status-reviewing-foreground",
+    num: "text-status-reviewing-foreground",
+    tint: "from-status-reviewing/40",
+  },
+  applied: {
+    icon: CheckCircle2,
+    bar: "bg-status-applied-foreground",
+    chip: "bg-status-applied text-status-applied-foreground",
+    num: "text-status-applied-foreground",
+    tint: "from-status-applied/45",
+  },
+  discarded: {
+    icon: Archive,
+    bar: "bg-status-discarded-foreground",
+    chip: "bg-status-discarded text-status-discarded-foreground",
+    num: "text-foreground",
+    tint: "from-status-discarded/70",
+  },
 };
 
 export function LeadsBrowser({ leads }: { leads: JobLead[] }) {
@@ -115,28 +139,36 @@ export function LeadsBrowser({ leads }: { leads: JobLead[] }) {
               aria-pressed={active}
               onClick={() => setStatusFilter(active ? "all" : s)}
               className={cn(
-                "group relative overflow-hidden rounded-2xl border bg-card p-3.5 text-left transition-all hover:border-primary/40 hover:shadow-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
-                active && "border-primary/50 ring-2 ring-primary/30",
+                "group relative overflow-hidden rounded-2xl border bg-gradient-to-br to-card p-3.5 text-left shadow-xs transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+                meta.tint,
+                active
+                  ? "border-primary/50 ring-2 ring-primary/30"
+                  : "border-transparent",
               )}
             >
               <span
-                className={cn("absolute inset-y-0 left-0 w-1", meta.dot)}
+                className={cn("absolute inset-y-0 left-0 w-1", meta.bar)}
                 aria-hidden
               />
               <div className="flex items-center justify-between">
-                <span className="text-2xl font-semibold tabular-nums leading-none">
+                <span
+                  className={cn(
+                    "text-2xl font-semibold tabular-nums leading-none",
+                    meta.num,
+                  )}
+                >
                   {counts[s]}
                 </span>
                 <span
                   className={cn(
-                    "flex size-7 items-center justify-center rounded-lg bg-muted",
-                    meta.text,
+                    "flex size-8 items-center justify-center rounded-lg shadow-xs",
+                    meta.chip,
                   )}
                 >
                   <Icon className="size-4" aria-hidden />
                 </span>
               </div>
-              <div className="mt-2 text-xs font-medium text-muted-foreground">
+              <div className="mt-2 text-xs font-medium text-foreground/70">
                 {LEAD_STATUS_LABELS[s]}
               </div>
             </button>
@@ -382,7 +414,7 @@ function LeadCard({
         }
       }}
       aria-label={`View details for ${lead.title}`}
-      className="group relative flex h-full cursor-pointer flex-col rounded-2xl border bg-card p-4 transition-colors hover:border-primary/40 hover:shadow-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+      className="group relative flex h-full cursor-pointer flex-col rounded-2xl border bg-card p-4 shadow-xs transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
     >
       <div className="flex items-start justify-between gap-2">
         <h3 className="text-sm leading-snug font-medium group-hover:text-primary">
