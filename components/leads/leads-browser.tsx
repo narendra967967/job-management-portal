@@ -22,6 +22,7 @@ import { StatusBadge } from "@/components/leads/status-badge";
 import { LeadActions } from "@/components/leads/lead-actions";
 import { LeadDetailDialog } from "@/components/leads/lead-detail-dialog";
 import { mockResumes } from "@/lib/mock-data";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -33,9 +34,17 @@ import { cn } from "@/lib/utils";
 
 type StatusFilter = "all" | LeadStatus;
 type LocationFilter = "all" | "remote";
+type DateRange = "all" | "7d" | "30d" | "90d" | "custom";
 type Sort = "newest" | "oldest";
 
 const PAGE_SIZE = 15; // 3 columns × 5 rows on desktop.
+
+/** Local YYYY-MM-DD (matches the format of JobLead.capturedAt). */
+function toISODate(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate(),
+  ).padStart(2, "0")}`;
+}
 
 const STATUS_META: Record<
   LeadStatus,
@@ -74,6 +83,9 @@ const STATUS_META: Record<
 export function LeadsBrowser({ leads }: { leads: JobLead[] }) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [locationFilter, setLocationFilter] = useState<LocationFilter>("all");
+  const [dateRange, setDateRange] = useState<DateRange>("all");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
   // Default order is latest first (applies on mobile and desktop alike).
   const [sort, setSort] = useState<Sort>("newest");
   const [page, setPage] = useState(1);
@@ -100,11 +112,26 @@ export function LeadsBrowser({ leads }: { leads: JobLead[] }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leads, overrides]);
 
+  // Resolve the active capture-date window [from, to] (inclusive, YYYY-MM-DD).
+  const dateBounds = useMemo(() => {
+    if (dateRange === "custom") {
+      return { from: customFrom || null, to: customTo || null };
+    }
+    const days =
+      dateRange === "7d" ? 7 : dateRange === "30d" ? 30 : dateRange === "90d" ? 90 : null;
+    if (days === null) return { from: null as string | null, to: null as string | null };
+    const from = new Date();
+    from.setDate(from.getDate() - (days - 1));
+    return { from: toISODate(from), to: null as string | null };
+  }, [dateRange, customFrom, customTo]);
+
   const visible = useMemo(() => {
     let out = leads.slice();
     if (statusFilter !== "all")
       out = out.filter((l) => statusOf(l) === statusFilter);
     if (locationFilter === "remote") out = out.filter((l) => l.remote);
+    if (dateBounds.from) out = out.filter((l) => l.capturedAt >= dateBounds.from!);
+    if (dateBounds.to) out = out.filter((l) => l.capturedAt <= dateBounds.to!);
     out.sort((a, b) =>
       sort === "newest"
         ? b.capturedAt.localeCompare(a.capturedAt)
@@ -112,12 +139,12 @@ export function LeadsBrowser({ leads }: { leads: JobLead[] }) {
     );
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [leads, statusFilter, locationFilter, sort, overrides]);
+  }, [leads, statusFilter, locationFilter, dateBounds, sort, overrides]);
 
   // Reset to the first page whenever the result set changes.
   useEffect(() => {
     setPage(1);
-  }, [statusFilter, locationFilter, sort]);
+  }, [statusFilter, locationFilter, dateBounds, sort]);
 
   const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -177,35 +204,78 @@ export function LeadsBrowser({ leads }: { leads: JobLead[] }) {
       </div>
 
       {/* Filters — proper dropdowns */}
-      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-        <FilterSelect
-          label="Status"
-          value={statusFilter}
-          onValueChange={(v) => setStatusFilter(v as StatusFilter)}
-          options={[
-            { value: "all", label: "All statuses" },
-            ...LEAD_STATUSES.map((s) => ({ value: s, label: LEAD_STATUS_LABELS[s] })),
-          ]}
-        />
-        <FilterSelect
-          label="Location"
-          value={locationFilter}
-          onValueChange={(v) => setLocationFilter(v as LocationFilter)}
-          options={[
-            { value: "all", label: "All locations" },
-            { value: "remote", label: "Remote only" },
-          ]}
-        />
-        <FilterSelect
-          label="Sort by"
-          value={sort}
-          onValueChange={(v) => setSort(v as Sort)}
-          className="sm:ml-auto"
-          options={[
-            { value: "newest", label: "Newest first" },
-            { value: "oldest", label: "Oldest first" },
-          ]}
-        />
+      <div className="space-y-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+          <FilterSelect
+            label="Status"
+            value={statusFilter}
+            onValueChange={(v) => setStatusFilter(v as StatusFilter)}
+            options={[
+              { value: "all", label: "All statuses" },
+              ...LEAD_STATUSES.map((s) => ({ value: s, label: LEAD_STATUS_LABELS[s] })),
+            ]}
+          />
+          <FilterSelect
+            label="Location"
+            value={locationFilter}
+            onValueChange={(v) => setLocationFilter(v as LocationFilter)}
+            options={[
+              { value: "all", label: "All locations" },
+              { value: "remote", label: "Remote only" },
+            ]}
+          />
+          <FilterSelect
+            label="Captured"
+            value={dateRange}
+            onValueChange={(v) => setDateRange(v as DateRange)}
+            options={[
+              { value: "all", label: "Any time" },
+              { value: "7d", label: "Last 7 days" },
+              { value: "30d", label: "Last 30 days" },
+              { value: "90d", label: "Last 90 days" },
+              { value: "custom", label: "Custom range…" },
+            ]}
+          />
+          <FilterSelect
+            label="Sort by"
+            value={sort}
+            onValueChange={(v) => setSort(v as Sort)}
+            className="sm:ml-auto"
+            options={[
+              { value: "newest", label: "Newest first" },
+              { value: "oldest", label: "Oldest first" },
+            ]}
+          />
+        </div>
+
+        {dateRange === "custom" && (
+          <div className="flex flex-col gap-3 rounded-xl border bg-card p-3 shadow-xs sm:flex-row sm:items-end">
+            <DateField
+              label="From"
+              value={customFrom}
+              max={customTo || undefined}
+              onChange={setCustomFrom}
+            />
+            <DateField
+              label="To"
+              value={customTo}
+              min={customFrom || undefined}
+              onChange={setCustomTo}
+            />
+            {(customFrom || customTo) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setCustomFrom("");
+                  setCustomTo("");
+                }}
+                className="inline-flex min-h-11 items-center justify-center rounded-lg px-3 text-xs font-medium text-muted-foreground hover:text-foreground sm:min-h-9"
+              >
+                Clear dates
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {visible.length === 0 ? (
@@ -290,6 +360,34 @@ function FilterSelect({
           ))}
         </SelectContent>
       </Select>
+    </label>
+  );
+}
+
+function DateField({
+  label,
+  value,
+  min,
+  max,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  min?: string;
+  max?: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="flex flex-1 flex-col gap-1">
+      <span className="text-xs font-medium text-muted-foreground">{label}</span>
+      <Input
+        type="date"
+        value={value}
+        min={min}
+        max={max}
+        onChange={(e) => onChange(e.target.value)}
+        className="min-h-11 w-full sm:min-h-9"
+      />
     </label>
   );
 }
