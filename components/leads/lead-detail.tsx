@@ -35,6 +35,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { computeFitScore, fitBand } from "@/lib/fit";
+import { useDefaultResumeId } from "@/lib/use-default-resume";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -79,13 +81,23 @@ export function LeadDetailContent({
   resumes,
   status: statusProp,
   onStatusChange,
+  resumeId,
 }: Props & {
   status?: LeadStatus;
   onStatusChange?: (status: LeadStatus) => void;
+  /** Resume to score against; falls back to the user's default resume. */
+  resumeId?: string;
 }) {
   const [localStatus, setLocalStatus] = useState<LeadStatus>(lead.status);
   const status = statusProp ?? localStatus;
   const setStatus = onStatusChange ?? setLocalStatus;
+
+  const [defaultResumeId] = useDefaultResumeId();
+  const scoredResumeId = resumeId || defaultResumeId;
+  const fit = computeFitScore(lead.id, scoredResumeId);
+  const band = fitBand(fit);
+  const resumeLabel =
+    resumes.find((r) => r.id === scoredResumeId)?.label ?? "resume";
 
   return (
     <div className="space-y-5">
@@ -125,6 +137,30 @@ export function LeadDetailContent({
           <span className="ml-auto text-xs text-muted-foreground">
             Captured {lead.postedRelative}
           </span>
+        </div>
+
+        {/* Fit score vs the chosen (or default) resume */}
+        <div className="mt-4 flex items-center gap-3 rounded-xl border bg-muted/30 p-3">
+          <span
+            className={cn(
+              "flex size-12 shrink-0 items-center justify-center rounded-full text-base font-semibold tabular-nums",
+              band.chip,
+            )}
+          >
+            {fit}
+          </span>
+          <div className="min-w-0">
+            <p className="flex flex-wrap items-center gap-x-1.5 text-sm font-medium">
+              {band.label}
+              <span className="rounded bg-ai-muted px-1.5 py-0.5 text-[10px] font-medium text-ai">
+                <Sparkles className="mr-0.5 inline size-2.5" aria-hidden />
+                preview
+              </span>
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {band.advice} · scored vs {resumeLabel}
+            </p>
+          </div>
         </div>
 
         <div className="mt-4">

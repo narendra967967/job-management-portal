@@ -27,6 +27,7 @@ export function LeadDetailDialog({
   resumes,
   status,
   onStatusChange,
+  resumeId,
   open,
   onOpenChange,
 }: {
@@ -34,6 +35,7 @@ export function LeadDetailDialog({
   resumes: Resume[];
   status?: LeadStatus;
   onStatusChange?: (status: LeadStatus) => void;
+  resumeId?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -54,6 +56,7 @@ export function LeadDetailDialog({
               resumes={resumes}
               status={status}
               onStatusChange={onStatusChange}
+              resumeId={resumeId}
             />
             <Link
               href={`/leads/${lead.id}`}

@@ -343,6 +343,7 @@ export function LeadsBrowser({ leads }: { leads: JobLead[] }) {
         onStatusChange={
           detailLead ? (s) => setStatus(detailLead.id, s) : undefined
         }
+        resumeId={detailLead ? resumeIdFor(detailLead.id) : undefined}
         open={detailLead !== null}
         onOpenChange={(o) => !o && setDetailLead(null)}
       />
