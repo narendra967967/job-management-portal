@@ -11,9 +11,9 @@ export default function OutreachPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-4">
-      <div>
-        <h1 className="text-xl font-medium">Outreach</h1>
-        <p className="text-sm text-muted-foreground">
+      <div className="flex flex-wrap items-baseline gap-x-2">
+        <h1 className="text-lg font-semibold tracking-tight">Outreach</h1>
+        <p className="hidden text-sm text-muted-foreground sm:block">
           Drafted and sent messages across your leads.
         </p>
       </div>

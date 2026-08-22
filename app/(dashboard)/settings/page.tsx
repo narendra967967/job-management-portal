@@ -50,9 +50,9 @@ import { Label } from "@/components/ui/label";
 export default function SettingsPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-5">
-      <div>
-        <h1 className="text-xl font-medium">Settings</h1>
-        <p className="text-sm text-muted-foreground">
+      <div className="flex flex-wrap items-baseline gap-x-2">
+        <h1 className="text-lg font-semibold tracking-tight">Settings</h1>
+        <p className="hidden text-sm text-muted-foreground sm:block">
           Manage your profile, resumes, and Google connection.
         </p>
       </div>

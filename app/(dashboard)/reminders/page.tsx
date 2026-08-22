@@ -10,9 +10,9 @@ export default function RemindersPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-4">
-      <div>
-        <h1 className="text-xl font-medium">Reminders</h1>
-        <p className="text-sm text-muted-foreground">
+      <div className="flex flex-wrap items-baseline gap-x-2">
+        <h1 className="text-lg font-semibold tracking-tight">Reminders</h1>
+        <p className="hidden text-sm text-muted-foreground sm:block">
           Follow-ups scheduled after a message is marked sent.
         </p>
       </div>
