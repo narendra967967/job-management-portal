@@ -7,10 +7,15 @@ import {
   MapPin,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Sparkles,
   Timer,
   CheckCircle2,
   Archive,
+  UserPlus,
+  BellPlus,
+  Send,
+  ExternalLink,
 } from "lucide-react";
 import {
   LEAD_STATUS_LABELS,
@@ -19,7 +24,7 @@ import {
   type LeadStatus,
 } from "@/lib/types";
 import { StatusBadge } from "@/components/leads/status-badge";
-import { LeadActions } from "@/components/leads/lead-actions";
+import { useLeadActionDialogs } from "@/components/leads/lead-actions";
 import { LeadDetailDialog } from "@/components/leads/lead-detail-dialog";
 import { mockResumes } from "@/lib/mock-data";
 import { Input } from "@/components/ui/input";
@@ -30,6 +35,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
 type StatusFilter = "all" | LeadStatus;
@@ -500,6 +515,14 @@ function LeadCard({
   onOpen: () => void;
   onStatusChange: (status: LeadStatus) => void;
 }) {
+  const { openDialog, dialogs } = useLeadActionDialogs(lead, mockResumes);
+
+  // Stop card-body clicks/keys from firing on the header & footer controls.
+  const stop = {
+    onClick: (e: React.MouseEvent) => e.stopPropagation(),
+    onKeyDown: (e: React.KeyboardEvent) => e.stopPropagation(),
+  };
+
   return (
     <div
       role="button"
@@ -512,63 +535,147 @@ function LeadCard({
         }
       }}
       aria-label={`View details for ${lead.title}`}
-      className="group relative flex h-full cursor-pointer flex-col rounded-2xl border bg-card p-4 shadow-xs transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+      className="group relative flex h-full cursor-pointer flex-col overflow-hidden rounded-2xl border bg-card shadow-xs transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
     >
-      <div className="flex items-start justify-between gap-2">
+      {/* HEADER — current state + jump out to the source listing */}
+      <div
+        {...stop}
+        className="flex items-center justify-between gap-2 border-b bg-muted/30 px-3 py-1.5"
+      >
+        <StatusControl status={status} onChange={onStatusChange} />
+        <a
+          href={lead.canonicalJobUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Open on LinkedIn"
+          title="Open on LinkedIn"
+          className="inline-flex size-11 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:size-9"
+        >
+          <ExternalLink className="size-4" aria-hidden />
+        </a>
+      </div>
+
+      {/* BODY — clicking anywhere here opens the detail modal */}
+      <div className="flex flex-1 flex-col p-4">
         <h3 className="text-sm leading-snug font-medium group-hover:text-primary">
           {lead.title}
         </h3>
-        {/* Actions cluster stops propagation so it doesn't open the modal. */}
-        <div
-          className="flex shrink-0 items-center gap-1"
-          onClick={(e) => e.stopPropagation()}
-          onKeyDown={(e) => e.stopPropagation()}
-        >
-          <StatusBadge status={status} />
-          <LeadActions
-            lead={lead}
-            resumes={mockResumes}
-            status={status}
-            onStatusChange={onStatusChange}
-            onViewDetails={onOpen}
-            className="-mr-1 size-11 sm:size-9"
-          />
+        <p className="mt-1.5 flex items-center gap-1 text-xs text-muted-foreground">
+          <MapPin className="size-3.5 shrink-0" aria-hidden />
+          {lead.company} · {lead.location}
+        </p>
+        <div className="mt-auto flex flex-wrap items-center gap-1.5 pt-3">
+          {lead.tags.map((tag) => (
+            <span
+              key={tag}
+              className="rounded-md bg-ai-muted px-2 py-0.5 text-[11px] font-medium text-ai"
+            >
+              {tag}
+            </span>
+          ))}
+          {lead.remote && (
+            <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+              Remote
+            </span>
+          )}
+          {lead.contactCount > 0 && (
+            <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+              <Users className="size-3" aria-hidden />
+              {lead.contactCount}
+            </span>
+          )}
+          {lead.hasDueReminder && (
+            <span className="inline-flex items-center gap-1 rounded-md bg-status-reviewing px-2 py-0.5 text-[11px] font-medium text-status-reviewing-foreground">
+              <Clock className="size-3" aria-hidden />
+              Follow-up due
+            </span>
+          )}
+          <span className="ml-auto text-[11px] text-muted-foreground">
+            {lead.postedRelative}
+          </span>
         </div>
       </div>
-      <p className="mt-1.5 flex items-center gap-1 text-xs text-muted-foreground">
-        <MapPin className="size-3.5 shrink-0" aria-hidden />
-        {lead.company} · {lead.location}
-      </p>
-      <div className="mt-auto flex flex-wrap items-center gap-1.5 pt-3">
-        {lead.tags.map((tag) => (
-          <span
-            key={tag}
-            className="rounded-md bg-ai-muted px-2 py-0.5 text-[11px] font-medium text-ai"
-          >
-            {tag}
-          </span>
-        ))}
-        {lead.remote && (
-          <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-            Remote
-          </span>
-        )}
-        {lead.contactCount > 0 && (
-          <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-            <Users className="size-3" aria-hidden />
-            {lead.contactCount}
-          </span>
-        )}
-        {lead.hasDueReminder && (
-          <span className="inline-flex items-center gap-1 rounded-md bg-status-reviewing px-2 py-0.5 text-[11px] font-medium text-status-reviewing-foreground">
-            <Clock className="size-3" aria-hidden />
-            Follow-up due
-          </span>
-        )}
-        <span className="ml-auto text-[11px] text-muted-foreground">
-          {lead.postedRelative}
-        </span>
+
+      {/* FOOTER — create actions for this lead */}
+      <div {...stop} className="grid grid-cols-3 divide-x border-t">
+        <CardActionButton
+          icon={UserPlus}
+          label="Contact"
+          onClick={() => openDialog("contact")}
+        />
+        <CardActionButton
+          icon={BellPlus}
+          label="Reminder"
+          onClick={() => openDialog("reminder")}
+        />
+        <CardActionButton
+          icon={Send}
+          label="Draft"
+          onClick={() => openDialog("outreach")}
+        />
       </div>
+
+      {dialogs}
     </div>
+  );
+}
+
+/** Clickable status pill in the card header that changes the lead's status. */
+function StatusControl({
+  status,
+  onChange,
+}: {
+  status: LeadStatus;
+  onChange: (status: LeadStatus) => void;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        aria-label="Change status"
+        title="Change status"
+        className="inline-flex min-h-11 items-center gap-1 rounded-full pr-1 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:min-h-8"
+      >
+        <StatusBadge status={status} />
+        <ChevronDown className="size-3.5 text-muted-foreground" aria-hidden />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-44">
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>Change status</DropdownMenuLabel>
+        </DropdownMenuGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuRadioGroup
+          value={status}
+          onValueChange={(v) => onChange(v as LeadStatus)}
+        >
+          {LEAD_STATUSES.map((s) => (
+            <DropdownMenuRadioItem key={s} value={s}>
+              {LEAD_STATUS_LABELS[s]}
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+/** Footer action button: icon + short label, full-height touch target. */
+function CardActionButton({
+  icon: Icon,
+  label,
+  onClick,
+}: {
+  icon: typeof UserPlus;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex min-h-11 items-center justify-center gap-1.5 px-2 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:min-h-10"
+    >
+      <Icon className="size-4 shrink-0" aria-hidden />
+      {label}
+    </button>
   );
 }

@@ -157,24 +157,66 @@ export function LeadActions({
         </DropdownMenuContent>
       </DropdownMenu>
 
+      <LeadActionDialogs
+        lead={lead}
+        resumes={resumes}
+        dialog={dialog}
+        onDialogChange={setDialog}
+      />
+    </>
+  );
+}
+
+/**
+ * The three action dialogs (add contact / add reminder / draft outreach) plus a
+ * hook to open them. Lets a surface (e.g. the lead card) trigger the same
+ * dialogs from its own inline buttons without the dropdown menu.
+ */
+export function LeadActionDialogs({
+  lead,
+  resumes,
+  dialog,
+  onDialogChange,
+}: {
+  lead: JobLead;
+  resumes: Resume[];
+  dialog: DialogKind;
+  onDialogChange: (dialog: DialogKind) => void;
+}) {
+  return (
+    <>
       <AddContactDialog
         lead={lead}
         open={dialog === "contact"}
-        onOpenChange={(o) => setDialog(o ? "contact" : null)}
+        onOpenChange={(o) => onDialogChange(o ? "contact" : null)}
       />
       <AddReminderDialog
         lead={lead}
         open={dialog === "reminder"}
-        onOpenChange={(o) => setDialog(o ? "reminder" : null)}
+        onOpenChange={(o) => onDialogChange(o ? "reminder" : null)}
       />
       <DraftOutreachDialog
         lead={lead}
         resumes={resumes}
         open={dialog === "outreach"}
-        onOpenChange={(o) => setDialog(o ? "outreach" : null)}
+        onOpenChange={(o) => onDialogChange(o ? "outreach" : null)}
       />
     </>
   );
+}
+
+/** Manages the action-dialog state and renders them; returns an opener. */
+export function useLeadActionDialogs(lead: JobLead, resumes: Resume[]) {
+  const [dialog, setDialog] = useState<DialogKind>(null);
+  const dialogs = (
+    <LeadActionDialogs
+      lead={lead}
+      resumes={resumes}
+      dialog={dialog}
+      onDialogChange={setDialog}
+    />
+  );
+  return { openDialog: (kind: Exclude<DialogKind, null>) => setDialog(kind), dialogs };
 }
 
 /* ------------------------------------------------------------------ */
