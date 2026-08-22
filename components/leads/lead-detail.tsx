@@ -46,16 +46,7 @@ interface Props {
   resumes: Resume[];
 }
 
-export function LeadDetail({
-  lead,
-  detail,
-  contacts,
-  outreach,
-  reminders,
-  resumes,
-}: Props) {
-  const [status, setStatus] = useState<LeadStatus>(lead.status);
-
+export function LeadDetail(props: Props) {
   return (
     <div className="mx-auto max-w-3xl space-y-5">
       <Link
@@ -65,7 +56,39 @@ export function LeadDetail({
         <ArrowLeft className="size-4" aria-hidden />
         All leads
       </Link>
+      <LeadDetailContent {...props} />
+    </div>
+  );
+}
 
+/**
+ * The lead detail body — header card + tabbed read views — with no page chrome
+ * (no back link, no max-width wrapper) so it can live on the `/leads/[id]` page
+ * OR inside the "View details" modal on the leads list.
+ *
+ * When `status`/`onStatusChange` are supplied (modal case) the status is
+ * controlled by the parent so a change reflects live in the list; otherwise it
+ * falls back to local state (standalone page).
+ */
+export function LeadDetailContent({
+  lead,
+  detail,
+  contacts,
+  outreach,
+  reminders,
+  resumes,
+  status: statusProp,
+  onStatusChange,
+}: Props & {
+  status?: LeadStatus;
+  onStatusChange?: (status: LeadStatus) => void;
+}) {
+  const [localStatus, setLocalStatus] = useState<LeadStatus>(lead.status);
+  const status = statusProp ?? localStatus;
+  const setStatus = onStatusChange ?? setLocalStatus;
+
+  return (
+    <div className="space-y-5">
       {/* Header */}
       <div className="rounded-2xl border bg-card p-4 md:p-5">
         <div className="flex items-start justify-between gap-3">
@@ -85,6 +108,7 @@ export function LeadDetail({
               resumes={resumes}
               status={status}
               onStatusChange={setStatus}
+              hideViewDetails
             />
           </div>
         </div>

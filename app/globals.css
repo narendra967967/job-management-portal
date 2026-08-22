@@ -154,6 +154,11 @@
 }
 
 @layer base {
+  :root {
+    /* Smooth, highly readable Arial/Helvetica stack — rendered natively, no web-font load. */
+    --font-sans: "Helvetica Neue", Arial, Helvetica, ui-sans-serif, system-ui,
+      sans-serif;
+  }
   * {
     @apply border-border outline-ring/50;
   }
@@ -162,5 +167,7 @@
   }
   html {
     @apply font-sans;
+    /* Nudge everything up ~6% so text reads a touch larger and more comfortable. */
+    font-size: 106.25%;
   }
 }

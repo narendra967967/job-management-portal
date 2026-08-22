@@ -66,12 +66,18 @@ export function LeadActions({
   resumes,
   status,
   onStatusChange,
+  onViewDetails,
+  hideViewDetails,
   className,
 }: {
   lead: JobLead;
   resumes: Resume[];
   status: LeadStatus;
   onStatusChange?: (status: LeadStatus) => void;
+  /** Open the detail modal. When omitted, "View details" navigates to the page. */
+  onViewDetails?: () => void;
+  /** Hide the "View details" item (e.g. when already on the detail view). */
+  hideViewDetails?: boolean;
   className?: string;
 }) {
   const router = useRouter();
@@ -96,10 +102,18 @@ export function LeadActions({
             </DropdownMenuLabel>
           </DropdownMenuGroup>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => router.push(`/leads/${lead.id}`)}>
-            <Eye className="size-4" aria-hidden />
-            View details
-          </DropdownMenuItem>
+          {!hideViewDetails && (
+            <DropdownMenuItem
+              onClick={() =>
+                onViewDetails
+                  ? onViewDetails()
+                  : router.push(`/leads/${lead.id}`)
+              }
+            >
+              <Eye className="size-4" aria-hidden />
+              View details
+            </DropdownMenuItem>
+          )}
           <DropdownMenuSub>
             <DropdownMenuSubTrigger>
               <CircleDot className="size-4" aria-hidden />
