@@ -19,8 +19,6 @@ import {
   type JobLead,
   type JobLeadDetail,
   type LeadStatus,
-  type OutreachMessage,
-  type Reminder,
   type ReminderOutcome,
   type Resume,
 } from "@/lib/types";
@@ -37,14 +35,13 @@ import {
 } from "@/components/ui/select";
 import { computeFitScore, fitBand } from "@/lib/fit";
 import { useDefaultResumeId } from "@/lib/use-default-resume";
+import { useOutreachForLead, useRemindersForLead } from "@/lib/mock-store";
 import { cn } from "@/lib/utils";
 
 interface Props {
   lead: JobLead;
   detail?: JobLeadDetail;
   contacts: Contact[];
-  outreach: OutreachMessage[];
-  reminders: Reminder[];
   resumes: Resume[];
 }
 
@@ -76,8 +73,6 @@ export function LeadDetailContent({
   lead,
   detail,
   contacts,
-  outreach,
-  reminders,
   resumes,
   status: statusProp,
   onStatusChange,
@@ -199,10 +194,10 @@ export function LeadDetailContent({
           <ContactsTab contacts={contacts} />
         </TabsContent>
         <TabsContent value="outreach" className="mt-4">
-          <OutreachTab outreach={outreach} />
+          <OutreachTab leadId={lead.id} />
         </TabsContent>
         <TabsContent value="reminders" className="mt-4">
-          <RemindersTab reminders={reminders} />
+          <RemindersTab leadId={lead.id} />
         </TabsContent>
       </Tabs>
     </div>
@@ -331,7 +326,8 @@ function ContactCard({ contact }: { contact: Contact }) {
 
 /* ---------------- Outreach (read history) ---------------- */
 
-function OutreachTab({ outreach }: { outreach: OutreachMessage[] }) {
+function OutreachTab({ leadId }: { leadId: string }) {
+  const outreach = useOutreachForLead(leadId);
   if (outreach.length === 0) {
     return (
       <EmptyState
@@ -371,7 +367,8 @@ function OutreachTab({ outreach }: { outreach: OutreachMessage[] }) {
 
 /* ---------------- Reminders (read list + outcome) ---------------- */
 
-function RemindersTab({ reminders }: { reminders: Reminder[] }) {
+function RemindersTab({ leadId }: { leadId: string }) {
+  const reminders = useRemindersForLead(leadId);
   if (reminders.length === 0) {
     return (
       <EmptyState

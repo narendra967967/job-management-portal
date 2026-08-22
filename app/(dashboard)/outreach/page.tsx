@@ -1,11 +1,14 @@
+"use client";
+
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
-import { getLead, mockOutreach } from "@/lib/mock-data";
+import { getLead } from "@/lib/mock-data";
+import { useOutreach } from "@/lib/mock-store";
 import { OUTREACH_KIND_LABELS } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export default function OutreachPage() {
-  const rows = mockOutreach
+  const rows = useOutreach()
     .map((m) => ({ message: m, lead: getLead(m.leadId) }))
     .filter((row) => row.lead);
 

@@ -25,6 +25,7 @@ import {
 } from "@/lib/types";
 import { getContactsForLead, getOutreachForLead } from "@/lib/mock-data";
 import { computeFitScore, fitBand } from "@/lib/fit";
+import { addOutreach, addReminder, nextReminderSequence } from "@/lib/mock-store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -408,6 +409,17 @@ function AddReminderDialog({
       setError("Pick a due date.");
       return;
     }
+    // PHASE 1: record in the in-memory store (Phase 3 persists via a Server Action).
+    addReminder({
+      id: `rem-${Date.now()}`,
+      outreachMessageId: linkedMessage === "none" ? null : linkedMessage,
+      leadId: lead.id,
+      sequence: nextReminderSequence(lead.id),
+      dueDate,
+      outcome: "pending",
+      label: label || undefined,
+      manual: true,
+    });
     reset();
     onOpenChange(false);
   }
@@ -549,6 +561,41 @@ function DraftOutreachDialog({
     }, 700);
   }
 
+  function markSent() {
+    if (!draft.trim()) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const messageId = `msg-${Date.now()}`;
+    // PHASE 1: record the sent message in the in-memory store (Phase 3 persists
+    // via a Server Action). The draft text becomes the saved sentBody.
+    addOutreach({
+      id: messageId,
+      leadId: lead.id,
+      contactId,
+      kind,
+      channel: "LinkedIn",
+      status: "sent",
+      draftBody: draft,
+      sentBody: draft,
+      resumeId,
+      createdAt: today,
+      sentAt: today,
+    });
+    // Start the follow-up clock: schedule a reminder 3 days out.
+    const due = new Date();
+    due.setDate(due.getDate() + 3);
+    addReminder({
+      id: `rem-${Date.now()}`,
+      outreachMessageId: messageId,
+      leadId: lead.id,
+      sequence: nextReminderSequence(lead.id),
+      dueDate: due.toISOString().slice(0, 10),
+      outcome: "pending",
+      manual: false,
+    });
+    reset();
+    onOpenChange(false);
+  }
+
   return (
     <ActionDialog
       open={open}
@@ -565,7 +612,7 @@ function DraftOutreachDialog({
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button onClick={() => onOpenChange(false)}>
+            <Button onClick={markSent}>
               <Send className="size-4" aria-hidden />
               Mark as sent
             </Button>

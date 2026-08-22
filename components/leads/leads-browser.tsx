@@ -14,6 +14,7 @@ import {
   Archive,
   UserPlus,
   BellPlus,
+  Bell,
   Send,
   ExternalLink,
   Gauge,
@@ -27,9 +28,11 @@ import {
 import { StatusBadge } from "@/components/leads/status-badge";
 import { useLeadActionDialogs } from "@/components/leads/lead-actions";
 import { LeadDetailDialog } from "@/components/leads/lead-detail-dialog";
+import { LeadRemindersDialog } from "@/components/leads/lead-reminders-dialog";
 import { mockResumes } from "@/lib/mock-data";
 import { computeFitScore, fitBand } from "@/lib/fit";
 import { useDefaultResumeId } from "@/lib/use-default-resume";
+import { useRemindersForLead } from "@/lib/mock-store";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -540,6 +543,8 @@ function LeadCard({
     selectedResumeId: resumeId,
     onResumeChange,
   });
+  const [remindersOpen, setRemindersOpen] = useState(false);
+  const leadReminders = useRemindersForLead(lead.id);
 
   const fit = computeFitScore(lead.id, resumeId);
   const band = fitBand(fit);
@@ -554,35 +559,54 @@ function LeadCard({
   };
 
   return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={onOpen}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onOpen();
-        }
-      }}
-      aria-label={`View details for ${lead.title}`}
-      className="group relative flex h-full cursor-pointer flex-col overflow-hidden rounded-2xl border bg-card shadow-xs transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-    >
+    <>
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={onOpen}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onOpen();
+          }
+        }}
+        aria-label={`View details for ${lead.title}`}
+        className="group relative flex h-full cursor-pointer flex-col overflow-hidden rounded-2xl border bg-card shadow-xs transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+      >
       {/* HEADER — current state + jump out to the source listing */}
       <div
         {...stop}
         className="flex items-center justify-between gap-2 border-b bg-muted/30 px-3 py-1.5"
       >
         <StatusControl status={status} onChange={onStatusChange} />
-        <a
-          href={lead.canonicalJobUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label="Open on LinkedIn"
-          title="Open on LinkedIn"
-          className="inline-flex size-11 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:size-9"
-        >
-          <ExternalLink className="size-4" aria-hidden />
-        </a>
+        <div className="flex items-center gap-0.5">
+          <button
+            type="button"
+            aria-label={`Reminders${
+              leadReminders.length ? `, ${leadReminders.length}` : ""
+            }`}
+            title="Reminders"
+            onClick={() => setRemindersOpen(true)}
+            className="relative inline-flex size-11 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:size-9"
+          >
+            <Bell className="size-4" aria-hidden />
+            {leadReminders.length > 0 && (
+              <span className="absolute top-1 right-1 flex min-w-3.5 items-center justify-center rounded-full bg-primary px-0.5 text-[9px] leading-none font-medium text-primary-foreground tabular-nums sm:top-0.5 sm:right-0.5">
+                {leadReminders.length}
+              </span>
+            )}
+          </button>
+          <a
+            href={lead.canonicalJobUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Open on LinkedIn"
+            title="Open on LinkedIn"
+            className="inline-flex size-11 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:size-9"
+          >
+            <ExternalLink className="size-4" aria-hidden />
+          </a>
+        </div>
       </div>
 
       {/* BODY — clicking anywhere here opens the detail modal */}
@@ -667,11 +691,19 @@ function LeadCard({
         />
       </div>
 
-      {/* Dialogs render as React children of this clickable card, so their
-          (portalled) clicks would bubble to `onOpen` and pop the detail modal.
-          Stop propagation here so only a card-body click opens details. */}
-      <div {...stop}>{dialogs}</div>
-    </div>
+      </div>
+
+      {/* Dialogs are SIBLINGS of the clickable card (not descendants), so their
+          portalled clicks never bubble to `onOpen` — and there's no
+          stopPropagation wrapper to interfere with the dialogs' own dismissal. */}
+      {dialogs}
+      <LeadRemindersDialog
+        lead={lead}
+        open={remindersOpen}
+        onOpenChange={setRemindersOpen}
+        onAddReminder={() => openDialog("reminder")}
+      />
+    </>
   );
 }
 

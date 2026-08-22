@@ -1,10 +1,13 @@
+"use client";
+
 import Link from "next/link";
 import { Clock, ChevronRight } from "lucide-react";
-import { getLead, mockReminders } from "@/lib/mock-data";
+import { getLead } from "@/lib/mock-data";
+import { useReminders } from "@/lib/mock-store";
 import { REMINDER_OUTCOME_LABELS } from "@/lib/types";
 
 export default function RemindersPage() {
-  const rows = mockReminders
+  const rows = useReminders()
     .map((r) => ({ reminder: r, lead: getLead(r.leadId) }))
     .filter((row) => row.lead);
 

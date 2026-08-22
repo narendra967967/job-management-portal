@@ -4,8 +4,6 @@ import {
   getContactsForLead,
   getLead,
   getLeadDetail,
-  getOutreachForLead,
-  getRemindersForLead,
   mockResumes,
 } from "@/lib/mock-data";
 
@@ -23,8 +21,6 @@ export default async function LeadDetailPage({
       lead={lead}
       detail={getLeadDetail(id)}
       contacts={getContactsForLead(id)}
-      outreach={getOutreachForLead(id)}
-      reminders={getRemindersForLead(id)}
       resumes={mockResumes}
     />
   );
