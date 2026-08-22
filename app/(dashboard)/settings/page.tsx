@@ -9,10 +9,12 @@ import {
   Pencil,
   Check,
   X,
+  Star,
   ShieldCheck,
   KeyRound,
   LogOut,
 } from "lucide-react";
+import { useDefaultResumeId } from "@/lib/use-default-resume";
 import {
   mockAiSettings,
   mockGoogleConnection,
@@ -235,6 +237,7 @@ function AiProviderCard() {
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <Field label="Provider">
           <Select
+            items={AI_PROVIDER_LABELS}
             value={provider}
             onValueChange={(v) => setProvider((v as AiProvider) ?? provider)}
           >
@@ -340,6 +343,7 @@ interface PendingFile {
 
 function ResumesCard() {
   const [resumes, setResumes] = useState<Resume[]>(mockResumes);
+  const [defaultResumeId, setDefaultResumeId] = useDefaultResumeId();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState("");
   const [error, setError] = useState("");
@@ -408,7 +412,8 @@ function ResumesCard() {
     <section className="rounded-2xl border bg-card p-4 md:p-5">
       <h2 className="text-sm font-medium">Resumes</h2>
       <p className="mt-0.5 text-xs text-muted-foreground">
-        Upload PDF or Word files to pick from when drafting outreach.
+        Upload PDF or Word files to pick from when drafting outreach. The
+        default resume is used to score how well each lead fits.
       </p>
 
       <ul className="mt-4 space-y-2">
@@ -448,7 +453,15 @@ function ResumesCard() {
             ) : (
               <>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{r.label}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="truncate text-sm font-medium">{r.label}</p>
+                    {r.id === defaultResumeId && (
+                      <span className="inline-flex shrink-0 items-center gap-1 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                        <Star className="size-2.5 fill-current" aria-hidden />
+                        Default
+                      </span>
+                    )}
+                  </div>
                   <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                     <span className="rounded bg-muted px-1.5 py-px font-medium uppercase">
                       {r.fileType}
@@ -460,6 +473,29 @@ function ResumesCard() {
                     </span>
                   </p>
                 </div>
+                <button
+                  type="button"
+                  aria-label={
+                    r.id === defaultResumeId
+                      ? `${r.label} is the default resume`
+                      : `Set ${r.label} as default`
+                  }
+                  title={
+                    r.id === defaultResumeId ? "Default resume" : "Set as default"
+                  }
+                  onClick={() => setDefaultResumeId(r.id)}
+                  disabled={r.id === defaultResumeId}
+                  className={`flex size-9 items-center justify-center rounded-md hover:bg-muted disabled:opacity-100 ${
+                    r.id === defaultResumeId
+                      ? "text-primary"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Star
+                    className={`size-4 ${r.id === defaultResumeId ? "fill-current" : ""}`}
+                    aria-hidden
+                  />
+                </button>
                 <button
                   type="button"
                   aria-label={`Rename ${r.label}`}

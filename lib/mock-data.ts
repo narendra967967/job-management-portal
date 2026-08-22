@@ -371,6 +371,7 @@ export const mockResumes: Resume[] = [
     fileType: "pdf",
     sizeKb: 212,
     updatedAt: "2026-08-01",
+    isDefault: true,
   },
   {
     id: "resume-2",
@@ -443,6 +444,11 @@ export const mockNotifications: AppNotification[] = [
 ];
 
 // ---- Lookup helpers (mock stand-ins for Phase 3 queries) ----
+
+/** Seeded default resume (used for a lead's fit score unless overridden). */
+export function getDefaultResumeId(): string {
+  return (mockResumes.find((r) => r.isDefault) ?? mockResumes[0])?.id ?? "";
+}
 
 export function getLead(id: string): JobLead | undefined {
   return mockLeads.find((l) => l.id === id);

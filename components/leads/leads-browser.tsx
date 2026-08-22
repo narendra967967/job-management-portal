@@ -16,6 +16,7 @@ import {
   BellPlus,
   Send,
   ExternalLink,
+  Gauge,
 } from "lucide-react";
 import {
   LEAD_STATUS_LABELS,
@@ -27,6 +28,8 @@ import { StatusBadge } from "@/components/leads/status-badge";
 import { useLeadActionDialogs } from "@/components/leads/lead-actions";
 import { LeadDetailDialog } from "@/components/leads/lead-detail-dialog";
 import { mockResumes } from "@/lib/mock-data";
+import { computeFitScore, fitBand } from "@/lib/fit";
+import { useDefaultResumeId } from "@/lib/use-default-resume";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -108,6 +111,13 @@ export function LeadsBrowser({ leads }: { leads: JobLead[] }) {
   const [overrides, setOverrides] = useState<Record<string, LeadStatus>>({});
   // Which lead's "View details" modal is open (null = closed).
   const [detailLead, setDetailLead] = useState<JobLead | null>(null);
+  // Default resume drives the fit score; per-lead choices override it.
+  const [defaultResumeId] = useDefaultResumeId();
+  const [resumeChoice, setResumeChoice] = useState<Record<string, string>>({});
+
+  const resumeIdFor = (id: string) => resumeChoice[id] || defaultResumeId;
+  const setResumeFor = (id: string, resumeId: string) =>
+    setResumeChoice((prev) => ({ ...prev, [id]: resumeId }));
 
   const statusOf = (lead: JobLead): LeadStatus =>
     overrides[lead.id] ?? lead.status;
@@ -306,6 +316,8 @@ export function LeadsBrowser({ leads }: { leads: JobLead[] }) {
                 <LeadCard
                   lead={lead}
                   status={statusOf(lead)}
+                  resumeId={resumeIdFor(lead.id)}
+                  onResumeChange={(rid) => setResumeFor(lead.id, rid)}
                   onOpen={() => setDetailLead(lead)}
                   onStatusChange={(s) => setStatus(lead.id, s)}
                 />
@@ -360,7 +372,11 @@ function FilterSelect({
       <span className="text-xs font-medium text-muted-foreground sm:sr-only">
         {label}
       </span>
-      <Select value={value} onValueChange={(v) => onValueChange(v ?? value)}>
+      <Select
+        items={Object.fromEntries(options.map((o) => [o.value, o.label]))}
+        value={value}
+        onValueChange={(v) => onValueChange(v ?? value)}
+      >
         <SelectTrigger
           aria-label={label}
           className="min-h-11 w-full sm:min-h-9 sm:w-auto sm:min-w-40"
@@ -507,15 +523,28 @@ function PageButton({
 function LeadCard({
   lead,
   status,
+  resumeId,
+  onResumeChange,
   onOpen,
   onStatusChange,
 }: {
   lead: JobLead;
   status: LeadStatus;
+  resumeId: string;
+  onResumeChange: (resumeId: string) => void;
   onOpen: () => void;
   onStatusChange: (status: LeadStatus) => void;
 }) {
-  const { openDialog, dialogs } = useLeadActionDialogs(lead, mockResumes);
+  const { openDialog, dialogs } = useLeadActionDialogs(lead, mockResumes, {
+    selectedResumeId: resumeId,
+    onResumeChange,
+  });
+
+  const fit = computeFitScore(lead.id, resumeId);
+  const band = fitBand(fit);
+  const resumeLabel =
+    mockResumes.find((r) => r.id === resumeId)?.label ?? "resume";
+  const hasContacts = lead.contactCount > 0;
 
   // Stop card-body clicks/keys from firing on the header & footer controls.
   const stop = {
@@ -564,6 +593,24 @@ function LeadCard({
           <MapPin className="size-3.5 shrink-0" aria-hidden />
           {lead.company} · {lead.location}
         </p>
+        {/* Fit score vs the default (or chosen) resume */}
+        <div
+          className="mt-2.5 flex items-center gap-2"
+          title={`Fit for ${resumeLabel}`}
+        >
+          <span
+            className={cn(
+              "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-semibold tabular-nums",
+              band.chip,
+            )}
+          >
+            <Gauge className="size-3" aria-hidden />
+            {fit}
+          </span>
+          <span className="min-w-0 truncate text-[11px] text-muted-foreground">
+            {band.label} · {resumeLabel}
+          </span>
+        </div>
         <div className="mt-auto flex flex-wrap items-center gap-1.5 pt-3">
           {lead.tags.map((tag) => (
             <span
@@ -612,6 +659,10 @@ function LeadCard({
           icon={Send}
           label="Draft"
           onClick={() => openDialog("outreach")}
+          disabled={!hasContacts}
+          title={
+            hasContacts ? "Draft outreach" : "Add a contact first to draft outreach"
+          }
         />
       </div>
 
@@ -663,16 +714,22 @@ function CardActionButton({
   icon: Icon,
   label,
   onClick,
+  disabled,
+  title,
 }: {
   icon: typeof UserPlus;
   label: string;
   onClick: () => void;
+  disabled?: boolean;
+  title?: string;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex min-h-11 items-center justify-center gap-1.5 px-2 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:min-h-10"
+      disabled={disabled}
+      title={title}
+      className="inline-flex min-h-11 items-center justify-center gap-1.5 px-2 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-40 sm:min-h-10"
     >
       <Icon className="size-4 shrink-0" aria-hidden />
       {label}

@@ -368,7 +368,11 @@ function RemindersTab({ reminders }: { reminders: Reminder[] }) {
 function ReminderOutcomeSelect({ initial }: { initial: ReminderOutcome }) {
   const [outcome, setOutcome] = useState<ReminderOutcome>(initial);
   return (
-    <Select value={outcome} onValueChange={(v) => setOutcome((v as ReminderOutcome) ?? initial)}>
+    <Select
+      items={REMINDER_OUTCOME_LABELS}
+      value={outcome}
+      onValueChange={(v) => setOutcome((v as ReminderOutcome) ?? initial)}
+    >
       <SelectTrigger className="w-full sm:w-52" aria-label="Reminder outcome">
         <SelectValue />
       </SelectTrigger>

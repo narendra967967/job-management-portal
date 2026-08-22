@@ -24,6 +24,7 @@ import {
   type Resume,
 } from "@/lib/types";
 import { getContactsForLead, getOutreachForLead } from "@/lib/mock-data";
+import { computeFitScore, fitBand } from "@/lib/fit";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -177,11 +178,17 @@ export function LeadActionDialogs({
   resumes,
   dialog,
   onDialogChange,
+  selectedResumeId,
+  onResumeChange,
 }: {
   lead: JobLead;
   resumes: Resume[];
   dialog: DialogKind;
   onDialogChange: (dialog: DialogKind) => void;
+  /** Resume pre-selected in the draft panel (a lead's choice or the default). */
+  selectedResumeId?: string;
+  /** Called when the user picks a different resume for this lead. */
+  onResumeChange?: (resumeId: string) => void;
 }) {
   return (
     <>
@@ -198,6 +205,8 @@ export function LeadActionDialogs({
       <DraftOutreachDialog
         lead={lead}
         resumes={resumes}
+        selectedResumeId={selectedResumeId}
+        onResumeChange={onResumeChange}
         open={dialog === "outreach"}
         onOpenChange={(o) => onDialogChange(o ? "outreach" : null)}
       />
@@ -206,7 +215,14 @@ export function LeadActionDialogs({
 }
 
 /** Manages the action-dialog state and renders them; returns an opener. */
-export function useLeadActionDialogs(lead: JobLead, resumes: Resume[]) {
+export function useLeadActionDialogs(
+  lead: JobLead,
+  resumes: Resume[],
+  options?: {
+    selectedResumeId?: string;
+    onResumeChange?: (resumeId: string) => void;
+  },
+) {
   const [dialog, setDialog] = useState<DialogKind>(null);
   const dialogs = (
     <LeadActionDialogs
@@ -214,6 +230,8 @@ export function useLeadActionDialogs(lead: JobLead, resumes: Resume[]) {
       resumes={resumes}
       dialog={dialog}
       onDialogChange={setDialog}
+      selectedResumeId={options?.selectedResumeId}
+      onResumeChange={options?.onResumeChange}
     />
   );
   return { openDialog: (kind: Exclude<DialogKind, null>) => setDialog(kind), dialogs };
@@ -335,7 +353,11 @@ function AddContactDialog({
             />
           </Field>
           <Field label="Connection">
-            <Select value={type} onValueChange={(v) => setType(v as ConnectionType)}>
+            <Select
+              items={CONNECTION_TYPE_LABELS}
+              value={type}
+              onValueChange={(v) => setType(v as ConnectionType)}
+            >
               <SelectTrigger className="w-full">
                 <SelectValue />
               </SelectTrigger>
@@ -426,6 +448,15 @@ function AddReminderDialog({
         </Field>
         <Field label="Link to a sent message (optional)">
           <Select
+            items={{
+              none: "None — standalone reminder",
+              ...Object.fromEntries(
+                messages.map((m) => [
+                  m.id,
+                  `${OUTREACH_KIND_LABELS[m.kind]} · ${m.channel}`,
+                ]),
+              ),
+            }}
             value={linkedMessage}
             onValueChange={(v) => setLinkedMessage(v ?? "none")}
           >
@@ -455,26 +486,47 @@ function AddReminderDialog({
 function DraftOutreachDialog({
   lead,
   resumes,
+  selectedResumeId,
+  onResumeChange,
   open,
   onOpenChange,
 }: {
   lead: JobLead;
   resumes: Resume[];
+  selectedResumeId?: string;
+  onResumeChange?: (resumeId: string) => void;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
   const contacts = getContactsForLead(lead.id);
+  const initialResumeId =
+    selectedResumeId ??
+    resumes.find((r) => r.isDefault)?.id ??
+    resumes[0]?.id ??
+    "";
   const [kind, setKind] = useState<OutreachKind>("referral-ask");
   const [contactId, setContactId] = useState(contacts[0]?.id ?? "");
-  const [resumeId, setResumeId] = useState(resumes[0]?.id ?? "");
+  const [resumeId, setResumeId] = useState(initialResumeId);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
+  const fit = computeFitScore(lead.id, resumeId);
+  const band = fitBand(fit);
+  const contactItems = Object.fromEntries(contacts.map((c) => [c.id, c.name]));
+  const resumeItems = Object.fromEntries(
+    resumes.map((r) => [r.id, r.isDefault ? `${r.label} · default` : r.label]),
+  );
+
+  function pickResume(id: string) {
+    setResumeId(id);
+    onResumeChange?.(id); // record the per-lead choice so the card reflects it
+  }
+
   function reset() {
     setKind("referral-ask");
     setContactId(contacts[0]?.id ?? "");
-    setResumeId(resumes[0]?.id ?? "");
+    setResumeId(initialResumeId);
     setDraft("");
     setError("");
   }
@@ -533,7 +585,11 @@ function DraftOutreachDialog({
         <div className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-3">
             <Field label="Type">
-              <Select value={kind} onValueChange={(v) => setKind(v as OutreachKind)}>
+              <Select
+                items={OUTREACH_KIND_LABELS}
+                value={kind}
+                onValueChange={(v) => setKind(v as OutreachKind)}
+              >
                 <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
@@ -547,7 +603,11 @@ function DraftOutreachDialog({
               </Select>
             </Field>
             <Field label="Contact">
-              <Select value={contactId} onValueChange={(v) => setContactId(v ?? "")}>
+              <Select
+                items={contactItems}
+                value={contactId}
+                onValueChange={(v) => setContactId(v ?? "")}
+              >
                 <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
@@ -561,7 +621,11 @@ function DraftOutreachDialog({
               </Select>
             </Field>
             <Field label="Resume">
-              <Select value={resumeId} onValueChange={(v) => setResumeId(v ?? "")}>
+              <Select
+                items={resumeItems}
+                value={resumeId}
+                onValueChange={(v) => pickResume(v ?? "")}
+              >
                 <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
@@ -569,11 +633,34 @@ function DraftOutreachDialog({
                   {resumes.map((r) => (
                     <SelectItem key={r.id} value={r.id}>
                       {r.label}
+                      {r.isDefault ? " · default" : ""}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </Field>
+          </div>
+
+          {/* Fit score for the selected resume — updates when the resume changes */}
+          <div className="flex items-center gap-3 rounded-lg border bg-muted/30 p-3">
+            <span
+              className={cn(
+                "flex size-12 shrink-0 flex-col items-center justify-center rounded-full text-sm font-semibold tabular-nums",
+                band.chip,
+              )}
+            >
+              {fit}
+            </span>
+            <div className="min-w-0">
+              <p className="flex items-center gap-1.5 text-sm font-medium">
+                {band.label}
+                <span className="rounded bg-ai-muted px-1.5 py-0.5 text-[10px] font-medium text-ai">
+                  <Sparkles className="mr-0.5 inline size-2.5" aria-hidden />
+                  preview
+                </span>
+              </p>
+              <p className="text-xs text-muted-foreground">{band.advice}</p>
+            </div>
           </div>
 
           <Button

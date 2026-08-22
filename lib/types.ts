@@ -119,6 +119,7 @@ export interface Resume {
   fileType: "pdf" | "doc" | "docx";
   sizeKb: number;
   updatedAt: string;
+  isDefault?: boolean; // the resume used for a lead's fit score unless overridden
 }
 
 export const RESUME_ACCEPT = ".pdf,.doc,.docx";
