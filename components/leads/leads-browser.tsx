@@ -667,7 +667,10 @@ function LeadCard({
         />
       </div>
 
-      {dialogs}
+      {/* Dialogs render as React children of this clickable card, so their
+          (portalled) clicks would bubble to `onOpen` and pop the detail modal.
+          Stop propagation here so only a card-body click opens details. */}
+      <div {...stop}>{dialogs}</div>
     </div>
   );
 }
