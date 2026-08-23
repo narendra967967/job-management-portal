@@ -2,21 +2,69 @@
 // renders against mock data; the Drizzle schema in Phase 2 is written to match
 // what these reveal the UI actually needs.
 
-export type LeadStatus = "new" | "reviewing" | "applied" | "discarded";
+// Pipeline phases: new/reviewing/applied are OPEN (actionable); discarded and
+// closed are TERMINAL. A job only generates/accepts tasks & reminders while open.
+export type LeadStatus =
+  | "new"
+  | "reviewing"
+  | "applied"
+  | "discarded"
+  | "closed";
 
 export const LEAD_STATUSES: LeadStatus[] = [
   "new",
   "reviewing",
   "applied",
   "discarded",
+  "closed",
 ];
+
+/** Statuses where the job is still being worked. */
+export const OPEN_LEAD_STATUSES: LeadStatus[] = ["new", "reviewing", "applied"];
+
+export function isJobOpen(status: LeadStatus): boolean {
+  return status === "new" || status === "reviewing" || status === "applied";
+}
 
 export const LEAD_STATUS_LABELS: Record<LeadStatus, string> = {
   new: "New",
   reviewing: "Reviewing",
   applied: "Applied",
   discarded: "Discarded",
+  closed: "Closed",
 };
+
+// How a job concluded (set when status === "closed").
+export type CloseOutcome = "offer" | "rejected" | "withdrawn" | "no-response";
+
+export const CLOSE_OUTCOME_LABELS: Record<CloseOutcome, string> = {
+  offer: "Offer / hired",
+  rejected: "Rejected",
+  withdrawn: "Withdrew",
+  "no-response": "No response",
+};
+
+// A To-do item. Always tied to a job; optionally linked to a reminder (when it
+// was spawned by a follow-up) — standalone/manual tasks have reminderId null.
+export type TaskKind = "follow-up" | "decision" | "manual";
+
+export const TASK_KIND_LABELS: Record<TaskKind, string> = {
+  "follow-up": "Follow-up",
+  decision: "Decision",
+  manual: "Task",
+};
+
+export interface Task {
+  id: string;
+  jobId: string; // mandatory — every task belongs to a job
+  reminderId: string | null; // optional link to the reminder that spawned it
+  title: string;
+  kind: TaskKind;
+  dueDate: string | null; // ISO date
+  status: "open" | "done";
+  createdAt: string;
+  completedAt: string | null;
+}
 
 export type ConnectionType = "recruiter" | "referral" | "hiring-manager" | "other";
 
@@ -62,6 +110,7 @@ export interface JobLead {
   postedRelative: string;
   canonicalJobUrl: string;
   status: LeadStatus;
+  closeOutcome?: CloseOutcome | null; // set when status === "closed"
   capturedAt: string; // ISO date
   contactCount: number;
   hasDueReminder: boolean;

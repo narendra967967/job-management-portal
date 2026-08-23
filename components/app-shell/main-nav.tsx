@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import {
   LayoutGrid,
+  ListChecks,
   Users,
   MessageSquare,
   Bell,
@@ -37,6 +38,7 @@ function initials(name: string) {
 
 const navItems = [
   { href: "/leads", label: "Leads", icon: LayoutGrid },
+  { href: "/todo", label: "To-do", icon: ListChecks },
   { href: "/contacts", label: "Contacts", icon: Users },
   { href: "/outreach", label: "Outreach", icon: MessageSquare },
   { href: "/reminders", label: "Reminders", icon: Bell },
@@ -228,7 +230,7 @@ export function MobileNav() {
 export function BottomNav() {
   const pathname = usePathname();
   return (
-    <nav className="grid shrink-0 grid-cols-4 border-t bg-card pb-[env(safe-area-inset-bottom)] md:hidden">
+    <nav className="grid shrink-0 grid-cols-5 border-t bg-card pb-[env(safe-area-inset-bottom)] md:hidden">
       {navItems.map(({ href, label, icon: Icon }) => {
         const active = isActive(pathname, href);
         return (

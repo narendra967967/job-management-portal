@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ExternalLink } from "lucide-react";
-import type { JobLead, LeadStatus, Resume } from "@/lib/types";
+import type { JobLead, Resume } from "@/lib/types";
 import { getContactsForLead, getLeadDetail } from "@/lib/mock-data";
 import { LeadDetailContent } from "@/components/leads/lead-detail";
 import {
@@ -15,21 +15,17 @@ import {
 /**
  * "View details" as a modal over the leads list. Pulls the same mock data the
  * `/leads/[id]` page uses (Phase 3 swaps these getters for Server Actions).
- * Status is controlled by the list so a change here reflects live in the grid.
+ * Status/reminders/tasks all come from the store, so changes reflect live.
  */
 export function LeadDetailDialog({
   lead,
   resumes,
-  status,
-  onStatusChange,
   resumeId,
   open,
   onOpenChange,
 }: {
   lead: JobLead | null;
   resumes: Resume[];
-  status?: LeadStatus;
-  onStatusChange?: (status: LeadStatus) => void;
   resumeId?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -47,8 +43,6 @@ export function LeadDetailDialog({
               detail={getLeadDetail(lead.id)}
               contacts={getContactsForLead(lead.id)}
               resumes={resumes}
-              status={status}
-              onStatusChange={onStatusChange}
               resumeId={resumeId}
             />
             <Link

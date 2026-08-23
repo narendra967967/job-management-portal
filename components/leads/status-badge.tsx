@@ -6,6 +6,7 @@ const statusClasses: Record<LeadStatus, string> = {
   reviewing: "bg-status-reviewing text-status-reviewing-foreground",
   applied: "bg-status-applied text-status-applied-foreground",
   discarded: "bg-status-discarded text-status-discarded-foreground",
+  closed: "bg-status-closed text-status-closed-foreground",
 };
 
 export function StatusBadge({

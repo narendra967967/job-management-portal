@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { Clock, ChevronRight } from "lucide-react";
+import { Clock } from "lucide-react";
 import { getLead } from "@/lib/mock-data";
 import { useReminders } from "@/lib/mock-store";
-import { REMINDER_OUTCOME_LABELS } from "@/lib/types";
+import { ReminderActions } from "@/components/leads/reminder-actions";
+import { cn } from "@/lib/utils";
 
 export default function RemindersPage() {
   const rows = useReminders()
@@ -26,32 +27,41 @@ export default function RemindersPage() {
         </div>
       ) : (
         <ul className="space-y-2.5">
-          {rows.map(({ reminder, lead }) => (
-            <li key={reminder.id}>
-              <Link
-                href={`/leads/${lead!.id}`}
+          {rows.map(({ reminder, lead }) => {
+            const done = reminder.outcome !== "pending";
+            return (
+              <li
+                key={reminder.id}
                 className="flex items-center gap-3 rounded-xl border bg-card p-3.5 transition-colors hover:border-primary/40"
               >
-                <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-status-reviewing text-status-reviewing-foreground">
+                <div
+                  className={cn(
+                    "flex size-10 shrink-0 items-center justify-center rounded-full",
+                    done
+                      ? "bg-status-applied text-status-applied-foreground"
+                      : "bg-status-reviewing text-status-reviewing-foreground",
+                  )}
+                >
                   <Clock className="size-5" aria-hidden />
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{lead!.title}</p>
-                  <p className="truncate text-xs text-muted-foreground">
-                    {lead!.company} · Reminder {reminder.sequence} · due{" "}
-                    {reminder.dueDate}
+                <Link href={`/leads/${lead!.id}`} className="min-w-0 flex-1">
+                  <p
+                    className={cn(
+                      "truncate text-sm font-medium",
+                      done && "text-muted-foreground line-through",
+                    )}
+                  >
+                    {lead!.title}
                   </p>
-                </div>
-                <span className="shrink-0 rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                  {REMINDER_OUTCOME_LABELS[reminder.outcome]}
-                </span>
-                <ChevronRight
-                  className="size-4 shrink-0 text-muted-foreground"
-                  aria-hidden
-                />
-              </Link>
-            </li>
-          ))}
+                  <p className="truncate text-xs text-muted-foreground">
+                    {lead!.company} ·{" "}
+                    {done ? "Done" : `Reminder ${reminder.sequence} · due ${reminder.dueDate}`}
+                  </p>
+                </Link>
+                <ReminderActions reminder={reminder} />
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>

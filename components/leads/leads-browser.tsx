@@ -18,10 +18,15 @@ import {
   Send,
   ExternalLink,
   Gauge,
+  Flag,
 } from "lucide-react";
 import {
+  CLOSE_OUTCOME_LABELS,
   LEAD_STATUS_LABELS,
   LEAD_STATUSES,
+  OPEN_LEAD_STATUSES,
+  isJobOpen,
+  type CloseOutcome,
   type JobLead,
   type LeadStatus,
 } from "@/lib/types";
@@ -32,7 +37,11 @@ import { LeadRemindersDialog } from "@/components/leads/lead-reminders-dialog";
 import { mockResumes } from "@/lib/mock-data";
 import { computeFitScore, fitBand } from "@/lib/fit";
 import { useDefaultResumeId } from "@/lib/use-default-resume";
-import { useRemindersForLead } from "@/lib/mock-store";
+import {
+  useRemindersForLead,
+  useStatusOverrides,
+  setLeadStatus,
+} from "@/lib/mock-store";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -45,10 +54,14 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuGroup,
+  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
@@ -99,6 +112,13 @@ const STATUS_META: Record<
     num: "text-foreground",
     tint: "from-status-discarded/70",
   },
+  closed: {
+    icon: Flag,
+    bar: "bg-status-closed-foreground",
+    chip: "bg-status-closed text-status-closed-foreground",
+    num: "text-status-closed-foreground",
+    tint: "from-status-closed/45",
+  },
 };
 
 export function LeadsBrowser({ leads }: { leads: JobLead[] }) {
@@ -110,8 +130,9 @@ export function LeadsBrowser({ leads }: { leads: JobLead[] }) {
   // Default order is latest first (applies on mobile and desktop alike).
   const [sort, setSort] = useState<Sort>("newest");
   const [page, setPage] = useState(1);
-  // Local status overrides so "Change status" from the row menu reflects live.
-  const [overrides, setOverrides] = useState<Record<string, LeadStatus>>({});
+  // Job status lives in the store so it stays in sync with reminders/tasks and
+  // so closing a job can auto-cancel its follow-ups.
+  const statusOverrides = useStatusOverrides();
   // Which lead's "View details" modal is open (null = closed).
   const [detailLead, setDetailLead] = useState<JobLead | null>(null);
   // Default resume drives the fit score; per-lead choices override it.
@@ -123,10 +144,13 @@ export function LeadsBrowser({ leads }: { leads: JobLead[] }) {
     setResumeChoice((prev) => ({ ...prev, [id]: resumeId }));
 
   const statusOf = (lead: JobLead): LeadStatus =>
-    overrides[lead.id] ?? lead.status;
+    statusOverrides[lead.id]?.status ?? lead.status;
 
-  const setStatus = (id: string, status: LeadStatus) =>
-    setOverrides((prev) => ({ ...prev, [id]: status }));
+  const setStatus = (
+    id: string,
+    status: LeadStatus,
+    outcome: CloseOutcome | null = null,
+  ) => setLeadStatus(id, status, outcome);
 
   const counts = useMemo(() => {
     const c: Record<LeadStatus, number> = {
@@ -134,11 +158,12 @@ export function LeadsBrowser({ leads }: { leads: JobLead[] }) {
       reviewing: 0,
       applied: 0,
       discarded: 0,
+      closed: 0,
     };
     for (const l of leads) c[statusOf(l)]++;
     return c;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [leads, overrides]);
+  }, [leads, statusOverrides]);
 
   // Resolve the active capture-date window [from, to] (inclusive, YYYY-MM-DD).
   const dateBounds = useMemo(() => {
@@ -167,7 +192,7 @@ export function LeadsBrowser({ leads }: { leads: JobLead[] }) {
     );
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [leads, statusFilter, locationFilter, dateBounds, sort, overrides]);
+  }, [leads, statusFilter, locationFilter, dateBounds, sort, statusOverrides]);
 
   // Reset to the first page whenever the result set changes.
   useEffect(() => {
@@ -182,7 +207,7 @@ export function LeadsBrowser({ leads }: { leads: JobLead[] }) {
   return (
     <div className="space-y-4">
       {/* Metric row — each box also filters the list by that status */}
-      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-5">
         {LEAD_STATUSES.map((s) => {
           const meta = STATUS_META[s];
           const Icon = meta.icon;
@@ -322,7 +347,7 @@ export function LeadsBrowser({ leads }: { leads: JobLead[] }) {
                   resumeId={resumeIdFor(lead.id)}
                   onResumeChange={(rid) => setResumeFor(lead.id, rid)}
                   onOpen={() => setDetailLead(lead)}
-                  onStatusChange={(s) => setStatus(lead.id, s)}
+                  onStatusChange={(s, o) => setStatus(lead.id, s, o)}
                 />
               </li>
             ))}
@@ -342,10 +367,6 @@ export function LeadsBrowser({ leads }: { leads: JobLead[] }) {
       <LeadDetailDialog
         lead={detailLead}
         resumes={mockResumes}
-        status={detailLead ? statusOf(detailLead) : undefined}
-        onStatusChange={
-          detailLead ? (s) => setStatus(detailLead.id, s) : undefined
-        }
         resumeId={detailLead ? resumeIdFor(detailLead.id) : undefined}
         open={detailLead !== null}
         onOpenChange={(o) => !o && setDetailLead(null)}
@@ -537,7 +558,7 @@ function LeadCard({
   resumeId: string;
   onResumeChange: (resumeId: string) => void;
   onOpen: () => void;
-  onStatusChange: (status: LeadStatus) => void;
+  onStatusChange: (status: LeadStatus, outcome?: CloseOutcome | null) => void;
 }) {
   const { openDialog, dialogs } = useLeadActionDialogs(lead, mockResumes, {
     selectedResumeId: resumeId,
@@ -550,6 +571,7 @@ function LeadCard({
   const band = fitBand(fit);
   const resumeLabel =
     mockResumes.find((r) => r.id === resumeId)?.label ?? "resume";
+  const open = isJobOpen(status);
   const hasContacts = lead.contactCount > 0;
 
   // Stop card-body clicks/keys from firing on the header & footer controls.
@@ -668,25 +690,33 @@ function LeadCard({
         </div>
       </div>
 
-      {/* FOOTER — create actions for this lead */}
+      {/* FOOTER — create actions for this lead (only while the job is open) */}
       <div {...stop} className="grid grid-cols-3 divide-x border-t">
         <CardActionButton
           icon={UserPlus}
           label="Contact"
           onClick={() => openDialog("contact")}
+          disabled={!open}
+          title={open ? "Add contact" : "Reopen this job to add contacts"}
         />
         <CardActionButton
           icon={BellPlus}
           label="Reminder"
           onClick={() => openDialog("reminder")}
+          disabled={!open}
+          title={open ? "Add reminder" : "Reopen this job to add reminders"}
         />
         <CardActionButton
           icon={Send}
           label="Draft"
           onClick={() => openDialog("outreach")}
-          disabled={!hasContacts}
+          disabled={!open || !hasContacts}
           title={
-            hasContacts ? "Draft outreach" : "Add a contact first to draft outreach"
+            !open
+              ? "Reopen this job to draft outreach"
+              : hasContacts
+                ? "Draft outreach"
+                : "Add a contact first to draft outreach"
           }
         />
       </div>
@@ -713,7 +743,7 @@ function StatusControl({
   onChange,
 }: {
   status: LeadStatus;
-  onChange: (status: LeadStatus) => void;
+  onChange: (status: LeadStatus, outcome?: CloseOutcome | null) => void;
 }) {
   return (
     <DropdownMenu>
@@ -725,21 +755,41 @@ function StatusControl({
         <StatusBadge status={status} />
         <ChevronDown className="size-3.5 text-muted-foreground" aria-hidden />
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-44">
+      <DropdownMenuContent align="start" className="w-52">
         <DropdownMenuGroup>
-          <DropdownMenuLabel>Change status</DropdownMenuLabel>
+          <DropdownMenuLabel>Pipeline</DropdownMenuLabel>
         </DropdownMenuGroup>
-        <DropdownMenuSeparator />
         <DropdownMenuRadioGroup
-          value={status}
+          value={isJobOpen(status) ? status : ""}
           onValueChange={(v) => onChange(v as LeadStatus)}
         >
-          {LEAD_STATUSES.map((s) => (
+          {OPEN_LEAD_STATUSES.map((s) => (
             <DropdownMenuRadioItem key={s} value={s}>
               {LEAD_STATUS_LABELS[s]}
             </DropdownMenuRadioItem>
           ))}
         </DropdownMenuRadioGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>Close out</DropdownMenuLabel>
+        </DropdownMenuGroup>
+        <DropdownMenuItem onClick={() => onChange("discarded")}>
+          <Archive className="size-4" aria-hidden />
+          Discard
+        </DropdownMenuItem>
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger>
+            <Flag className="size-4" aria-hidden />
+            Close job…
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent>
+            {(Object.keys(CLOSE_OUTCOME_LABELS) as CloseOutcome[]).map((o) => (
+              <DropdownMenuItem key={o} onClick={() => onChange("closed", o)}>
+                {CLOSE_OUTCOME_LABELS[o]}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
       </DropdownMenuContent>
     </DropdownMenu>
   );

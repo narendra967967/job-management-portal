@@ -12,30 +12,30 @@ import {
   MapPin,
 } from "lucide-react";
 import {
+  CLOSE_OUTCOME_LABELS,
   CONNECTION_TYPE_LABELS,
   OUTREACH_KIND_LABELS,
-  REMINDER_OUTCOME_LABELS,
+  isJobOpen,
+  type CloseOutcome,
   type Contact,
   type JobLead,
   type JobLeadDetail,
   type LeadStatus,
-  type ReminderOutcome,
   type Resume,
 } from "@/lib/types";
 import { StatusBadge } from "@/components/leads/status-badge";
 import { LeadActions } from "@/components/leads/lead-actions";
+import { ReminderActions } from "@/components/leads/reminder-actions";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { computeFitScore, fitBand } from "@/lib/fit";
 import { useDefaultResumeId } from "@/lib/use-default-resume";
-import { useOutreachForLead, useRemindersForLead } from "@/lib/mock-store";
+import {
+  useOutreachForLead,
+  useRemindersForLead,
+  useLeadStatus,
+  setLeadStatus,
+} from "@/lib/mock-store";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -74,18 +74,17 @@ export function LeadDetailContent({
   detail,
   contacts,
   resumes,
-  status: statusProp,
-  onStatusChange,
   resumeId,
 }: Props & {
-  status?: LeadStatus;
-  onStatusChange?: (status: LeadStatus) => void;
   /** Resume to score against; falls back to the user's default resume. */
   resumeId?: string;
 }) {
-  const [localStatus, setLocalStatus] = useState<LeadStatus>(lead.status);
-  const status = statusProp ?? localStatus;
-  const setStatus = onStatusChange ?? setLocalStatus;
+  // Status is owned by the store so it stays in sync everywhere and closing a
+  // job auto-cancels its follow-ups.
+  const { status, closeOutcome } = useLeadStatus(lead.id);
+  const setStatus = (s: LeadStatus, o: CloseOutcome | null = null) =>
+    setLeadStatus(lead.id, s, o);
+  const open = isJobOpen(status);
 
   const [defaultResumeId] = useDefaultResumeId();
   const scoredResumeId = resumeId || defaultResumeId;
@@ -115,12 +114,18 @@ export function LeadDetailContent({
               resumes={resumes}
               status={status}
               onStatusChange={setStatus}
+              canAct={open}
               hideViewDetails
             />
           </div>
         </div>
 
         <div className="mt-3 flex flex-wrap items-center gap-1.5">
+          {status === "closed" && closeOutcome && (
+            <span className="rounded-md bg-status-closed px-2 py-0.5 text-[11px] font-medium text-status-closed-foreground">
+              {CLOSE_OUTCOME_LABELS[closeOutcome]}
+            </span>
+          )}
           {lead.tags.map((tag) => (
             <span
               key={tag}
@@ -380,43 +385,33 @@ function RemindersTab({ leadId }: { leadId: string }) {
   }
   return (
     <ul className="space-y-2.5">
-      {reminders.map((r) => (
-        <li
-          key={r.id}
-          className="flex flex-col gap-3 rounded-xl border bg-card p-4 sm:flex-row sm:items-center sm:justify-between"
-        >
-          <div>
-            <p className="text-sm font-medium">
-              {r.manual ? r.label || "Manual reminder" : `Reminder ${r.sequence}`}
-            </p>
-            <p className="text-xs text-muted-foreground">Due {r.dueDate}</p>
-          </div>
-          <ReminderOutcomeSelect initial={r.outcome} />
-        </li>
-      ))}
+      {reminders.map((r) => {
+        const done = r.outcome !== "pending";
+        return (
+          <li
+            key={r.id}
+            className="flex items-center gap-3 rounded-xl border bg-card p-4"
+          >
+            <div className="min-w-0 flex-1">
+              <p
+                className={cn(
+                  "text-sm font-medium",
+                  done && "text-muted-foreground line-through",
+                )}
+              >
+                {r.manual
+                  ? r.label || "Manual reminder"
+                  : `Reminder ${r.sequence}`}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {done ? "Done" : `Due ${r.dueDate}`}
+              </p>
+            </div>
+            <ReminderActions reminder={r} />
+          </li>
+        );
+      })}
     </ul>
-  );
-}
-
-function ReminderOutcomeSelect({ initial }: { initial: ReminderOutcome }) {
-  const [outcome, setOutcome] = useState<ReminderOutcome>(initial);
-  return (
-    <Select
-      items={REMINDER_OUTCOME_LABELS}
-      value={outcome}
-      onValueChange={(v) => setOutcome((v as ReminderOutcome) ?? initial)}
-    >
-      <SelectTrigger className="w-full sm:w-52" aria-label="Reminder outcome">
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        {Object.entries(REMINDER_OUTCOME_LABELS).map(([v, l]) => (
-          <SelectItem key={v} value={v}>
-            {l}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
   );
 }
 

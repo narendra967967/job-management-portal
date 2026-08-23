@@ -11,12 +11,17 @@ import {
   Send,
   ExternalLink,
   CircleDot,
+  Archive,
+  Flag,
 } from "lucide-react";
 import {
+  CLOSE_OUTCOME_LABELS,
   CONNECTION_TYPE_LABELS,
-  LEAD_STATUSES,
   LEAD_STATUS_LABELS,
+  OPEN_LEAD_STATUSES,
   OUTREACH_KIND_LABELS,
+  isJobOpen,
+  type CloseOutcome,
   type ConnectionType,
   type JobLead,
   type LeadStatus,
@@ -70,20 +75,24 @@ export function LeadActions({
   onStatusChange,
   onViewDetails,
   hideViewDetails,
+  canAct,
   className,
 }: {
   lead: JobLead;
   resumes: Resume[];
   status: LeadStatus;
-  onStatusChange?: (status: LeadStatus) => void;
+  onStatusChange?: (status: LeadStatus, outcome?: CloseOutcome | null) => void;
   /** Open the detail modal. When omitted, "View details" navigates to the page. */
   onViewDetails?: () => void;
   /** Hide the "View details" item (e.g. when already on the detail view). */
   hideViewDetails?: boolean;
+  /** Whether create-actions (contact/reminder/draft) are allowed (job open). */
+  canAct?: boolean;
   className?: string;
 }) {
   const router = useRouter();
   const [dialog, setDialog] = useState<DialogKind>(null);
+  const canActNow = canAct ?? isJobOpen(status);
 
   return (
     <>
@@ -123,27 +132,50 @@ export function LeadActions({
             </DropdownMenuSubTrigger>
             <DropdownMenuSubContent>
               <DropdownMenuRadioGroup
-                value={status}
+                value={isJobOpen(status) ? status : ""}
                 onValueChange={(v) => onStatusChange?.(v as LeadStatus)}
               >
-                {LEAD_STATUSES.map((s) => (
+                {OPEN_LEAD_STATUSES.map((s) => (
                   <DropdownMenuRadioItem key={s} value={s}>
                     {LEAD_STATUS_LABELS[s]}
                   </DropdownMenuRadioItem>
                 ))}
               </DropdownMenuRadioGroup>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => onStatusChange?.("discarded")}>
+                <Archive className="size-4" aria-hidden />
+                Discard
+              </DropdownMenuItem>
+              {(Object.keys(CLOSE_OUTCOME_LABELS) as CloseOutcome[]).map((o) => (
+                <DropdownMenuItem
+                  key={o}
+                  onClick={() => onStatusChange?.("closed", o)}
+                >
+                  <Flag className="size-4" aria-hidden />
+                  Close · {CLOSE_OUTCOME_LABELS[o]}
+                </DropdownMenuItem>
+              ))}
             </DropdownMenuSubContent>
           </DropdownMenuSub>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => setDialog("contact")}>
+          <DropdownMenuItem
+            disabled={!canActNow}
+            onClick={() => setDialog("contact")}
+          >
             <UserPlus className="size-4" aria-hidden />
             Add contact
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => setDialog("reminder")}>
+          <DropdownMenuItem
+            disabled={!canActNow}
+            onClick={() => setDialog("reminder")}
+          >
             <BellPlus className="size-4" aria-hidden />
             Add reminder
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => setDialog("outreach")}>
+          <DropdownMenuItem
+            disabled={!canActNow}
+            onClick={() => setDialog("outreach")}
+          >
             <Send className="size-4" aria-hidden />
             Draft outreach
           </DropdownMenuItem>

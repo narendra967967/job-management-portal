@@ -1,8 +1,9 @@
 "use client";
 
-import { Bell, BellPlus, Clock, Trash2 } from "lucide-react";
-import { REMINDER_OUTCOME_LABELS, type JobLead } from "@/lib/types";
-import { deleteReminder, useRemindersForLead } from "@/lib/mock-store";
+import { Bell, BellPlus, Clock } from "lucide-react";
+import { isJobOpen, type JobLead } from "@/lib/types";
+import { useLeadStatus, useRemindersForLead } from "@/lib/mock-store";
+import { ReminderActions } from "@/components/leads/reminder-actions";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -12,11 +13,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 
 /**
- * All reminders for one lead, with delete. "Add reminder" opens the existing
- * add dialog (stacked above, via the card's action-dialog opener). Reads from
- * the in-memory store so adds/deletes reflect live (Phase 3 → Server Actions).
+ * All reminders for one lead: mark done, snooze/reschedule, delete. "Add
+ * reminder" opens the add dialog (stacked above) and is disabled once the job
+ * is closed/discarded. Reads from the store so changes reflect live.
  */
 export function LeadRemindersDialog({
   lead,
@@ -30,6 +32,8 @@ export function LeadRemindersDialog({
   onAddReminder: () => void;
 }) {
   const reminders = useRemindersForLead(lead.id);
+  const { status } = useLeadStatus(lead.id);
+  const jobOpen = isJobOpen(status);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -59,35 +63,42 @@ export function LeadRemindersDialog({
           </div>
         ) : (
           <ul className="space-y-2">
-            {reminders.map((r) => (
-              <li
-                key={r.id}
-                className="flex items-center gap-3 rounded-xl border bg-card p-3"
-              >
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-status-reviewing text-status-reviewing-foreground">
-                  <Clock className="size-4" aria-hidden />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">
-                    {r.manual
-                      ? r.label || "Manual reminder"
-                      : `Reminder ${r.sequence}`}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Due {r.dueDate} · {REMINDER_OUTCOME_LABELS[r.outcome]}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  aria-label="Delete reminder"
-                  title="Delete reminder"
-                  onClick={() => deleteReminder(r.id)}
-                  className="flex size-9 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
+            {reminders.map((r) => {
+              const done = r.outcome !== "pending";
+              return (
+                <li
+                  key={r.id}
+                  className="flex items-center gap-3 rounded-xl border bg-card p-3"
                 >
-                  <Trash2 className="size-4" aria-hidden />
-                </button>
-              </li>
-            ))}
+                  <span
+                    className={cn(
+                      "flex size-9 shrink-0 items-center justify-center rounded-md",
+                      done
+                        ? "bg-status-applied text-status-applied-foreground"
+                        : "bg-status-reviewing text-status-reviewing-foreground",
+                    )}
+                  >
+                    <Clock className="size-4" aria-hidden />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p
+                      className={cn(
+                        "truncate text-sm font-medium",
+                        done && "text-muted-foreground line-through",
+                      )}
+                    >
+                      {r.manual
+                        ? r.label || "Manual reminder"
+                        : `Reminder ${r.sequence}`}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {done ? "Done" : `Due ${r.dueDate}`}
+                    </p>
+                  </div>
+                  <ReminderActions reminder={r} />
+                </li>
+              );
+            })}
           </ul>
         )}
 
@@ -95,7 +106,11 @@ export function LeadRemindersDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Close
           </Button>
-          <Button onClick={onAddReminder}>
+          <Button
+            onClick={onAddReminder}
+            disabled={!jobOpen}
+            title={jobOpen ? "Add reminder" : "Reopen this job to add reminders"}
+          >
             <BellPlus className="size-4" aria-hidden />
             Add reminder
           </Button>
