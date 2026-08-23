@@ -16,10 +16,16 @@
 // Phase 3 replaces all of this with Server Actions against Postgres.
 
 import { useSyncExternalStore } from "react";
-import { mockLeads, mockOutreach, mockReminders } from "@/lib/mock-data";
+import {
+  mockContacts,
+  mockLeads,
+  mockOutreach,
+  mockReminders,
+} from "@/lib/mock-data";
 import { isJobOpen } from "@/lib/types";
 import type {
   CloseOutcome,
+  Contact,
   LeadStatus,
   OutreachMessage,
   Reminder,
@@ -59,6 +65,7 @@ function reminderToTask(r: Reminder): Task {
 }
 
 let statusOverrides: Record<string, StatusOverride> = {};
+let contacts: Contact[] = [...mockContacts];
 let outreach: OutreachMessage[] = [...mockOutreach];
 let reminders: Reminder[] = [...mockReminders];
 let tasks: Task[] = mockReminders.map(reminderToTask);
@@ -108,6 +115,23 @@ export function setLeadStatus(
         : t,
     );
   }
+  emit();
+}
+
+/* ---- contacts ---- */
+
+export function addContact(input: Omit<Contact, "id">) {
+  contacts = [{ ...input, id: `contact-${Date.now()}` }, ...contacts];
+  emit();
+}
+
+export function updateContact(id: string, patch: Partial<Omit<Contact, "id">>) {
+  contacts = contacts.map((c) => (c.id === id ? { ...c, ...patch } : c));
+  emit();
+}
+
+export function deleteContact(id: string) {
+  contacts = contacts.filter((c) => c.id !== id);
   emit();
 }
 
@@ -218,11 +242,18 @@ export function deleteTask(id: string) {
 
 /* ---- reads (stable snapshots) ---- */
 
+const getContacts = () => contacts;
 const getOutreach = () => outreach;
 const getReminders = () => reminders;
 const getTasks = () => tasks;
 const getStatusOverrides = () => statusOverrides;
 
+export function useContacts(): Contact[] {
+  return useSyncExternalStore(subscribe, getContacts, getContacts);
+}
+export function useContactsForLead(leadId: string): Contact[] {
+  return useContacts().filter((c) => c.leadId === leadId);
+}
 export function useOutreach(): OutreachMessage[] {
   return useSyncExternalStore(subscribe, getOutreach, getOutreach);
 }

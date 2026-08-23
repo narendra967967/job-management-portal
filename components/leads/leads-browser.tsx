@@ -38,6 +38,7 @@ import { mockResumes } from "@/lib/mock-data";
 import { computeFitScore, fitBand } from "@/lib/fit";
 import { useDefaultResumeId } from "@/lib/use-default-resume";
 import {
+  useContactsForLead,
   useRemindersForLead,
   useStatusOverrides,
   setLeadStatus,
@@ -566,13 +567,14 @@ function LeadCard({
   });
   const [remindersOpen, setRemindersOpen] = useState(false);
   const leadReminders = useRemindersForLead(lead.id);
+  const contactCount = useContactsForLead(lead.id).length;
 
   const fit = computeFitScore(lead.id, resumeId);
   const band = fitBand(fit);
   const resumeLabel =
     mockResumes.find((r) => r.id === resumeId)?.label ?? "resume";
   const open = isJobOpen(status);
-  const hasContacts = lead.contactCount > 0;
+  const hasContacts = contactCount > 0;
 
   // Stop card-body clicks/keys from firing on the header & footer controls.
   const stop = {
@@ -672,10 +674,10 @@ function LeadCard({
               Remote
             </span>
           )}
-          {lead.contactCount > 0 && (
+          {contactCount > 0 && (
             <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
               <Users className="size-3" aria-hidden />
-              {lead.contactCount}
+              {contactCount}
             </span>
           )}
           {lead.hasDueReminder && (

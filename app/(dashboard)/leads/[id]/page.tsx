@@ -1,11 +1,6 @@
 import { notFound } from "next/navigation";
 import { LeadDetail } from "@/components/leads/lead-detail";
-import {
-  getContactsForLead,
-  getLead,
-  getLeadDetail,
-  mockResumes,
-} from "@/lib/mock-data";
+import { getLead, getLeadDetail, mockResumes } from "@/lib/mock-data";
 
 export default async function LeadDetailPage({
   params,
@@ -20,7 +15,6 @@ export default async function LeadDetailPage({
     <LeadDetail
       lead={lead}
       detail={getLeadDetail(id)}
-      contacts={getContactsForLead(id)}
       resumes={mockResumes}
     />
   );

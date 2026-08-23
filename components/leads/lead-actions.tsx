@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   MoreHorizontal,
@@ -22,15 +22,23 @@ import {
   OUTREACH_KIND_LABELS,
   isJobOpen,
   type CloseOutcome,
+  type Contact,
   type ConnectionType,
   type JobLead,
   type LeadStatus,
   type OutreachKind,
   type Resume,
 } from "@/lib/types";
-import { getContactsForLead, getOutreachForLead } from "@/lib/mock-data";
+import { getOutreachForLead } from "@/lib/mock-data";
 import { computeFitScore, fitBand } from "@/lib/fit";
-import { addOutreach, addReminder, nextReminderSequence } from "@/lib/mock-store";
+import {
+  addContact,
+  addOutreach,
+  addReminder,
+  nextReminderSequence,
+  updateContact,
+  useContactsForLead,
+} from "@/lib/mock-store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -274,31 +282,46 @@ export function useLeadActionDialogs(
 /* Add contact                                                         */
 /* ------------------------------------------------------------------ */
 
-function AddContactDialog({
+export function AddContactDialog({
   lead,
+  contact,
   open,
   onOpenChange,
 }: {
   lead: JobLead;
+  /** When provided, the dialog edits this contact instead of adding one. */
+  contact?: Contact;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const editing = !!contact;
   const [pasted, setPasted] = useState("");
   const [parsing, setParsing] = useState(false);
+  const [aiParsed, setAiParsed] = useState(false);
   const [name, setName] = useState("");
   const [title, setTitle] = useState("");
   const [url, setUrl] = useState("");
   const [type, setType] = useState<ConnectionType>("recruiter");
   const [error, setError] = useState("");
 
-  function reset() {
+  // Sync fields when the dialog opens (prefill for edit, blank for add).
+  useEffect(() => {
+    if (!open) return;
+    if (contact) {
+      setName(contact.name);
+      setTitle(contact.title);
+      setUrl(contact.linkedinUrl ?? "");
+      setType(contact.connectionType);
+    } else {
+      setName("");
+      setTitle("");
+      setUrl("");
+      setType("recruiter");
+    }
     setPasted("");
-    setName("");
-    setTitle("");
-    setUrl("");
-    setType("recruiter");
+    setAiParsed(false);
     setError("");
-  }
+  }, [open, contact]);
 
   function structure() {
     if (!pasted.trim()) {
@@ -314,6 +337,7 @@ function AddContactDialog({
       setTitle("Parsed title");
       setUrl("");
       setType("recruiter");
+      setAiParsed(true);
       setParsing(false);
     }, 700);
   }
@@ -323,53 +347,67 @@ function AddContactDialog({
       setError("Name is required.");
       return;
     }
-    // Mock: Phase 3 persists via a Server Action. Close on success.
-    reset();
+    if (editing && contact) {
+      updateContact(contact.id, {
+        name,
+        title,
+        linkedinUrl: url,
+        connectionType: type,
+      });
+    } else {
+      addContact({
+        leadId: lead.id,
+        name,
+        title,
+        linkedinUrl: url,
+        connectionType: type,
+        aiParsed,
+      });
+    }
     onOpenChange(false);
   }
 
   return (
     <ActionDialog
       open={open}
-      onOpenChange={(o) => {
-        if (!o) reset();
-        onOpenChange(o);
-      }}
+      onOpenChange={onOpenChange}
       icon={<UserPlus className="size-4" aria-hidden />}
-      title="Add contact"
+      title={editing ? "Edit contact" : "Add contact"}
       description={`${lead.company} · ${lead.title}`}
       footer={
         <>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={save}>Save contact</Button>
+          <Button onClick={save}>{editing ? "Save changes" : "Save contact"}</Button>
         </>
       }
     >
       <div className="space-y-4">
-        <div className="rounded-lg border bg-muted/40 p-3">
-          <Label htmlFor="paste-contact" className="text-ai">
-            <Sparkles className="size-3.5" aria-hidden />
-            Paste &amp; structure with AI
-          </Label>
-          <Textarea
-            id="paste-contact"
-            value={pasted}
-            onChange={(e) => setPasted(e.target.value)}
-            placeholder="Paste hiring-team or referral text from LinkedIn…"
-            className="mt-2 min-h-20"
-          />
-          <Button
-            variant="outline"
-            onClick={structure}
-            disabled={parsing}
-            className="mt-2 border-ai/40 text-ai hover:bg-ai-muted/50"
-          >
-            <Sparkles className="size-4" aria-hidden />
-            {parsing ? "Structuring…" : "Structure with AI"}
-          </Button>
-        </div>
+        {!editing && (
+          <div className="rounded-lg border bg-muted/40 p-3">
+            <Label htmlFor="paste-contact" className="text-ai">
+              <Sparkles className="size-3.5" aria-hidden />
+              Paste &amp; structure with AI
+            </Label>
+            <Textarea
+              id="paste-contact"
+              value={pasted}
+              onChange={(e) => setPasted(e.target.value)}
+              placeholder="Paste hiring-team or referral text from LinkedIn…"
+              className="mt-2 min-h-20"
+            />
+            <Button
+              variant="outline"
+              onClick={structure}
+              disabled={parsing}
+              className="mt-2 border-ai/40 text-ai hover:bg-ai-muted/50"
+            >
+              <Sparkles className="size-4" aria-hidden />
+              {parsing ? "Structuring…" : "Structure with AI"}
+            </Button>
+          </div>
+        )}
 
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Name">
@@ -542,7 +580,7 @@ function DraftOutreachDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const contacts = getContactsForLead(lead.id);
+  const contacts = useContactsForLead(lead.id);
   const initialResumeId =
     selectedResumeId ??
     resumes.find((r) => r.isDefault)?.id ??

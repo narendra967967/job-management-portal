@@ -10,6 +10,8 @@ import {
   Send,
   Clock,
   MapPin,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import {
   CLOSE_OUTCOME_LABELS,
@@ -24,24 +26,25 @@ import {
   type Resume,
 } from "@/lib/types";
 import { StatusBadge } from "@/components/leads/status-badge";
-import { LeadActions } from "@/components/leads/lead-actions";
+import { LeadActions, AddContactDialog } from "@/components/leads/lead-actions";
 import { ReminderActions } from "@/components/leads/reminder-actions";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { computeFitScore, fitBand } from "@/lib/fit";
 import { useDefaultResumeId } from "@/lib/use-default-resume";
 import {
+  useContactsForLead,
   useOutreachForLead,
   useRemindersForLead,
   useLeadStatus,
   setLeadStatus,
+  deleteContact,
 } from "@/lib/mock-store";
 import { cn } from "@/lib/utils";
 
 interface Props {
   lead: JobLead;
   detail?: JobLeadDetail;
-  contacts: Contact[];
   resumes: Resume[];
 }
 
@@ -72,13 +75,13 @@ export function LeadDetail(props: Props) {
 export function LeadDetailContent({
   lead,
   detail,
-  contacts,
   resumes,
   resumeId,
 }: Props & {
   /** Resume to score against; falls back to the user's default resume. */
   resumeId?: string;
 }) {
+  const contacts = useContactsForLead(lead.id);
   // Status is owned by the store so it stays in sync everywhere and closing a
   // job auto-cancels its follow-ups.
   const { status, closeOutcome } = useLeadStatus(lead.id);
@@ -196,7 +199,7 @@ export function LeadDetailContent({
           <OverviewTab detail={detail} />
         </TabsContent>
         <TabsContent value="contacts" className="mt-4">
-          <ContactsTab contacts={contacts} />
+          <ContactsTab lead={lead} />
         </TabsContent>
         <TabsContent value="outreach" className="mt-4">
           <OutreachTab leadId={lead.id} />
@@ -278,28 +281,50 @@ function OverviewTab({ detail }: { detail?: JobLeadDetail }) {
 
 /* ---------------- Contacts (read list) ---------------- */
 
-function ContactsTab({ contacts }: { contacts: Contact[] }) {
-  if (contacts.length === 0) {
-    return (
-      <EmptyState
-        icon={<Users className="size-5" aria-hidden />}
-        title="No contacts yet"
-        body="Use the actions menu (⋯) above to add a recruiter or referral."
-      />
-    );
-  }
+function ContactsTab({ lead }: { lead: JobLead }) {
+  const contacts = useContactsForLead(lead.id);
+  const [editing, setEditing] = useState<Contact | null>(null);
+
   return (
-    <ul className="space-y-2.5">
-      {contacts.map((c) => (
-        <li key={c.id}>
-          <ContactCard contact={c} />
-        </li>
-      ))}
-    </ul>
+    <>
+      {contacts.length === 0 ? (
+        <EmptyState
+          icon={<Users className="size-5" aria-hidden />}
+          title="No contacts yet"
+          body="Use the actions menu (⋯) above to add a recruiter or referral."
+        />
+      ) : (
+        <ul className="space-y-2.5">
+          {contacts.map((c) => (
+            <li key={c.id}>
+              <ContactCard
+                contact={c}
+                onEdit={() => setEditing(c)}
+                onDelete={() => deleteContact(c.id)}
+              />
+            </li>
+          ))}
+        </ul>
+      )}
+      <AddContactDialog
+        lead={lead}
+        contact={editing ?? undefined}
+        open={editing !== null}
+        onOpenChange={(o) => !o && setEditing(null)}
+      />
+    </>
   );
 }
 
-function ContactCard({ contact }: { contact: Contact }) {
+function ContactCard({
+  contact,
+  onEdit,
+  onDelete,
+}: {
+  contact: Contact;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
   const initials = contact.name
     .split(" ")
     .map((p) => p[0])
@@ -320,11 +345,28 @@ function ContactCard({ contact }: { contact: Contact }) {
             </span>
           )}
         </div>
-        <p className="truncate text-xs text-muted-foreground">{contact.title}</p>
+        <p className="truncate text-xs text-muted-foreground">
+          {contact.title} · {CONNECTION_TYPE_LABELS[contact.connectionType]}
+        </p>
       </div>
-      <span className="shrink-0 rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-        {CONNECTION_TYPE_LABELS[contact.connectionType]}
-      </span>
+      <button
+        type="button"
+        aria-label={`Edit ${contact.name}`}
+        title="Edit"
+        onClick={onEdit}
+        className="inline-flex size-9 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+      >
+        <Pencil className="size-4" aria-hidden />
+      </button>
+      <button
+        type="button"
+        aria-label={`Delete ${contact.name}`}
+        title="Delete"
+        onClick={onDelete}
+        className="inline-flex size-9 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
+      >
+        <Trash2 className="size-4" aria-hidden />
+      </button>
     </div>
   );
 }

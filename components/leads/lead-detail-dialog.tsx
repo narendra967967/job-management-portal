@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { ExternalLink } from "lucide-react";
 import type { JobLead, Resume } from "@/lib/types";
-import { getContactsForLead, getLeadDetail } from "@/lib/mock-data";
+import { getLeadDetail } from "@/lib/mock-data";
 import { LeadDetailContent } from "@/components/leads/lead-detail";
 import {
   Dialog,
@@ -41,7 +41,6 @@ export function LeadDetailDialog({
             <LeadDetailContent
               lead={lead}
               detail={getLeadDetail(lead.id)}
-              contacts={getContactsForLead(lead.id)}
               resumes={resumes}
               resumeId={resumeId}
             />

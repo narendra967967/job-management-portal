@@ -1,10 +1,13 @@
+"use client";
+
 import Link from "next/link";
 import { Sparkles, ChevronRight } from "lucide-react";
-import { getLead, mockContacts } from "@/lib/mock-data";
+import { getLead } from "@/lib/mock-data";
+import { useContacts } from "@/lib/mock-store";
 import { CONNECTION_TYPE_LABELS } from "@/lib/types";
 
 export default function ContactsPage() {
-  const rows = mockContacts
+  const rows = useContacts()
     .map((c) => ({ contact: c, lead: getLead(c.leadId) }))
     .filter((row) => row.lead);
 
