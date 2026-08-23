@@ -228,7 +228,7 @@ export function MobileNav() {
 export function BottomNav() {
   const pathname = usePathname();
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t bg-card md:hidden">
+    <nav className="grid shrink-0 grid-cols-4 border-t bg-card pb-[env(safe-area-inset-bottom)] md:hidden">
       {navItems.map(({ href, label, icon: Icon }) => {
         const active = isActive(pathname, href);
         return (
