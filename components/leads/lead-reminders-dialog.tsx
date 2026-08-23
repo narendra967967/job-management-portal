@@ -1,7 +1,11 @@
 "use client";
 
 import { Bell, BellPlus, Clock } from "lucide-react";
-import { isJobOpen, type JobLead } from "@/lib/types";
+import {
+  REMINDER_OUTCOME_LABELS,
+  isJobOpen,
+  type JobLead,
+} from "@/lib/types";
 import { useLeadStatus, useRemindersForLead } from "@/lib/mock-store";
 import { ReminderActions } from "@/components/leads/reminder-actions";
 import { Button } from "@/components/ui/button";
@@ -92,7 +96,7 @@ export function LeadRemindersDialog({
                         : `Reminder ${r.sequence}`}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {done ? "Done" : `Due ${r.dueDate}`}
+                      {done ? REMINDER_OUTCOME_LABELS[r.outcome] : `Due ${r.dueDate}`}
                     </p>
                   </div>
                   <ReminderActions reminder={r} />

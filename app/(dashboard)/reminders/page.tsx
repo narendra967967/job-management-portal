@@ -5,6 +5,7 @@ import { Clock } from "lucide-react";
 import { getLead } from "@/lib/mock-data";
 import { useReminders } from "@/lib/mock-store";
 import { ReminderActions } from "@/components/leads/reminder-actions";
+import { REMINDER_OUTCOME_LABELS } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export default function RemindersPage() {
@@ -55,7 +56,9 @@ export default function RemindersPage() {
                   </p>
                   <p className="truncate text-xs text-muted-foreground">
                     {lead!.company} ·{" "}
-                    {done ? "Done" : `Reminder ${reminder.sequence} · due ${reminder.dueDate}`}
+                    {done
+                      ? REMINDER_OUTCOME_LABELS[reminder.outcome]
+                      : `Reminder ${reminder.sequence} · due ${reminder.dueDate}`}
                   </p>
                 </Link>
                 <ReminderActions reminder={reminder} />

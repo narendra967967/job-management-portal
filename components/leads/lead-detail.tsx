@@ -17,6 +17,7 @@ import {
   CLOSE_OUTCOME_LABELS,
   CONNECTION_TYPE_LABELS,
   OUTREACH_KIND_LABELS,
+  REMINDER_OUTCOME_LABELS,
   isJobOpen,
   type CloseOutcome,
   type Contact,
@@ -446,7 +447,7 @@ function RemindersTab({ leadId }: { leadId: string }) {
                   : `Reminder ${r.sequence}`}
               </p>
               <p className="text-xs text-muted-foreground">
-                {done ? "Done" : `Due ${r.dueDate}`}
+                {done ? REMINDER_OUTCOME_LABELS[r.outcome] : `Due ${r.dueDate}`}
               </p>
             </div>
             <ReminderActions reminder={r} />

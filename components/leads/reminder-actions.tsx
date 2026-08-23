@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Clock3, RotateCcw, Trash2 } from "lucide-react";
-import type { Reminder } from "@/lib/types";
+import { CheckCheck, Clock3, RotateCcw, Trash2 } from "lucide-react";
+import { REMINDER_OUTCOME_LABELS, type Reminder } from "@/lib/types";
 import {
-  completeReminder,
   deleteReminder,
+  setReminderOutcome,
   snoozeReminder,
 } from "@/lib/mock-store";
 import { Input } from "@/components/ui/input";
@@ -30,10 +30,18 @@ function addDays(n: number): string {
   return iso(d);
 }
 
+// Outcomes the user can record when resolving a reminder (FR-5.3).
+const RESOLVE_OUTCOMES = [
+  "response-received",
+  "reminder-sent",
+  "not-responded",
+  "closed",
+] as const;
+
 const iconBtn =
   "inline-flex size-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none";
 
-/** Per-reminder actions: Mark done · Snooze/Reschedule · Delete (or Reopen). */
+/** Per-reminder actions: Resolve (record outcome) · Snooze/Reschedule · Delete. */
 export function ReminderActions({ reminder }: { reminder: Reminder }) {
   const done = reminder.outcome !== "pending";
   const [custom, setCustom] = useState("");
@@ -45,22 +53,36 @@ export function ReminderActions({ reminder }: { reminder: Reminder }) {
           type="button"
           aria-label="Reopen reminder"
           title="Reopen"
-          onClick={() => snoozeReminder(reminder.id, addDays(3))}
+          onClick={() => setReminderOutcome(reminder.id, "pending")}
           className={iconBtn}
         >
           <RotateCcw className="size-4" aria-hidden />
         </button>
       ) : (
         <>
-          <button
-            type="button"
-            aria-label="Mark reminder done"
-            title="Mark done"
-            onClick={() => completeReminder(reminder.id)}
-            className={`${iconBtn} hover:text-status-applied-foreground`}
-          >
-            <Check className="size-4" aria-hidden />
-          </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              aria-label="Resolve reminder"
+              title="Resolve — record outcome"
+              className={`${iconBtn} hover:text-status-applied-foreground`}
+            >
+              <CheckCheck className="size-4" aria-hidden />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuGroup>
+                <DropdownMenuLabel>Record outcome</DropdownMenuLabel>
+              </DropdownMenuGroup>
+              {RESOLVE_OUTCOMES.map((o) => (
+                <DropdownMenuItem
+                  key={o}
+                  onClick={() => setReminderOutcome(reminder.id, o)}
+                >
+                  {REMINDER_OUTCOME_LABELS[o]}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
           <DropdownMenu>
             <DropdownMenuTrigger
               aria-label="Snooze or reschedule"
