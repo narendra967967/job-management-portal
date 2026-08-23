@@ -3,7 +3,7 @@ import { Logo } from "@/components/app-shell/logo";
 import {
   SidebarNav,
   SidebarFooter,
-  AccountMenu,
+  MobileNav,
   BottomNav,
 } from "@/components/app-shell/main-nav";
 import { NotificationsMenu, TopBarStats } from "@/components/app-shell/top-bar";
@@ -29,6 +29,7 @@ export default function DashboardLayout({
         {/* Top app bar */}
         <header className="sticky top-0 z-30 border-b bg-card/70 shadow-[0_1px_2px_-1px_oklch(0.51_0.24_277_/_0.12)] backdrop-blur-md">
           <div className="flex items-center gap-2 px-4 py-2.5 md:gap-3 md:px-6">
+            <MobileNav />
             <div className="md:hidden">
               <Logo showName={false} />
             </div>
@@ -47,10 +48,6 @@ export default function DashboardLayout({
             <div className="ml-auto flex items-center gap-1.5 sm:gap-2.5">
               <TopBarStats className="hidden sm:flex" />
               <NotificationsMenu />
-              {/* Account (Settings / Log out) — mobile only; desktop uses the sidebar footer. */}
-              <div className="md:hidden">
-                <AccountMenu />
-              </div>
             </div>
           </div>
         </header>

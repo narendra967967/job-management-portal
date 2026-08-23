@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import {
@@ -9,7 +10,10 @@ import {
   Bell,
   Settings,
   LogOut,
+  Menu,
+  X,
 } from "lucide-react";
+import { Logo } from "@/components/app-shell/logo";
 import { mockProfile } from "@/lib/mock-data";
 import {
   DropdownMenu,
@@ -136,6 +140,81 @@ export function AccountMenu() {
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+/** Hamburger + slide-in sidebar drawer — mobile only (below md). */
+export function MobileNav() {
+  const [open, setOpen] = useState(false);
+  const pathname = usePathname();
+
+  // Close on navigation.
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
+
+  // Lock body scroll + close on Escape while open.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+
+  return (
+    <div className="md:hidden">
+      <button
+        type="button"
+        aria-label="Open menu"
+        aria-expanded={open}
+        onClick={() => setOpen(true)}
+        className="inline-flex size-11 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+      >
+        <Menu className="size-5" aria-hidden />
+      </button>
+
+      {open && (
+        <div className="fixed inset-0 z-50">
+          <button
+            type="button"
+            aria-label="Close menu"
+            tabIndex={-1}
+            onClick={() => setOpen(false)}
+            className="absolute inset-0 bg-black/40"
+          />
+          <aside className="absolute inset-y-0 left-0 flex w-72 max-w-[85%] flex-col border-r border-sidebar-border bg-sidebar shadow-xl">
+            <div className="flex items-center justify-between border-b border-sidebar-border p-4">
+              <Logo />
+              <button
+                type="button"
+                aria-label="Close menu"
+                onClick={() => setOpen(false)}
+                className="inline-flex size-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+              >
+                <X className="size-5" aria-hidden />
+              </button>
+            </div>
+            {/* Close when any link inside is tapped (covers same-route taps too). */}
+            <div
+              className="flex min-h-0 flex-1 flex-col overflow-y-auto"
+              onClick={(e) => {
+                if ((e.target as HTMLElement).closest("a")) setOpen(false);
+              }}
+            >
+              <SidebarNav />
+              <SidebarFooter />
+            </div>
+          </aside>
+        </div>
+      )}
+    </div>
   );
 }
 
