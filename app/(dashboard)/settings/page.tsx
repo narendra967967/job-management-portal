@@ -278,8 +278,9 @@ function GoogleCard() {
               {query}
             </p>
             <p className="mt-1 text-[11px] text-muted-foreground">
-              This exact read-only search is what the daily sync runs against
-              your mailbox.
+              The first sync backfills this window; after that JMP fetches only
+              new mail and skips jobs already saved (deduped by LinkedIn job
+              ID), so nothing is imported twice.
             </p>
           </div>
 

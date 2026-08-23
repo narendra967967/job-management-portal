@@ -109,6 +109,13 @@ export interface JobLead {
   tags: string[];
   postedRelative: string;
   canonicalJobUrl: string;
+  /**
+   * LinkedIn's numeric job ID (from the canonical URL). This is the DEDUPE KEY:
+   * Phase 2 puts a UNIQUE (user_id, linkedinJobId) constraint on the table and
+   * the Gmail sync inserts ON CONFLICT DO NOTHING, so a job re-seen across
+   * emails or daily re-fetches is stored exactly once.
+   */
+  linkedinJobId: string;
   status: LeadStatus;
   closeOutcome?: CloseOutcome | null; // set when status === "closed"
   capturedAt: string; // ISO date

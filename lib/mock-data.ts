@@ -15,7 +15,15 @@ import type {
   Resume,
 } from "@/lib/types";
 
-export const mockLeads: JobLead[] = [
+// LinkedIn's numeric job ID from a canonical job URL — the dedupe key.
+export function extractLinkedInJobId(url: string): string {
+  const m =
+    url.match(/\/jobs\/view\/(\d+)/) ??
+    url.match(/(?:currentJobId|jobId)=(\d+)/);
+  return m ? m[1] : "";
+}
+
+const rawLeads: Omit<JobLead, "linkedinJobId">[] = [
   {
     id: "lead-1",
     title: "Delivery Manager — Remote",
@@ -283,6 +291,13 @@ export const mockLeads: JobLead[] = [
     hasDueReminder: false,
   },
 ];
+
+// The dedupe key (linkedinJobId) is derived from each lead's canonical URL,
+// mirroring how the Phase-3 Gmail sync will populate it.
+export const mockLeads: JobLead[] = rawLeads.map((l) => ({
+  ...l,
+  linkedinJobId: extractLinkedInJobId(l.canonicalJobUrl),
+}));
 
 export const mockLeadDetails: Record<string, JobLeadDetail> = {
   "lead-2": {
