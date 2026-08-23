@@ -483,7 +483,7 @@ function ResumesCard() {
                   type="button"
                   aria-label="Save name"
                   onClick={() => saveEdit(r.id)}
-                  className="flex size-9 items-center justify-center rounded-md text-status-applied-foreground hover:bg-muted"
+                  className="flex size-11 items-center justify-center rounded-md sm:size-9 text-status-applied-foreground hover:bg-muted"
                 >
                   <Check className="size-4" aria-hidden />
                 </button>
@@ -491,7 +491,7 @@ function ResumesCard() {
                   type="button"
                   aria-label="Cancel"
                   onClick={() => setEditingId(null)}
-                  className="flex size-9 items-center justify-center rounded-md text-muted-foreground hover:bg-muted"
+                  className="flex size-11 items-center justify-center rounded-md sm:size-9 text-muted-foreground hover:bg-muted"
                 >
                   <X className="size-4" aria-hidden />
                 </button>
@@ -531,7 +531,7 @@ function ResumesCard() {
                   }
                   onClick={() => setDefaultResumeId(r.id)}
                   disabled={r.id === defaultResumeId}
-                  className={`flex size-9 items-center justify-center rounded-md hover:bg-muted disabled:opacity-100 ${
+                  className={`flex size-11 items-center justify-center rounded-md sm:size-9 hover:bg-muted disabled:opacity-100 ${
                     r.id === defaultResumeId
                       ? "text-primary"
                       : "text-muted-foreground hover:text-foreground"
@@ -549,7 +549,7 @@ function ResumesCard() {
                     setEditingId(r.id);
                     setEditLabel(r.label);
                   }}
-                  className="flex size-9 items-center justify-center rounded-md text-muted-foreground hover:bg-muted"
+                  className="flex size-11 items-center justify-center rounded-md sm:size-9 text-muted-foreground hover:bg-muted"
                 >
                   <Pencil className="size-4" aria-hidden />
                 </button>
@@ -559,7 +559,7 @@ function ResumesCard() {
                   onClick={() =>
                     setResumes((list) => list.filter((x) => x.id !== r.id))
                   }
-                  className="flex size-9 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-destructive"
+                  className="flex size-11 items-center justify-center rounded-md sm:size-9 text-muted-foreground hover:bg-muted hover:text-destructive"
                 >
                   <Trash2 className="size-4" aria-hidden />
                 </button>

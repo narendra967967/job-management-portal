@@ -39,7 +39,7 @@ const RESOLVE_OUTCOMES = [
 ] as const;
 
 const iconBtn =
-  "inline-flex size-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none";
+  "inline-flex size-11 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:size-9";
 
 /** Per-reminder actions: Resolve (record outcome) · Snooze/Reschedule · Delete. */
 export function ReminderActions({ reminder }: { reminder: Reminder }) {

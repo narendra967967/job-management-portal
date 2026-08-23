@@ -355,7 +355,7 @@ function ContactCard({
         aria-label={`Edit ${contact.name}`}
         title="Edit"
         onClick={onEdit}
-        className="inline-flex size-9 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        className="inline-flex size-11 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:size-9"
       >
         <Pencil className="size-4" aria-hidden />
       </button>
@@ -364,7 +364,7 @@ function ContactCard({
         aria-label={`Delete ${contact.name}`}
         title="Delete"
         onClick={onDelete}
-        className="inline-flex size-9 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
+        className="inline-flex size-11 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-destructive sm:size-9"
       >
         <Trash2 className="size-4" aria-hidden />
       </button>
