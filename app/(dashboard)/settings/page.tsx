@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   FileText,
@@ -13,9 +13,12 @@ import {
   ShieldCheck,
   KeyRound,
   LogOut,
+  Filter,
 } from "lucide-react";
 import { useDefaultResumeId } from "@/lib/use-default-resume";
 import { useAppSettings } from "@/lib/use-app-settings";
+import { useGmailSettings, buildGmailQuery } from "@/lib/use-gmail-settings";
+import { Textarea } from "@/components/ui/textarea";
 import {
   mockAiSettings,
   mockGoogleConnection,
@@ -124,6 +127,38 @@ function ProfileCard() {
 
 function GoogleCard() {
   const [connected, setConnected] = useState(mockGoogleConnection.connected);
+  const [settings, updateSettings] = useGmailSettings();
+
+  // Local form mirrors the saved settings until you press Save.
+  const [sendersText, setSendersText] = useState("");
+  const [label, setLabel] = useState("");
+  const [subjectKeywords, setSubjectKeywords] = useState("");
+  const [lookbackDays, setLookbackDays] = useState(30);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    setSendersText(settings.senders.join("\n"));
+    setLabel(settings.label);
+    setSubjectKeywords(settings.subjectKeywords);
+    setLookbackDays(settings.lookbackDays);
+  }, [settings]);
+
+  const draft = {
+    senders: sendersText
+      .split("\n")
+      .map((s) => s.trim())
+      .filter(Boolean),
+    label,
+    subjectKeywords,
+    lookbackDays,
+  };
+  const query = buildGmailQuery(draft);
+
+  function save() {
+    updateSettings(draft);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1500);
+  }
 
   return (
     <section className="rounded-2xl border bg-card p-4 md:p-5">
@@ -171,6 +206,91 @@ function GoogleCard() {
           </Button>
         </div>
       )}
+
+      {/* ---- Which emails to ingest ---- */}
+      <div className="mt-5 border-t pt-4">
+        <h3 className="flex items-center gap-1.5 text-sm font-medium">
+          <Filter className="size-4 text-muted-foreground" aria-hidden />
+          Which emails to read
+        </h3>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          JMP only reads messages matching these rules. Tip: open a real
+          LinkedIn alert in Gmail and copy its “From” address to be sure.
+        </p>
+
+        <div className="mt-4 space-y-4">
+          <Field label="From addresses (one per line)">
+            <Textarea
+              value={sendersText}
+              onChange={(e) => setSendersText(e.target.value)}
+              placeholder="jobalerts-noreply@linkedin.com"
+              className="min-h-20 font-mono text-[13px]"
+            />
+          </Field>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Gmail label (optional)">
+              <Input
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                placeholder="e.g. Job Alerts"
+              />
+            </Field>
+            <Field label="Initial history to pull">
+              <Select
+                items={{
+                  "7": "Last 7 days",
+                  "30": "Last 30 days",
+                  "90": "Last 90 days",
+                  "180": "Last 6 months",
+                  "0": "All mail",
+                }}
+                value={String(lookbackDays)}
+                onValueChange={(v) => setLookbackDays(Number(v ?? "30"))}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="7">Last 7 days</SelectItem>
+                  <SelectItem value="30">Last 30 days</SelectItem>
+                  <SelectItem value="90">Last 90 days</SelectItem>
+                  <SelectItem value="180">Last 6 months</SelectItem>
+                  <SelectItem value="0">All mail</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
+
+          <Field label="Subject must contain (optional, comma-separated)">
+            <Input
+              value={subjectKeywords}
+              onChange={(e) => setSubjectKeywords(e.target.value)}
+              placeholder="job alert, new jobs"
+            />
+          </Field>
+
+          <div>
+            <span className="text-xs font-medium text-muted-foreground">
+              Effective Gmail search
+            </span>
+            <p className="mt-1.5 rounded-lg border bg-muted/40 p-2.5 font-mono text-[12px] break-all text-foreground">
+              {query}
+            </p>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              This exact read-only search is what the daily sync runs against
+              your mailbox.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Button onClick={save}>Save email rules</Button>
+            {saved && (
+              <span className="text-xs text-status-applied-foreground">Saved</span>
+            )}
+          </div>
+        </div>
+      </div>
     </section>
   );
 }
