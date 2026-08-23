@@ -238,11 +238,11 @@ export function BottomNav() {
             key={href}
             href={href}
             className={cn(
-              "flex min-h-14 flex-col items-center justify-center gap-1 text-xs font-medium transition-colors",
+              "flex min-h-14 flex-col items-center justify-center gap-1 px-0.5 text-[10px] font-medium whitespace-nowrap transition-colors",
               active ? "text-primary" : "text-muted-foreground",
             )}
           >
-            <Icon className="size-5" aria-hidden />
+            <Icon className="size-5 shrink-0" aria-hidden />
             {label}
           </Link>
         );
