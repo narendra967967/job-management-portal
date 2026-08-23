@@ -765,7 +765,7 @@ function CardActionButton({
       onClick={onClick}
       disabled={disabled}
       title={title}
-      className="inline-flex min-h-11 items-center justify-center gap-1.5 px-2 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:pointer-events-none disabled:opacity-40 sm:min-h-10"
+      className="inline-flex min-h-11 items-center justify-center gap-1.5 px-2 py-2 text-xs font-medium text-muted-foreground transition-colors enabled:hover:bg-muted enabled:hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40 sm:min-h-10"
     >
       <Icon className="size-4 shrink-0" aria-hidden />
       {label}
