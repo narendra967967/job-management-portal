@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { Bell, Clock, Sparkles } from "lucide-react";
+import { useRouter, usePathname } from "next/navigation";
+import { Bell, Clock, Sparkles, Search } from "lucide-react";
 import { mockLeads, mockNotifications, mockReminders } from "@/lib/mock-data";
+import { useSearchQuery, setSearchQuery } from "@/lib/search-store";
+import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,6 +19,32 @@ import { cn } from "@/lib/utils";
 
 const newCount = mockLeads.filter((l) => l.status === "new").length;
 const dueCount = mockReminders.filter((r) => r.outcome === "pending").length;
+
+/** Search box that filters the Leads list (jumps to /leads when typing). */
+export function TopBarSearch() {
+  const query = useSearchQuery();
+  const router = useRouter();
+  const pathname = usePathname();
+  return (
+    <div className="relative w-36 sm:w-56 md:w-72">
+      <Search
+        className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+        aria-hidden
+      />
+      <Input
+        type="search"
+        value={query}
+        onChange={(e) => {
+          setSearchQuery(e.target.value);
+          if (e.target.value && pathname !== "/leads") router.push("/leads");
+        }}
+        placeholder="Search company or title"
+        aria-label="Search leads"
+        className="h-9 pl-9"
+      />
+    </div>
+  );
+}
 
 /** Compact key numbers in the top bar. */
 export function TopBarStats({ className }: { className?: string }) {

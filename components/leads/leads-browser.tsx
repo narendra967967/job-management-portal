@@ -37,6 +37,7 @@ import { LeadRemindersDialog } from "@/components/leads/lead-reminders-dialog";
 import { mockResumes } from "@/lib/mock-data";
 import { computeFitScore, fitBand } from "@/lib/fit";
 import { useDefaultResumeId } from "@/lib/use-default-resume";
+import { useSearchQuery } from "@/lib/search-store";
 import {
   useContactsForLead,
   useRemindersForLead,
@@ -125,12 +126,18 @@ const STATUS_META: Record<
 export function LeadsBrowser({ leads }: { leads: JobLead[] }) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [locationFilter, setLocationFilter] = useState<LocationFilter>("all");
+  const [tagFilter, setTagFilter] = useState<string>("all");
   const [dateRange, setDateRange] = useState<DateRange>("all");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
   // Default order is latest first (applies on mobile and desktop alike).
   const [sort, setSort] = useState<Sort>("newest");
   const [page, setPage] = useState(1);
+  const search = useSearchQuery();
+  const allTags = useMemo(
+    () => [...new Set(leads.flatMap((l) => l.tags))].sort(),
+    [leads],
+  );
   // Job status lives in the store so it stays in sync with reminders/tasks and
   // so closing a job can auto-cancel its follow-ups.
   const statusOverrides = useStatusOverrides();
@@ -184,6 +191,16 @@ export function LeadsBrowser({ leads }: { leads: JobLead[] }) {
     if (statusFilter !== "all")
       out = out.filter((l) => statusOf(l) === statusFilter);
     if (locationFilter === "remote") out = out.filter((l) => l.remote);
+    if (tagFilter !== "all") out = out.filter((l) => l.tags.includes(tagFilter));
+    const q = search.trim().toLowerCase();
+    if (q)
+      out = out.filter(
+        (l) =>
+          l.title.toLowerCase().includes(q) ||
+          l.company.toLowerCase().includes(q) ||
+          l.location.toLowerCase().includes(q) ||
+          l.tags.some((t) => t.toLowerCase().includes(q)),
+      );
     if (dateBounds.from) out = out.filter((l) => l.capturedAt >= dateBounds.from!);
     if (dateBounds.to) out = out.filter((l) => l.capturedAt <= dateBounds.to!);
     out.sort((a, b) =>
@@ -193,12 +210,12 @@ export function LeadsBrowser({ leads }: { leads: JobLead[] }) {
     );
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [leads, statusFilter, locationFilter, dateBounds, sort, statusOverrides]);
+  }, [leads, statusFilter, locationFilter, tagFilter, search, dateBounds, sort, statusOverrides]);
 
   // Reset to the first page whenever the result set changes.
   useEffect(() => {
     setPage(1);
-  }, [statusFilter, locationFilter, dateBounds, sort]);
+  }, [statusFilter, locationFilter, tagFilter, search, dateBounds, sort]);
 
   const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -278,6 +295,17 @@ export function LeadsBrowser({ leads }: { leads: JobLead[] }) {
               { value: "remote", label: "Remote only" },
             ]}
           />
+          {allTags.length > 0 && (
+            <FilterSelect
+              label="Tag"
+              value={tagFilter}
+              onValueChange={setTagFilter}
+              options={[
+                { value: "all", label: "All tags" },
+                ...allTags.map((t) => ({ value: t, label: t })),
+              ]}
+            />
+          )}
           <FilterSelect
             label="Captured"
             value={dateRange}
