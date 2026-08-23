@@ -19,6 +19,7 @@ import {
   ExternalLink,
   Gauge,
   Flag,
+  AlertTriangle,
 } from "lucide-react";
 import {
   CLOSE_OUTCOME_LABELS,
@@ -37,6 +38,7 @@ import { LeadRemindersDialog } from "@/components/leads/lead-reminders-dialog";
 import { mockResumes } from "@/lib/mock-data";
 import { computeFitScore, fitBand } from "@/lib/fit";
 import { useDefaultResumeId } from "@/lib/use-default-resume";
+import { useAppSettings } from "@/lib/use-app-settings";
 import { useSearchQuery } from "@/lib/search-store";
 import {
   useContactsForLead,
@@ -603,6 +605,16 @@ function LeadCard({
     mockResumes.find((r) => r.id === resumeId)?.label ?? "resume";
   const open = isJobOpen(status);
   const hasContacts = contactCount > 0;
+  // Stale = open, no pending follow-up, and captured longer ago than the
+  // configured threshold (FR-2.4).
+  const [{ staleLeadDays }] = useAppSettings();
+  const hasPendingReminder = leadReminders.some((r) => r.outcome === "pending");
+  const staleCutoff = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() - staleLeadDays);
+    return toISODate(d);
+  })();
+  const stale = open && !hasPendingReminder && lead.capturedAt < staleCutoff;
 
   // Stop card-body clicks/keys from firing on the header & footer controls.
   const stop = {
@@ -712,6 +724,15 @@ function LeadCard({
             <span className="inline-flex items-center gap-1 rounded-md bg-status-reviewing px-2 py-0.5 text-[11px] font-medium text-status-reviewing-foreground">
               <Clock className="size-3" aria-hidden />
               Follow-up due
+            </span>
+          )}
+          {stale && (
+            <span
+              className="inline-flex items-center gap-1 rounded-md border border-destructive/40 px-2 py-0.5 text-[11px] font-medium text-destructive"
+              title={`No activity for ${staleLeadDays}+ days`}
+            >
+              <AlertTriangle className="size-3" aria-hidden />
+              Stale
             </span>
           )}
           <span className="ml-auto text-[11px] text-muted-foreground">

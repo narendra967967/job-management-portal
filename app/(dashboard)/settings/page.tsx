@@ -15,6 +15,7 @@ import {
   LogOut,
 } from "lucide-react";
 import { useDefaultResumeId } from "@/lib/use-default-resume";
+import { useAppSettings } from "@/lib/use-app-settings";
 import {
   mockAiSettings,
   mockGoogleConnection,
@@ -62,6 +63,7 @@ export default function SettingsPage() {
       <ProfileCard />
       <GoogleCard />
       <AiProviderCard />
+      <FollowUpsCard />
       <ResumesCard />
       <AccountCard />
     </div>
@@ -325,6 +327,50 @@ function AiProviderCard() {
           never sent to the browser or exposed in client code.
         </p>
       </div>
+    </section>
+  );
+}
+
+/* ---------------- Follow-ups ---------------- */
+
+function FollowUpsCard() {
+  const [settings, update] = useAppSettings();
+  return (
+    <section className="rounded-2xl border bg-card p-4 md:p-5">
+      <h2 className="text-sm font-medium">Follow-ups</h2>
+      <p className="mt-0.5 text-xs text-muted-foreground">
+        How reminders are scheduled and when stalled leads get flagged.
+      </p>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <Field label="Reminder interval (days)">
+          <Input
+            type="number"
+            min={1}
+            value={settings.reminderIntervalDays}
+            onChange={(e) =>
+              update({
+                reminderIntervalDays: Math.max(1, Number(e.target.value) || 1),
+              })
+            }
+          />
+        </Field>
+        <Field label="Flag lead as stale after (days)">
+          <Input
+            type="number"
+            min={1}
+            value={settings.staleLeadDays}
+            onChange={(e) =>
+              update({ staleLeadDays: Math.max(1, Number(e.target.value) || 1) })
+            }
+          />
+        </Field>
+      </div>
+      <p className="mt-3 text-xs text-muted-foreground">
+        A follow-up is auto-scheduled {settings.reminderIntervalDays} day
+        {settings.reminderIntervalDays === 1 ? "" : "s"} after a message is
+        marked sent. Open leads with no pending follow-up for{" "}
+        {settings.staleLeadDays} days are flagged <em>Stale</em> for review.
+      </p>
     </section>
   );
 }

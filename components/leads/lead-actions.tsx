@@ -31,6 +31,7 @@ import {
 } from "@/lib/types";
 import { getOutreachForLead } from "@/lib/mock-data";
 import { computeFitScore, fitBand } from "@/lib/fit";
+import { getReminderIntervalDays } from "@/lib/use-app-settings";
 import {
   addContact,
   addOutreach,
@@ -650,9 +651,9 @@ function DraftOutreachDialog({
       createdAt: today,
       sentAt: today,
     });
-    // Start the follow-up clock: schedule a reminder 3 days out.
+    // Start the follow-up clock: schedule a reminder at the configured interval.
     const due = new Date();
-    due.setDate(due.getDate() + 3);
+    due.setDate(due.getDate() + getReminderIntervalDays());
     addReminder({
       id: `rem-${Date.now()}`,
       outreachMessageId: messageId,
