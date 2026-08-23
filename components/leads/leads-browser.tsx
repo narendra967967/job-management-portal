@@ -226,8 +226,9 @@ export function LeadsBrowser({ leads }: { leads: JobLead[] }) {
 
   return (
     <div className="space-y-4">
-      {/* Metric row — each box also filters the list by that status */}
-      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-5">
+      {/* Metric row — each box also filters the list by that status.
+          Hidden on mobile to save vertical space; shown from sm+. */}
+      <div className="hidden gap-2.5 sm:grid sm:grid-cols-5">
         {LEAD_STATUSES.map((s) => {
           const meta = STATUS_META[s];
           const Icon = meta.icon;
