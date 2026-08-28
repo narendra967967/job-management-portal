@@ -55,7 +55,7 @@ import { Label } from "@/components/ui/label";
 
 export default function SettingsPage() {
   return (
-    <div className="mx-auto max-w-2xl space-y-5">
+    <div className="mx-auto max-w-2xl space-y-5 lg:max-w-5xl">
       <div className="flex flex-wrap items-baseline gap-x-2">
         <h1 className="text-lg font-semibold tracking-tight">Settings</h1>
         <p className="hidden text-sm text-muted-foreground sm:block">
@@ -63,12 +63,17 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      <ProfileCard />
-      <GoogleCard />
-      <AiProviderCard />
-      <FollowUpsCard />
-      <ResumesCard />
-      <AccountCard />
+      {/* Single column on mobile/tablet; on large screens the cards flow into
+          two balanced masonry columns so the width isn't wasted. Each card
+          stays intact (break-inside-avoid) and keeps its vertical rhythm. */}
+      <div className="[&>section]:mb-5 lg:columns-2 lg:gap-5 lg:[&>section]:break-inside-avoid">
+        <ProfileCard />
+        <GoogleCard />
+        <AiProviderCard />
+        <FollowUpsCard />
+        <ResumesCard />
+        <AccountCard />
+      </div>
     </div>
   );
 }
@@ -633,7 +638,7 @@ function ResumesCard() {
                     <span className="rounded bg-muted px-1.5 py-px font-medium uppercase">
                       {r.fileType}
                     </span>
-                    <span className="truncate">{r.fileName}</span>
+                    <span className="min-w-0 truncate">{r.fileName}</span>
                     <span aria-hidden>·</span>
                     <span className="whitespace-nowrap">
                       {formatSize(r.sizeKb)}
@@ -734,7 +739,7 @@ function ResumesCard() {
           </DialogHeader>
 
           {pending && (
-            <div className="space-y-4 py-1">
+            <div className="min-w-0 space-y-4 py-1">
               <div className="flex items-center gap-3 rounded-lg border bg-muted/40 p-3">
                 <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
                   <FileText className="size-4" aria-hidden />
@@ -796,7 +801,7 @@ function AccountCard() {
         Single-user access to this workspace.
       </p>
       <div className="mt-4">
-        <Button variant="outline" nativeButton={false} render={<Link href="/" />}>
+        <Button variant="destructive" nativeButton={false} render={<Link href="/" />}>
           <LogOut className="size-4" aria-hidden />
           Log out
         </Button>
