@@ -1,10 +1,24 @@
 # Phase 2 — Database Schema Plan
 
-> **Status: PLAN (not yet implemented).** Per the build order, the Drizzle schema
-> (`db/schema.ts`) + migrations are written only once Phase 1 UI is signed off.
-> This document captures the schema the finished Phase 1 UI revealed, so Phase 2
-> is a transcription job, not a redesign. Stack: **Neon Postgres + Drizzle ORM +
+> **Status: IMPLEMENTED.** `db/schema.ts` (single source of truth), the Better
+> Auth tables in `db/auth-schema.ts`, and migration `db/migrations/0000_*.sql`
+> are written. Apply with `npm run db:migrate` once `DATABASE_URL` is set. This
+> document is the design; the sections below note where the built schema
+> deviates from the original plan text. Stack: **Neon Postgres + Drizzle ORM +
 > Drizzle Kit**, auth by **Better Auth**.
+>
+> **Deviations found while building (vs. this plan's original text):**
+> - **`user_id` is `text`, not `uuid`.** Better Auth's default IDs are `text`, so
+>   `user.id` is text and every app-table `user_id` FK is text to match.
+> - **AI key stored as `text` (base64 ciphertext), not `bytea`.** Functionally
+>   identical for "encrypted at rest"; avoids a custom Drizzle column type.
+> - **Added `resume_file_type` enum** (`pdf`/`doc`/`docx`) for `resumes.file_type`.
+> - **`job_lead_details` has no `user_id`** (scoped via its 1:1 `lead_id` FK), as
+>   this plan's table list specified — the one app table without a `user_id`.
+> - **`user.mobile`** added to the Better Auth user table (via `additionalFields`)
+>   to back Settings → Profile's mobile field.
+> - Workflow: `npm run auth:generate` (Better Auth tables) → `npm run db:generate`
+>   (migration) → `npm run db:migrate`.
 
 ## Principles
 - **Schema follows the UI.** Every column below exists because a Phase 1 screen
