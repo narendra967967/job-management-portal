@@ -22,10 +22,19 @@ import {
   mockOutreach,
   mockReminders,
 } from "@/lib/mock-data";
-import { isJobOpen } from "@/lib/types";
+import {
+  CLOSE_OUTCOME_LABELS,
+  LEAD_STATUS_LABELS,
+  OUTREACH_KIND_LABELS,
+  REMINDER_OUTCOME_LABELS,
+  contactPersonKey,
+  isJobOpen,
+} from "@/lib/types";
 import type {
   CloseOutcome,
+  ConnectionType,
   Contact,
+  JobLead,
   LeadStatus,
   OutreachMessage,
   Reminder,
@@ -120,8 +129,11 @@ export function setLeadStatus(
 
 /* ---- contacts ---- */
 
-export function addContact(input: Omit<Contact, "id">) {
-  contacts = [{ ...input, id: `contact-${Date.now()}` }, ...contacts];
+export function addContact(input: Omit<Contact, "id" | "addedAt">) {
+  contacts = [
+    { ...input, id: `contact-${Date.now()}`, addedAt: todayISO() },
+    ...contacts,
+  ];
   emit();
 }
 
@@ -364,4 +376,180 @@ export function useTodos(): TodoGroups {
     overdue.length + todayItems.length + upcoming.length + noDate.length;
 
   return { overdue, today: todayItems, upcoming, noDate, nudges, openCount };
+}
+
+/* ---- derived: per-contact history across leads (FR-6.1) ---- */
+
+export interface PersonLead {
+  lead: JobLead;
+  contact: Contact; // this person's contact record on that lead
+  messages: OutreachMessage[]; // outreach to that record
+}
+
+export interface Person {
+  key: string;
+  name: string;
+  title: string; // most recent non-empty title seen
+  linkedinUrl: string | null;
+  connectionTypes: ConnectionType[];
+  aiParsed: boolean; // true if any of the person's records came from AI parse
+  leads: PersonLead[]; // one entry per lead the person appears on, newest first
+  messageCount: number;
+  lastActivity: string; // ISO date of the newest message or capture
+}
+
+/** Group all contacts into people (by contactPersonKey) with their outreach. */
+export function usePeople(): Person[] {
+  const allContacts = useContacts();
+  const allOutreach = useOutreach();
+
+  const byKey = new Map<string, Contact[]>();
+  for (const c of allContacts) {
+    const key = contactPersonKey(c);
+    const list = byKey.get(key);
+    if (list) list.push(c);
+    else byKey.set(key, [c]);
+  }
+
+  const people: Person[] = [];
+  for (const [key, records] of byKey) {
+    // Newest record first so the "current" title/type wins.
+    const sorted = [...records].sort((a, b) => b.addedAt.localeCompare(a.addedAt));
+    const leads: PersonLead[] = [];
+    for (const contact of sorted) {
+      const lead = mockLeads.find((l) => l.id === contact.leadId);
+      if (!lead) continue;
+      const messages = allOutreach
+        .filter((m) => m.contactId === contact.id)
+        .sort((a, b) => (b.sentAt ?? b.createdAt).localeCompare(a.sentAt ?? a.createdAt));
+      leads.push({ lead, contact, messages });
+    }
+    if (leads.length === 0) continue;
+
+    const connectionTypes = [...new Set(sorted.map((c) => c.connectionType))];
+    const messageCount = leads.reduce((n, l) => n + l.messages.length, 0);
+    const dates = [
+      ...sorted.map((c) => c.addedAt),
+      ...leads.flatMap((l) => l.messages.map((m) => m.sentAt ?? m.createdAt)),
+    ];
+    const lastActivity = dates.sort().at(-1) ?? sorted[0].addedAt;
+
+    people.push({
+      key,
+      name: sorted[0].name,
+      title: sorted.find((c) => c.title.trim())?.title ?? "",
+      linkedinUrl: sorted.find((c) => c.linkedinUrl)?.linkedinUrl ?? null,
+      connectionTypes,
+      aiParsed: sorted.some((c) => c.aiParsed),
+      leads,
+      messageCount,
+      lastActivity,
+    });
+  }
+
+  people.sort((a, b) => b.lastActivity.localeCompare(a.lastActivity));
+  return people;
+}
+
+/** One person by identity key (for the contact-history dialog). */
+export function usePerson(key: string | null): Person | null {
+  const people = usePeople();
+  if (!key) return null;
+  return people.find((p) => p.key === key) ?? null;
+}
+
+/* ---- derived: per-lead activity timeline (FR-6.2) ---- */
+
+export type TimelineKind =
+  | "captured"
+  | "contact-added"
+  | "message"
+  | "reminder"
+  | "reminder-resolved"
+  | "status";
+
+export interface TimelineEvent {
+  id: string;
+  kind: TimelineKind;
+  date: string; // ISO date used for ordering
+  title: string;
+  detail?: string;
+}
+
+/**
+ * Chronological lead timeline: captured → contacts added → messages sent →
+ * reminders scheduled/resolved → current status/outcome (FR-6.2).
+ *
+ * Sourced from the timestamps we actually store today. Status *transitions*
+ * aren't individually timestamped in Phase 1, so the current status/outcome is
+ * shown as the closing state rather than a dated history — Phase 2's schema can
+ * add per-row timestamps (contacts.added_at exists; reminders need created_at)
+ * or a small events table if a fully dated audit trail proves worth it.
+ */
+export function useLeadTimeline(leadId: string): TimelineEvent[] {
+  const leadContacts = useContactsForLead(leadId);
+  const leadOutreach = useOutreachForLead(leadId);
+  const leadReminders = useRemindersForLead(leadId);
+  const { status, closeOutcome } = useLeadStatus(leadId);
+
+  const lead = mockLeads.find((l) => l.id === leadId);
+  const events: TimelineEvent[] = [];
+
+  if (lead) {
+    events.push({
+      id: "captured",
+      kind: "captured",
+      date: lead.capturedAt,
+      title: "Lead captured",
+      detail: `${lead.company} · ${lead.title}`,
+    });
+  }
+
+  for (const c of leadContacts) {
+    events.push({
+      id: `contact-${c.id}`,
+      kind: "contact-added",
+      date: c.addedAt,
+      title: `Contact added — ${c.name}`,
+      detail: c.title || undefined,
+    });
+  }
+
+  for (const m of leadOutreach) {
+    const when = m.status === "sent" ? (m.sentAt ?? m.createdAt) : m.createdAt;
+    events.push({
+      id: `msg-${m.id}`,
+      kind: "message",
+      date: when,
+      title: `${OUTREACH_KIND_LABELS[m.kind]} ${m.status === "sent" ? "sent" : "drafted"} · ${m.channel}`,
+    });
+  }
+
+  for (const r of leadReminders) {
+    const label = r.manual ? r.label || "Manual reminder" : `Reminder ${r.sequence}`;
+    events.push({
+      id: `rem-${r.id}`,
+      kind: "reminder",
+      date: r.dueDate,
+      title:
+        r.outcome === "pending"
+          ? `${label} due`
+          : `${label} · ${REMINDER_OUTCOME_LABELS[r.outcome]}`,
+    });
+  }
+
+  // Closing state — the current status (and outcome when closed).
+  events.push({
+    id: "status",
+    kind: "status",
+    date: "9999-12-31", // always sorts last
+    title: `Status: ${LEAD_STATUS_LABELS[status]}`,
+    detail:
+      status === "closed" && closeOutcome
+        ? CLOSE_OUTCOME_LABELS[closeOutcome]
+        : undefined,
+  });
+
+  events.sort((a, b) => a.date.localeCompare(b.date));
+  return events;
 }

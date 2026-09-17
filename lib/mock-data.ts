@@ -327,6 +327,7 @@ export const mockContacts: Contact[] = [
     linkedinUrl: "https://www.linkedin.com/in/priya-nair",
     connectionType: "referral",
     aiParsed: true,
+    addedAt: "2026-08-18",
   },
   {
     id: "contact-2",
@@ -336,6 +337,7 @@ export const mockContacts: Contact[] = [
     linkedinUrl: "https://www.linkedin.com/in/marcus-webb",
     connectionType: "recruiter",
     aiParsed: true,
+    addedAt: "2026-08-19",
   },
   {
     id: "contact-3",
@@ -345,6 +347,20 @@ export const mockContacts: Contact[] = [
     linkedinUrl: "https://www.linkedin.com/in/dana-ortiz",
     connectionType: "hiring-manager",
     aiParsed: false,
+    addedAt: "2026-08-14",
+  },
+  // Same person as contact-1 (Priya), captured again on a second payments role.
+  // Demonstrates per-contact history across leads (FR-6.1) — grouped by
+  // LinkedIn URL via contactPersonKey.
+  {
+    id: "contact-4",
+    leadId: "lead-4",
+    name: "Priya Nair",
+    title: "Staff Product Manager",
+    linkedinUrl: "https://www.linkedin.com/in/priya-nair",
+    connectionType: "referral",
+    aiParsed: false,
+    addedAt: "2026-08-20",
   },
 ];
 
@@ -363,6 +379,23 @@ export const mockOutreach: OutreachMessage[] = [
     resumeId: "resume-1",
     createdAt: "2026-08-15",
     sentAt: "2026-08-15",
+  },
+  // Referral ask to Priya on the Adyen role — her second appearance, so her
+  // contact history spans two leads (FR-6.1).
+  {
+    id: "msg-2",
+    leadId: "lead-4",
+    contactId: "contact-4",
+    kind: "referral-ask",
+    channel: "LinkedIn",
+    status: "sent",
+    draftBody:
+      "Hi Priya, we spoke about the Stripe PM role — I saw Adyen is hiring a Group PM for Payments too...",
+    sentBody:
+      "Hi Priya, we connected over the Stripe payments PM role a little while back. Adyen just posted a Group PM, Payments position that looks like a strong fit — would you be open to a quick intro or any pointers on the team?",
+    resumeId: "resume-1",
+    createdAt: "2026-08-20",
+    sentAt: "2026-08-20",
   },
 ];
 

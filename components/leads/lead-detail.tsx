@@ -29,6 +29,7 @@ import {
 import { StatusBadge } from "@/components/leads/status-badge";
 import { LeadActions, AddContactDialog } from "@/components/leads/lead-actions";
 import { ReminderActions } from "@/components/leads/reminder-actions";
+import { LeadTimeline } from "@/components/leads/lead-timeline";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { computeFitScore, fitBand } from "@/lib/fit";
@@ -194,6 +195,7 @@ export function LeadDetailContent({
           </TabsTrigger>
           <TabsTrigger value="outreach">Outreach</TabsTrigger>
           <TabsTrigger value="reminders">Reminders</TabsTrigger>
+          <TabsTrigger value="timeline">Timeline</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="mt-4">
@@ -207,6 +209,9 @@ export function LeadDetailContent({
         </TabsContent>
         <TabsContent value="reminders" className="mt-4">
           <RemindersTab leadId={lead.id} />
+        </TabsContent>
+        <TabsContent value="timeline" className="mt-4">
+          <LeadTimeline leadId={lead.id} />
         </TabsContent>
       </Tabs>
     </div>

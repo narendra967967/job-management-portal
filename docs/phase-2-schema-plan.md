@@ -65,7 +65,11 @@ adapter. Notes:
 
 ### `contacts`  (maps `Contact`)
 `id` PK · `user_id` · `lead_id` FK · `name` · `title` · `linkedin_url` NULL ·
-`connection_type` · `ai_parsed` boolean · timestamps. Index `(lead_id)`.
+`connection_type` · `ai_parsed` boolean · `added_at` timestamptz · timestamps.
+Index `(lead_id)`. `added_at` (UI: `Contact.addedAt`) is what the per-lead
+timeline orders "contact added" events by (FR-6.2) — must be a real stored
+column, not just `created_at` audit noise. Add `(user_id, linkedin_url)` index
+to support the per-contact cross-lead grouping (see Module 6 below).
 
 ### `outreach_messages`  (maps `OutreachMessage`)
 `id` PK · `user_id` · `lead_id` FK · `contact_id` FK · `kind` · `channel` ·
@@ -116,6 +120,24 @@ text NULL. Lets the cron fetch only what changed since last run.
 `user_id` + `message_id` (composite PK). Belt-and-braces so a re-delivered
 email isn’t re-parsed; the `linkedin_job_id` unique key already prevents
 duplicate leads even without this.
+
+## Module 6 — history & timeline (FR-6.1/6.2) — derived, no new tables
+Both Module 6 surfaces the Phase 1 UI added are **read-only projections** over
+the tables above; nothing new to persist.
+- **FR-6.1 — per-contact history across leads.** Contacts stay lead-scoped
+  (one row per person per lead). The Contacts page groups rows into a "person"
+  by `linkedin_url` (normalized), falling back to normalized `name` when the URL
+  is absent (UI: `contactPersonKey`). Phase 2 query = group contacts by that key,
+  left-join `outreach_messages` per contact row. The `(user_id, linkedin_url)`
+  index above keeps this cheap. **Not** promoting to a `people`/`lead_contacts`
+  split yet — revisit only if a person needs identity/notes independent of a lead.
+- **FR-6.2 — per-lead timeline.** A chronological merge of rows that already
+  carry timestamps: `job_leads.captured_at`, `contacts.added_at`,
+  `outreach_messages.sent_at`/`created_at`, `reminders.due_date` + outcome, with
+  the current `status`/`close_outcome` as the closing state. Status *transitions*
+  are not individually timestamped today, so they aren't dated in the timeline —
+  if a fully dated audit trail is ever wanted, add a `lead_events` table written
+  on each mutation; deferred as out of scope for now.
 
 ## Dedup & incremental sync (the anti-flooding design)
 1. **Backfill once:** first run uses `newer_than:{lookback_days}d`.

@@ -139,6 +139,19 @@ export interface Contact {
   connectionType: ConnectionType;
   // true when this record came from AI paste-and-parse (vs. manual entry)
   aiParsed: boolean;
+  addedAt: string; // ISO date the contact was captured (drives the lead timeline)
+}
+
+/**
+ * Identity key that groups a contact across leads (FR-6.1). Contacts are stored
+ * per-lead, so the same person on two roles is two rows — we treat them as one
+ * "person" by LinkedIn URL when present, else by normalized name. Phase 2 can
+ * promote this to a real contacts/lead_contacts split if it proves worth it.
+ */
+export function contactPersonKey(c: Pick<Contact, "linkedinUrl" | "name">): string {
+  const url = c.linkedinUrl?.trim().toLowerCase().replace(/\/+$/, "");
+  if (url) return `url:${url}`;
+  return `name:${c.name.trim().toLowerCase().replace(/\s+/g, " ")}`;
 }
 
 export interface OutreachMessage {
