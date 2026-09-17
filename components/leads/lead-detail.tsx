@@ -50,6 +50,12 @@ interface Props {
   resumes: Resume[];
 }
 
+// Selected tab uses the primary color (overrides the primitive's neutral pill).
+// `group/tab` lets the count badge react to the active state too.
+const tabActive =
+  "group/tab data-active:bg-primary data-active:text-primary-foreground " +
+  "dark:data-active:border-transparent dark:data-active:bg-primary dark:data-active:text-primary-foreground";
+
 export function LeadDetail(props: Props) {
   return (
     <div className="mx-auto max-w-3xl space-y-5">
@@ -184,18 +190,26 @@ export function LeadDetailContent({
       {/* Tabbed sections — read views. Adding is done via the actions menu. */}
       <Tabs defaultValue="overview">
         <TabsList className="w-full justify-start overflow-x-auto">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="contacts">
+          <TabsTrigger value="overview" className={tabActive}>
+            Overview
+          </TabsTrigger>
+          <TabsTrigger value="contacts" className={tabActive}>
             Contacts
             {contacts.length > 0 && (
-              <span className="ml-1.5 rounded-full bg-muted px-1.5 text-[11px] tabular-nums">
+              <span className="ml-1.5 rounded-full bg-muted px-1.5 text-[11px] tabular-nums group-data-active/tab:bg-primary-foreground/20 group-data-active/tab:text-primary-foreground">
                 {contacts.length}
               </span>
             )}
           </TabsTrigger>
-          <TabsTrigger value="outreach">Outreach</TabsTrigger>
-          <TabsTrigger value="reminders">Reminders</TabsTrigger>
-          <TabsTrigger value="timeline">Timeline</TabsTrigger>
+          <TabsTrigger value="outreach" className={tabActive}>
+            Outreach
+          </TabsTrigger>
+          <TabsTrigger value="reminders" className={tabActive}>
+            Reminders
+          </TabsTrigger>
+          <TabsTrigger value="timeline" className={tabActive}>
+            Timeline
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="mt-4">
