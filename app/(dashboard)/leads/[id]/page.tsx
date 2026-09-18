@@ -1,21 +1,27 @@
-import { notFound } from "next/navigation";
+"use client";
+
+import Link from "next/link";
+import { useParams } from "next/navigation";
 import { LeadDetail } from "@/components/leads/lead-detail";
-import { getLead, getLeadDetail, mockResumes } from "@/lib/mock-data";
+import { useLead, useLeadDetail } from "@/lib/mock-store";
+import { mockResumes } from "@/lib/mock-data";
 
-export default async function LeadDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = await params;
-  const lead = getLead(id);
-  if (!lead) notFound();
+export default function LeadDetailPage() {
+  const params = useParams<{ id: string }>();
+  const id = params.id;
+  const lead = useLead(id);
+  const detail = useLeadDetail(id);
 
-  return (
-    <LeadDetail
-      lead={lead}
-      detail={getLeadDetail(id)}
-      resumes={mockResumes}
-    />
-  );
+  if (!lead) {
+    return (
+      <div className="mx-auto max-w-3xl py-16 text-center">
+        <p className="text-sm text-muted-foreground">Lead not found.</p>
+        <Link href="/leads" className="mt-2 inline-block text-sm text-primary hover:underline">
+          Back to leads
+        </Link>
+      </div>
+    );
+  }
+
+  return <LeadDetail lead={lead} detail={detail} resumes={mockResumes} />;
 }

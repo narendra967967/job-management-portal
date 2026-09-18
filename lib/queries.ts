@@ -7,7 +7,7 @@ import "server-only";
 // Dates are serialized to "YYYY-MM-DD" strings (matching the old mock data and
 // keeping the payload serializable across the server→client boundary).
 
-import { and, asc, desc, eq } from "drizzle-orm";
+import { asc, desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   contacts as contactsT,

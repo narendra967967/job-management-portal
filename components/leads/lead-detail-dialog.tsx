@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { ExternalLink } from "lucide-react";
 import type { JobLead, Resume } from "@/lib/types";
-import { getLeadDetail } from "@/lib/mock-data";
+import { useLeadDetail } from "@/lib/mock-store";
 import { LeadDetailContent } from "@/components/leads/lead-detail";
 import {
   Dialog,
@@ -30,6 +30,7 @@ export function LeadDetailDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const detail = useLeadDetail(lead?.id ?? "");
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
@@ -40,7 +41,7 @@ export function LeadDetailDialog({
             </DialogHeader>
             <LeadDetailContent
               lead={lead}
-              detail={getLeadDetail(lead.id)}
+              detail={detail}
               resumes={resumes}
               resumeId={resumeId}
             />

@@ -1,5 +1,4 @@
 import { LeadsBrowser } from "@/components/leads/leads-browser";
-import { mockLeads } from "@/lib/mock-data";
 
 export default function LeadsPage() {
   return (
@@ -10,7 +9,7 @@ export default function LeadsPage() {
           Job alerts captured from your inbox.
         </p>
       </div>
-      <LeadsBrowser leads={mockLeads} />
+      <LeadsBrowser />
     </div>
   );
 }

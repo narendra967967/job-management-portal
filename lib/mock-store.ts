@@ -1,83 +1,60 @@
 "use client";
 
-// PHASE 1 in-memory store tying Jobs ↔ Reminders ↔ Tasks together.
+// Client workspace store — now DB-backed (the name is legacy; a rename is a
+// later cleanup). It holds the current user's data, hydrated once from the
+// server (via WorkspaceProvider using loadWorkspace), and exposes:
+//   - selector hooks the UI reads (useLeads, useContactsForLead, useTodos, …)
+//   - async mutations that call Server Actions then re-read the workspace so the
+//     UI reflects the persisted truth. All jobs↔reminders↔tasks cascade logic
+//     lives server-side in actions/data.ts now.
 //
-// The rules (agreed design):
-//  - A job is OPEN (new/reviewing/applied) or TERMINAL (discarded/closed).
-//  - Reminders are scheduled prompts. A Task is the actionable To-do item; every
-//    task belongs to a job, and may link to the reminder that spawned it.
-//  - Creating a reminder also creates a linked follow-up task.
-//  - Completing/snoozing a reminder syncs its linked task, and vice-versa.
-//  - Marking a job terminal AUTO-CANCELS its pending reminders + open tasks — no
-//    dangling to-dos on a job you've dropped or closed.
-//  - The To-do view = open tasks on open jobs, plus a derived "plan next step or
-//    close" nudge for any open job that has no open task.
-//
-// Phase 3 replaces all of this with Server Actions against Postgres.
+// Single-user by design (CLAUDE.md), so a module-level singleton is fine.
 
 import { useSyncExternalStore } from "react";
 import {
-  mockContacts,
-  mockLeads,
-  mockOutreach,
-  mockReminders,
-} from "@/lib/mock-data";
+  addContactAction,
+  addReminderManualAction,
+  completeTaskAction,
+  deleteContactAction,
+  deleteReminderAction,
+  getWorkspace,
+  markSentAction,
+  setLeadStatusAction,
+  setReminderOutcomeAction,
+  snoozeReminderAction,
+  updateContactAction,
+} from "@/actions/data";
+import { contactPersonKey, isJobOpen } from "@/lib/types";
 import {
   CLOSE_OUTCOME_LABELS,
   LEAD_STATUS_LABELS,
   OUTREACH_KIND_LABELS,
   REMINDER_OUTCOME_LABELS,
-  contactPersonKey,
-  isJobOpen,
 } from "@/lib/types";
 import type {
   CloseOutcome,
   ConnectionType,
   Contact,
   JobLead,
+  JobLeadDetail,
   LeadStatus,
+  OutreachKind,
   OutreachMessage,
   Reminder,
   ReminderOutcome,
   Task,
 } from "@/lib/types";
+import type { WorkspaceData } from "@/lib/queries";
 
-function todayISO(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-    d.getDate(),
-  ).padStart(2, "0")}`;
-}
+/* ---------------- state ---------------- */
 
-interface StatusOverride {
-  status: LeadStatus;
-  closeOutcome: CloseOutcome | null;
-}
-
-function reminderToTask(r: Reminder): Task {
-  const lead = mockLeads.find((l) => l.id === r.leadId);
-  const done = r.outcome !== "pending";
-  return {
-    id: `task-${r.id}`,
-    jobId: r.leadId,
-    reminderId: r.id,
-    title:
-      r.manual && r.label
-        ? r.label
-        : `Follow up — ${lead?.company ?? "lead"}`,
-    kind: "follow-up",
-    dueDate: r.dueDate,
-    status: done ? "done" : "open",
-    createdAt: r.dueDate,
-    completedAt: done ? r.dueDate : null,
-  };
-}
-
-let statusOverrides: Record<string, StatusOverride> = {};
-let contacts: Contact[] = [...mockContacts];
-let outreach: OutreachMessage[] = [...mockOutreach];
-let reminders: Reminder[] = [...mockReminders];
-let tasks: Task[] = mockReminders.map(reminderToTask);
+let leads: JobLead[] = [];
+let details: Record<string, JobLeadDetail> = {};
+let contacts: Contact[] = [];
+let outreach: OutreachMessage[] = [];
+let reminders: Reminder[] = [];
+let tasks: Task[] = [];
+let hydrated = false;
 
 const listeners = new Set<() => void>();
 function emit() {
@@ -88,178 +65,54 @@ function subscribe(l: () => void) {
   return () => listeners.delete(l);
 }
 
-/* ---- job status ---- */
-
-function baseStatus(leadId: string): LeadStatus {
-  return mockLeads.find((l) => l.id === leadId)?.status ?? "new";
+function apply(data: WorkspaceData) {
+  leads = data.leads;
+  details = data.details;
+  contacts = data.contacts;
+  outreach = data.outreach;
+  reminders = data.reminders;
+  tasks = data.tasks;
 }
 
-export function getStatus(leadId: string): LeadStatus {
-  return statusOverrides[leadId]?.status ?? baseStatus(leadId);
-}
-
-export function getCloseOutcome(leadId: string): CloseOutcome | null {
-  return statusOverrides[leadId]?.closeOutcome ?? null;
-}
-
-export function setLeadStatus(
-  leadId: string,
-  status: LeadStatus,
-  closeOutcome: CloseOutcome | null = null,
-) {
-  statusOverrides = {
-    ...statusOverrides,
-    [leadId]: { status, closeOutcome: status === "closed" ? closeOutcome : null },
-  };
-  // Terminal → cancel pending reminders + open tasks for this job.
-  if (!isJobOpen(status)) {
-    reminders = reminders.map((r) =>
-      r.leadId === leadId && r.outcome === "pending"
-        ? { ...r, outcome: "closed" as ReminderOutcome }
-        : r,
-    );
-    tasks = tasks.map((t) =>
-      t.jobId === leadId && t.status === "open"
-        ? { ...t, status: "done" as const, completedAt: todayISO() }
-        : t,
-    );
+/** Called by WorkspaceProvider during render so the first snapshot has data.
+ *  On the server we apply fresh per request (single-user, so no real request
+ *  concurrency to worry about); on the client we hydrate once so navigations /
+ *  post-mutation refreshes aren't clobbered by the stale initial payload. */
+export function hydrateWorkspace(data: WorkspaceData) {
+  if (typeof window === "undefined") {
+    apply(data);
+    hydrated = true;
+  } else if (!hydrated) {
+    apply(data);
+    hydrated = true;
   }
+}
+
+/** Re-read the persisted workspace after a mutation and notify subscribers. */
+async function refresh() {
+  const data = await getWorkspace();
+  apply(data);
   emit();
 }
 
-/* ---- contacts ---- */
+/* ---------------- reads ---------------- */
 
-export function addContact(input: Omit<Contact, "id" | "addedAt">) {
-  contacts = [
-    { ...input, id: `contact-${Date.now()}`, addedAt: todayISO() },
-    ...contacts,
-  ];
-  emit();
-}
-
-export function updateContact(id: string, patch: Partial<Omit<Contact, "id">>) {
-  contacts = contacts.map((c) => (c.id === id ? { ...c, ...patch } : c));
-  emit();
-}
-
-export function deleteContact(id: string) {
-  contacts = contacts.filter((c) => c.id !== id);
-  emit();
-}
-
-/* ---- outreach ---- */
-
-export function addOutreach(message: OutreachMessage) {
-  outreach = [message, ...outreach];
-  emit();
-}
-
-/* ---- reminders (each keeps a linked task in sync) ---- */
-
-export function addReminder(reminder: Reminder) {
-  reminders = [reminder, ...reminders];
-  tasks = [reminderToTask(reminder), ...tasks];
-  emit();
-}
-
-export function completeReminder(id: string) {
-  reminders = reminders.map((r) =>
-    r.id === id ? { ...r, outcome: "closed" as ReminderOutcome } : r,
-  );
-  tasks = tasks.map((t) =>
-    t.reminderId === id && t.status === "open"
-      ? { ...t, status: "done" as const, completedAt: todayISO() }
-      : t,
-  );
-  emit();
-}
-
-/** Snooze / reschedule to a new due date (keeps the reminder & task active). */
-export function snoozeReminder(id: string, newDueDate: string) {
-  reminders = reminders.map((r) =>
-    r.id === id
-      ? { ...r, outcome: "pending" as ReminderOutcome, dueDate: newDueDate }
-      : r,
-  );
-  tasks = tasks.map((t) =>
-    t.reminderId === id
-      ? { ...t, status: "open" as const, completedAt: null, dueDate: newDueDate }
-      : t,
-  );
-  emit();
-}
-
-export function setReminderOutcome(id: string, outcome: ReminderOutcome) {
-  reminders = reminders.map((r) => (r.id === id ? { ...r, outcome } : r));
-  const done = outcome !== "pending";
-  tasks = tasks.map((t) =>
-    t.reminderId === id
-      ? {
-          ...t,
-          status: done ? "done" : "open",
-          completedAt: done ? todayISO() : null,
-        }
-      : t,
-  );
-  emit();
-}
-
-export function deleteReminder(id: string) {
-  reminders = reminders.filter((r) => r.id !== id);
-  tasks = tasks.filter((t) => t.reminderId !== id);
-  emit();
-}
-
-export function nextReminderSequence(leadId: string): number {
-  return reminders.filter((r) => r.leadId === leadId).length + 1;
-}
-
-/* ---- tasks ---- */
-
-export function addTask(
-  input: Omit<Task, "id" | "status" | "createdAt" | "completedAt">,
-) {
-  tasks = [
-    {
-      ...input,
-      id: `task-${Date.now()}`,
-      status: "open",
-      createdAt: todayISO(),
-      completedAt: null,
-    },
-    ...tasks,
-  ];
-  emit();
-}
-
-export function completeTask(id: string) {
-  const task = tasks.find((t) => t.id === id);
-  tasks = tasks.map((t) =>
-    t.id === id ? { ...t, status: "done" as const, completedAt: todayISO() } : t,
-  );
-  if (task?.reminderId) {
-    reminders = reminders.map((r) =>
-      r.id === task.reminderId
-        ? { ...r, outcome: "closed" as ReminderOutcome }
-        : r,
-    );
-  }
-  emit();
-}
-
-export function deleteTask(id: string) {
-  tasks = tasks.filter((t) => t.id !== id);
-  emit();
-}
-
-/* ---- reads (stable snapshots) ---- */
-
+const getLeads = () => leads;
+const getDetails = () => details;
 const getContacts = () => contacts;
 const getOutreach = () => outreach;
 const getReminders = () => reminders;
 const getTasks = () => tasks;
-const getStatusOverrides = () => statusOverrides;
 
+export function useLeads(): JobLead[] {
+  return useSyncExternalStore(subscribe, getLeads, getLeads);
+}
+export function useLead(id: string): JobLead | undefined {
+  return useLeads().find((l) => l.id === id);
+}
+export function useLeadDetail(id: string): JobLeadDetail | undefined {
+  return useSyncExternalStore(subscribe, getDetails, getDetails)[id];
+}
 export function useContacts(): Contact[] {
   return useSyncExternalStore(subscribe, getContacts, getContacts);
 }
@@ -269,139 +122,147 @@ export function useContactsForLead(leadId: string): Contact[] {
 export function useOutreach(): OutreachMessage[] {
   return useSyncExternalStore(subscribe, getOutreach, getOutreach);
 }
-export function useReminders(): Reminder[] {
-  return useSyncExternalStore(subscribe, getReminders, getReminders);
-}
-export function useTasks(): Task[] {
-  return useSyncExternalStore(subscribe, getTasks, getTasks);
-}
-/** Subscribe to status changes (returns the overrides map; use with getStatus). */
-export function useStatusOverrides(): Record<string, StatusOverride> {
-  return useSyncExternalStore(subscribe, getStatusOverrides, getStatusOverrides);
-}
-
 export function useOutreachForLead(leadId: string): OutreachMessage[] {
   return useOutreach().filter((m) => m.leadId === leadId);
+}
+export function useReminders(): Reminder[] {
+  return useSyncExternalStore(subscribe, getReminders, getReminders);
 }
 export function useRemindersForLead(leadId: string): Reminder[] {
   return useReminders().filter((r) => r.leadId === leadId);
 }
+export function useTasks(): Task[] {
+  return useSyncExternalStore(subscribe, getTasks, getTasks);
+}
 
-/** Live status for one lead (re-renders when it changes). */
+/** Current lead by id (non-hook), for use inside other selectors. */
+function findLead(leadId: string): JobLead | undefined {
+  return leads.find((l) => l.id === leadId);
+}
+export function getStatus(leadId: string): LeadStatus {
+  return findLead(leadId)?.status ?? "new";
+}
+
+/** Live status for one lead. */
 export function useLeadStatus(leadId: string): {
   status: LeadStatus;
   closeOutcome: CloseOutcome | null;
 } {
-  const overrides = useStatusOverrides();
-  const o = overrides[leadId];
+  const lead = useLead(leadId);
   return {
-    status: o?.status ?? baseStatus(leadId),
-    closeOutcome: o?.closeOutcome ?? null,
+    status: lead?.status ?? "new",
+    closeOutcome: lead?.closeOutcome ?? null,
   };
 }
 
-/* ---- derived To-do ---- */
+/* ---------------- mutations (persist, then refresh) ---------------- */
 
-export interface TodoItem {
-  task: Task;
-  lead: (typeof mockLeads)[number];
-  overdue: boolean;
+export async function setLeadStatus(
+  leadId: string,
+  status: LeadStatus,
+  closeOutcome: CloseOutcome | null = null,
+) {
+  await setLeadStatusAction(leadId, status, closeOutcome);
+  await refresh();
 }
 
-export interface TodoNudge {
-  lead: (typeof mockLeads)[number];
-  message: string;
+export async function addContact(input: {
+  leadId: string;
+  name: string;
+  title: string;
+  linkedinUrl: string;
+  connectionType: ConnectionType;
+  aiParsed: boolean;
+}) {
+  await addContactAction(input);
+  await refresh();
 }
 
-export interface TodoGroups {
-  overdue: TodoItem[];
-  today: TodoItem[];
-  upcoming: TodoItem[];
-  noDate: TodoItem[];
-  nudges: TodoNudge[];
-  openCount: number;
+export async function updateContact(
+  id: string,
+  patch: {
+    name: string;
+    title: string;
+    linkedinUrl: string;
+    connectionType: ConnectionType;
+  },
+) {
+  await updateContactAction(id, patch);
+  await refresh();
 }
 
-function nudgeMessage(status: LeadStatus): string {
-  if (status === "applied") return "Follow up or close this lead";
-  if (status === "reviewing") return "Decide next step or close";
-  return "Review — add a contact, or discard";
+export async function deleteContact(id: string) {
+  await deleteContactAction(id);
+  await refresh();
 }
 
-/** The To-do view: open tasks on open jobs, grouped by urgency, + nudges. */
-export function useTodos(): TodoGroups {
-  const allTasks = useTasks();
-  useStatusOverrides(); // subscribe so status changes re-run this
-
-  const today = todayISO();
-  const overdue: TodoItem[] = [];
-  const todayItems: TodoItem[] = [];
-  const upcoming: TodoItem[] = [];
-  const noDate: TodoItem[] = [];
-
-  const openTaskJobIds = new Set<string>();
-
-  for (const task of allTasks) {
-    if (task.status !== "open") continue;
-    const lead = mockLeads.find((l) => l.id === task.jobId);
-    if (!lead || !isJobOpen(getStatus(lead.id))) continue;
-    openTaskJobIds.add(lead.id);
-    const item: TodoItem = {
-      task,
-      lead,
-      overdue: !!task.dueDate && task.dueDate < today,
-    };
-    if (!task.dueDate) noDate.push(item);
-    else if (task.dueDate < today) overdue.push(item);
-    else if (task.dueDate === today) todayItems.push(item);
-    else upcoming.push(item);
-  }
-
-  const byDate = (a: TodoItem, b: TodoItem) =>
-    (a.task.dueDate ?? "").localeCompare(b.task.dueDate ?? "");
-  overdue.sort(byDate);
-  todayItems.sort(byDate);
-  upcoming.sort(byDate);
-
-  // Nudge every open job that has no open task → drives closure.
-  const nudges: TodoNudge[] = [];
-  for (const lead of mockLeads) {
-    const status = getStatus(lead.id);
-    if (isJobOpen(status) && !openTaskJobIds.has(lead.id)) {
-      nudges.push({ lead, message: nudgeMessage(status) });
-    }
-  }
-
-  const openCount =
-    overdue.length + todayItems.length + upcoming.length + noDate.length;
-
-  return { overdue, today: todayItems, upcoming, noDate, nudges, openCount };
+/** Mark a drafted message sent + schedule the follow-up reminder/task. */
+export async function markSent(input: {
+  leadId: string;
+  contactId: string;
+  kind: OutreachKind;
+  channel: string;
+  draftBody: string;
+  intervalDays: number;
+}) {
+  await markSentAction(input);
+  await refresh();
 }
 
-/* ---- derived: per-contact history across leads (FR-6.1) ---- */
+export async function addReminderManual(input: {
+  leadId: string;
+  dueDate: string;
+  label: string;
+  outreachMessageId: string | null;
+}) {
+  await addReminderManualAction(input);
+  await refresh();
+}
+
+export async function setReminderOutcome(id: string, outcome: ReminderOutcome) {
+  await setReminderOutcomeAction(id, outcome);
+  await refresh();
+}
+
+export async function snoozeReminder(id: string, newDueDate: string) {
+  await snoozeReminderAction(id, newDueDate);
+  await refresh();
+}
+
+export async function deleteReminder(id: string) {
+  await deleteReminderAction(id);
+  await refresh();
+}
+
+export async function completeTask(id: string) {
+  await completeTaskAction(id);
+  await refresh();
+}
+
+/* ---------------- derived: per-contact history across leads (FR-6.1) ------- */
 
 export interface PersonLead {
   lead: JobLead;
-  contact: Contact; // this person's contact record on that lead
-  messages: OutreachMessage[]; // outreach to that record
+  contact: Contact;
+  messages: OutreachMessage[];
 }
 
 export interface Person {
   key: string;
   name: string;
-  title: string; // most recent non-empty title seen
+  title: string;
   linkedinUrl: string | null;
   connectionTypes: ConnectionType[];
-  aiParsed: boolean; // true if any of the person's records came from AI parse
-  leads: PersonLead[]; // one entry per lead the person appears on, newest first
+  aiParsed: boolean;
+  leads: PersonLead[];
   messageCount: number;
-  lastActivity: string; // ISO date of the newest message or capture
+  lastActivity: string;
 }
 
-/** Group all contacts into people (by contactPersonKey) with their outreach. */
 export function usePeople(): Person[] {
   const allContacts = useContacts();
   const allOutreach = useOutreach();
+  const allLeads = useLeads();
 
   const byKey = new Map<string, Contact[]>();
   for (const c of allContacts) {
@@ -413,24 +274,23 @@ export function usePeople(): Person[] {
 
   const people: Person[] = [];
   for (const [key, records] of byKey) {
-    // Newest record first so the "current" title/type wins.
     const sorted = [...records].sort((a, b) => b.addedAt.localeCompare(a.addedAt));
-    const leads: PersonLead[] = [];
+    const personLeads: PersonLead[] = [];
     for (const contact of sorted) {
-      const lead = mockLeads.find((l) => l.id === contact.leadId);
+      const lead = allLeads.find((l) => l.id === contact.leadId);
       if (!lead) continue;
       const messages = allOutreach
         .filter((m) => m.contactId === contact.id)
         .sort((a, b) => (b.sentAt ?? b.createdAt).localeCompare(a.sentAt ?? a.createdAt));
-      leads.push({ lead, contact, messages });
+      personLeads.push({ lead, contact, messages });
     }
-    if (leads.length === 0) continue;
+    if (personLeads.length === 0) continue;
 
     const connectionTypes = [...new Set(sorted.map((c) => c.connectionType))];
-    const messageCount = leads.reduce((n, l) => n + l.messages.length, 0);
+    const messageCount = personLeads.reduce((n, l) => n + l.messages.length, 0);
     const dates = [
       ...sorted.map((c) => c.addedAt),
-      ...leads.flatMap((l) => l.messages.map((m) => m.sentAt ?? m.createdAt)),
+      ...personLeads.flatMap((l) => l.messages.map((m) => m.sentAt ?? m.createdAt)),
     ];
     const lastActivity = dates.sort().at(-1) ?? sorted[0].addedAt;
 
@@ -441,7 +301,7 @@ export function usePeople(): Person[] {
       linkedinUrl: sorted.find((c) => c.linkedinUrl)?.linkedinUrl ?? null,
       connectionTypes,
       aiParsed: sorted.some((c) => c.aiParsed),
-      leads,
+      leads: personLeads,
       messageCount,
       lastActivity,
     });
@@ -451,14 +311,13 @@ export function usePeople(): Person[] {
   return people;
 }
 
-/** One person by identity key (for the contact-history dialog). */
 export function usePerson(key: string | null): Person | null {
   const people = usePeople();
   if (!key) return null;
   return people.find((p) => p.key === key) ?? null;
 }
 
-/* ---- derived: per-lead activity timeline (FR-6.2) ---- */
+/* ---------------- derived: per-lead timeline (FR-6.2) ---------------- */
 
 export type TimelineKind =
   | "captured"
@@ -471,28 +330,18 @@ export type TimelineKind =
 export interface TimelineEvent {
   id: string;
   kind: TimelineKind;
-  date: string; // ISO date used for ordering
+  date: string;
   title: string;
   detail?: string;
 }
 
-/**
- * Chronological lead timeline: captured → contacts added → messages sent →
- * reminders scheduled/resolved → current status/outcome (FR-6.2).
- *
- * Sourced from the timestamps we actually store today. Status *transitions*
- * aren't individually timestamped in Phase 1, so the current status/outcome is
- * shown as the closing state rather than a dated history — Phase 2's schema can
- * add per-row timestamps (contacts.added_at exists; reminders need created_at)
- * or a small events table if a fully dated audit trail proves worth it.
- */
 export function useLeadTimeline(leadId: string): TimelineEvent[] {
   const leadContacts = useContactsForLead(leadId);
   const leadOutreach = useOutreachForLead(leadId);
   const leadReminders = useRemindersForLead(leadId);
+  const lead = useLead(leadId);
   const { status, closeOutcome } = useLeadStatus(leadId);
 
-  const lead = mockLeads.find((l) => l.id === leadId);
   const events: TimelineEvent[] = [];
 
   if (lead) {
@@ -538,11 +387,10 @@ export function useLeadTimeline(leadId: string): TimelineEvent[] {
     });
   }
 
-  // Closing state — the current status (and outcome when closed).
   events.push({
     id: "status",
     kind: "status",
-    date: "9999-12-31", // always sorts last
+    date: "9999-12-31",
     title: `Status: ${LEAD_STATUS_LABELS[status]}`,
     detail:
       status === "closed" && closeOutcome
@@ -552,4 +400,119 @@ export function useLeadTimeline(leadId: string): TimelineEvent[] {
 
   events.sort((a, b) => a.date.localeCompare(b.date));
   return events;
+}
+
+/* ---------------- derived: To-do ---------------- */
+
+export interface TodoItem {
+  task: Task;
+  lead: JobLead;
+  overdue: boolean;
+}
+export interface TodoNudge {
+  lead: JobLead;
+  message: string;
+}
+export interface TodoGroups {
+  overdue: TodoItem[];
+  today: TodoItem[];
+  upcoming: TodoItem[];
+  noDate: TodoItem[];
+  nudges: TodoNudge[];
+  openCount: number;
+}
+
+function todayISO(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function nudgeMessage(status: LeadStatus): string {
+  if (status === "applied") return "Follow up or close this lead";
+  if (status === "reviewing") return "Decide next step or close";
+  return "Review — add a contact, or discard";
+}
+
+export function useTodos(): TodoGroups {
+  const allTasks = useTasks();
+  const allLeads = useLeads();
+
+  const today = todayISO();
+  const overdue: TodoItem[] = [];
+  const todayItems: TodoItem[] = [];
+  const upcoming: TodoItem[] = [];
+  const noDate: TodoItem[] = [];
+  const openTaskJobIds = new Set<string>();
+
+  for (const task of allTasks) {
+    if (task.status !== "open") continue;
+    const lead = allLeads.find((l) => l.id === task.jobId);
+    if (!lead || !isJobOpen(lead.status)) continue;
+    openTaskJobIds.add(lead.id);
+    const item: TodoItem = {
+      task,
+      lead,
+      overdue: !!task.dueDate && task.dueDate < today,
+    };
+    if (!task.dueDate) noDate.push(item);
+    else if (task.dueDate < today) overdue.push(item);
+    else if (task.dueDate === today) todayItems.push(item);
+    else upcoming.push(item);
+  }
+
+  const byDate = (a: TodoItem, b: TodoItem) =>
+    (a.task.dueDate ?? "").localeCompare(b.task.dueDate ?? "");
+  overdue.sort(byDate);
+  todayItems.sort(byDate);
+  upcoming.sort(byDate);
+
+  const nudges: TodoNudge[] = [];
+  for (const lead of allLeads) {
+    if (isJobOpen(lead.status) && !openTaskJobIds.has(lead.id)) {
+      nudges.push({ lead, message: nudgeMessage(lead.status) });
+    }
+  }
+
+  const openCount =
+    overdue.length + todayItems.length + upcoming.length + noDate.length;
+  return { overdue, today: todayItems, upcoming, noDate, nudges, openCount };
+}
+
+/* ---------------- derived: notifications (top-bar bell) ---------------- */
+
+export interface StoreNotification {
+  id: string;
+  kind: "new-lead" | "reminder-due";
+  title: string;
+  detail: string;
+  leadId: string;
+}
+
+export function useNotifications(): StoreNotification[] {
+  const allLeads = useLeads();
+  const allReminders = useReminders();
+  const items: StoreNotification[] = [];
+
+  for (const r of allReminders) {
+    if (r.outcome !== "pending") continue;
+    const lead = allLeads.find((l) => l.id === r.leadId);
+    if (!lead) continue;
+    items.push({
+      id: `rem-${r.id}`,
+      kind: "reminder-due",
+      title: "Follow-up due",
+      detail: `${lead.title} · ${lead.company}`,
+      leadId: lead.id,
+    });
+  }
+  for (const l of allLeads) {
+    if (l.status !== "new") continue;
+    items.push({
+      id: `lead-${l.id}`,
+      kind: "new-lead",
+      title: "New lead captured",
+      detail: `${l.title} · ${l.company}`,
+      leadId: l.id,
+    });
+  }
+  return items;
 }

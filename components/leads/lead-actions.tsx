@@ -29,16 +29,15 @@ import {
   type OutreachKind,
   type Resume,
 } from "@/lib/types";
-import { getOutreachForLead } from "@/lib/mock-data";
 import { computeFitScore, fitBand } from "@/lib/fit";
 import { getReminderIntervalDays } from "@/lib/use-app-settings";
 import {
   addContact,
-  addOutreach,
-  addReminder,
-  nextReminderSequence,
+  addReminderManual,
+  markSent,
   updateContact,
   useContactsForLead,
+  useOutreachForLead,
 } from "@/lib/mock-store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -462,7 +461,7 @@ function AddReminderDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const messages = getOutreachForLead(lead.id);
+  const messages = useOutreachForLead(lead.id);
   const [dueDate, setDueDate] = useState("");
   const [label, setLabel] = useState("");
   const [linkedMessage, setLinkedMessage] = useState<string>("none");
@@ -480,16 +479,11 @@ function AddReminderDialog({
       setError("Pick a due date.");
       return;
     }
-    // PHASE 1: record in the in-memory store (Phase 3 persists via a Server Action).
-    addReminder({
-      id: `rem-${Date.now()}`,
-      outreachMessageId: linkedMessage === "none" ? null : linkedMessage,
+    addReminderManual({
       leadId: lead.id,
-      sequence: nextReminderSequence(lead.id),
       dueDate,
-      outcome: "pending",
-      label: label || undefined,
-      manual: true,
+      label,
+      outreachMessageId: linkedMessage === "none" ? null : linkedMessage,
     });
     reset();
     onOpenChange(false);
@@ -632,36 +626,18 @@ function DraftOutreachDialog({
     }, 700);
   }
 
-  function markSent() {
+  function markSentClick() {
     if (!draft.trim()) return;
-    const today = new Date().toISOString().slice(0, 10);
-    const messageId = `msg-${Date.now()}`;
-    // PHASE 1: record the sent message in the in-memory store (Phase 3 persists
-    // via a Server Action). The draft text becomes the saved sentBody.
-    addOutreach({
-      id: messageId,
+    // Persist the sent message and start the follow-up clock (a reminder + task
+    // at the configured interval) in one Server Action. resumeId isn't stored
+    // yet — resumes become DB-backed in a later milestone.
+    markSent({
       leadId: lead.id,
       contactId,
       kind,
       channel: "LinkedIn",
-      status: "sent",
       draftBody: draft,
-      sentBody: draft,
-      resumeId,
-      createdAt: today,
-      sentAt: today,
-    });
-    // Start the follow-up clock: schedule a reminder at the configured interval.
-    const due = new Date();
-    due.setDate(due.getDate() + getReminderIntervalDays());
-    addReminder({
-      id: `rem-${Date.now()}`,
-      outreachMessageId: messageId,
-      leadId: lead.id,
-      sequence: nextReminderSequence(lead.id),
-      dueDate: due.toISOString().slice(0, 10),
-      outcome: "pending",
-      manual: false,
+      intervalDays: getReminderIntervalDays(),
     });
     reset();
     onOpenChange(false);
@@ -683,7 +659,7 @@ function DraftOutreachDialog({
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button onClick={markSent}>
+            <Button onClick={markSentClick}>
               <Send className="size-4" aria-hidden />
               Mark as sent
             </Button>

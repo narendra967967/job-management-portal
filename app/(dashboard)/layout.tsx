@@ -10,17 +10,21 @@ import {
   TopBarStats,
   TopBarSearch,
 } from "@/components/app-shell/top-bar";
+import { getCurrentUserId } from "@/lib/current-user";
+import { loadWorkspace } from "@/lib/queries";
+import { WorkspaceProvider } from "@/lib/workspace-provider";
 
-export default function DashboardLayout({
+export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const workspace = await loadWorkspace(await getCurrentUserId());
   return (
     // App shell: full-height flex. On mobile the header + bottom nav are
     // fixed-height flex children and only <main> scrolls, so the bottom nav is
-    // always pinned to the visible bottom (no reliance on position:fixed, which
-    // mobile browsers hide behind the URL bar until you scroll).
+    // always pinned to the visible bottom (no reliance on position:fixed).
+    <WorkspaceProvider initial={workspace}>
     <div className="flex h-dvh flex-col overflow-hidden bg-background md:flex-row">
       {/* Desktop sidebar */}
       <aside className="hidden w-60 shrink-0 flex-col overflow-y-auto border-r border-sidebar-border bg-sidebar md:flex">
@@ -54,6 +58,7 @@ export default function DashboardLayout({
         {/* Mobile bottom nav — a flex child pinned below <main>, not fixed. */}
         <BottomNav />
       </div>
-    </div>
+      </div>
+    </WorkspaceProvider>
   );
 }

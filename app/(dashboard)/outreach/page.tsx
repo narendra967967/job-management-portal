@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
-import { getLead } from "@/lib/mock-data";
-import { useOutreach } from "@/lib/mock-store";
+import { useLeads, useOutreach } from "@/lib/mock-store";
 import { OUTREACH_KIND_LABELS } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export default function OutreachPage() {
+  const leadById = new Map(useLeads().map((l) => [l.id, l]));
   const rows = useOutreach()
-    .map((m) => ({ message: m, lead: getLead(m.leadId) }))
+    .map((m) => ({ message: m, lead: leadById.get(m.leadId) }))
     .filter((row) => row.lead);
 
   return (

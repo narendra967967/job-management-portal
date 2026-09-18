@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { Bell, Clock, Sparkles, Search } from "lucide-react";
-import { mockLeads, mockNotifications, mockReminders } from "@/lib/mock-data";
+import { useLeads, useReminders, useNotifications } from "@/lib/mock-store";
 import { useSearchQuery, setSearchQuery } from "@/lib/search-store";
 import { Input } from "@/components/ui/input";
 import {
@@ -16,9 +16,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-
-const newCount = mockLeads.filter((l) => l.status === "new").length;
-const dueCount = mockReminders.filter((r) => r.outcome === "pending").length;
 
 /** Search box that filters the Leads list (jumps to /leads when typing). */
 export function TopBarSearch() {
@@ -48,6 +45,8 @@ export function TopBarSearch() {
 
 /** Compact key numbers in the top bar. */
 export function TopBarStats({ className }: { className?: string }) {
+  const newCount = useLeads().filter((l) => l.status === "new").length;
+  const dueCount = useReminders().filter((r) => r.outcome === "pending").length;
   return (
     <div className={cn("flex items-center gap-1.5", className)}>
       <Link
@@ -76,7 +75,8 @@ export function TopBarStats({ className }: { className?: string }) {
 /** Bell with a dropdown of notifications; each opens its lead. */
 export function NotificationsMenu() {
   const router = useRouter();
-  const unread = mockNotifications.filter((n) => n.unread).length;
+  const notifications = useNotifications();
+  const unread = notifications.length;
 
   return (
     <DropdownMenu>
@@ -96,12 +96,12 @@ export function NotificationsMenu() {
           <DropdownMenuLabel>Notifications</DropdownMenuLabel>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        {mockNotifications.length === 0 ? (
+        {notifications.length === 0 ? (
           <p className="px-2 py-6 text-center text-xs text-muted-foreground">
             You&apos;re all caught up.
           </p>
         ) : (
-          mockNotifications.map((n) => (
+          notifications.map((n) => (
             <DropdownMenuItem
               key={n.id}
               className="items-start gap-2.5 py-2"
@@ -122,12 +122,7 @@ export function NotificationsMenu() {
                 )}
               </span>
               <span className="min-w-0 flex-1">
-                <span className="flex items-center justify-between gap-2">
-                  <span className="text-sm font-medium">{n.title}</span>
-                  <span className="shrink-0 text-[11px] text-muted-foreground">
-                    {n.time}
-                  </span>
-                </span>
+                <span className="text-sm font-medium">{n.title}</span>
                 <span className="block truncate text-xs text-muted-foreground">
                   {n.detail}
                 </span>

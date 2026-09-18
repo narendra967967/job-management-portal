@@ -2,15 +2,15 @@
 
 import Link from "next/link";
 import { Clock } from "lucide-react";
-import { getLead } from "@/lib/mock-data";
-import { useReminders } from "@/lib/mock-store";
+import { useLeads, useReminders } from "@/lib/mock-store";
 import { ReminderActions } from "@/components/leads/reminder-actions";
 import { REMINDER_OUTCOME_LABELS } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export default function RemindersPage() {
+  const leadById = new Map(useLeads().map((l) => [l.id, l]));
   const rows = useReminders()
-    .map((r) => ({ reminder: r, lead: getLead(r.leadId) }))
+    .map((r) => ({ reminder: r, lead: leadById.get(r.leadId) }))
     .filter((row) => row.lead);
 
   return (

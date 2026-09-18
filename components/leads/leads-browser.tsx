@@ -41,9 +41,9 @@ import { useDefaultResumeId } from "@/lib/use-default-resume";
 import { useAppSettings } from "@/lib/use-app-settings";
 import { useSearchQuery } from "@/lib/search-store";
 import {
+  useLeads,
   useContactsForLead,
   useRemindersForLead,
-  useStatusOverrides,
   setLeadStatus,
 } from "@/lib/mock-store";
 import { Input } from "@/components/ui/input";
@@ -125,7 +125,8 @@ const STATUS_META: Record<
   },
 };
 
-export function LeadsBrowser({ leads }: { leads: JobLead[] }) {
+export function LeadsBrowser() {
+  const leads = useLeads();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [locationFilter, setLocationFilter] = useState<LocationFilter>("all");
   const [tagFilter, setTagFilter] = useState<string>("all");
@@ -140,9 +141,6 @@ export function LeadsBrowser({ leads }: { leads: JobLead[] }) {
     () => [...new Set(leads.flatMap((l) => l.tags))].sort(),
     [leads],
   );
-  // Job status lives in the store so it stays in sync with reminders/tasks and
-  // so closing a job can auto-cancel its follow-ups.
-  const statusOverrides = useStatusOverrides();
   // Which lead's "View details" modal is open (null = closed).
   const [detailLead, setDetailLead] = useState<JobLead | null>(null);
   // Default resume drives the fit score; per-lead choices override it.
@@ -153,8 +151,7 @@ export function LeadsBrowser({ leads }: { leads: JobLead[] }) {
   const setResumeFor = (id: string, resumeId: string) =>
     setResumeChoice((prev) => ({ ...prev, [id]: resumeId }));
 
-  const statusOf = (lead: JobLead): LeadStatus =>
-    statusOverrides[lead.id]?.status ?? lead.status;
+  const statusOf = (lead: JobLead): LeadStatus => lead.status;
 
   const setStatus = (
     id: string,
@@ -172,8 +169,7 @@ export function LeadsBrowser({ leads }: { leads: JobLead[] }) {
     };
     for (const l of leads) c[statusOf(l)]++;
     return c;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [leads, statusOverrides]);
+  }, [leads]);
 
   // Resolve the active capture-date window [from, to] (inclusive, YYYY-MM-DD).
   const dateBounds = useMemo(() => {
@@ -211,8 +207,7 @@ export function LeadsBrowser({ leads }: { leads: JobLead[] }) {
         : a.capturedAt.localeCompare(b.capturedAt),
     );
     return out;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [leads, statusFilter, locationFilter, tagFilter, search, dateBounds, sort, statusOverrides]);
+  }, [leads, statusFilter, locationFilter, tagFilter, search, dateBounds, sort]);
 
   // Reset to the first page whenever the result set changes.
   useEffect(() => {
