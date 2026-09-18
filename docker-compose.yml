@@ -1,0 +1,31 @@
+# Local development database (Phase 2 local-first setup).
+# Not used in production — online hosting is decided later.
+#
+#   Start:  docker compose up -d
+#   Stop:   docker compose stop
+#   Reset:  docker compose down -v   (deletes all data)
+#
+# Host port is 5433 (not the default 5432) because another project already uses
+# 5432 on this machine. The DATABASE_URL in .env.local points at 5433.
+
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: jmp-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: jmp
+      POSTGRES_PASSWORD: jmp_local_dev
+      POSTGRES_DB: jmp
+    ports:
+      - "5433:5432"
+    volumes:
+      - jmp_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jmp -d jmp"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  jmp_pgdata:

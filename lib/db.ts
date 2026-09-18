@@ -1,13 +1,17 @@
-// Drizzle client over Neon's serverless HTTP driver. One connection function,
-// reused across Server Actions (Phase 3). No pooling to manage — Neon's driver
-// is built for serverless invocations.
+// Drizzle client.
 //
-// `DATABASE_URL` is the Neon pooled connection string (TRD §10), injected by
-// the Neon–Vercel integration in prod and read from .env.local in dev. It is a
-// secret and never reaches the client — this module is server-only.
+// LOCAL-FIRST (current): uses node-postgres (`pg`) against a standard Postgres
+// server — the local Docker container in docker-compose.yml. `DATABASE_URL` is
+// read from .env.local (a secret file, never committed) and never reaches the
+// client; this module is server-only.
+//
+// DEVIATION FROM TRD §2: the TRD specced Neon's serverless HTTP driver, which
+// cannot reach a local Postgres. We switched to `pg` for the local environment.
+// Going online later is a one-file change here (point `pg` at a hosted Postgres,
+// or swap in drizzle-orm/neon-http for an edge deploy).
 
-import { drizzle } from "drizzle-orm/neon-http";
-import { neon } from "@neondatabase/serverless";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
 import * as schema from "@/db/schema";
 
 const connectionString = process.env.DATABASE_URL;
@@ -17,4 +21,6 @@ if (!connectionString) {
   );
 }
 
-export const db = drizzle(neon(connectionString), { schema });
+const pool = new Pool({ connectionString });
+
+export const db = drizzle(pool, { schema });

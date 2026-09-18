@@ -181,7 +181,20 @@ All below were revealed/approved during Phase 1; none silently diverge:
 
 ## Migration workflow
 `db/schema.ts` = single source of truth → `drizzle-kit generate` → review SQL →
-`drizzle-kit migrate` against Neon. Seed script optional for local dev.
+`drizzle-kit migrate`. Seed script optional for local dev.
+
+## Local development (current — no cloud DB yet)
+Decision (2026-09-18): build and test entirely against a **local Postgres in
+Docker** first; online hosting is decided later. On this machine port 5432 was
+already taken by another project, so JMP uses **5433**.
+- `docker-compose.yml` runs `postgres:17-alpine` as `jmp-postgres` (db/user/pass
+  all `jmp` / `jmp_local_dev`), data in the `jmp_pgdata` volume.
+- `.env.local` (gitignored) holds `DATABASE_URL=postgresql://jmp:jmp_local_dev@localhost:5433/jmp`.
+- **Runtime driver deviation:** `lib/db.ts` uses **node-postgres (`pg`)**, not
+  Neon's serverless HTTP driver (TRD §2) — the Neon driver can't reach a local
+  Postgres. Going online later is a one-file change in `lib/db.ts`.
+- Commands: `docker compose up -d` → `npm run db:migrate`. Reset all data with
+  `docker compose down -v`. Browse with `npm run db:studio`.
 
 ## Open decisions to confirm before writing `schema.ts`
 1. `gmail_config` + `gmail_sync_state` as **two tables** (clean separation) or one `gmail_integration` row? (Plan assumes two.)
