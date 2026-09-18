@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { Logo } from "@/components/app-shell/logo";
 import { useProfile } from "@/lib/mock-store";
+import { signOutToHome } from "@/lib/auth-client";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -104,13 +105,14 @@ export function SidebarFooter() {
             {profile.email}
           </p>
         </div>
-        <Link
-          href="/"
+        <button
+          type="button"
+          onClick={signOutToHome}
           aria-label="Log out"
           className="flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
         >
           <LogOut className="size-4" aria-hidden />
-        </Link>
+        </button>
       </div>
     </div>
   );
@@ -139,7 +141,7 @@ export function AccountMenu() {
           <Settings className="size-4" aria-hidden />
           Settings
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => router.push("/")}>
+        <DropdownMenuItem onClick={signOutToHome}>
           <LogOut className="size-4" aria-hidden />
           Log out
         </DropdownMenuItem>

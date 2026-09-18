@@ -1,26 +1,15 @@
-"use client";
-
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Logo } from "@/components/app-shell/logo";
+import { GoogleSignInButton } from "@/components/auth/sign-in";
+import { authEnabled, getSessionUserId } from "@/lib/current-user";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 
-export default function LoginPage() {
-  const router = useRouter();
-  const [identifier, setIdentifier] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-
-  function submit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!identifier.trim() || !password.trim()) {
-      setError("Enter your email or mobile number and password.");
-      return;
-    }
-    setError("");
-    // Phase 1 mock. Phase 3 authenticates via Better Auth (credentials).
-    router.push("/leads");
+export default async function LoginPage() {
+  const enabled = authEnabled();
+  if (enabled) {
+    const id = await getSessionUserId();
+    if (id) redirect("/leads");
   }
 
   return (
@@ -34,40 +23,32 @@ export default function LoginPage() {
           </p>
         </div>
 
-        <form onSubmit={submit} className="mt-8 rounded-2xl border bg-card p-6">
-          <label className="block space-y-1.5">
-            <span className="text-xs font-medium text-muted-foreground">
-              Email or mobile number
-            </span>
-            <Input
-              value={identifier}
-              onChange={(e) => setIdentifier(e.target.value)}
-              placeholder="you@example.com or +1 555 018 2245"
-              autoComplete="username"
-            />
-          </label>
-          <label className="mt-3 block space-y-1.5">
-            <span className="text-xs font-medium text-muted-foreground">
-              Password
-            </span>
-            <Input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete="current-password"
-            />
-          </label>
-
-          {error && <p className="mt-3 text-xs text-destructive">{error}</p>}
-
-          <Button type="submit" className="mt-5 w-full">
-            Sign in
-          </Button>
-
-          <p className="mt-4 text-center text-xs text-muted-foreground">
-            Connect Google for Gmail sync later, from Settings.
-          </p>
-        </form>
+        <div className="mt-8 rounded-2xl border bg-card p-6">
+          {enabled ? (
+            <>
+              <GoogleSignInButton />
+              <p className="mt-4 text-center text-xs text-muted-foreground">
+                One consent screen grants sign-in and read-only Gmail access.
+              </p>
+            </>
+          ) : (
+            <>
+              <Button
+                nativeButton={false}
+                render={<Link href="/leads" />}
+                className="w-full"
+              >
+                Enter workspace
+              </Button>
+              <p className="mt-4 text-center text-xs text-muted-foreground">
+                Dev mode — Google sign-in activates once{" "}
+                <code className="text-[11px]">GOOGLE_CLIENT_ID</code> /{" "}
+                <code className="text-[11px]">SECRET</code> are set in{" "}
+                <code className="text-[11px]">.env.local</code>.
+              </p>
+            </>
+          )}
+        </div>
 
         <p className="mt-6 text-center text-xs text-muted-foreground">
           Personal, single-user system.

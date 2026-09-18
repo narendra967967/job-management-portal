@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import {
   FileText,
   Upload,
@@ -32,6 +31,7 @@ import {
   removeAiKey,
 } from "@/lib/mock-store";
 import { buildGmailQuery } from "@/lib/use-gmail-settings";
+import { signOutToHome } from "@/lib/auth-client";
 import { Textarea } from "@/components/ui/textarea";
 import {
   AI_PROVIDER_DEFAULT_MODEL,
@@ -795,7 +795,7 @@ function AccountCard() {
         Single-user access to this workspace.
       </p>
       <div className="mt-4">
-        <Button variant="destructive" nativeButton={false} render={<Link href="/" />}>
+        <Button variant="destructive" onClick={signOutToHome}>
           <LogOut className="size-4" aria-hidden />
           Log out
         </Button>

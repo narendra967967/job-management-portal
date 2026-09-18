@@ -1,16 +1,34 @@
 import "server-only";
 
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+import { auth } from "@/lib/auth";
+
 // Resolves the acting user's id for data-layer reads/writes.
 //
-// PHASE 3 / Milestone A (now): auth isn't wired yet, so we fall back to the
-// fixed dev user the seed created (DEV_USER_ID). Once Better Auth lands
-// (Milestone B), this reads the Better Auth session and returns the real
-// signed-in user's id — the single-email allow-list guarantees it's the owner.
+// Auth ENFORCES only when Google credentials are configured. Until then (local
+// dev without an OAuth client yet) we fall back to the seeded dev user so the
+// app is fully usable. Once GOOGLE_CLIENT_ID/SECRET are set, a real Better Auth
+// session is required and the single-email allow-list (lib/auth.ts) applies.
 
+/** True when Google OAuth is configured, so real auth should be enforced. */
+export function authEnabled(): boolean {
+  return !!process.env.GOOGLE_CLIENT_ID && !!process.env.GOOGLE_CLIENT_SECRET;
+}
+
+/** The signed-in user's id, or null. Falls back to the dev user when auth is off. */
+export async function getSessionUserId(): Promise<string | null> {
+  if (!authEnabled()) {
+    return process.env.DEV_USER_ID ?? "dev-user";
+  }
+  const s = await auth.api.getSession({ headers: await headers() });
+  return s?.user?.id ?? null;
+}
+
+/** Like getSessionUserId, but redirects to the login page when unauthenticated
+ *  (auth enabled + no session). Use in dashboard reads and Server Actions. */
 export async function getCurrentUserId(): Promise<string> {
-  // Milestone B replaces this block with a Better Auth session lookup:
-  //   const session = await auth.api.getSession({ headers: await headers() });
-  //   if (!session) redirect("/");   return session.user.id;
-  const devUser = process.env.DEV_USER_ID ?? "dev-user";
-  return devUser;
+  const id = await getSessionUserId();
+  if (!id) redirect("/");
+  return id;
 }
