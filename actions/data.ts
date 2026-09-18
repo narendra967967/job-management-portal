@@ -17,6 +17,7 @@ import {
   outreachMessages as outreachT,
   reminders as remindersT,
   tasks as tasksT,
+  userSettings as settingsT,
 } from "@/db/schema";
 import { isJobOpen } from "@/lib/types";
 import type {
@@ -133,11 +134,16 @@ export async function markSentAction(input: {
   kind: OutreachKind;
   channel: string;
   draftBody: string;
-  intervalDays: number;
 }) {
   const userId = await getCurrentUserId();
   await db.transaction(async (tx) => {
     const now = new Date();
+    // Follow-up interval comes from the user's saved settings (FR-5.1).
+    const [settings] = await tx
+      .select({ interval: settingsT.reminderIntervalDays })
+      .from(settingsT)
+      .where(eq(settingsT.userId, userId));
+    const intervalDays = settings?.interval ?? 3;
     // Record the sent message. resumeId is left null until resumes are
     // DB-backed (a later milestone) — avoids an FK error on mock resume ids.
     await tx.insert(outreachT).values({
@@ -161,7 +167,7 @@ export async function markSentAction(input: {
 
     const seq = await nextSequence(tx, userId, input.leadId);
     const due = new Date();
-    due.setDate(due.getDate() + input.intervalDays);
+    due.setDate(due.getDate() + intervalDays);
     const dueDate = ymd(due);
 
     const [rem] = await tx

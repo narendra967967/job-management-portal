@@ -35,15 +35,15 @@ import { StatusBadge } from "@/components/leads/status-badge";
 import { useLeadActionDialogs } from "@/components/leads/lead-actions";
 import { LeadDetailDialog } from "@/components/leads/lead-detail-dialog";
 import { LeadRemindersDialog } from "@/components/leads/lead-reminders-dialog";
-import { mockResumes } from "@/lib/mock-data";
 import { computeFitScore, fitBand } from "@/lib/fit";
-import { useDefaultResumeId } from "@/lib/use-default-resume";
-import { useAppSettings } from "@/lib/use-app-settings";
 import { useSearchQuery } from "@/lib/search-store";
 import {
   useLeads,
+  useResumes,
   useContactsForLead,
   useRemindersForLead,
+  useDefaultResumeId,
+  useAppSettings,
   setLeadStatus,
 } from "@/lib/mock-store";
 import { Input } from "@/components/ui/input";
@@ -127,6 +127,7 @@ const STATUS_META: Record<
 
 export function LeadsBrowser() {
   const leads = useLeads();
+  const resumes = useResumes();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [locationFilter, setLocationFilter] = useState<LocationFilter>("all");
   const [tagFilter, setTagFilter] = useState<string>("all");
@@ -393,7 +394,7 @@ export function LeadsBrowser() {
 
       <LeadDetailDialog
         lead={detailLead}
-        resumes={mockResumes}
+        resumes={resumes}
         resumeId={detailLead ? resumeIdFor(detailLead.id) : undefined}
         open={detailLead !== null}
         onOpenChange={(o) => !o && setDetailLead(null)}
@@ -587,7 +588,8 @@ function LeadCard({
   onOpen: () => void;
   onStatusChange: (status: LeadStatus, outcome?: CloseOutcome | null) => void;
 }) {
-  const { openDialog, dialogs } = useLeadActionDialogs(lead, mockResumes, {
+  const resumes = useResumes();
+  const { openDialog, dialogs } = useLeadActionDialogs(lead, resumes, {
     selectedResumeId: resumeId,
     onResumeChange,
   });
@@ -598,7 +600,7 @@ function LeadCard({
   const fit = computeFitScore(lead.id, resumeId);
   const band = fitBand(fit);
   const resumeLabel =
-    mockResumes.find((r) => r.id === resumeId)?.label ?? "resume";
+    resumes.find((r) => r.id === resumeId)?.label ?? "resume";
   const open = isJobOpen(status);
   const hasContacts = contactCount > 0;
   // Stale = open, no pending follow-up, and captured longer ago than the

@@ -15,16 +15,24 @@ import {
   LogOut,
   Filter,
 } from "lucide-react";
-import { useDefaultResumeId } from "@/lib/use-default-resume";
-import { useAppSettings } from "@/lib/use-app-settings";
-import { useGmailSettings, buildGmailQuery } from "@/lib/use-gmail-settings";
-import { Textarea } from "@/components/ui/textarea";
 import {
-  mockAiSettings,
-  mockGoogleConnection,
-  mockProfile,
-  mockResumes,
-} from "@/lib/mock-data";
+  useProfile,
+  updateProfile,
+  useResumes,
+  useDefaultResumeId,
+  addResume,
+  renameResume,
+  deleteResume,
+  useAppSettings,
+  useGmailSettings,
+  useGoogle,
+  useAiSettings,
+  updateAiSettings,
+  saveAiKey,
+  removeAiKey,
+} from "@/lib/mock-store";
+import { buildGmailQuery } from "@/lib/use-gmail-settings";
+import { Textarea } from "@/components/ui/textarea";
 import {
   AI_PROVIDER_DEFAULT_MODEL,
   AI_PROVIDER_LABELS,
@@ -63,9 +71,6 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      {/* Single column on mobile/tablet; on large screens the cards flow into
-          two balanced masonry columns so the width isn't wasted. Each card
-          stays intact (break-inside-avoid) and keeps its vertical rhythm. */}
       <div className="[&>section]:mb-5 lg:columns-2 lg:gap-5 lg:[&>section]:break-inside-avoid">
         <ProfileCard />
         <GoogleCard />
@@ -81,10 +86,17 @@ export default function SettingsPage() {
 /* ---------------- Profile ---------------- */
 
 function ProfileCard() {
-  const [name, setName] = useState(mockProfile.name);
-  const [email, setEmail] = useState(mockProfile.email);
-  const [mobile, setMobile] = useState(mockProfile.mobile);
+  const profile = useProfile();
+  const [name, setName] = useState(profile.name);
+  const [email, setEmail] = useState(profile.email);
+  const [mobile, setMobile] = useState(profile.mobile);
   const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    setName(profile.name);
+    setEmail(profile.email);
+    setMobile(profile.mobile);
+  }, [profile]);
 
   return (
     <section className="rounded-2xl border bg-card p-4 md:p-5">
@@ -114,6 +126,7 @@ function ProfileCard() {
       <div className="mt-4 flex items-center gap-3">
         <Button
           onClick={() => {
+            updateProfile({ name, email, mobile });
             setSaved(true);
             setTimeout(() => setSaved(false), 1500);
           }}
@@ -131,10 +144,9 @@ function ProfileCard() {
 /* ---------------- Google connection ---------------- */
 
 function GoogleCard() {
-  const [connected, setConnected] = useState(mockGoogleConnection.connected);
+  const google = useGoogle();
   const [settings, updateSettings] = useGmailSettings();
 
-  // Local form mirrors the saved settings until you press Save.
   const [sendersText, setSendersText] = useState("");
   const [label, setLabel] = useState("");
   const [subjectKeywords, setSubjectKeywords] = useState("");
@@ -176,12 +188,12 @@ function GoogleCard() {
         </div>
         <span
           className={
-            connected
+            google.connected
               ? "rounded-full bg-status-applied px-2.5 py-0.5 text-[11px] font-medium text-status-applied-foreground"
               : "rounded-full bg-muted px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground"
           }
         >
-          {connected ? "Connected" : "Not connected"}
+          {google.connected ? "Connected" : "Not connected"}
         </span>
       </div>
 
@@ -193,24 +205,15 @@ function GoogleCard() {
         </p>
       </div>
 
-      {connected ? (
-        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm">
-            Connected as{" "}
-            <span className="font-medium">{mockProfile.email}</span>
-          </p>
-          <Button variant="outline" onClick={() => setConnected(false)}>
-            Disconnect
-          </Button>
-        </div>
-      ) : (
-        <div className="mt-4">
-          <Button onClick={() => setConnected(true)}>
-            <GoogleGlyph />
-            Connect Google
-          </Button>
-        </div>
-      )}
+      <div className="mt-4">
+        <Button disabled title="Google sign-in is enabled when Gmail sync is set up">
+          <GoogleGlyph />
+          Connect Google
+        </Button>
+        <p className="mt-2 text-[11px] text-muted-foreground">
+          Google sign-in + Gmail access are enabled when Gmail sync is set up.
+        </p>
+      </div>
 
       {/* ---- Which emails to ingest ---- */}
       <div className="mt-5 border-t pt-4">
@@ -304,18 +307,28 @@ function GoogleCard() {
 /* ---------------- AI provider & API key ---------------- */
 
 function AiProviderCard() {
-  const [provider, setProvider] = useState<AiProvider>(mockAiSettings.provider);
-  const [model, setModel] = useState(mockAiSettings.model);
-  const [keyConfigured, setKeyConfigured] = useState(
-    mockAiSettings.keyConfigured,
-  );
-  const [keyLast4, setKeyLast4] = useState<string | null>(
-    mockAiSettings.keyLast4,
-  );
+  const ai = useAiSettings();
+  const [provider, setProvider] = useState<AiProvider>(ai.provider);
+  const [model, setModel] = useState(ai.model);
   const [keyInput, setKeyInput] = useState("");
-  const [editingKey, setEditingKey] = useState(!mockAiSettings.keyConfigured);
+  const [editingKey, setEditingKey] = useState(!ai.keyConfigured);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    setProvider(ai.provider);
+    setModel(ai.model);
+    setEditingKey(!ai.keyConfigured);
+  }, [ai]);
+
+  function pickProvider(p: AiProvider) {
+    setProvider(p);
+    updateAiSettings({ provider: p, model });
+  }
+
+  function saveModel() {
+    updateAiSettings({ provider, model });
+  }
 
   function saveKey() {
     const key = keyInput.trim();
@@ -324,10 +337,7 @@ function AiProviderCard() {
       return;
     }
     setError("");
-    // Mock: Phase 3 sends this to a Server Action that encrypts it at rest. The
-    // raw key is never stored in client state or read back to the browser.
-    setKeyLast4(key.slice(-4));
-    setKeyConfigured(true);
+    saveAiKey(key);
     setKeyInput("");
     setEditingKey(false);
     setSaved(true);
@@ -335,8 +345,7 @@ function AiProviderCard() {
   }
 
   function removeKey() {
-    setKeyConfigured(false);
-    setKeyLast4(null);
+    removeAiKey();
     setKeyInput("");
     setEditingKey(true);
   }
@@ -353,12 +362,12 @@ function AiProviderCard() {
         </div>
         <span
           className={
-            keyConfigured
+            ai.keyConfigured
               ? "rounded-full bg-status-applied px-2.5 py-0.5 text-[11px] font-medium text-status-applied-foreground"
               : "rounded-full bg-muted px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground"
           }
         >
-          {keyConfigured ? "Configured" : "Not configured"}
+          {ai.keyConfigured ? "Configured" : "Not configured"}
         </span>
       </div>
 
@@ -367,7 +376,7 @@ function AiProviderCard() {
           <Select
             items={AI_PROVIDER_LABELS}
             value={provider}
-            onValueChange={(v) => setProvider((v as AiProvider) ?? provider)}
+            onValueChange={(v) => pickProvider((v as AiProvider) ?? provider)}
           >
             <SelectTrigger className="w-full">
               <SelectValue />
@@ -385,6 +394,7 @@ function AiProviderCard() {
           <Input
             value={model}
             onChange={(e) => setModel(e.target.value)}
+            onBlur={saveModel}
             placeholder={AI_PROVIDER_DEFAULT_MODEL[provider]}
           />
         </Field>
@@ -394,11 +404,11 @@ function AiProviderCard() {
         <span className="text-xs font-medium text-muted-foreground">
           API key
         </span>
-        {keyConfigured && !editingKey ? (
+        {ai.keyConfigured && !editingKey ? (
           <div className="mt-1.5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <span className="inline-flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 font-mono text-sm">
               <KeyRound className="size-4 text-muted-foreground" aria-hidden />
-              {provider === "openai" ? "sk" : "sk-ant"}-••••••••{keyLast4}
+              {provider === "openai" ? "sk" : "sk-ant"}-••••••••{ai.keyLast4}
             </span>
             <div className="flex items-center gap-2">
               <Button variant="outline" onClick={() => setEditingKey(true)}>
@@ -415,15 +425,13 @@ function AiProviderCard() {
               type="password"
               value={keyInput}
               onChange={(e) => setKeyInput(e.target.value)}
-              placeholder={
-                provider === "openai" ? "sk-…" : "sk-ant-…"
-              }
+              placeholder={provider === "openai" ? "sk-…" : "sk-ant-…"}
               autoComplete="off"
               className="flex-1 font-mono"
             />
             <div className="flex items-center gap-2">
               <Button onClick={saveKey}>Save key</Button>
-              {keyConfigured && (
+              {ai.keyConfigured && (
                 <Button
                   variant="outline"
                   onClick={() => {
@@ -514,13 +522,12 @@ interface PendingFile {
 }
 
 function ResumesCard() {
-  const [resumes, setResumes] = useState<Resume[]>(mockResumes);
+  const resumes = useResumes();
   const [defaultResumeId, setDefaultResumeId] = useDefaultResumeId();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState("");
   const [error, setError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
-  // After a valid file is picked, we hold it here and ask for a display name.
   const [pending, setPending] = useState<PendingFile | null>(null);
   const [pendingName, setPendingName] = useState("");
   const [nameError, setNameError] = useState("");
@@ -540,11 +547,9 @@ function ResumesCard() {
         fileType: ext as Resume["fileType"],
         sizeKb: Math.max(1, Math.round(file.size / 1024)),
       });
-      // Pre-fill the name from the filename; the user can change it.
       setPendingName(file.name.replace(/\.[^.]+$/, ""));
       setNameError("");
     }
-    // Reset so re-selecting the same file fires change again.
     if (fileRef.current) fileRef.current.value = "";
   }
 
@@ -555,28 +560,19 @@ function ResumesCard() {
       setNameError("Give this resume a name.");
       return;
     }
-    // Mock: Phase 3 uploads the file to blob storage via a Server Action and
-    // stores its URL + metadata. Here we only capture the metadata.
-    setResumes((r) => [
-      ...r,
-      {
-        id: `resume-${Date.now()}`,
-        label,
-        fileName: pending.fileName,
-        fileType: pending.fileType,
-        sizeKb: pending.sizeKb,
-        updatedAt: new Date().toISOString().slice(0, 10),
-      },
-    ]);
+    addResume({
+      label,
+      fileName: pending.fileName,
+      fileType: pending.fileType,
+      sizeKb: pending.sizeKb,
+    });
     setPending(null);
     setPendingName("");
   }
 
   function saveEdit(id: string) {
     const label = editLabel.trim();
-    if (label) {
-      setResumes((r) => r.map((x) => (x.id === id ? { ...x, label } : x)));
-    }
+    if (label) renameResume(id, label);
     setEditingId(null);
   }
 
@@ -682,9 +678,7 @@ function ResumesCard() {
                 <button
                   type="button"
                   aria-label={`Delete ${r.label}`}
-                  onClick={() =>
-                    setResumes((list) => list.filter((x) => x.id !== r.id))
-                  }
+                  onClick={() => deleteResume(r.id)}
                   className="flex size-11 items-center justify-center rounded-md sm:size-9 text-muted-foreground hover:bg-muted hover:text-destructive"
                 >
                   <Trash2 className="size-4" aria-hidden />

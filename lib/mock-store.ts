@@ -24,6 +24,18 @@ import {
   snoozeReminderAction,
   updateContactAction,
 } from "@/actions/data";
+import {
+  addResumeAction,
+  deleteResumeAction,
+  removeAiKeyAction,
+  renameResumeAction,
+  saveAiKeyAction,
+  setDefaultResumeAction,
+  updateAiSettingsAction,
+  updateFollowUpsAction,
+  updateGmailConfigAction,
+  updateProfileAction,
+} from "@/actions/settings";
 import { contactPersonKey, isJobOpen } from "@/lib/types";
 import {
   CLOSE_OUTCOME_LABELS,
@@ -32,19 +44,29 @@ import {
   REMINDER_OUTCOME_LABELS,
 } from "@/lib/types";
 import type {
+  AiProvider,
+  AiSettings,
   CloseOutcome,
   ConnectionType,
   Contact,
+  GoogleConnection,
   JobLead,
   JobLeadDetail,
   LeadStatus,
   OutreachKind,
   OutreachMessage,
+  Profile,
   Reminder,
   ReminderOutcome,
+  Resume,
   Task,
 } from "@/lib/types";
-import type { WorkspaceData } from "@/lib/queries";
+import type { GmailConfigData, WorkspaceData } from "@/lib/queries";
+
+export interface AppSettings {
+  reminderIntervalDays: number;
+  staleLeadDays: number;
+}
 
 /* ---------------- state ---------------- */
 
@@ -54,6 +76,19 @@ let contacts: Contact[] = [];
 let outreach: OutreachMessage[] = [];
 let reminders: Reminder[] = [];
 let tasks: Task[] = [];
+let resumes: Resume[] = [];
+let defaultResumeId = "";
+let appSettings: AppSettings = { reminderIntervalDays: 3, staleLeadDays: 14 };
+let profile: Profile = { name: "", email: "", mobile: "" };
+let google: GoogleConnection = { connected: false, email: null, scope: "gmail.readonly" };
+let aiSettings: AiSettings = { provider: "openai", model: "", keyConfigured: false, keyLast4: null };
+let gmailConfig: GmailConfigData = {
+  senders: [],
+  label: "",
+  subjectKeywords: "",
+  lookbackDays: 30,
+  connected: false,
+};
 let hydrated = false;
 
 const listeners = new Set<() => void>();
@@ -72,6 +107,17 @@ function apply(data: WorkspaceData) {
   outreach = data.outreach;
   reminders = data.reminders;
   tasks = data.tasks;
+  resumes = data.resumes;
+  defaultResumeId =
+    data.defaultResumeId ?? data.resumes.find((r) => r.isDefault)?.id ?? "";
+  appSettings = {
+    reminderIntervalDays: data.reminderIntervalDays,
+    staleLeadDays: data.staleLeadDays,
+  };
+  profile = data.profile;
+  google = data.google;
+  aiSettings = data.aiSettings;
+  gmailConfig = data.gmailConfig;
 }
 
 /** Called by WorkspaceProvider during render so the first snapshot has data.
@@ -196,14 +242,14 @@ export async function deleteContact(id: string) {
   await refresh();
 }
 
-/** Mark a drafted message sent + schedule the follow-up reminder/task. */
+/** Mark a drafted message sent + schedule the follow-up reminder/task. The
+ *  follow-up interval is read from saved settings server-side. */
 export async function markSent(input: {
   leadId: string;
   contactId: string;
   kind: OutreachKind;
   channel: string;
   draftBody: string;
-  intervalDays: number;
 }) {
   await markSentAction(input);
   await refresh();
@@ -236,6 +282,132 @@ export async function deleteReminder(id: string) {
 
 export async function completeTask(id: string) {
   await completeTaskAction(id);
+  await refresh();
+}
+
+/* ---------------- settings & resumes (persist, then refresh) -------------- */
+
+const getResumes = () => resumes;
+const getDefaultResumeId = () => defaultResumeId;
+const getAppSettings = () => appSettings;
+const getProfile = () => profile;
+const getGoogle = () => google;
+const getAiSettings = () => aiSettings;
+const getGmailConfig = () => gmailConfig;
+
+export function useResumes(): Resume[] {
+  return useSyncExternalStore(subscribe, getResumes, getResumes);
+}
+
+/** [id, setDefault] — matches the old localStorage hook's shape. */
+export function useDefaultResumeId(): [string, (id: string) => void] {
+  const id = useSyncExternalStore(
+    subscribe,
+    getDefaultResumeId,
+    getDefaultResumeId,
+  );
+  const setDefault = (next: string) => {
+    void (async () => {
+      await setDefaultResumeAction(next);
+      await refresh();
+    })();
+  };
+  return [id, setDefault];
+}
+
+export function useAppSettings(): [
+  AppSettings,
+  (patch: Partial<AppSettings>) => void,
+] {
+  const settings = useSyncExternalStore(
+    subscribe,
+    getAppSettings,
+    getAppSettings,
+  );
+  const update = (patch: Partial<AppSettings>) => {
+    const next = { ...settings, ...patch };
+    void (async () => {
+      await updateFollowUpsAction(next);
+      await refresh();
+    })();
+  };
+  return [settings, update];
+}
+
+export function useGmailSettings(): [
+  GmailConfigData,
+  (patch: Partial<GmailConfigData>) => void,
+] {
+  const cfg = useSyncExternalStore(subscribe, getGmailConfig, getGmailConfig);
+  const update = (patch: Partial<GmailConfigData>) => {
+    const next = { ...cfg, ...patch };
+    void (async () => {
+      await updateGmailConfigAction({
+        senders: next.senders,
+        label: next.label,
+        subjectKeywords: next.subjectKeywords,
+        lookbackDays: next.lookbackDays,
+      });
+      await refresh();
+    })();
+  };
+  return [cfg, update];
+}
+
+export function useProfile(): Profile {
+  return useSyncExternalStore(subscribe, getProfile, getProfile);
+}
+export function useGoogle(): GoogleConnection {
+  return useSyncExternalStore(subscribe, getGoogle, getGoogle);
+}
+export function useAiSettings(): AiSettings {
+  return useSyncExternalStore(subscribe, getAiSettings, getAiSettings);
+}
+
+export async function updateProfile(input: {
+  name: string;
+  email: string;
+  mobile: string;
+}) {
+  await updateProfileAction(input);
+  await refresh();
+}
+
+export async function updateAiSettings(input: {
+  provider: AiProvider;
+  model: string;
+}) {
+  await updateAiSettingsAction(input);
+  await refresh();
+}
+
+export async function saveAiKey(plainKey: string) {
+  await saveAiKeyAction(plainKey);
+  await refresh();
+}
+
+export async function removeAiKey() {
+  await removeAiKeyAction();
+  await refresh();
+}
+
+export async function addResume(input: {
+  label: string;
+  fileName: string;
+  fileType: "pdf" | "doc" | "docx";
+  sizeKb: number;
+}) {
+  await addResumeAction(input);
+  await refresh();
+}
+
+export async function renameResume(id: string, label: string) {
+  await renameResumeAction(id, label);
+  await refresh();
+}
+
+export async function deleteResume(id: string) {
+  await deleteResumeAction(id);
   await refresh();
 }
 

@@ -1,11 +1,7 @@
-"use client";
-
-import { useEffect, useState } from "react";
-
-// Which Gmail messages the ingestion should pull. These map 1:1 to Gmail
-// search operators — the sync builds a `q` string and calls
-// users.messages.list (READ-ONLY, gmail.readonly). Phase 3 reads these
-// server-side; Phase 1 just captures + persists them.
+// Gmail ingestion rules — pure helpers. The live values are held in the
+// workspace store (useGmailSettings there) and persisted to gmail_config; this
+// file keeps the shared type, sensible defaults, and the query builder the sync
+// will use (READ-ONLY, gmail.readonly).
 
 export interface GmailSettings {
   /** From-address allow-list (the sender of your LinkedIn job alerts). */
@@ -19,8 +15,6 @@ export interface GmailSettings {
 }
 
 export const DEFAULT_GMAIL_SETTINGS: GmailSettings = {
-  // Common LinkedIn job-alert senders — verify against a real alert (open one
-  // in Gmail, check its "From" address) and adjust as needed.
   senders: [
     "jobalerts-noreply@linkedin.com",
     "jobs-noreply@linkedin.com",
@@ -30,21 +24,6 @@ export const DEFAULT_GMAIL_SETTINGS: GmailSettings = {
   subjectKeywords: "",
   lookbackDays: 30,
 };
-
-const KEY = "jmp:gmail-settings";
-const EVENT = "jmp:gmail-settings-changed";
-
-function read(): GmailSettings {
-  if (typeof window === "undefined") return DEFAULT_GMAIL_SETTINGS;
-  try {
-    const raw = window.localStorage.getItem(KEY);
-    return raw
-      ? { ...DEFAULT_GMAIL_SETTINGS, ...JSON.parse(raw) }
-      : DEFAULT_GMAIL_SETTINGS;
-  } catch {
-    return DEFAULT_GMAIL_SETTINGS;
-  }
-}
 
 /** Build the Gmail search query these settings imply (what the sync runs). */
 export function buildGmailQuery(s: GmailSettings): string {
@@ -74,32 +53,4 @@ export function buildGmailQuery(s: GmailSettings): string {
   if (s.lookbackDays > 0) parts.push(`newer_than:${s.lookbackDays}d`);
 
   return parts.join(" ") || "in:inbox";
-}
-
-export function useGmailSettings(): [
-  GmailSettings,
-  (patch: Partial<GmailSettings>) => void,
-] {
-  const [settings, setSettings] = useState<GmailSettings>(
-    DEFAULT_GMAIL_SETTINGS,
-  );
-
-  useEffect(() => {
-    setSettings(read());
-    const onChange = (e: Event) =>
-      setSettings((e as CustomEvent<GmailSettings>).detail);
-    window.addEventListener(EVENT, onChange);
-    return () => window.removeEventListener(EVENT, onChange);
-  }, []);
-
-  const update = (patch: Partial<GmailSettings>) => {
-    const next = { ...read(), ...patch };
-    setSettings(next);
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(KEY, JSON.stringify(next));
-      window.dispatchEvent(new CustomEvent<GmailSettings>(EVENT, { detail: next }));
-    }
-  };
-
-  return [settings, update];
 }

@@ -33,12 +33,12 @@ import { LeadTimeline } from "@/components/leads/lead-timeline";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { computeFitScore, fitBand } from "@/lib/fit";
-import { useDefaultResumeId } from "@/lib/use-default-resume";
 import {
   useContactsForLead,
   useOutreachForLead,
   useRemindersForLead,
   useLeadStatus,
+  useDefaultResumeId,
   setLeadStatus,
   deleteContact,
 } from "@/lib/mock-store";

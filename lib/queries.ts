@@ -22,6 +22,7 @@ import {
   userSettings as settingsT,
 } from "@/db/schema";
 import type {
+  AiSettings,
   Contact,
   GoogleConnection,
   JobLead,
@@ -32,6 +33,14 @@ import type {
   Resume,
   Task,
 } from "@/lib/types";
+
+export interface GmailConfigData {
+  senders: string[];
+  label: string;
+  subjectKeywords: string;
+  lookbackDays: number;
+  connected: boolean;
+}
 
 /** Date/timestamp → "YYYY-MM-DD". */
 function ymd(d: Date | string | null): string | null {
@@ -53,6 +62,8 @@ export interface WorkspaceData {
   staleLeadDays: number;
   profile: Profile;
   google: GoogleConnection;
+  aiSettings: AiSettings;
+  gmailConfig: GmailConfigData;
 }
 
 /** Everything the dashboard needs for one user, in UI-ready shapes. */
@@ -208,6 +219,21 @@ export async function loadWorkspace(userId: string): Promise<WorkspaceData> {
     scope: "gmail.readonly",
   };
 
+  const aiSettings: AiSettings = {
+    provider: settings?.aiProvider ?? "openai",
+    model: settings?.aiModel ?? "",
+    keyConfigured: !!settings?.aiKeyCiphertext,
+    keyLast4: settings?.aiKeyLast4 ?? null,
+  };
+
+  const gmailConfig: GmailConfigData = {
+    senders: gmail?.senders ?? [],
+    label: gmail?.label ?? "",
+    subjectKeywords: gmail?.subjectKeywords ?? "",
+    lookbackDays: gmail?.lookbackDays ?? 30,
+    connected: gmail?.connected ?? false,
+  };
+
   return {
     leads,
     details,
@@ -221,5 +247,7 @@ export async function loadWorkspace(userId: string): Promise<WorkspaceData> {
     staleLeadDays: settings?.staleLeadDays ?? 14,
     profile,
     google,
+    aiSettings,
+    gmailConfig,
   };
 }

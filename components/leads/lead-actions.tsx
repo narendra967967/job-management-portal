@@ -30,7 +30,6 @@ import {
   type Resume,
 } from "@/lib/types";
 import { computeFitScore, fitBand } from "@/lib/fit";
-import { getReminderIntervalDays } from "@/lib/use-app-settings";
 import {
   addContact,
   addReminderManual,
@@ -637,7 +636,6 @@ function DraftOutreachDialog({
       kind,
       channel: "LinkedIn",
       draftBody: draft,
-      intervalDays: getReminderIntervalDays(),
     });
     reset();
     onOpenChange(false);

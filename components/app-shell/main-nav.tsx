@@ -16,7 +16,7 @@ import {
   X,
 } from "lucide-react";
 import { Logo } from "@/components/app-shell/logo";
-import { mockProfile } from "@/lib/mock-data";
+import { useProfile } from "@/lib/mock-store";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -78,6 +78,7 @@ export function SidebarNav() {
 /** Sidebar footer — desktop: Settings link + profile + logout. */
 export function SidebarFooter() {
   const pathname = usePathname();
+  const profile = useProfile();
   const active = isActive(pathname, "/settings");
   return (
     <div className="mt-auto border-t p-3">
@@ -95,12 +96,12 @@ export function SidebarFooter() {
       </Link>
       <div className="flex items-center gap-2.5 rounded-lg px-3 py-2">
         <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-[oklch(0.56_0.2_305)] text-[11px] font-semibold text-primary-foreground shadow-sm">
-          {initials(mockProfile.name)}
+          {initials(profile.name)}
         </span>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-xs font-medium">{mockProfile.name}</p>
+          <p className="truncate text-xs font-medium">{profile.name}</p>
           <p className="truncate text-[11px] text-muted-foreground">
-            {mockProfile.email}
+            {profile.email}
           </p>
         </div>
         <Link
@@ -118,18 +119,19 @@ export function SidebarFooter() {
 /** Account menu — mobile top bar: avatar → Settings / Log out. */
 export function AccountMenu() {
   const router = useRouter();
+  const profile = useProfile();
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
         aria-label="Account menu"
         className="flex size-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-[oklch(0.56_0.2_305)] text-[11px] font-semibold text-primary-foreground shadow-sm"
       >
-        {initials(mockProfile.name)}
+        {initials(profile.name)}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-52">
         <DropdownMenuGroup>
           <DropdownMenuLabel className="truncate">
-            {mockProfile.name}
+            {profile.name}
           </DropdownMenuLabel>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
