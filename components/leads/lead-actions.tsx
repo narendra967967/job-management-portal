@@ -30,6 +30,7 @@ import {
   type Resume,
 } from "@/lib/types";
 import { computeFitScore, fitBand } from "@/lib/fit";
+import { draftOutreachAction, structureContactAction } from "@/actions/ai";
 import {
   addContact,
   addReminderManual,
@@ -322,23 +323,24 @@ export function AddContactDialog({
     setError("");
   }, [open, contact]);
 
-  function structure() {
+  async function structure() {
     if (!pasted.trim()) {
       setError("Paste the hiring-team or referral text first.");
       return;
     }
     setError("");
     setParsing(true);
-    // Mock AI parse — Phase 3 replaces with an OpenAI Server Action that fills
-    // these fields for the user to review.
-    setTimeout(() => {
-      setName("Parsed name");
-      setTitle("Parsed title");
-      setUrl("");
-      setType("recruiter");
+    const res = await structureContactAction(pasted);
+    if (res.ok) {
+      setName(res.contact.name);
+      setTitle(res.contact.title);
+      setUrl(res.contact.linkedinUrl);
+      setType(res.contact.connectionType);
       setAiParsed(true);
-      setParsing(false);
-    }, 700);
+    } else {
+      setError(res.error);
+    }
+    setParsing(false);
   }
 
   function save() {
@@ -607,22 +609,24 @@ function DraftOutreachDialog({
     setError("");
   }
 
-  function generate() {
+  async function generate() {
     if (!contactId) {
       setError("Add a contact to this lead first.");
       return;
     }
     setError("");
     setBusy(true);
-    setTimeout(() => {
-      const c = contacts.find((x) => x.id === contactId);
-      setDraft(
-        `Hi ${c?.name.split(" ")[0] ?? "there"},\n\nA ${OUTREACH_KIND_LABELS[
-          kind
-        ].toLowerCase()} draft appears here once AI is wired — grounded in the JD, your selected resume, and this contact. You review and edit before anything is sent.`,
-      );
-      setBusy(false);
-    }, 700);
+    const resumeLabel =
+      resumes.find((r) => r.id === resumeId)?.label ?? "my resume";
+    const res = await draftOutreachAction({
+      leadId: lead.id,
+      contactId,
+      kind,
+      resumeLabel,
+    });
+    if (res.ok) setDraft(res.draft);
+    else setError(res.error);
+    setBusy(false);
   }
 
   function markSentClick() {

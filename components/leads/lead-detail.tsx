@@ -33,6 +33,7 @@ import { LeadTimeline } from "@/components/leads/lead-timeline";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { computeFitScore, fitBand } from "@/lib/fit";
+import { summarizeJdAction } from "@/actions/ai";
 import {
   useContactsForLead,
   useOutreachForLead,
@@ -213,7 +214,7 @@ export function LeadDetailContent({
         </TabsList>
 
         <TabsContent value="overview" className="mt-4">
-          <OverviewTab detail={detail} />
+          <OverviewTab leadId={lead.id} detail={detail} />
         </TabsContent>
         <TabsContent value="contacts" className="mt-4">
           <ContactsTab lead={lead} />
@@ -234,25 +235,23 @@ export function LeadDetailContent({
 
 /* ---------------- Overview: JD paste (FR-3.1) + AI summary ---------------- */
 
-function OverviewTab({ detail }: { detail?: JobLeadDetail }) {
+function OverviewTab({ leadId, detail }: { leadId: string; detail?: JobLeadDetail }) {
   const [jd, setJd] = useState(detail?.jdText ?? "");
   const [summary, setSummary] = useState(detail?.aiSummary ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  function summarize() {
+  async function summarize() {
     if (!jd.trim()) {
       setError("Paste the job description first.");
       return;
     }
     setError("");
     setBusy(true);
-    setTimeout(() => {
-      setSummary(
-        "AI summary appears here once wired: a 2–3 line scan of the role, seniority, and location pulled from the pasted JD.",
-      );
-      setBusy(false);
-    }, 700);
+    const res = await summarizeJdAction(leadId, jd);
+    if (res.ok) setSummary(res.summary);
+    else setError(res.error);
+    setBusy(false);
   }
 
   return (
