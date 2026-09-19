@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Users,
   Clock,
@@ -20,6 +21,8 @@ import {
   Gauge,
   Flag,
   AlertTriangle,
+  SlidersHorizontal,
+  X,
 } from "lucide-react";
 import {
   CLOSE_OUTCOME_LABELS,
@@ -84,6 +87,62 @@ function toISODate(d: Date): string {
   ).padStart(2, "0")}`;
 }
 
+// Country derivation from LinkedIn's free-text location (the alert gives no
+// clean country). Heuristic, transparent: match a known country name first
+// (covers "India (Remote)", "London Area, United Kingdom (Hybrid)", …), then a
+// US "City, ST" pattern, then common cities → country; else "Other". Extend the
+// maps as new regions show up.
+const COUNTRY_NAMES = [
+  "United Arab Emirates",
+  "United States",
+  "United Kingdom",
+  "India",
+  "Canada",
+  "Australia",
+  "Germany",
+  "Ireland",
+  "Singapore",
+  "Netherlands",
+];
+const CITY_COUNTRY: Record<string, string> = {
+  london: "United Kingdom",
+  slough: "United Kingdom",
+  addlestone: "United Kingdom",
+  bromsgrove: "United Kingdom",
+  "newcastle upon tyne": "United Kingdom",
+  england: "United Kingdom",
+  dubai: "United Arab Emirates",
+  gurgaon: "India",
+  gurugram: "India",
+  noida: "India",
+  "new delhi": "India",
+  delhi: "India",
+  pune: "India",
+  bengaluru: "India",
+  bangalore: "India",
+  mumbai: "India",
+  hyderabad: "India",
+  chennai: "India",
+  chicago: "United States",
+  columbus: "United States",
+  madison: "United States",
+};
+
+export function countryOf(location: string): string {
+  const base = location
+    .replace(/\s*\((?:remote|hybrid|on-?site)\)\s*$/i, "")
+    .trim();
+  const lower = base.toLowerCase();
+  for (const c of COUNTRY_NAMES) {
+    if (lower.includes(c.toLowerCase())) return c;
+  }
+  if (/,\s*[A-Z]{2}$/.test(base)) return "United States"; // "Chicago, IL"
+  for (const [city, country] of Object.entries(CITY_COUNTRY)) {
+    if (lower.includes(city)) return country;
+  }
+  return "Other";
+}
+
 const STATUS_META: Record<
   LeadStatus,
   { icon: typeof Sparkles; bar: string; chip: string; num: string; tint: string }
@@ -130,7 +189,10 @@ export function LeadsBrowser() {
   const resumes = useResumes();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [locationFilter, setLocationFilter] = useState<LocationFilter>("all");
+  const [countryFilter, setCountryFilter] = useState<string>("all");
+  const [titleFilter, setTitleFilter] = useState<string>("all");
   const [tagFilter, setTagFilter] = useState<string>("all");
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange>("all");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
@@ -140,6 +202,19 @@ export function LeadsBrowser() {
   const search = useSearchQuery();
   const allTags = useMemo(
     () => [...new Set(leads.flatMap((l) => l.tags))].sort(),
+    [leads],
+  );
+  // Distinct job titles, so the Title filter grows automatically as new roles
+  // are ingested.
+  const allTitles = useMemo(
+    () => [...new Set(leads.map((l) => l.title))].sort((a, b) => a.localeCompare(b)),
+    [leads],
+  );
+  const allCountries = useMemo(
+    () =>
+      [...new Set(leads.map((l) => countryOf(l.location)))].sort((a, b) =>
+        a.localeCompare(b),
+      ),
     [leads],
   );
   // Which lead's "View details" modal is open (null = closed).
@@ -190,6 +265,9 @@ export function LeadsBrowser() {
     if (statusFilter !== "all")
       out = out.filter((l) => statusOf(l) === statusFilter);
     if (locationFilter === "remote") out = out.filter((l) => l.remote);
+    if (countryFilter !== "all")
+      out = out.filter((l) => countryOf(l.location) === countryFilter);
+    if (titleFilter !== "all") out = out.filter((l) => l.title === titleFilter);
     if (tagFilter !== "all") out = out.filter((l) => l.tags.includes(tagFilter));
     const q = search.trim().toLowerCase();
     if (q)
@@ -208,12 +286,46 @@ export function LeadsBrowser() {
         : a.capturedAt.localeCompare(b.capturedAt),
     );
     return out;
-  }, [leads, statusFilter, locationFilter, tagFilter, search, dateBounds, sort]);
+  }, [leads, statusFilter, locationFilter, countryFilter, titleFilter, tagFilter, search, dateBounds, sort]);
 
   // Reset to the first page whenever the result set changes.
   useEffect(() => {
     setPage(1);
-  }, [statusFilter, locationFilter, tagFilter, search, dateBounds, sort]);
+  }, [statusFilter, locationFilter, countryFilter, titleFilter, tagFilter, search, dateBounds, sort]);
+
+  const activeFilterCount =
+    (statusFilter !== "all" ? 1 : 0) +
+    (locationFilter !== "all" ? 1 : 0) +
+    (countryFilter !== "all" ? 1 : 0) +
+    (titleFilter !== "all" ? 1 : 0) +
+    (tagFilter !== "all" ? 1 : 0) +
+    (dateRange !== "all" ? 1 : 0);
+
+  const clearAllFilters = () => {
+    setStatusFilter("all");
+    setLocationFilter("all");
+    setCountryFilter("all");
+    setTitleFilter("all");
+    setTagFilter("all");
+    setDateRange("all");
+    setCustomFrom("");
+    setCustomTo("");
+  };
+
+  // Lock body scroll + close on Escape while the filter drawer is open.
+  useEffect(() => {
+    if (!filtersOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setFiltersOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [filtersOpen]);
 
   const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -273,91 +385,180 @@ export function LeadsBrowser() {
         })}
       </div>
 
-      {/* Filters — proper dropdowns */}
-      <div className="space-y-2">
-        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-          <FilterSelect
-            label="Status"
-            value={statusFilter}
-            onValueChange={(v) => setStatusFilter(v as StatusFilter)}
-            options={[
-              { value: "all", label: "All statuses" },
-              ...LEAD_STATUSES.map((s) => ({ value: s, label: LEAD_STATUS_LABELS[s] })),
-            ]}
-          />
-          <FilterSelect
-            label="Location"
-            value={locationFilter}
-            onValueChange={(v) => setLocationFilter(v as LocationFilter)}
-            options={[
-              { value: "all", label: "All locations" },
-              { value: "remote", label: "Remote only" },
-            ]}
-          />
-          {allTags.length > 0 && (
-            <FilterSelect
-              label="Tag"
-              value={tagFilter}
-              onValueChange={setTagFilter}
-              options={[
-                { value: "all", label: "All tags" },
-                ...allTags.map((t) => ({ value: t, label: t })),
-              ]}
-            />
+      {/* Filter bar: open the drawer + quick sort */}
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setFiltersOpen(true)}
+          className="inline-flex min-h-10 items-center gap-2 rounded-lg border bg-card px-3 text-sm font-medium shadow-xs hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+        >
+          <SlidersHorizontal className="size-4" aria-hidden />
+          Filters
+          {activeFilterCount > 0 && (
+            <span className="flex min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[11px] font-semibold text-primary-foreground tabular-nums">
+              {activeFilterCount}
+            </span>
           )}
-          <FilterSelect
-            label="Captured"
-            value={dateRange}
-            onValueChange={(v) => setDateRange(v as DateRange)}
-            options={[
-              { value: "all", label: "Any time" },
-              { value: "7d", label: "Last 7 days" },
-              { value: "30d", label: "Last 30 days" },
-              { value: "90d", label: "Last 90 days" },
-              { value: "custom", label: "Custom range…" },
-            ]}
-          />
-          <FilterSelect
-            label="Sort by"
-            value={sort}
-            onValueChange={(v) => setSort(v as Sort)}
-            className="sm:ml-auto"
-            options={[
-              { value: "newest", label: "Newest first" },
-              { value: "oldest", label: "Oldest first" },
-            ]}
-          />
-        </div>
-
-        {dateRange === "custom" && (
-          <div className="flex flex-col gap-3 rounded-xl border bg-card p-3 shadow-xs sm:flex-row sm:items-end">
-            <DateField
-              label="From"
-              value={customFrom}
-              max={customTo || undefined}
-              onChange={setCustomFrom}
-            />
-            <DateField
-              label="To"
-              value={customTo}
-              min={customFrom || undefined}
-              onChange={setCustomTo}
-            />
-            {(customFrom || customTo) && (
-              <button
-                type="button"
-                onClick={() => {
-                  setCustomFrom("");
-                  setCustomTo("");
-                }}
-                className="inline-flex min-h-11 items-center justify-center rounded-lg px-3 text-xs font-medium text-muted-foreground hover:text-foreground sm:min-h-9"
-              >
-                Clear dates
-              </button>
-            )}
-          </div>
+        </button>
+        {activeFilterCount > 0 && (
+          <button
+            type="button"
+            onClick={clearAllFilters}
+            className="text-xs font-medium text-muted-foreground hover:text-foreground"
+          >
+            Clear all
+          </button>
         )}
+        <FilterSelect
+          label="Sort by"
+          value={sort}
+          onValueChange={(v) => setSort(v as Sort)}
+          className="ml-auto"
+          options={[
+            { value: "newest", label: "Newest first" },
+            { value: "oldest", label: "Oldest first" },
+          ]}
+        />
       </div>
+
+      {filtersOpen &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div className="fixed inset-0 z-50">
+            <button
+              type="button"
+              aria-label="Close filters"
+              tabIndex={-1}
+              onClick={() => setFiltersOpen(false)}
+              className="absolute inset-0 bg-black/40"
+            />
+            <aside className="absolute inset-y-0 right-0 flex w-80 max-w-[88%] flex-col border-l bg-card shadow-xl">
+              <div className="flex items-center justify-between border-b p-4">
+                <h2 className="flex items-center gap-2 text-sm font-semibold">
+                  <SlidersHorizontal className="size-4" aria-hidden />
+                  Filters
+                  {activeFilterCount > 0 && (
+                    <span className="flex min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[11px] font-semibold text-primary-foreground tabular-nums">
+                      {activeFilterCount}
+                    </span>
+                  )}
+                </h2>
+                <button
+                  type="button"
+                  aria-label="Close filters"
+                  onClick={() => setFiltersOpen(false)}
+                  className="inline-flex size-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                >
+                  <X className="size-5" aria-hidden />
+                </button>
+              </div>
+
+              <div className="flex-1 space-y-4 overflow-y-auto p-4">
+                <DrawerSelect
+                  label="Status"
+                  value={statusFilter}
+                  onValueChange={(v) => setStatusFilter(v as StatusFilter)}
+                  options={[
+                    { value: "all", label: "All statuses" },
+                    ...LEAD_STATUSES.map((s) => ({
+                      value: s,
+                      label: LEAD_STATUS_LABELS[s],
+                    })),
+                  ]}
+                />
+                <DrawerSelect
+                  label="Workplace"
+                  value={locationFilter}
+                  onValueChange={(v) => setLocationFilter(v as LocationFilter)}
+                  options={[
+                    { value: "all", label: "All" },
+                    { value: "remote", label: "Remote only" },
+                  ]}
+                />
+                {allCountries.length > 0 && (
+                  <DrawerSelect
+                    label="Country"
+                    value={countryFilter}
+                    onValueChange={setCountryFilter}
+                    options={[
+                      { value: "all", label: "All countries" },
+                      ...allCountries.map((c) => ({ value: c, label: c })),
+                    ]}
+                  />
+                )}
+                {allTitles.length > 0 && (
+                  <DrawerSelect
+                    label="Title"
+                    value={titleFilter}
+                    onValueChange={setTitleFilter}
+                    options={[
+                      { value: "all", label: "All titles" },
+                      ...allTitles.map((t) => ({ value: t, label: t })),
+                    ]}
+                  />
+                )}
+                {allTags.length > 0 && (
+                  <DrawerSelect
+                    label="Tag"
+                    value={tagFilter}
+                    onValueChange={setTagFilter}
+                    options={[
+                      { value: "all", label: "All tags" },
+                      ...allTags.map((t) => ({ value: t, label: t })),
+                    ]}
+                  />
+                )}
+                <DrawerSelect
+                  label="Captured"
+                  value={dateRange}
+                  onValueChange={(v) => setDateRange(v as DateRange)}
+                  options={[
+                    { value: "all", label: "Any time" },
+                    { value: "7d", label: "Last 7 days" },
+                    { value: "30d", label: "Last 30 days" },
+                    { value: "90d", label: "Last 90 days" },
+                    { value: "custom", label: "Custom range…" },
+                  ]}
+                />
+                {dateRange === "custom" && (
+                  <div className="space-y-3 rounded-xl border bg-muted/30 p-3">
+                    <DateField
+                      label="From"
+                      value={customFrom}
+                      max={customTo || undefined}
+                      onChange={setCustomFrom}
+                    />
+                    <DateField
+                      label="To"
+                      value={customTo}
+                      min={customFrom || undefined}
+                      onChange={setCustomTo}
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center justify-between gap-2 border-t p-4">
+                <button
+                  type="button"
+                  onClick={clearAllFilters}
+                  disabled={activeFilterCount === 0}
+                  className="text-sm font-medium text-muted-foreground hover:text-foreground disabled:opacity-40"
+                >
+                  Clear all
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFiltersOpen(false)}
+                  className="inline-flex min-h-10 items-center justify-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+                >
+                  Show {visible.length} {visible.length === 1 ? "lead" : "leads"}
+                </button>
+              </div>
+            </aside>
+          </div>,
+          document.body,
+        )}
 
       {visible.length === 0 ? (
         <div className="rounded-xl border border-dashed bg-card p-10 text-center text-sm text-muted-foreground">
@@ -434,6 +635,41 @@ function FilterSelect({
           aria-label={label}
           className="min-h-11 w-full sm:min-h-9 sm:w-auto sm:min-w-40"
         >
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {options.map((o) => (
+            <SelectItem key={o.value} value={o.value}>
+              {o.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </label>
+  );
+}
+
+/** Full-width labeled select for the filter drawer. */
+function DrawerSelect({
+  label,
+  value,
+  onValueChange,
+  options,
+}: {
+  label: string;
+  value: string;
+  onValueChange: (value: string) => void;
+  options: { value: string; label: string }[];
+}) {
+  return (
+    <label className="block space-y-1.5">
+      <span className="text-xs font-medium text-muted-foreground">{label}</span>
+      <Select
+        items={Object.fromEntries(options.map((o) => [o.value, o.label]))}
+        value={value}
+        onValueChange={(v) => onValueChange(v ?? value)}
+      >
+        <SelectTrigger aria-label={label} className="min-h-10 w-full">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
