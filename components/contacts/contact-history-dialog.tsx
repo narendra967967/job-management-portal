@@ -145,7 +145,7 @@ export function ContactHistoryDialog({
                                 : "Draft"}
                             </span>
                           </div>
-                          <p className="mt-1.5 line-clamp-3 text-xs whitespace-pre-line text-muted-foreground">
+                          <p className="mt-1.5 line-clamp-3 text-xs break-words whitespace-pre-line text-muted-foreground">
                             {m.sentBody ?? m.draftBody}
                           </p>
                         </li>

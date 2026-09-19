@@ -46,6 +46,13 @@ export async function summarizeJdAction(
     .where(and(eq(leadsT.id, leadId), eq(leadsT.userId, userId)));
   if (!lead) return { ok: false, error: "Lead not found." };
 
+  // Persist the pasted JD immediately (FR-3.1/3.3) so it's saved to this lead
+  // even if the AI summary fails (e.g. no API key). Keep any existing summary.
+  await db
+    .insert(detailsT)
+    .values({ leadId, jdText: text })
+    .onConflictDoUpdate({ target: detailsT.leadId, set: { jdText: text } });
+
   try {
     const summary = await aiComplete(
       userId,
@@ -53,14 +60,10 @@ export async function summarizeJdAction(
       text,
       300,
     );
-    // Persist the pasted JD + summary (FR-3.3).
     await db
-      .insert(detailsT)
-      .values({ leadId, jdText: text, aiSummary: summary })
-      .onConflictDoUpdate({
-        target: detailsT.leadId,
-        set: { jdText: text, aiSummary: summary },
-      });
+      .update(detailsT)
+      .set({ aiSummary: summary })
+      .where(eq(detailsT.leadId, leadId));
     return { ok: true, summary };
   } catch (err) {
     return { ok: false, error: friendly(err) };

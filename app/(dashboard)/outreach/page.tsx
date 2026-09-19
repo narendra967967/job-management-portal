@@ -57,7 +57,7 @@ export default function OutreachPage() {
                     />
                   </div>
                 </div>
-                <p className="mt-2 line-clamp-2 text-sm whitespace-pre-line text-muted-foreground">
+                <p className="mt-2 line-clamp-2 text-sm break-words whitespace-pre-line text-muted-foreground">
                   {message.sentBody ?? message.draftBody}
                 </p>
               </Link>

@@ -33,7 +33,6 @@ import { LeadTimeline } from "@/components/leads/lead-timeline";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { computeFitScore, fitBand } from "@/lib/fit";
-import { summarizeJdAction } from "@/actions/ai";
 import {
   useContactsForLead,
   useOutreachForLead,
@@ -42,6 +41,7 @@ import {
   useDefaultResumeId,
   setLeadStatus,
   deleteContact,
+  summarizeJd,
 } from "@/lib/mock-store";
 import { cn } from "@/lib/utils";
 
@@ -248,7 +248,7 @@ function OverviewTab({ leadId, detail }: { leadId: string; detail?: JobLeadDetai
     }
     setError("");
     setBusy(true);
-    const res = await summarizeJdAction(leadId, jd);
+    const res = await summarizeJd(leadId, jd);
     if (res.ok) setSummary(res.summary);
     else setError(res.error);
     setBusy(false);
@@ -280,7 +280,7 @@ function OverviewTab({ leadId, detail }: { leadId: string; detail?: JobLeadDetai
           </button>
           <p className="flex items-start gap-1.5 text-xs text-ai">
             <Sparkles className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-            You review everything — nothing is saved automatically.
+            Summarizing saves the description to this lead.
           </p>
         </div>
       </section>
@@ -291,7 +291,9 @@ function OverviewTab({ leadId, detail }: { leadId: string; detail?: JobLeadDetai
             <Sparkles className="size-4" aria-hidden />
             AI summary
           </h2>
-          <p className="mt-2 text-sm leading-relaxed">{summary}</p>
+          <p className="mt-2 text-sm leading-relaxed break-words whitespace-pre-line">
+            {summary}
+          </p>
         </section>
       )}
     </div>
@@ -422,7 +424,7 @@ function OutreachTab({ leadId }: { leadId: string }) {
               {m.status === "sent" ? "Sent" : "Draft"}
             </span>
           </div>
-          <p className="mt-2 text-sm whitespace-pre-line text-muted-foreground">
+          <p className="mt-2 text-sm break-words whitespace-pre-line text-muted-foreground">
             {m.sentBody ?? m.draftBody}
           </p>
         </li>

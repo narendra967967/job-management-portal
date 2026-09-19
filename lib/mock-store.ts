@@ -40,6 +40,7 @@ import {
   updateSyncIntervalAction,
 } from "@/actions/settings";
 import { syncMyGmailAction } from "@/actions/gmail-sync";
+import { summarizeJdAction } from "@/actions/ai";
 import type { SyncResult } from "@/lib/gmail-sync";
 import type { GmailSyncStatus, IngestError } from "@/lib/queries";
 import { contactPersonKey, isJobOpen } from "@/lib/types";
@@ -431,6 +432,17 @@ export async function deleteResume(id: string) {
 export async function disconnectGoogle() {
   await disconnectGoogleAction();
   await refresh();
+}
+
+/** Summarize a lead's JD with AI; also persists the JD (+ summary) to the lead
+ *  and refreshes so the saved detail reflects live. */
+export async function summarizeJd(
+  leadId: string,
+  jdText: string,
+): Promise<{ ok: true; summary: string } | { ok: false; error: string }> {
+  const res = await summarizeJdAction(leadId, jdText);
+  await refresh();
+  return res;
 }
 
 /** Manually run the Gmail sync for the current user, then refresh so newly
