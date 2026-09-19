@@ -15,12 +15,15 @@ import { Pool } from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { eq } from "drizzle-orm";
 import * as schema from "./schema";
+import { hashPassword } from "../lib/password";
 
 config({ path: ".env.local" });
 config();
 
 const DEV_USER_ID = process.env.DEV_USER_ID ?? "dev-user";
 const DEV_EMAIL = process.env.ALLOWED_EMAIL ?? "narendragpt967967@gmail.com";
+// Initial admin-provisioned login (change later via an admin dashboard).
+const DEV_PASSWORD = process.env.DEV_PASSWORD ?? "admin1234";
 
 async function main() {
   const url = process.env.DATABASE_URL;
@@ -52,6 +55,17 @@ async function main() {
     email: DEV_EMAIL,
     emailVerified: true,
     mobile: "+1 (555) 018-2245",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+
+  // Credential login (email + password) — Better Auth's "credential" account.
+  await db.insert(schema.account).values({
+    id: randomUUID(),
+    accountId: DEV_USER_ID,
+    providerId: "credential",
+    userId: DEV_USER_ID,
+    password: await hashPassword(DEV_PASSWORD),
     createdAt: new Date(),
     updatedAt: new Date(),
   });
@@ -295,6 +309,7 @@ async function main() {
   });
 
   console.log("Seed complete.");
+  console.log(`Login: ${DEV_EMAIL} / ${DEV_PASSWORD}`);
   await pool.end();
 }
 

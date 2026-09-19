@@ -9,6 +9,7 @@ import { db } from "@/lib/db";
 import { getCurrentUserId } from "@/lib/current-user";
 import { encryptSecret } from "@/lib/crypto";
 import {
+  account as accountT,
   gmailConfig as gmailConfigT,
   resumes as resumesT,
   user as userT,
@@ -122,6 +123,16 @@ export async function updateGmailConfigAction(input: {
     .insert(gmailConfigT)
     .values({ userId, ...set })
     .onConflictDoUpdate({ target: gmailConfigT.userId, set });
+}
+
+/* ---------------- Google (Gmail) connection ---------------- */
+
+/** Unlink the user's Google account (removes the stored refresh token). */
+export async function disconnectGoogleAction() {
+  const userId = await getCurrentUserId();
+  await db
+    .delete(accountT)
+    .where(and(eq(accountT.userId, userId), eq(accountT.providerId, "google")));
 }
 
 /* ---------------- resumes ---------------- */

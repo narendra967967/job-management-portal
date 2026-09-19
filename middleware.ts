@@ -1,16 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getSessionCookie } from "better-auth/cookies";
 
-// Gate the dashboard when auth is enabled (Google creds configured). This is a
-// fast cookie-presence check only — the real session/allow-list check happens
-// server-side in getCurrentUserId. When auth is off (no Google creds yet), the
-// app is open for local dev.
+// Gate the dashboard: a fast cookie-presence check only (the real session check
+// happens server-side in getCurrentUserId). Unauthenticated requests to a
+// dashboard route are sent to the login page.
 
 export function middleware(request: NextRequest) {
-  const authEnabled =
-    !!process.env.GOOGLE_CLIENT_ID && !!process.env.GOOGLE_CLIENT_SECRET;
-  if (!authEnabled) return NextResponse.next();
-
   const cookie = getSessionCookie(request);
   if (!cookie) {
     const url = request.nextUrl.clone();

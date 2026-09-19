@@ -31,11 +31,19 @@
   a unique key + `ON CONFLICT DO NOTHING` (see “Dedup & incremental sync”).
 
 ## Auth tables — owned by Better Auth (not hand-designed)
-`users`, `accounts`, `sessions`, `verification` come from Better Auth's Drizzle
-adapter. Notes:
-- `accounts.scope` includes `gmail.readonly`; `accounts.refresh_token` is what
-  the Gmail sync uses — **no separately stored Google credential.**
-- App tables' `user_id` → FK to `users.id`.
+`user`, `account`, `session`, `verification` come from Better Auth's Drizzle
+adapter (`db/auth-schema.ts`). Notes:
+- App tables' `user_id` → FK to `user.id` (text ids).
+- **Login = email + password** (Better Auth `emailAndPassword`, self sign-up
+  disabled → admin-provisioned accounts only). Passwords are scrypt-hashed
+  (`lib/password.ts`) in the `account` table (`providerId: "credential"`).
+- **Google is NOT login.** It is linked from Settings (account linking) to grant
+  read-only Gmail; the linked `account` row (`providerId: "google"`) holds the
+  `refresh_token` the Gmail sync uses — no separately stored Google credential.
+- **Deviation from TRD §8** (owner-directed): the TRD specced Google-only login
+  with no password. We use credentials login + Google-for-Gmail-only instead, so
+  an admin can provision users and each connects their own Gmail. Multi-user /
+  admin dashboard remain deferred; today it's one seeded account.
 
 ## Enums (Postgres enums via Drizzle `pgEnum`)
 | Enum | Values | Source |

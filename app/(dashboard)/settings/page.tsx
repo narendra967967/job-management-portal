@@ -25,13 +25,14 @@ import {
   useAppSettings,
   useGmailSettings,
   useGoogle,
+  disconnectGoogle,
   useAiSettings,
   updateAiSettings,
   saveAiKey,
   removeAiKey,
 } from "@/lib/mock-store";
 import { buildGmailQuery } from "@/lib/use-gmail-settings";
-import { signOutToHome } from "@/lib/auth-client";
+import { signOutToHome, connectGoogle } from "@/lib/auth-client";
 import { Textarea } from "@/components/ui/textarea";
 import {
   AI_PROVIDER_DEFAULT_MODEL,
@@ -205,15 +206,29 @@ function GoogleCard() {
         </p>
       </div>
 
-      <div className="mt-4">
-        <Button disabled title="Google sign-in is enabled when Gmail sync is set up">
-          <GoogleGlyph />
-          Connect Google
-        </Button>
-        <p className="mt-2 text-[11px] text-muted-foreground">
-          Google sign-in + Gmail access are enabled when Gmail sync is set up.
-        </p>
-      </div>
+      {google.connected ? (
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm">
+            Connected as{" "}
+            <span className="font-medium">{google.email ?? "Google account"}</span>
+          </p>
+          <Button variant="outline" onClick={() => disconnectGoogle()}>
+            Disconnect
+          </Button>
+        </div>
+      ) : (
+        <div className="mt-4">
+          <Button onClick={() => connectGoogle()} disabled={!google.configured}>
+            <GoogleGlyph />
+            Connect Google
+          </Button>
+          <p className="mt-2 text-[11px] text-muted-foreground">
+            {google.configured
+              ? "Grants read-only Gmail access so JMP can fetch your LinkedIn job alerts."
+              : "Set GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET in .env.local to enable Gmail connection."}
+          </p>
+        </div>
+      )}
 
       {/* ---- Which emails to ingest ---- */}
       <div className="mt-5 border-t pt-4">

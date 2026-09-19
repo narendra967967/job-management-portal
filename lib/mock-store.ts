@@ -27,6 +27,7 @@ import {
 import {
   addResumeAction,
   deleteResumeAction,
+  disconnectGoogleAction,
   removeAiKeyAction,
   renameResumeAction,
   saveAiKeyAction,
@@ -80,7 +81,12 @@ let resumes: Resume[] = [];
 let defaultResumeId = "";
 let appSettings: AppSettings = { reminderIntervalDays: 3, staleLeadDays: 14 };
 let profile: Profile = { name: "", email: "", mobile: "" };
-let google: GoogleConnection = { connected: false, email: null, scope: "gmail.readonly" };
+let google: GoogleConnection = {
+  connected: false,
+  email: null,
+  scope: "gmail.readonly",
+  configured: false,
+};
 let aiSettings: AiSettings = { provider: "openai", model: "", keyConfigured: false, keyLast4: null };
 let gmailConfig: GmailConfigData = {
   senders: [],
@@ -408,6 +414,11 @@ export async function renameResume(id: string, label: string) {
 
 export async function deleteResume(id: string) {
   await deleteResumeAction(id);
+  await refresh();
+}
+
+export async function disconnectGoogle() {
+  await disconnectGoogleAction();
   await refresh();
 }
 

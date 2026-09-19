@@ -214,9 +214,10 @@ export interface AppNotification {
 }
 
 export interface GoogleConnection {
-  connected: boolean;
-  email: string | null;
+  connected: boolean; // a Google account is linked for this user
+  email: string | null; // the linked Google account's email
   scope: string; // always read-only
+  configured: boolean; // Google OAuth client is set up server-side (can connect)
 }
 
 export type AiProvider = "openai" | "anthropic";

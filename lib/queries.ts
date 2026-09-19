@@ -7,9 +7,10 @@ import "server-only";
 // Dates are serialized to "YYYY-MM-DD" strings (matching the old mock data and
 // keeping the payload serializable across the server→client boundary).
 
-import { asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
+  account as accountT,
   contacts as contactsT,
   gmailConfig as gmailConfigT,
   jobLeadDetails as detailsT,
@@ -79,6 +80,7 @@ export async function loadWorkspace(userId: string): Promise<WorkspaceData> {
     settingsRow,
     gmailRow,
     userRow,
+    googleAccountRows,
   ] = await Promise.all([
     db.select().from(leadsT).where(eq(leadsT.userId, userId)),
     db
@@ -106,6 +108,11 @@ export async function loadWorkspace(userId: string): Promise<WorkspaceData> {
     db.select().from(settingsT).where(eq(settingsT.userId, userId)).limit(1),
     db.select().from(gmailConfigT).where(eq(gmailConfigT.userId, userId)).limit(1),
     db.select().from(userT).where(eq(userT.id, userId)).limit(1),
+    db
+      .select({ accountId: accountT.accountId })
+      .from(accountT)
+      .where(and(eq(accountT.userId, userId), eq(accountT.providerId, "google")))
+      .limit(1),
   ]);
 
   // Per-lead derived fields (contactCount, hasDueReminder) — computed in JS
@@ -213,10 +220,15 @@ export async function loadWorkspace(userId: string): Promise<WorkspaceData> {
     mobile: u?.mobile ?? "",
   };
 
+  // "Connected" means a Google account is linked for this user (its refresh
+  // token powers the Gmail sync). Login is separate (email+password).
+  const googleLinked = googleAccountRows.length > 0;
   const google: GoogleConnection = {
-    connected: gmail?.connected ?? false,
-    email: gmail?.connected ? (u?.email ?? null) : null,
+    connected: googleLinked,
+    email: googleLinked ? (u?.email ?? null) : null,
     scope: "gmail.readonly",
+    configured:
+      !!process.env.GOOGLE_CLIENT_ID && !!process.env.GOOGLE_CLIENT_SECRET,
   };
 
   const aiSettings: AiSettings = {
