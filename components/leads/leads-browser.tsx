@@ -480,6 +480,20 @@ function DateField({
 /* Pagination                                                          */
 /* ------------------------------------------------------------------ */
 
+/** Compact page list: 1 … (page-1) page (page+1) … last, deduped + ordered. */
+function pageList(page: number, total: number): (number | "…")[] {
+  const wanted = new Set([1, total, page, page - 1, page + 1]);
+  const pages = [...wanted].filter((p) => p >= 1 && p <= total).sort((a, b) => a - b);
+  const out: (number | "…")[] = [];
+  let prev = 0;
+  for (const p of pages) {
+    if (p - prev > 1) out.push("…");
+    out.push(p);
+    prev = p;
+  }
+  return out;
+}
+
 function Pagination({
   page,
   totalPages,
@@ -516,17 +530,27 @@ function Pagination({
         >
           <ChevronLeft className="size-4" aria-hidden />
         </PageButton>
-        {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
-          <PageButton
-            key={n}
-            active={n === page}
-            onClick={() => onPage(n)}
-            aria-label={`Page ${n}`}
-            aria-current={n === page ? "page" : undefined}
-          >
-            {n}
-          </PageButton>
-        ))}
+        {pageList(page, totalPages).map((n, i) =>
+          n === "…" ? (
+            <span
+              key={`gap-${i}`}
+              className="inline-flex size-9 items-center justify-center text-sm text-muted-foreground"
+              aria-hidden
+            >
+              …
+            </span>
+          ) : (
+            <PageButton
+              key={n}
+              active={n === page}
+              onClick={() => onPage(n)}
+              aria-label={`Page ${n}`}
+              aria-current={n === page ? "page" : undefined}
+            >
+              {n}
+            </PageButton>
+          ),
+        )}
         <PageButton
           disabled={page === totalPages}
           onClick={() => onPage(page + 1)}
