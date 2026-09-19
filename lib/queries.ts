@@ -13,6 +13,8 @@ import {
   account as accountT,
   contacts as contactsT,
   gmailConfig as gmailConfigT,
+  gmailIngestErrors as errorsT,
+  gmailSyncState as syncStateT,
   jobLeadDetails as detailsT,
   jobLeads as leadsT,
   outreachMessages as outreachT,
@@ -43,6 +45,20 @@ export interface GmailConfigData {
   connected: boolean;
 }
 
+export interface GmailSyncStatus {
+  lastSyncedAt: string | null; // ISO
+  lastRunAt: string | null; // ISO
+  lastError: string | null;
+}
+
+export interface IngestError {
+  id: string;
+  messageId: string;
+  reason: string;
+  rawExcerpt: string | null;
+  createdAt: string; // ISO
+}
+
 /** Date/timestamp → "YYYY-MM-DD". */
 function ymd(d: Date | string | null): string | null {
   if (d == null) return null;
@@ -65,6 +81,9 @@ export interface WorkspaceData {
   google: GoogleConnection;
   aiSettings: AiSettings;
   gmailConfig: GmailConfigData;
+  syncIntervalHours: number;
+  gmailSync: GmailSyncStatus;
+  ingestErrors: IngestError[];
 }
 
 /** Everything the dashboard needs for one user, in UI-ready shapes. */
@@ -81,6 +100,8 @@ export async function loadWorkspace(userId: string): Promise<WorkspaceData> {
     gmailRow,
     userRow,
     googleAccountRows,
+    syncStateRows,
+    errorRows,
   ] = await Promise.all([
     db.select().from(leadsT).where(eq(leadsT.userId, userId)),
     db
@@ -113,6 +134,13 @@ export async function loadWorkspace(userId: string): Promise<WorkspaceData> {
       .from(accountT)
       .where(and(eq(accountT.userId, userId), eq(accountT.providerId, "google")))
       .limit(1),
+    db.select().from(syncStateT).where(eq(syncStateT.userId, userId)).limit(1),
+    db
+      .select()
+      .from(errorsT)
+      .where(eq(errorsT.userId, userId))
+      .orderBy(desc(errorsT.createdAt))
+      .limit(20),
   ]);
 
   // Per-lead derived fields (contactCount, hasDueReminder) — computed in JS
@@ -246,6 +274,21 @@ export async function loadWorkspace(userId: string): Promise<WorkspaceData> {
     connected: gmail?.connected ?? false,
   };
 
+  const ss = syncStateRows[0];
+  const gmailSync: GmailSyncStatus = {
+    lastSyncedAt: ss?.lastSyncedAt ? ss.lastSyncedAt.toISOString() : null,
+    lastRunAt: ss?.lastRunAt ? ss.lastRunAt.toISOString() : null,
+    lastError: ss?.lastError ?? null,
+  };
+
+  const ingestErrors: IngestError[] = errorRows.map((e) => ({
+    id: e.id,
+    messageId: e.messageId,
+    reason: e.reason,
+    rawExcerpt: e.rawExcerpt,
+    createdAt: e.createdAt.toISOString(),
+  }));
+
   return {
     leads,
     details,
@@ -261,5 +304,8 @@ export async function loadWorkspace(userId: string): Promise<WorkspaceData> {
     google,
     aiSettings,
     gmailConfig,
+    syncIntervalHours: settings?.syncIntervalHours ?? 24,
+    gmailSync,
+    ingestErrors,
   };
 }

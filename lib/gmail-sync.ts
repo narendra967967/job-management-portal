@@ -9,6 +9,7 @@ import "server-only";
 
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
+import { isJobOpen } from "@/lib/types";
 import {
   account as accountT,
   gmailConfig as gmailConfigT,
@@ -16,6 +17,7 @@ import {
   gmailProcessedMessages as processedT,
   gmailSyncState as syncStateT,
   jobLeads as leadsT,
+  userSettings as settingsT,
 } from "@/db/schema";
 import {
   buildGmailQuery,
@@ -34,6 +36,7 @@ export interface SyncResult {
   connected: boolean;
   fetched: number;
   inserted: number;
+  renewed: number;
   errors: number;
   message?: string;
 }
@@ -44,7 +47,7 @@ export async function runSyncForUser(userId: string): Promise<SyncResult> {
     accessToken = await getGoogleAccessToken(userId);
   } catch (err) {
     if (err instanceof Error && err.message === GOOGLE_NOT_CONNECTED) {
-      return { connected: false, fetched: 0, inserted: 0, errors: 0, message: "Google not connected." };
+      return { connected: false, fetched: 0, inserted: 0, renewed: 0, errors: 0, message: "Google not connected." };
     }
     throw err;
   }
@@ -76,6 +79,7 @@ export async function runSyncForUser(userId: string): Promise<SyncResult> {
 
   let fetched = 0;
   let inserted = 0;
+  let renewed = 0;
   let errorCount = 0;
 
   try {
@@ -115,9 +119,22 @@ export async function runSyncForUser(userId: string): Promise<SyncResult> {
         errorCount++;
       } else {
         for (const d of drafts) {
-          const res = await db
-            .insert(leadsT)
-            .values({
+          const [existing] = await db
+            .select({
+              id: leadsT.id,
+              status: leadsT.status,
+              tags: leadsT.tags,
+            })
+            .from(leadsT)
+            .where(
+              and(
+                eq(leadsT.userId, userId),
+                eq(leadsT.linkedinJobId, d.linkedinJobId),
+              ),
+            );
+
+          if (!existing) {
+            await db.insert(leadsT).values({
               userId,
               linkedinJobId: d.linkedinJobId,
               title: d.title,
@@ -128,12 +145,25 @@ export async function runSyncForUser(userId: string): Promise<SyncResult> {
               postedRelative: d.postedRelative,
               canonicalJobUrl: d.canonicalJobUrl,
               sourceMessageId: id,
-            })
-            .onConflictDoNothing({
-              target: [leadsT.userId, leadsT.linkedinJobId],
-            })
-            .returning({ id: leadsT.id });
-          if (res.length > 0) inserted++;
+            });
+            inserted++;
+          } else if (isJobOpen(existing.status)) {
+            // Re-seen active lead: resurface it (bump capture date) + tag
+            // "Re-newed", keeping its contacts/reminders. Discarded/closed
+            // leads are left untouched.
+            const mergedTags = [
+              ...new Set([...existing.tags, ...d.tags, "Re-newed"]),
+            ];
+            await db
+              .update(leadsT)
+              .set({
+                capturedAt: new Date(),
+                tags: mergedTags,
+                updatedAt: new Date(),
+              })
+              .where(eq(leadsT.id, existing.id));
+            renewed++;
+          }
         }
       }
 
@@ -152,7 +182,7 @@ export async function runSyncForUser(userId: string): Promise<SyncResult> {
         set: { lastSyncedAt: new Date(), lastRunAt: new Date(), lastError: null },
       });
 
-    return { connected: true, fetched, inserted, errors: errorCount };
+    return { connected: true, fetched, inserted, renewed, errors: errorCount };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     await db
@@ -162,22 +192,49 @@ export async function runSyncForUser(userId: string): Promise<SyncResult> {
         target: syncStateT.userId,
         set: { lastRunAt: new Date(), lastError: message.slice(0, 500) },
       });
-    return { connected: true, fetched, inserted, errors: errorCount + 1, message };
+    return { connected: true, fetched, inserted, renewed, errors: errorCount + 1, message };
   }
 }
 
-/** Run the sync for every user with a linked Google account (cron entry point). */
+/** Run the sync for every connected user whose interval has elapsed (cron entry
+ *  point). Each user's sync_interval_hours gates whether they're due, so the
+ *  cron can fire frequently while each user syncs at their chosen cadence. */
 export async function runSyncForAllUsers(): Promise<
-  { userId: string; result: SyncResult }[]
+  { userId: string; result: SyncResult; skipped?: boolean }[]
 > {
   const users = await db
     .selectDistinct({ userId: accountT.userId })
     .from(accountT)
     .where(eq(accountT.providerId, "google"));
 
-  const out: { userId: string; result: SyncResult }[] = [];
+  const out: { userId: string; result: SyncResult; skipped?: boolean }[] = [];
   for (const { userId } of users) {
+    if (!(await isDue(userId))) {
+      out.push({
+        userId,
+        skipped: true,
+        result: { connected: true, fetched: 0, inserted: 0, renewed: 0, errors: 0, message: "Not due yet." },
+      });
+      continue;
+    }
     out.push({ userId, result: await runSyncForUser(userId) });
   }
   return out;
+}
+
+/** Whether enough time has passed since the user's last run for their interval. */
+async function isDue(userId: string): Promise<boolean> {
+  const [settings] = await db
+    .select({ hours: settingsT.syncIntervalHours })
+    .from(settingsT)
+    .where(eq(settingsT.userId, userId));
+  const [state] = await db
+    .select({ lastRunAt: syncStateT.lastRunAt })
+    .from(syncStateT)
+    .where(eq(syncStateT.userId, userId));
+
+  if (!state?.lastRunAt) return true; // never run
+  const hours = settings?.hours ?? 24;
+  const elapsedMs = Date.now() - state.lastRunAt.getTime();
+  return elapsedMs >= hours * 3600_000;
 }

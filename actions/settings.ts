@@ -11,6 +11,7 @@ import { encryptSecret } from "@/lib/crypto";
 import {
   account as accountT,
   gmailConfig as gmailConfigT,
+  gmailIngestErrors as errorsT,
   resumes as resumesT,
   user as userT,
   userSettings as settingsT,
@@ -102,6 +103,23 @@ export async function saveAiKeyAction(plainKey: string) {
 export async function removeAiKeyAction() {
   const userId = await getCurrentUserId();
   await upsertSettings(userId, { aiKeyCiphertext: null, aiKeyLast4: null });
+}
+
+/* ---------------- sync schedule ---------------- */
+
+const ALLOWED_INTERVALS = [1, 3, 6, 12, 24];
+
+export async function updateSyncIntervalAction(hours: number) {
+  const userId = await getCurrentUserId();
+  const h = ALLOWED_INTERVALS.includes(hours) ? hours : 24;
+  await upsertSettings(userId, { syncIntervalHours: h });
+}
+
+/* ---------------- ingestion issues ---------------- */
+
+export async function clearIngestErrorsAction() {
+  const userId = await getCurrentUserId();
+  await db.delete(errorsT).where(eq(errorsT.userId, userId));
 }
 
 /* ---------------- Gmail ingestion rules ---------------- */

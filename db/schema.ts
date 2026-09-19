@@ -305,6 +305,8 @@ export const userSettings = pgTable("user_settings", {
     .references(() => user.id, { onDelete: "cascade" }),
   reminderIntervalDays: integer("reminder_interval_days").notNull().default(3), // FR-5.1
   staleLeadDays: integer("stale_lead_days").notNull().default(14), // FR-2.4
+  // How often the Gmail sync should run for this user (hours): 24/12/6/3/1.
+  syncIntervalHours: integer("sync_interval_hours").notNull().default(24),
   defaultResumeId: uuid("default_resume_id").references(() => resumes.id, {
     onDelete: "set null",
   }),

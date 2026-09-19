@@ -26,6 +26,7 @@ import {
 } from "@/actions/data";
 import {
   addResumeAction,
+  clearIngestErrorsAction,
   deleteResumeAction,
   disconnectGoogleAction,
   removeAiKeyAction,
@@ -36,9 +37,11 @@ import {
   updateFollowUpsAction,
   updateGmailConfigAction,
   updateProfileAction,
+  updateSyncIntervalAction,
 } from "@/actions/settings";
 import { syncMyGmailAction } from "@/actions/gmail-sync";
 import type { SyncResult } from "@/lib/gmail-sync";
+import type { GmailSyncStatus, IngestError } from "@/lib/queries";
 import { contactPersonKey, isJobOpen } from "@/lib/types";
 import {
   CLOSE_OUTCOME_LABELS,
@@ -97,6 +100,9 @@ let gmailConfig: GmailConfigData = {
   lookbackDays: 30,
   connected: false,
 };
+let syncIntervalHours = 24;
+let gmailSync: GmailSyncStatus = { lastSyncedAt: null, lastRunAt: null, lastError: null };
+let ingestErrors: IngestError[] = [];
 let hydrated = false;
 
 const listeners = new Set<() => void>();
@@ -126,6 +132,9 @@ function apply(data: WorkspaceData) {
   google = data.google;
   aiSettings = data.aiSettings;
   gmailConfig = data.gmailConfig;
+  syncIntervalHours = data.syncIntervalHours;
+  gmailSync = data.gmailSync;
+  ingestErrors = data.ingestErrors;
 }
 
 /** Called by WorkspaceProvider during render so the first snapshot has data.
@@ -430,6 +439,49 @@ export async function syncGmail(): Promise<SyncResult> {
   const result = await syncMyGmailAction();
   await refresh();
   return result;
+}
+
+/* ---------------- sync schedule + ingestion issues ---------------- */
+
+const getSyncInterval = () => syncIntervalHours;
+const getGmailSync = () => gmailSync;
+const getIngestErrors = () => ingestErrors;
+
+export function useSyncInterval(): [number, (hours: number) => void] {
+  const hours = useSyncExternalStore(subscribe, getSyncInterval, getSyncInterval);
+  const set = (h: number) => {
+    void (async () => {
+      await updateSyncIntervalAction(h);
+      await refresh();
+    })();
+  };
+  return [hours, set];
+}
+
+export function useGmailSync(): GmailSyncStatus {
+  return useSyncExternalStore(subscribe, getGmailSync, getGmailSync);
+}
+
+export function useIngestErrors(): IngestError[] {
+  return useSyncExternalStore(subscribe, getIngestErrors, getIngestErrors);
+}
+
+export async function clearIngestErrors() {
+  await clearIngestErrorsAction();
+  await refresh();
+}
+
+/** Read the current sync schedule imperatively (for the auto-sync timer). */
+export function currentSyncInfo(): {
+  intervalHours: number;
+  lastRunAt: string | null;
+  connected: boolean;
+} {
+  return {
+    intervalHours: syncIntervalHours,
+    lastRunAt: gmailSync.lastRunAt,
+    connected: google.connected,
+  };
 }
 
 /* ---------------- derived: per-contact history across leads (FR-6.1) ------- */

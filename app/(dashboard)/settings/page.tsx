@@ -27,6 +27,10 @@ import {
   useGoogle,
   disconnectGoogle,
   syncGmail,
+  useSyncInterval,
+  useGmailSync,
+  useIngestErrors,
+  clearIngestErrors,
   useAiSettings,
   updateAiSettings,
   saveAiKey,
@@ -76,6 +80,8 @@ export default function SettingsPage() {
       <div className="[&>section]:mb-5 lg:columns-2 lg:gap-5 lg:[&>section]:break-inside-avoid">
         <ProfileCard />
         <GoogleCard />
+        <SyncScheduleCard />
+        <IngestionIssuesCard />
         <AiProviderCard />
         <FollowUpsCard />
         <ResumesCard />
@@ -164,7 +170,7 @@ function GoogleCard() {
       const r = await syncGmail();
       setSyncMsg(
         r.connected
-          ? `Fetched ${r.fetched}, added ${r.inserted} new lead${r.inserted === 1 ? "" : "s"}` +
+          ? `Fetched ${r.fetched}, added ${r.inserted} new, renewed ${r.renewed}` +
               (r.errors ? `, ${r.errors} parse issue${r.errors === 1 ? "" : "s"}.` : ".")
           : (r.message ?? "Not connected."),
       );
@@ -348,6 +354,134 @@ function GoogleCard() {
           </div>
         </div>
       </div>
+    </section>
+  );
+}
+
+/* ---------------- Sync schedule (cron) ---------------- */
+
+const INTERVAL_LABELS: Record<string, string> = {
+  "1": "Every hour",
+  "3": "Every 3 hours",
+  "6": "Every 6 hours",
+  "12": "Every 12 hours",
+  "24": "Once a day",
+};
+
+function fmtDateTime(iso: string | null): string {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleString();
+}
+
+function SyncScheduleCard() {
+  const google = useGoogle();
+  const [interval, setInterval] = useSyncInterval();
+  const sync = useGmailSync();
+  const [cfg] = useGmailSettings();
+
+  return (
+    <section className="rounded-2xl border bg-card p-4 md:p-5">
+      <h2 className="text-sm font-medium">Sync schedule</h2>
+      <p className="mt-0.5 text-xs text-muted-foreground">
+        How often JMP checks Gmail for new LinkedIn alerts.
+      </p>
+
+      <div className="mt-4">
+        <Field label="Run frequency">
+          <Select
+            items={INTERVAL_LABELS}
+            value={String(interval)}
+            onValueChange={(v) => setInterval(Number(v ?? "24"))}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {Object.entries(INTERVAL_LABELS).map(([v, l]) => (
+                <SelectItem key={v} value={v}>
+                  {l}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
+      </div>
+
+      <div className="mt-3 rounded-lg border bg-muted/40 p-3 text-xs">
+        {!google.connected ? (
+          <p className="text-muted-foreground">
+            Connect Google (above) to enable syncing.
+          </p>
+        ) : sync.lastSyncedAt ? (
+          <p className="text-foreground">
+            Next run fetches alerts received{" "}
+            <span className="font-medium">since {fmtDateTime(sync.lastSyncedAt)}</span>.
+          </p>
+        ) : (
+          <p className="text-foreground">
+            First run backfills the last{" "}
+            <span className="font-medium">
+              {cfg.lookbackDays === 0 ? "all" : cfg.lookbackDays} day
+              {cfg.lookbackDays === 1 ? "" : "s"}
+            </span>
+            ; after that it fetches only new mail since the previous run.
+          </p>
+        )}
+        <p className="mt-1 text-muted-foreground">
+          Last run: {fmtDateTime(sync.lastRunAt)}
+          {sync.lastError ? ` · last error: ${sync.lastError}` : ""}
+        </p>
+      </div>
+
+      <p className="mt-2 text-[11px] text-muted-foreground">
+        Auto-syncs about {INTERVAL_LABELS[String(interval)]?.toLowerCase()} while
+        the app is open; the deployed cron runs it in the background.
+      </p>
+    </section>
+  );
+}
+
+/* ---------------- Ingestion issues (FR-1.7) ---------------- */
+
+function IngestionIssuesCard() {
+  const errors = useIngestErrors();
+  return (
+    <section className="rounded-2xl border bg-card p-4 md:p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-medium">Ingestion issues</h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Alert emails that couldn’t be parsed into leads.
+          </p>
+        </div>
+        {errors.length > 0 && (
+          <Button variant="outline" onClick={() => clearIngestErrors()}>
+            Clear
+          </Button>
+        )}
+      </div>
+
+      {errors.length === 0 ? (
+        <p className="mt-4 rounded-lg border border-dashed p-4 text-center text-xs text-muted-foreground">
+          No issues — every alert parsed cleanly.
+        </p>
+      ) : (
+        <ul className="mt-4 space-y-2">
+          {errors.map((e) => (
+            <li key={e.id} className="rounded-lg border p-3">
+              <p className="text-xs font-medium">{e.reason}</p>
+              {e.rawExcerpt && (
+                <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                  {e.rawExcerpt}
+                </p>
+              )}
+              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                {fmtDateTime(e.createdAt)}
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }

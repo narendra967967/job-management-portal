@@ -10,6 +10,7 @@ import {
   TopBarStats,
   TopBarSearch,
 } from "@/components/app-shell/top-bar";
+import { AutoSync } from "@/components/app-shell/auto-sync";
 import { getCurrentUserId } from "@/lib/current-user";
 import { loadWorkspace } from "@/lib/queries";
 import { WorkspaceProvider } from "@/lib/workspace-provider";
@@ -25,6 +26,7 @@ export default async function DashboardLayout({
     // fixed-height flex children and only <main> scrolls, so the bottom nav is
     // always pinned to the visible bottom (no reliance on position:fixed).
     <WorkspaceProvider initial={workspace}>
+    <AutoSync />
     <div className="flex h-dvh flex-col overflow-hidden bg-background md:flex-row">
       {/* Desktop sidebar */}
       <aside className="hidden w-60 shrink-0 flex-col overflow-y-auto border-r border-sidebar-border bg-sidebar md:flex">
