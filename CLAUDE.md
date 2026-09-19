@@ -86,9 +86,22 @@ Check this on every change that touches data, auth, or external calls, not just 
 **Build now:** everything in FRD Section 6 (all six functional modules) per the TRD's
 Phase 1→2→3 sequence.
 
+**Multi-user direction (updated 2026-09-19 — supersedes the FRD/TRD "single-user only" stance):**
+The system must be **multi-user-ready**. It runs single-user *for now* (one seeded
+account), but the owner will add more users later (each gets their own login ID + password,
+their own isolated data, their own Google/Gmail connection, and their own AI key). So:
+- **Every feature is scoped by `user_id`** and isolated per user — never assume a single global
+  user. All reads/writes go through the session user (`getCurrentUserId`).
+- **Auth is credentials-based** (email + password), admin-provisioned (self sign-up disabled).
+  Login is NOT Google — Google is linked per-user from Settings for read-only Gmail only.
+  (This deviates from TRD §8 by owner decision.)
+- App-level infra (the Google OAuth client id/secret, `APP_ENCRYPTION_KEY`, `BETTER_AUTH_SECRET`)
+  stays in env — one per app, shared by all users. Per-user secrets (AI key, Gmail tokens) live
+  in the DB, scoped to the user.
+- **Still deferred:** the admin dashboard to create/manage users (add users via the seed for now);
+  per-tenant "bring-your-own OAuth app"; org/team hierarchy.
+
 **Explicitly deferred — do not build unless I ask for it:**
-- Multi-user support beyond the `user_id` column already present in the schema (it's there so
-  a future migration isn't needed, not as an invitation to build multi-tenancy now)
 - Browser-extension-based passive capture of LinkedIn contact data
 - Automated test suite beyond basic sanity checks
 - Observability/error-tracking tooling (e.g. Sentry)

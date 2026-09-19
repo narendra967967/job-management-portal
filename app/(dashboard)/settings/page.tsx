@@ -225,7 +225,7 @@ function GoogleCard() {
           <p className="mt-2 text-[11px] text-muted-foreground">
             {google.configured
               ? "Grants read-only Gmail access so JMP can fetch your LinkedIn job alerts."
-              : "Set GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET in .env.local to enable Gmail connection."}
+              : "Gmail connection isn’t available yet — an administrator needs to configure Google access for this workspace."}
           </p>
         </div>
       )}
