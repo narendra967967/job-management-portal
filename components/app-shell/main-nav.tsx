@@ -10,6 +10,7 @@ import {
   Users,
   MessageSquare,
   Bell,
+  Archive,
   Settings,
   LogOut,
   Menu,
@@ -45,6 +46,12 @@ const navItems = [
   { href: "/reminders", label: "Reminders", icon: Bell },
 ];
 
+// Secondary items — shown in the desktop sidebar + mobile drawer, but not the
+// space-constrained bottom tab bar.
+const secondaryNavItems = [
+  { href: "/archive", label: "Archive", icon: Archive },
+];
+
 function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(href + "/");
 }
@@ -54,7 +61,7 @@ export function SidebarNav() {
   const pathname = usePathname();
   return (
     <nav className="flex flex-col gap-1 p-3">
-      {navItems.map(({ href, label, icon: Icon }) => {
+      {[...navItems, ...secondaryNavItems].map(({ href, label, icon: Icon }) => {
         const active = isActive(pathname, href);
         return (
           <Link

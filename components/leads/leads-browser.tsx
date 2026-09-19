@@ -43,6 +43,7 @@ import { useSearchQuery } from "@/lib/search-store";
 import {
   useLeads,
   useResumes,
+  useReminders,
   useContactsForLead,
   useRemindersForLead,
   useDefaultResumeId,
@@ -184,10 +185,68 @@ const STATUS_META: Record<
   },
 };
 
-export function LeadsBrowser() {
-  const leads = useLeads();
+type ArchiveBucket = "stale" | "closed" | "discarded";
+
+const BUCKET_META: Record<
+  ArchiveBucket,
+  { icon: typeof Sparkles; bar: string; chip: string; num: string; tint: string; label: string }
+> = {
+  stale: {
+    icon: AlertTriangle,
+    bar: "bg-destructive",
+    chip: "bg-destructive/15 text-destructive",
+    num: "text-destructive",
+    tint: "from-destructive/20",
+    label: "Stale",
+  },
+  closed: { ...STATUS_META.closed, label: LEAD_STATUS_LABELS.closed },
+  discarded: { ...STATUS_META.discarded, label: LEAD_STATUS_LABELS.discarded },
+};
+const ARCHIVE_BUCKETS: ArchiveBucket[] = ["stale", "closed", "discarded"];
+
+export function LeadsBrowser({ scope = "all" }: { scope?: "all" | "archive" }) {
+  const allLeads = useLeads();
   const resumes = useResumes();
+  const allReminders = useReminders();
+  const [{ staleLeadDays }] = useAppSettings();
+
+  // Stale = open lead, no pending follow-up, captured before the cutoff (FR-2.4).
+  const pendingLeadIds = useMemo(
+    () =>
+      new Set(
+        allReminders.filter((r) => r.outcome === "pending").map((r) => r.leadId),
+      ),
+    [allReminders],
+  );
+  const staleCutoff = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - staleLeadDays);
+    return toISODate(d);
+  }, [staleLeadDays]);
+  const isStale = (l: JobLead) =>
+    isJobOpen(l.status) && !pendingLeadIds.has(l.id) && l.capturedAt < staleCutoff;
+  const bucketOf = (l: JobLead): ArchiveBucket =>
+    l.status === "closed"
+      ? "closed"
+      : l.status === "discarded"
+        ? "discarded"
+        : "stale";
+
+  // "archive" scope shows only stale / closed / discarded leads.
+  const leads = useMemo(
+    () =>
+      scope === "archive"
+        ? allLeads.filter(
+            (l) =>
+              l.status === "closed" || l.status === "discarded" || isStale(l),
+          )
+        : allLeads,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [allLeads, scope, pendingLeadIds, staleCutoff],
+  );
+
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [bucketFilter, setBucketFilter] = useState<ArchiveBucket | "all">("all");
   const [locationFilter, setLocationFilter] = useState<LocationFilter>("all");
   const [countryFilter, setCountryFilter] = useState<string>("all");
   const [titleFilter, setTitleFilter] = useState<string>("all");
@@ -247,6 +306,12 @@ export function LeadsBrowser() {
     return c;
   }, [leads]);
 
+  const archiveCounts = useMemo(() => {
+    const c: Record<ArchiveBucket, number> = { stale: 0, closed: 0, discarded: 0 };
+    for (const l of leads) c[bucketOf(l)]++;
+    return c;
+  }, [leads]);
+
   // Resolve the active capture-date window [from, to] (inclusive, YYYY-MM-DD).
   const dateBounds = useMemo(() => {
     if (dateRange === "custom") {
@@ -262,8 +327,12 @@ export function LeadsBrowser() {
 
   const visible = useMemo(() => {
     let out = leads.slice();
-    if (statusFilter !== "all")
+    if (scope === "archive") {
+      if (bucketFilter !== "all")
+        out = out.filter((l) => bucketOf(l) === bucketFilter);
+    } else if (statusFilter !== "all") {
       out = out.filter((l) => statusOf(l) === statusFilter);
+    }
     if (locationFilter === "remote") out = out.filter((l) => l.remote);
     if (countryFilter !== "all")
       out = out.filter((l) => countryOf(l.location) === countryFilter);
@@ -286,15 +355,17 @@ export function LeadsBrowser() {
         : a.capturedAt.localeCompare(b.capturedAt),
     );
     return out;
-  }, [leads, statusFilter, locationFilter, countryFilter, titleFilter, tagFilter, search, dateBounds, sort]);
+  }, [leads, scope, statusFilter, bucketFilter, locationFilter, countryFilter, titleFilter, tagFilter, search, dateBounds, sort]);
 
   // Reset to the first page whenever the result set changes.
   useEffect(() => {
     setPage(1);
-  }, [statusFilter, locationFilter, countryFilter, titleFilter, tagFilter, search, dateBounds, sort]);
+  }, [scope, statusFilter, bucketFilter, locationFilter, countryFilter, titleFilter, tagFilter, search, dateBounds, sort]);
 
   const activeFilterCount =
-    (statusFilter !== "all" ? 1 : 0) +
+    ((scope === "archive" ? bucketFilter !== "all" : statusFilter !== "all")
+      ? 1
+      : 0) +
     (locationFilter !== "all" ? 1 : 0) +
     (countryFilter !== "all" ? 1 : 0) +
     (titleFilter !== "all" ? 1 : 0) +
@@ -303,6 +374,7 @@ export function LeadsBrowser() {
 
   const clearAllFilters = () => {
     setStatusFilter("all");
+    setBucketFilter("all");
     setLocationFilter("all");
     setCountryFilter("all");
     setTitleFilter("all");
@@ -334,55 +406,42 @@ export function LeadsBrowser() {
 
   return (
     <div className="space-y-4">
-      {/* Metric row — each box also filters the list by that status.
-          Hidden on mobile to save vertical space; shown from sm+. */}
-      <div className="hidden gap-2.5 sm:grid sm:grid-cols-5">
-        {LEAD_STATUSES.map((s) => {
-          const meta = STATUS_META[s];
-          const Icon = meta.icon;
-          const active = statusFilter === s;
-          return (
-            <button
-              key={s}
-              type="button"
-              aria-pressed={active}
-              onClick={() => setStatusFilter(active ? "all" : s)}
-              className={cn(
-                "group relative overflow-hidden rounded-2xl border bg-gradient-to-br to-card p-3.5 text-left shadow-xs transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
-                meta.tint,
-                active
-                  ? "border-primary/50 ring-2 ring-primary/30"
-                  : "border-transparent",
-              )}
-            >
-              <span
-                className={cn("absolute inset-y-0 left-0 w-1", meta.bar)}
-                aria-hidden
-              />
-              <div className="flex items-center justify-between">
-                <span
-                  className={cn(
-                    "text-2xl font-semibold tabular-nums leading-none",
-                    meta.num,
-                  )}
-                >
-                  {counts[s]}
-                </span>
-                <span
-                  className={cn(
-                    "flex size-8 items-center justify-center rounded-lg shadow-xs",
-                    meta.chip,
-                  )}
-                >
-                  <Icon className="size-4" aria-hidden />
-                </span>
-              </div>
-              <div className="mt-2 text-xs font-medium text-foreground/70">
-                {LEAD_STATUS_LABELS[s]}
-              </div>
-            </button>
-          );
-        })}
+      {/* Metric row — each box also filters the list. Hidden on mobile. */}
+      <div
+        className={cn(
+          "hidden gap-2.5 sm:grid",
+          scope === "archive" ? "sm:grid-cols-3" : "sm:grid-cols-5",
+        )}
+      >
+        {scope === "archive"
+          ? ARCHIVE_BUCKETS.map((b) => {
+              const meta = BUCKET_META[b];
+              return (
+                <MetricBox
+                  key={b}
+                  label={meta.label}
+                  count={archiveCounts[b]}
+                  icon={meta.icon}
+                  meta={meta}
+                  active={bucketFilter === b}
+                  onClick={() => setBucketFilter(bucketFilter === b ? "all" : b)}
+                />
+              );
+            })
+          : LEAD_STATUSES.map((s) => {
+              const meta = STATUS_META[s];
+              return (
+                <MetricBox
+                  key={s}
+                  label={LEAD_STATUS_LABELS[s]}
+                  count={counts[s]}
+                  icon={meta.icon}
+                  meta={meta}
+                  active={statusFilter === s}
+                  onClick={() => setStatusFilter(statusFilter === s ? "all" : s)}
+                />
+              );
+            })}
       </div>
 
       {/* Filter bar: open the drawer + quick sort */}
@@ -454,18 +513,33 @@ export function LeadsBrowser() {
               </div>
 
               <div className="flex-1 space-y-4 overflow-y-auto p-4">
-                <DrawerSelect
-                  label="Status"
-                  value={statusFilter}
-                  onValueChange={(v) => setStatusFilter(v as StatusFilter)}
-                  options={[
-                    { value: "all", label: "All statuses" },
-                    ...LEAD_STATUSES.map((s) => ({
-                      value: s,
-                      label: LEAD_STATUS_LABELS[s],
-                    })),
-                  ]}
-                />
+                {scope === "archive" ? (
+                  <DrawerSelect
+                    label="Bucket"
+                    value={bucketFilter}
+                    onValueChange={(v) => setBucketFilter(v as ArchiveBucket | "all")}
+                    options={[
+                      { value: "all", label: "All (stale, closed, discarded)" },
+                      ...ARCHIVE_BUCKETS.map((b) => ({
+                        value: b,
+                        label: BUCKET_META[b].label,
+                      })),
+                    ]}
+                  />
+                ) : (
+                  <DrawerSelect
+                    label="Status"
+                    value={statusFilter}
+                    onValueChange={(v) => setStatusFilter(v as StatusFilter)}
+                    options={[
+                      { value: "all", label: "All statuses" },
+                      ...LEAD_STATUSES.map((s) => ({
+                        value: s,
+                        label: LEAD_STATUS_LABELS[s],
+                      })),
+                    ]}
+                  />
+                )}
                 <DrawerSelect
                   label="Workplace"
                   value={locationFilter}
@@ -646,6 +720,54 @@ function FilterSelect({
         </SelectContent>
       </Select>
     </label>
+  );
+}
+
+/** A metric/quick-filter box in the top row (status or archive bucket). */
+function MetricBox({
+  label,
+  count,
+  icon: Icon,
+  meta,
+  active,
+  onClick,
+}: {
+  label: string;
+  count: number;
+  icon: typeof Sparkles;
+  meta: { bar: string; chip: string; num: string; tint: string };
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onClick}
+      className={cn(
+        "group relative overflow-hidden rounded-2xl border bg-gradient-to-br to-card p-3.5 text-left shadow-xs transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+        meta.tint,
+        active ? "border-primary/50 ring-2 ring-primary/30" : "border-transparent",
+      )}
+    >
+      <span className={cn("absolute inset-y-0 left-0 w-1", meta.bar)} aria-hidden />
+      <div className="flex items-center justify-between">
+        <span
+          className={cn("text-2xl font-semibold tabular-nums leading-none", meta.num)}
+        >
+          {count}
+        </span>
+        <span
+          className={cn(
+            "flex size-8 items-center justify-center rounded-lg shadow-xs",
+            meta.chip,
+          )}
+        >
+          <Icon className="size-4" aria-hidden />
+        </span>
+      </div>
+      <div className="mt-2 text-xs font-medium text-foreground/70">{label}</div>
+    </button>
   );
 }
 
