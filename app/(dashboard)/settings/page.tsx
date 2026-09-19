@@ -26,6 +26,7 @@ import {
   useGmailSettings,
   useGoogle,
   disconnectGoogle,
+  syncGmail,
   useAiSettings,
   updateAiSettings,
   saveAiKey,
@@ -153,6 +154,26 @@ function GoogleCard() {
   const [subjectKeywords, setSubjectKeywords] = useState("");
   const [lookbackDays, setLookbackDays] = useState(30);
   const [saved, setSaved] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState("");
+
+  async function runSync() {
+    setSyncing(true);
+    setSyncMsg("");
+    try {
+      const r = await syncGmail();
+      setSyncMsg(
+        r.connected
+          ? `Fetched ${r.fetched}, added ${r.inserted} new lead${r.inserted === 1 ? "" : "s"}` +
+              (r.errors ? `, ${r.errors} parse issue${r.errors === 1 ? "" : "s"}.` : ".")
+          : (r.message ?? "Not connected."),
+      );
+    } catch (e) {
+      setSyncMsg(e instanceof Error ? e.message : "Sync failed.");
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   useEffect(() => {
     setSendersText(settings.senders.join("\n"));
@@ -207,14 +228,26 @@ function GoogleCard() {
       </div>
 
       {google.connected ? (
-        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm">
-            Connected as{" "}
-            <span className="font-medium">{google.email ?? "Google account"}</span>
-          </p>
-          <Button variant="outline" onClick={() => disconnectGoogle()}>
-            Disconnect
-          </Button>
+        <div className="mt-4 space-y-2">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm">
+              Connected as{" "}
+              <span className="font-medium">
+                {google.email ?? "Google account"}
+              </span>
+            </p>
+            <div className="flex items-center gap-2">
+              <Button onClick={runSync} disabled={syncing}>
+                {syncing ? "Syncing…" : "Sync now"}
+              </Button>
+              <Button variant="outline" onClick={() => disconnectGoogle()}>
+                Disconnect
+              </Button>
+            </div>
+          </div>
+          {syncMsg && (
+            <p className="text-xs text-muted-foreground">{syncMsg}</p>
+          )}
         </div>
       ) : (
         <div className="mt-4">

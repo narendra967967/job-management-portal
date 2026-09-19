@@ -37,6 +37,8 @@ import {
   updateGmailConfigAction,
   updateProfileAction,
 } from "@/actions/settings";
+import { syncMyGmailAction } from "@/actions/gmail-sync";
+import type { SyncResult } from "@/lib/gmail-sync";
 import { contactPersonKey, isJobOpen } from "@/lib/types";
 import {
   CLOSE_OUTCOME_LABELS,
@@ -420,6 +422,14 @@ export async function deleteResume(id: string) {
 export async function disconnectGoogle() {
   await disconnectGoogleAction();
   await refresh();
+}
+
+/** Manually run the Gmail sync for the current user, then refresh so newly
+ *  ingested leads appear. */
+export async function syncGmail(): Promise<SyncResult> {
+  const result = await syncMyGmailAction();
+  await refresh();
+  return result;
 }
 
 /* ---------------- derived: per-contact history across leads (FR-6.1) ------- */
