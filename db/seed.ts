@@ -108,8 +108,12 @@ async function main() {
   await db.insert(schema.gmailConfig).values({
     userId: DEV_USER_ID,
     senders: ["jobalerts-noreply@linkedin.com"],
-    label: "Job Alerts",
-    subjectKeywords: "job alert",
+    // No label/subject filter by default: LinkedIn alert subjects are the top
+    // job's title (e.g. "Project Manager at Acme"), not "job alert", and most
+    // inboxes have no "Job Alerts" label — either clause silently excludes real
+    // alerts. Sender + lookback is the reliable default.
+    label: "",
+    subjectKeywords: "",
     lookbackDays: 30,
     connected: false,
   });
