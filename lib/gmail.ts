@@ -104,15 +104,40 @@ export async function getMessage(
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-function decode(b64url: string): string {
-  return Buffer.from(b64url.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString(
-    "utf8",
-  );
+/** Quoted-printable → text (UTF-8 aware): drop soft breaks, decode =XX bytes. */
+function decodeQuotedPrintable(s: string): string {
+  const noSoftBreaks = s.replace(/=\r?\n/g, "");
+  const bytes: number[] = [];
+  for (let i = 0; i < noSoftBreaks.length; i++) {
+    const c = noSoftBreaks[i];
+    if (c === "=" && /^[0-9A-Fa-f]{2}$/.test(noSoftBreaks.substr(i + 1, 2))) {
+      bytes.push(parseInt(noSoftBreaks.substr(i + 1, 2), 16));
+      i += 2;
+    } else {
+      bytes.push(noSoftBreaks.charCodeAt(i));
+    }
+  }
+  return Buffer.from(bytes).toString("utf8");
+}
+
+/** base64url-decode a part body, then transfer-decode by its CTE header. */
+function decodePart(part: any): string {
+  if (!part?.body?.data) return "";
+  const text = Buffer.from(
+    part.body.data.replace(/-/g, "+").replace(/_/g, "/"),
+    "base64",
+  ).toString("utf8");
+  const cte = (
+    (part.headers ?? []).find(
+      (h: { name: string }) => h.name.toLowerCase() === "content-transfer-encoding",
+    )?.value ?? ""
+  ).toLowerCase();
+  return cte === "quoted-printable" ? decodeQuotedPrintable(text) : text;
 }
 
 function extractHtml(part: any): string {
   if (!part) return "";
-  if (part.mimeType === "text/html" && part.body?.data) return decode(part.body.data);
+  if (part.mimeType === "text/html" && part.body?.data) return decodePart(part);
   for (const p of part.parts ?? []) {
     const html = extractHtml(p);
     if (html) return html;
@@ -122,7 +147,7 @@ function extractHtml(part: any): string {
 
 function extractPlain(part: any): string {
   if (!part) return "";
-  if (part.mimeType === "text/plain" && part.body?.data) return decode(part.body.data);
+  if (part.mimeType === "text/plain" && part.body?.data) return decodePart(part);
   for (const p of part.parts ?? []) {
     const t = extractPlain(p);
     if (t) return t;
