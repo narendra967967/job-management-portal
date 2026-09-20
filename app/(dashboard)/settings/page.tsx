@@ -61,6 +61,7 @@ import {
 } from "@/lib/ai-prompts";
 import { signOutToHome, connectGoogle } from "@/lib/auth-client";
 import { previewPromptAction } from "@/actions/ai";
+import { MarkdownLite, looksLikeMarkdown } from "@/components/ui/markdown-lite";
 import { Textarea } from "@/components/ui/textarea";
 import {
   AI_PROVIDER_DEFAULT_MODEL,
@@ -986,7 +987,7 @@ function AiPromptsCard() {
         open={testType !== null}
         onOpenChange={(o) => !o && !testing && setTestType(null)}
       >
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-xl lg:max-w-3xl">
           <DialogHeader>
             <DialogTitle>
               Test {testType === "draft" ? "draft outreach" : "summarize"} prompt
@@ -1034,8 +1035,12 @@ function AiPromptsCard() {
             {testResult && (
               <div className="space-y-1.5">
                 <Label>Generated result</Label>
-                <div className="max-h-48 overflow-y-auto rounded-lg border bg-muted/40 p-3 text-sm whitespace-pre-wrap">
-                  {testResult}
+                <div className="max-h-64 overflow-y-auto rounded-lg border bg-muted/40 p-3">
+                  {looksLikeMarkdown(testResult) ? (
+                    <MarkdownLite text={testResult} />
+                  ) : (
+                    <p className="text-sm whitespace-pre-wrap">{testResult}</p>
+                  )}
                 </div>
                 <p className="text-[11px] text-muted-foreground">
                   Happy with this? Save the prompt. Otherwise close, tweak it,
