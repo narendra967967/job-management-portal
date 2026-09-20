@@ -64,6 +64,7 @@ import { previewPromptAction } from "@/actions/ai";
 import { Textarea } from "@/components/ui/textarea";
 import {
   AI_PROVIDER_DEFAULT_MODEL,
+  AI_PROVIDER_KEY_PREFIX,
   AI_PROVIDER_LABELS,
   RESUME_ACCEPT,
   RESUME_ALLOWED_EXT,
@@ -816,7 +817,7 @@ function AiProviderCard() {
           <div className="mt-1.5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <span className="inline-flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 font-mono text-sm">
               <KeyRound className="size-4 text-muted-foreground" aria-hidden />
-              {provider === "openai" ? "sk" : "sk-ant"}-••••••••{ai.keyLast4}
+              {AI_PROVIDER_KEY_PREFIX[provider]}-••••••••{ai.keyLast4}
             </span>
             <div className="flex items-center gap-2">
               <Button variant="outline" onClick={() => setEditingKey(true)}>
@@ -833,7 +834,7 @@ function AiProviderCard() {
               type="password"
               value={keyInput}
               onChange={(e) => setKeyInput(e.target.value)}
-              placeholder={provider === "openai" ? "sk-…" : "sk-ant-…"}
+              placeholder={`${AI_PROVIDER_KEY_PREFIX[provider]}-…`}
               autoComplete="off"
               className="flex-1 font-mono"
             />

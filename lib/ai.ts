@@ -68,6 +68,41 @@ async function callOpenAI(
   return (data.choices?.[0]?.message?.content ?? "").trim();
 }
 
+// OpenRouter is OpenAI-compatible; same request/response shape, different base
+// URL + Bearer key. The Referer/Title headers are optional attribution only.
+async function callOpenRouter(
+  ai: UserAi,
+  system: string,
+  user: string,
+  maxTokens: number,
+): Promise<string> {
+  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${ai.key}`,
+      "HTTP-Referer": "https://github.com/job-management-portal",
+      "X-Title": "Job Management Portal",
+    },
+    body: JSON.stringify({
+      model: ai.model,
+      temperature: 0.4,
+      max_tokens: maxTokens,
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: user },
+      ],
+    }),
+  });
+  if (!res.ok) {
+    throw new Error(
+      `OpenRouter error ${res.status}: ${(await res.text()).slice(0, 200)}`,
+    );
+  }
+  const data = await res.json();
+  return (data.choices?.[0]?.message?.content ?? "").trim();
+}
+
 async function callAnthropic(
   ai: UserAi,
   system: string,
@@ -103,7 +138,12 @@ export async function aiComplete(
   maxTokens = 600,
 ): Promise<string> {
   const ai = await getUserAi(userId);
-  return ai.provider === "anthropic"
-    ? callAnthropic(ai, system, user, maxTokens)
-    : callOpenAI(ai, system, user, maxTokens);
+  switch (ai.provider) {
+    case "anthropic":
+      return callAnthropic(ai, system, user, maxTokens);
+    case "openrouter":
+      return callOpenRouter(ai, system, user, maxTokens);
+    default:
+      return callOpenAI(ai, system, user, maxTokens);
+  }
 }

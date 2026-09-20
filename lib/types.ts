@@ -232,17 +232,27 @@ export interface GoogleConnection {
   configured: boolean; // Google OAuth client is set up server-side (can connect)
 }
 
-export type AiProvider = "openai" | "anthropic";
+export type AiProvider = "openai" | "anthropic" | "openrouter";
 
 export const AI_PROVIDER_LABELS: Record<AiProvider, string> = {
   openai: "OpenAI",
   anthropic: "Claude (Anthropic)",
+  openrouter: "OpenRouter",
 };
 
-// Suggested default model per provider, shown as a placeholder.
+// Suggested default model per provider, shown as a placeholder. OpenRouter
+// models are namespaced "vendor/model" slugs (openrouter.ai/models).
 export const AI_PROVIDER_DEFAULT_MODEL: Record<AiProvider, string> = {
   openai: "gpt-4o-mini",
   anthropic: "claude-sonnet-5",
+  openrouter: "openai/gpt-4o-mini",
+};
+
+// API-key prefix hint per provider (for the Settings placeholder + masked view).
+export const AI_PROVIDER_KEY_PREFIX: Record<AiProvider, string> = {
+  openai: "sk",
+  anthropic: "sk-ant",
+  openrouter: "sk-or",
 };
 
 export interface AiSettings {

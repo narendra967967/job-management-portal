@@ -62,7 +62,10 @@ export const gmailConfigSchema = z.object({
 });
 
 export const aiProviderSchema = z.object({
-  provider: zEnum(["openai", "anthropic"] as const, "Unknown AI provider."),
+  provider: zEnum(
+    ["openai", "anthropic", "openrouter"] as const,
+    "Unknown AI provider.",
+  ),
   model: z.string().trim().max(120),
 });
 
