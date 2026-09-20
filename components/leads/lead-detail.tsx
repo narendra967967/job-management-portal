@@ -32,6 +32,7 @@ import { ReminderActions } from "@/components/leads/reminder-actions";
 import { LeadTimeline } from "@/components/leads/lead-timeline";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { MarkdownLite, looksLikeMarkdown } from "@/components/ui/markdown-lite";
 import { computeFitScore, fitBand } from "@/lib/fit";
 import {
   useContactsForLead,
@@ -318,9 +319,15 @@ function OverviewTab({ leadId, detail }: { leadId: string; detail?: JobLeadDetai
             <Sparkles className="size-4" aria-hidden />
             AI summary
           </h2>
-          <p className="mt-2 text-sm leading-relaxed break-words whitespace-pre-line">
-            {summary}
-          </p>
+          <div className="mt-2 max-h-96 overflow-y-auto pr-1">
+            {looksLikeMarkdown(summary) ? (
+              <MarkdownLite text={summary} />
+            ) : (
+              <p className="text-sm leading-relaxed break-words whitespace-pre-line">
+                {summary}
+              </p>
+            )}
+          </div>
         </section>
       )}
     </div>
