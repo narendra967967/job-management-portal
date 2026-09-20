@@ -23,6 +23,8 @@ import {
   AlertTriangle,
   SlidersHorizontal,
   X,
+  Trash2,
+  Check,
 } from "lucide-react";
 import {
   CLOSE_OUTCOME_LABELS,
@@ -49,8 +51,18 @@ import {
   useDefaultResumeId,
   useAppSettings,
   setLeadStatus,
+  deleteLeads,
 } from "@/lib/mock-store";
 import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -278,6 +290,18 @@ export function LeadsBrowser({ scope = "all" }: { scope?: "all" | "archive" }) {
   );
   // Which lead's "View details" modal is open (null = closed).
   const [detailLead, setDetailLead] = useState<JobLead | null>(null);
+  // Archive-only trash: multi-select + a confirm dialog holding the ids to
+  // permanently delete (null = closed).
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [pendingDelete, setPendingDelete] = useState<string[] | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const toggleSelect = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   // Default resume drives the fit score; per-lead choices override it.
   const [defaultResumeId] = useDefaultResumeId();
   const [resumeChoice, setResumeChoice] = useState<Record<string, string>>({});
@@ -357,9 +381,11 @@ export function LeadsBrowser({ scope = "all" }: { scope?: "all" | "archive" }) {
     return out;
   }, [leads, scope, statusFilter, bucketFilter, locationFilter, countryFilter, titleFilter, tagFilter, search, dateBounds, sort]);
 
-  // Reset to the first page whenever the result set changes.
+  // Reset to the first page (and clear any selection) whenever the result set
+  // changes.
   useEffect(() => {
     setPage(1);
+    setSelected(new Set());
   }, [scope, statusFilter, bucketFilter, locationFilter, countryFilter, titleFilter, tagFilter, search, dateBounds, sort]);
 
   const activeFilterCount =
@@ -403,6 +429,30 @@ export function LeadsBrowser({ scope = "all" }: { scope?: "all" | "archive" }) {
   const currentPage = Math.min(page, totalPages);
   const start = (currentPage - 1) * PAGE_SIZE;
   const pageItems = visible.slice(start, start + PAGE_SIZE);
+
+  // Trash selection (archive scope). "Select all" spans the whole filtered set,
+  // not just the current page.
+  const selectedCount = selected.size;
+  const allVisibleSelected =
+    visible.length > 0 && visible.every((l) => selected.has(l.id));
+  const toggleSelectAll = () =>
+    setSelected(allVisibleSelected ? new Set() : new Set(visible.map((l) => l.id)));
+
+  async function confirmDelete() {
+    if (!pendingDelete) return;
+    setDeleting(true);
+    try {
+      await deleteLeads(pendingDelete);
+      setSelected((prev) => {
+        const next = new Set(prev);
+        for (const id of pendingDelete) next.delete(id);
+        return next;
+      });
+      setPendingDelete(null);
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -479,6 +529,34 @@ export function LeadsBrowser({ scope = "all" }: { scope?: "all" | "archive" }) {
           ]}
         />
       </div>
+
+      {/* Trash toolbar — select across pages, then permanently delete. */}
+      {scope === "archive" && visible.length > 0 && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border bg-card px-3 py-2">
+          <button
+            type="button"
+            onClick={toggleSelectAll}
+            className="inline-flex items-center gap-2 text-sm font-medium hover:text-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          >
+            <CheckBox checked={allVisibleSelected} />
+            {allVisibleSelected ? "Clear selection" : `Select all (${visible.length})`}
+          </button>
+          {selectedCount > 0 && (
+            <span className="text-xs text-muted-foreground">
+              {selectedCount} selected
+            </span>
+          )}
+          <Button
+            variant="destructive"
+            onClick={() => setPendingDelete([...selected])}
+            disabled={selectedCount === 0}
+            className="ml-auto h-9"
+          >
+            <Trash2 className="size-4" aria-hidden />
+            Delete{selectedCount > 0 ? ` (${selectedCount})` : ""}
+          </Button>
+        </div>
+      )}
 
       {filtersOpen &&
         typeof document !== "undefined" &&
@@ -651,6 +729,14 @@ export function LeadsBrowser({ scope = "all" }: { scope?: "all" | "archive" }) {
                   onResumeChange={(rid) => setResumeFor(lead.id, rid)}
                   onOpen={() => setDetailLead(lead)}
                   onStatusChange={(s, o) => setStatus(lead.id, s, o)}
+                  selectable={scope === "archive"}
+                  selected={selected.has(lead.id)}
+                  onToggleSelect={() => toggleSelect(lead.id)}
+                  onDelete={
+                    scope === "archive"
+                      ? () => setPendingDelete([lead.id])
+                      : undefined
+                  }
                 />
               </li>
             ))}
@@ -674,7 +760,60 @@ export function LeadsBrowser({ scope = "all" }: { scope?: "all" | "archive" }) {
         open={detailLead !== null}
         onOpenChange={(o) => !o && setDetailLead(null)}
       />
+
+      <Dialog
+        open={pendingDelete !== null}
+        onOpenChange={(o) => !o && !deleting && setPendingDelete(null)}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              Delete {pendingDelete?.length ?? 0}{" "}
+              {(pendingDelete?.length ?? 0) === 1 ? "lead" : "leads"}?
+            </DialogTitle>
+            <DialogDescription>
+              This permanently removes the{" "}
+              {(pendingDelete?.length ?? 0) === 1 ? "lead" : "leads"} and all
+              their contacts, outreach, reminders, and notes. This can&apos;t be
+              undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setPendingDelete(null)}
+              disabled={deleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmDelete}
+              disabled={deleting}
+            >
+              <Trash2 className="size-4" aria-hidden />
+              {deleting ? "Deleting…" : "Delete permanently"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
+  );
+}
+
+/** Small square checkbox (no dedicated UI primitive in the repo yet). */
+function CheckBox({ checked }: { checked: boolean }) {
+  return (
+    <span
+      className={cn(
+        "flex size-5 shrink-0 items-center justify-center rounded border transition-colors",
+        checked
+          ? "border-primary bg-primary text-primary-foreground"
+          : "border-input bg-card",
+      )}
+    >
+      {checked && <Check className="size-3.5" aria-hidden />}
+    </span>
   );
 }
 
@@ -962,6 +1101,10 @@ function LeadCard({
   onResumeChange,
   onOpen,
   onStatusChange,
+  selectable = false,
+  selected = false,
+  onToggleSelect,
+  onDelete,
 }: {
   lead: JobLead;
   status: LeadStatus;
@@ -969,6 +1112,10 @@ function LeadCard({
   onResumeChange: (resumeId: string) => void;
   onOpen: () => void;
   onStatusChange: (status: LeadStatus, outcome?: CloseOutcome | null) => void;
+  selectable?: boolean;
+  selected?: boolean;
+  onToggleSelect?: () => void;
+  onDelete?: () => void;
 }) {
   const resumes = useResumes();
   const { openDialog, dialogs } = useLeadActionDialogs(lead, resumes, {
@@ -1015,15 +1162,43 @@ function LeadCard({
           }
         }}
         aria-label={`View details for ${lead.title}`}
-        className="group relative flex h-full cursor-pointer flex-col overflow-hidden rounded-2xl border bg-card shadow-xs transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+        className={cn(
+          "group relative flex h-full cursor-pointer flex-col overflow-hidden rounded-2xl border bg-card shadow-xs transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+          selected && "border-primary/60 ring-2 ring-primary/30",
+        )}
       >
       {/* HEADER — current state + jump out to the source listing */}
       <div
         {...stop}
         className="flex items-center justify-between gap-2 border-b bg-muted/30 px-3 py-1.5"
       >
-        <StatusControl status={status} onChange={onStatusChange} />
+        <div className="flex items-center gap-1.5">
+          {selectable && (
+            <button
+              type="button"
+              role="checkbox"
+              aria-checked={selected}
+              aria-label={selected ? `Deselect ${lead.title}` : `Select ${lead.title}`}
+              onClick={onToggleSelect}
+              className="inline-flex size-11 items-center justify-center rounded-lg hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:size-9"
+            >
+              <CheckBox checked={selected} />
+            </button>
+          )}
+          <StatusControl status={status} onChange={onStatusChange} />
+        </div>
         <div className="flex items-center gap-0.5">
+          {onDelete && (
+            <button
+              type="button"
+              aria-label={`Delete ${lead.title}`}
+              title="Delete permanently"
+              onClick={onDelete}
+              className="inline-flex size-11 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:size-9"
+            >
+              <Trash2 className="size-4" aria-hidden />
+            </button>
+          )}
           <button
             type="button"
             aria-label={`Reminders${
