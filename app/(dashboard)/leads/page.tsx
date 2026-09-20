@@ -4,18 +4,21 @@ import { useState } from "react";
 import { List, Columns3 } from "lucide-react";
 import { LeadsBrowser } from "@/components/leads/leads-browser";
 import { LeadsKanban } from "@/components/leads/leads-kanban";
+import { useIsDesktop } from "@/lib/use-media-query";
 import { cn } from "@/lib/utils";
 
 type View = "list" | "board";
 
 export default function LeadsPage() {
   const [view, setView] = useState<View>("list");
+  const isDesktop = useIsDesktop();
   // The board is a laptop-only view; on smaller screens we always show the list
-  // (mobile board design comes later), and the toggle is hidden there.
-  const boardWide = view === "board";
+  // (mobile board design comes later), and the toggle is hidden there. Gating on
+  // isDesktop means exactly one of the two views is mounted at a time.
+  const showBoard = view === "board" && isDesktop;
 
   return (
-    <div className={cn("mx-auto space-y-3", boardWide ? "max-w-none" : "max-w-5xl")}>
+    <div className={cn("mx-auto space-y-3", showBoard ? "max-w-none" : "max-w-5xl")}>
       <div className="flex flex-wrap items-baseline gap-x-2">
         <h1 className="text-lg font-semibold tracking-tight">Leads</h1>
         <p className="hidden text-sm text-muted-foreground sm:block">
@@ -38,19 +41,7 @@ export default function LeadsPage() {
         </div>
       </div>
 
-      {view === "board" ? (
-        <>
-          {/* Board on laptop; list stays the mobile experience for now. */}
-          <div className="hidden lg:block">
-            <LeadsKanban />
-          </div>
-          <div className="lg:hidden">
-            <LeadsBrowser />
-          </div>
-        </>
-      ) : (
-        <LeadsBrowser />
-      )}
+      {showBoard ? <LeadsKanban /> : <LeadsBrowser />}
     </div>
   );
 }
