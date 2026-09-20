@@ -13,7 +13,16 @@ import {
   KeyRound,
   LogOut,
   Filter,
+  User,
+  Mail,
+  RefreshCw,
+  AlertTriangle,
+  Sparkles,
+  Wand2,
+  Bell,
+  type LucideIcon,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import {
   useProfile,
   updateProfile,
@@ -73,9 +82,31 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 
+interface SettingsSection {
+  id: string;
+  label: string;
+  icon: LucideIcon;
+  render: () => React.ReactNode;
+}
+
+const SECTIONS: SettingsSection[] = [
+  { id: "profile", label: "Profile", icon: User, render: () => <ProfileCard /> },
+  { id: "google", label: "Gmail connection", icon: Mail, render: () => <GoogleCard /> },
+  { id: "schedule", label: "Sync schedule", icon: RefreshCw, render: () => <SyncScheduleCard /> },
+  { id: "issues", label: "Ingestion issues", icon: AlertTriangle, render: () => <IngestionIssuesCard /> },
+  { id: "ai", label: "AI provider", icon: Sparkles, render: () => <AiProviderCard /> },
+  { id: "prompts", label: "AI prompts", icon: Wand2, render: () => <AiPromptsCard /> },
+  { id: "followups", label: "Follow-ups", icon: Bell, render: () => <FollowUpsCard /> },
+  { id: "resumes", label: "Resumes", icon: FileText, render: () => <ResumesCard /> },
+  { id: "account", label: "Account", icon: ShieldCheck, render: () => <AccountCard /> },
+];
+
 export default function SettingsPage() {
+  const [active, setActive] = useState(SECTIONS[0].id);
+  const current = SECTIONS.find((s) => s.id === active) ?? SECTIONS[0];
+
   return (
-    <div className="mx-auto max-w-2xl space-y-5 lg:max-w-5xl">
+    <div className="mx-auto max-w-5xl">
       <div className="flex flex-wrap items-baseline gap-x-2">
         <h1 className="text-lg font-semibold tracking-tight">Settings</h1>
         <p className="hidden text-sm text-muted-foreground sm:block">
@@ -83,16 +114,38 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      <div className="[&>section]:mb-5 lg:columns-2 lg:gap-5 lg:[&>section]:break-inside-avoid">
-        <ProfileCard />
-        <GoogleCard />
-        <SyncScheduleCard />
-        <IngestionIssuesCard />
-        <AiProviderCard />
-        <AiPromptsCard />
-        <FollowUpsCard />
-        <ResumesCard />
-        <AccountCard />
+      <div className="mt-5 lg:flex lg:gap-6">
+        {/* Section nav — horizontal scroll strip until there's room for a
+            sidebar (lg); the app's own left rail already appears at md, so a
+            second sidebar there would squeeze the panel into a scroll. */}
+        <nav
+          aria-label="Settings sections"
+          className="-mx-4 flex gap-1 overflow-x-auto px-4 pb-1 lg:mx-0 lg:w-56 lg:shrink-0 lg:flex-col lg:gap-0.5 lg:overflow-visible lg:px-0 lg:pb-0"
+        >
+          {SECTIONS.map((s) => {
+            const Icon = s.icon;
+            const selected = s.id === active;
+            return (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => setActive(s.id)}
+                aria-current={selected ? "page" : undefined}
+                className={cn(
+                  "flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors lg:w-full",
+                  selected
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                )}
+              >
+                <Icon className="size-4 shrink-0" />
+                {s.label}
+              </button>
+            );
+          })}
+        </nav>
+
+        <div className="mt-4 min-w-0 flex-1 lg:mt-0">{current.render()}</div>
       </div>
     </div>
   );
