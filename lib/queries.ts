@@ -105,11 +105,7 @@ export async function loadWorkspace(userId: string): Promise<WorkspaceData> {
     errorRows,
   ] = await Promise.all([
     db.select().from(leadsT).where(eq(leadsT.userId, userId)),
-    db
-      .select()
-      .from(detailsT)
-      .innerJoin(leadsT, eq(detailsT.leadId, leadsT.id))
-      .where(eq(leadsT.userId, userId)),
+    db.select().from(detailsT).where(eq(detailsT.userId, userId)),
     db
       .select()
       .from(contactsT)
@@ -171,8 +167,7 @@ export async function loadWorkspace(userId: string): Promise<WorkspaceData> {
   }));
 
   const details: Record<string, JobLeadDetail> = {};
-  for (const row of detailRows) {
-    const d = row.job_lead_details;
+  for (const d of detailRows) {
     details[d.leadId] = {
       leadId: d.leadId,
       jdText: d.jdText,

@@ -185,6 +185,7 @@ async function main() {
   await db.insert(schema.jobLeadDetails).values([
     {
       leadId: leadStripe,
+      userId: DEV_USER_ID,
       jdText:
         "Stripe is looking for a Senior Product Manager to own the payments acceptance experience…",
       aiSummary:
@@ -193,6 +194,7 @@ async function main() {
     },
     {
       leadId: leadDatadog,
+      userId: DEV_USER_ID,
       jdText:
         "Datadog seeks an Engineering Lead for the Platform team to guide senior engineers building the observability pipeline…",
       aiSummary:

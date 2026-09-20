@@ -53,7 +53,7 @@ export async function saveJdAction(
 
   await db
     .insert(detailsT)
-    .values({ leadId, jdText: text })
+    .values({ leadId, userId, jdText: text })
     .onConflictDoUpdate({ target: detailsT.leadId, set: { jdText: text } });
   return { ok: true };
 }
@@ -78,7 +78,7 @@ export async function summarizeJdAction(
   // even if the AI summary fails (e.g. no API key). Keep any existing summary.
   await db
     .insert(detailsT)
-    .values({ leadId, jdText: text })
+    .values({ leadId, userId, jdText: text })
     .onConflictDoUpdate({ target: detailsT.leadId, set: { jdText: text } });
 
   try {
@@ -180,7 +180,7 @@ export async function draftOutreachAction(input: {
   const [detail] = await db
     .select({ jdText: detailsT.jdText, aiSummary: detailsT.aiSummary })
     .from(detailsT)
-    .where(eq(detailsT.leadId, input.leadId));
+    .where(and(eq(detailsT.leadId, input.leadId), eq(detailsT.userId, userId)));
 
   const jd = detail?.aiSummary || detail?.jdText || "(no job description saved yet)";
 

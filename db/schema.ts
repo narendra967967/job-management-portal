@@ -126,6 +126,11 @@ export const jobLeadDetails = pgTable("job_lead_details", {
   leadId: uuid("lead_id")
     .primaryKey()
     .references(() => jobLeads.id, { onDelete: "cascade" }),
+  // Direct owner scoping (in addition to lead_id → job_leads) so every write
+  // carries user_id and reads can filter by it (multi-user).
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
   jdText: text("jd_text"),
   aiSummary: text("ai_summary"),
   notes: text("notes"),
