@@ -45,6 +45,12 @@ import { computeFitScore, fitBand } from "@/lib/fit";
 import { StatusBadge } from "@/components/leads/status-badge";
 import { LeadDetailDialog } from "@/components/leads/lead-detail-dialog";
 import {
+  LeadFilters,
+  applyLeadFilters,
+  EMPTY_LEAD_FILTERS,
+  type LeadFilterValue,
+} from "@/components/leads/lead-filters";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -80,6 +86,7 @@ export function LeadsKanban() {
   const search = useSearchQuery();
 
   const [columns, setColumns] = useState<LeadStatus[]>(DEFAULT_COLUMNS);
+  const [filters, setFilters] = useState<LeadFilterValue>(EMPTY_LEAD_FILTERS);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [detailLead, setDetailLead] = useState<JobLead | null>(null);
   // Lead awaiting a close outcome (dragged onto the Closed column).
@@ -96,16 +103,19 @@ export function LeadsKanban() {
   }, [staleLeadDays]);
 
   const filtered = useMemo(() => {
+    let out = applyLeadFilters(allLeads, filters);
     const q = search.trim().toLowerCase();
-    if (!q) return allLeads;
-    return allLeads.filter(
-      (l) =>
-        l.title.toLowerCase().includes(q) ||
-        l.company.toLowerCase().includes(q) ||
-        l.location.toLowerCase().includes(q) ||
-        l.tags.some((t) => t.toLowerCase().includes(q)),
-    );
-  }, [allLeads, search]);
+    if (q) {
+      out = out.filter(
+        (l) =>
+          l.title.toLowerCase().includes(q) ||
+          l.company.toLowerCase().includes(q) ||
+          l.location.toLowerCase().includes(q) ||
+          l.tags.some((t) => t.toLowerCase().includes(q)),
+      );
+    }
+    return out;
+  }, [allLeads, filters, search]);
 
   const byStatus = useMemo(() => {
     const map: Record<LeadStatus, JobLead[]> = {
@@ -155,6 +165,9 @@ export function LeadsKanban() {
 
   return (
     <div className="space-y-3">
+      {/* Filters (everything but status — status is the columns) */}
+      <LeadFilters leads={allLeads} value={filters} onChange={setFilters} />
+
       {/* Column picker */}
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-xs font-medium text-muted-foreground">Columns:</span>
