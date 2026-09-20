@@ -33,7 +33,7 @@ export function LeadDetailDialog({
   const detail = useLeadDetail(lead?.id ?? "");
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
+      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-3xl lg:max-w-4xl">
         {lead && (
           <>
             <DialogHeader className="pr-8">
