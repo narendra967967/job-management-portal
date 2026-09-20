@@ -316,6 +316,9 @@ export const userSettings = pgTable("user_settings", {
   // chars are ever returned to the client.
   aiKeyCiphertext: text("ai_key_ciphertext"),
   aiKeyLast4: text("ai_key_last4"),
+  // User-customized AI instruction prompts (null = use the built-in default).
+  promptSummary: text("prompt_summary"),
+  promptDraft: text("prompt_draft"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

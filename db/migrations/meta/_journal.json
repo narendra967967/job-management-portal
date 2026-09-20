@@ -15,6 +15,13 @@
       "when": 1789815044721,
       "tag": "0001_legal_dreaming_celestial",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789880880618,
+      "tag": "0002_natural_gamma_corps",
+      "breakpoints": true
     }
   ]
 }

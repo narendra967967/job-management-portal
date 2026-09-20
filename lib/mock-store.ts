@@ -35,6 +35,7 @@ import {
   setDefaultResumeAction,
   updateAiSettingsAction,
   updateFollowUpsAction,
+  updateAiPromptsAction,
   updateGmailConfigAction,
   updateProfileAction,
   updateSyncIntervalAction,
@@ -104,6 +105,7 @@ let gmailConfig: GmailConfigData = {
 let syncIntervalHours = 24;
 let gmailSync: GmailSyncStatus = { lastSyncedAt: null, lastRunAt: null, lastError: null };
 let ingestErrors: IngestError[] = [];
+let aiPrompts = { summary: "", draft: "" };
 let hydrated = false;
 
 const listeners = new Set<() => void>();
@@ -136,6 +138,7 @@ function apply(data: WorkspaceData) {
   syncIntervalHours = data.syncIntervalHours;
   gmailSync = data.gmailSync;
   ingestErrors = data.ingestErrors;
+  aiPrompts = data.aiPrompts;
 }
 
 /** Called by WorkspaceProvider during render so the first snapshot has data.
@@ -480,6 +483,15 @@ export function useIngestErrors(): IngestError[] {
 
 export async function clearIngestErrors() {
   await clearIngestErrorsAction();
+  await refresh();
+}
+
+const getAiPrompts = () => aiPrompts;
+export function useAiPrompts(): { summary: string; draft: string } {
+  return useSyncExternalStore(subscribe, getAiPrompts, getAiPrompts);
+}
+export async function updateAiPrompts(input: { summary: string; draft: string }) {
+  await updateAiPromptsAction(input);
   await refresh();
 }
 

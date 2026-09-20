@@ -84,6 +84,7 @@ export interface WorkspaceData {
   syncIntervalHours: number;
   gmailSync: GmailSyncStatus;
   ingestErrors: IngestError[];
+  aiPrompts: { summary: string; draft: string };
 }
 
 /** Everything the dashboard needs for one user, in UI-ready shapes. */
@@ -307,5 +308,9 @@ export async function loadWorkspace(userId: string): Promise<WorkspaceData> {
     syncIntervalHours: settings?.syncIntervalHours ?? 24,
     gmailSync,
     ingestErrors,
+    aiPrompts: {
+      summary: settings?.promptSummary ?? "",
+      draft: settings?.promptDraft ?? "",
+    },
   };
 }

@@ -105,6 +105,18 @@ export async function removeAiKeyAction() {
   await upsertSettings(userId, { aiKeyCiphertext: null, aiKeyLast4: null });
 }
 
+/** Save custom AI instruction prompts (empty string → clear = use default). */
+export async function updateAiPromptsAction(input: {
+  summary: string;
+  draft: string;
+}) {
+  const userId = await getCurrentUserId();
+  await upsertSettings(userId, {
+    promptSummary: input.summary.trim() || null,
+    promptDraft: input.draft.trim() || null,
+  });
+}
+
 /* ---------------- sync schedule ---------------- */
 
 const ALLOWED_INTERVALS = [1, 3, 6, 12, 24];

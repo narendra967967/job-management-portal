@@ -10,9 +10,14 @@ import { db } from "@/lib/db";
 import { getCurrentUserId } from "@/lib/current-user";
 import { aiComplete, AI_NOT_CONFIGURED } from "@/lib/ai";
 import {
+  DEFAULT_SUMMARY_PROMPT,
+  DEFAULT_DRAFT_PROMPT,
+} from "@/lib/ai-prompts";
+import {
   contacts as contactsT,
   jobLeadDetails as detailsT,
   jobLeads as leadsT,
+  userSettings as settingsT,
 } from "@/db/schema";
 import {
   CONNECTION_TYPE_LABELS,
@@ -54,12 +59,12 @@ export async function summarizeJdAction(
     .onConflictDoUpdate({ target: detailsT.leadId, set: { jdText: text } });
 
   try {
-    const summary = await aiComplete(
-      userId,
-      "You summarize job descriptions in 2–3 short lines for quick scanning — role, seniority, location, and key focus. No preamble, no bullet points.",
-      text,
-      300,
-    );
+    const [s] = await db
+      .select({ p: settingsT.promptSummary })
+      .from(settingsT)
+      .where(eq(settingsT.userId, userId));
+    const system = s?.p?.trim() || DEFAULT_SUMMARY_PROMPT;
+    const summary = await aiComplete(userId, system, text, 300);
     await db
       .update(detailsT)
       .set({ aiSummary: summary })
@@ -165,12 +170,12 @@ export async function draftOutreachAction(input: {
   ].join("\n");
 
   try {
-    const draft = await aiComplete(
-      userId,
-      "You draft short, professional LinkedIn outreach for a job seeker (120–160 words). Warm, specific to the role and recipient, no fluff or clichés. Start with a greeting using the recipient's first name. The user will review and edit before sending, so do not invent specific facts about the sender beyond the resume label.",
-      context,
-      500,
-    );
+    const [s] = await db
+      .select({ p: settingsT.promptDraft })
+      .from(settingsT)
+      .where(eq(settingsT.userId, userId));
+    const system = s?.p?.trim() || DEFAULT_DRAFT_PROMPT;
+    const draft = await aiComplete(userId, system, context, 500);
     return { ok: true, draft };
   } catch (err) {
     return { ok: false, error: friendly(err) };

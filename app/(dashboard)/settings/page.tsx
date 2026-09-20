@@ -35,8 +35,14 @@ import {
   updateAiSettings,
   saveAiKey,
   removeAiKey,
+  useAiPrompts,
+  updateAiPrompts,
 } from "@/lib/mock-store";
 import { buildGmailQuery } from "@/lib/use-gmail-settings";
+import {
+  DEFAULT_SUMMARY_PROMPT,
+  DEFAULT_DRAFT_PROMPT,
+} from "@/lib/ai-prompts";
 import { signOutToHome, connectGoogle } from "@/lib/auth-client";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -83,6 +89,7 @@ export default function SettingsPage() {
         <SyncScheduleCard />
         <IngestionIssuesCard />
         <AiProviderCard />
+        <AiPromptsCard />
         <FollowUpsCard />
         <ResumesCard />
         <AccountCard />
@@ -642,6 +649,92 @@ function AiProviderCard() {
           Stored encrypted and used only server-side for AI calls. Your key is
           never sent to the browser or exposed in client code.
         </p>
+      </div>
+    </section>
+  );
+}
+
+/* ---------------- AI prompts ---------------- */
+
+function AiPromptsCard() {
+  const prompts = useAiPrompts();
+  const [summary, setSummary] = useState(prompts.summary);
+  const [draft, setDraft] = useState(prompts.draft);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    setSummary(prompts.summary);
+    setDraft(prompts.draft);
+  }, [prompts]);
+
+  function save() {
+    updateAiPrompts({ summary, draft });
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1500);
+  }
+
+  return (
+    <section className="rounded-2xl border bg-card p-4 md:p-5">
+      <h2 className="text-sm font-medium">AI prompts</h2>
+      <p className="mt-0.5 text-xs text-muted-foreground">
+        Customize the instructions used by “Summarize with AI” and “Draft with
+        AI”. Leave blank to use the default. Write instructions only — the pasted
+        job description and the lead/contact details are added automatically.
+      </p>
+
+      <div className="mt-4 space-y-4">
+        <div>
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground">
+              Summarize prompt
+            </span>
+            {summary && (
+              <button
+                type="button"
+                onClick={() => setSummary("")}
+                className="text-[11px] font-medium text-muted-foreground hover:text-foreground"
+              >
+                Reset to default
+              </button>
+            )}
+          </div>
+          <Textarea
+            value={summary}
+            onChange={(e) => setSummary(e.target.value)}
+            placeholder={DEFAULT_SUMMARY_PROMPT}
+            className="mt-1.5 min-h-24"
+          />
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground">
+              Draft outreach prompt
+            </span>
+            {draft && (
+              <button
+                type="button"
+                onClick={() => setDraft("")}
+                className="text-[11px] font-medium text-muted-foreground hover:text-foreground"
+              >
+                Reset to default
+              </button>
+            )}
+          </div>
+          <Textarea
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder={DEFAULT_DRAFT_PROMPT}
+            className="mt-1.5 min-h-32"
+          />
+        </div>
+
+        <div className="flex items-center gap-3">
+          <Button onClick={save}>Save prompts</Button>
+          {saved && (
+            <span className="text-xs text-status-applied-foreground">Saved</span>
+          )}
+        </div>
       </div>
     </section>
   );
