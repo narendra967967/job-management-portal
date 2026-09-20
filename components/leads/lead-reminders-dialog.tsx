@@ -17,7 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { cn } from "@/lib/utils";
+import { cn, formatDateTime } from "@/lib/utils";
 
 /**
  * All reminders for one lead: mark done, snooze/reschedule, delete. "Add
@@ -91,12 +91,13 @@ export function LeadRemindersDialog({
                         done && "text-muted-foreground line-through",
                       )}
                     >
-                      {r.manual
-                        ? r.label || "Manual reminder"
-                        : `Reminder ${r.sequence}`}
+                      {r.reason ??
+                        (r.manual ? "Manual reminder" : `Reminder ${r.sequence}`)}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {done ? REMINDER_OUTCOME_LABELS[r.outcome] : `Due ${r.dueDate}`}
+                      {done
+                        ? REMINDER_OUTCOME_LABELS[r.outcome]
+                        : `Due ${formatDateTime(r.dueDate)}`}
                     </p>
                   </div>
                   <ReminderActions reminder={r} />

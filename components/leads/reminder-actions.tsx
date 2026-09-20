@@ -24,10 +24,17 @@ function iso(d: Date): string {
     d.getDate(),
   ).padStart(2, "0")}`;
 }
+/** n days from now at 9:00 AM local, as an ISO datetime. */
 function addDays(n: number): string {
   const d = new Date();
   d.setDate(d.getDate() + n);
-  return iso(d);
+  d.setHours(9, 0, 0, 0);
+  return d.toISOString();
+}
+/** A "YYYY-MM-DD" from a date input → that day at 9:00 AM local, ISO. */
+function dayToIso(day: string): string {
+  const d = new Date(`${day}T09:00`);
+  return d.toISOString();
 }
 
 // Outcomes the user can record when resolving a reminder (FR-5.3).
@@ -122,7 +129,7 @@ export function ReminderActions({ reminder }: { reminder: Reminder }) {
                   onChange={(e) => {
                     const v = e.target.value;
                     setCustom(v);
-                    if (v) snoozeReminder(reminder.id, v);
+                    if (v) snoozeReminder(reminder.id, dayToIso(v));
                   }}
                   className="h-9"
                 />

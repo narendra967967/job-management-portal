@@ -299,7 +299,7 @@ async function main() {
     leadId: leadDatadog,
     outreachMessageId: msgDana,
     sequence: 1,
-    dueDate: "2026-08-18",
+    dueDate: "2026-08-18T09:00:00Z",
     outcome: "pending",
     manual: false,
   });
@@ -311,6 +311,30 @@ async function main() {
     title: "Follow up — Datadog",
     kind: "follow-up",
     dueDate: "2026-08-18",
+    status: "open",
+  });
+
+  // A manual reminder with a note, so the "why it's there" line has content.
+  const remStripe = randomUUID();
+  await db.insert(schema.reminders).values({
+    id: remStripe,
+    userId: DEV_USER_ID,
+    leadId: leadStripe,
+    outreachMessageId: null,
+    sequence: 1,
+    dueDate: "2026-08-24T14:30:00Z",
+    outcome: "pending",
+    manual: true,
+    label: "Ask Priya to intro me to the hiring manager",
+  });
+  await db.insert(schema.tasks).values({
+    id: randomUUID(),
+    userId: DEV_USER_ID,
+    jobId: leadStripe,
+    reminderId: remStripe,
+    title: "Ask Priya to intro me to the hiring manager",
+    kind: "follow-up",
+    dueDate: "2026-08-24",
     status: "open",
   });
 

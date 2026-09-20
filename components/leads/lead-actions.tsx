@@ -477,12 +477,12 @@ function AddReminderDialog({
 
   function save() {
     if (!dueDate) {
-      setError("Pick a due date.");
+      setError("Pick a due date and time.");
       return;
     }
     addReminderManual({
       leadId: lead.id,
-      dueDate,
+      dueDate: new Date(dueDate).toISOString(),
       label,
       outreachMessageId: linkedMessage === "none" ? null : linkedMessage,
     });
@@ -510,9 +510,9 @@ function AddReminderDialog({
       }
     >
       <div className="space-y-4">
-        <Field label="Due date">
+        <Field label="Due date & time">
           <Input
-            type="date"
+            type="datetime-local"
             value={dueDate}
             onChange={(e) => setDueDate(e.target.value)}
           />
@@ -577,6 +577,8 @@ function DraftOutreachDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const contacts = useContactsForLead(lead.id);
+  const messages = useOutreachForLead(lead.id);
+  const sentCount = messages.filter((m) => m.status === "sent").length;
   const initialResumeId =
     selectedResumeId ??
     resumes.find((r) => r.isDefault)?.id ??
@@ -673,6 +675,12 @@ function DraftOutreachDialog({
         )
       }
     >
+      {sentCount > 0 && (
+        <p className="mb-3 inline-flex items-center gap-1.5 rounded-md bg-status-applied px-2.5 py-1 text-xs font-medium text-status-applied-foreground">
+          <Send className="size-3.5" aria-hidden />
+          {sentCount} message{sentCount === 1 ? "" : "s"} already sent to this lead
+        </p>
+      )}
       {contacts.length === 0 ? (
         <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
           Add a contact to this lead first, then draft a message for them.

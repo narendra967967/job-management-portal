@@ -160,19 +160,22 @@ export async function markSentAction(input: {
     const intervalDays = settings?.interval ?? 3;
     // Record the sent message. resumeId is left null until resumes are
     // DB-backed (a later milestone) — avoids an FK error on mock resume ids.
-    await tx.insert(outreachT).values({
-      userId,
-      leadId: input.leadId,
-      contactId: input.contactId,
-      kind: input.kind,
-      channel: input.channel,
-      status: "sent",
-      draftBody: input.draftBody,
-      sentBody: input.draftBody,
-      resumeId: null,
-      createdAt: now,
-      sentAt: now,
-    });
+    const [msg] = await tx
+      .insert(outreachT)
+      .values({
+        userId,
+        leadId: input.leadId,
+        contactId: input.contactId,
+        kind: input.kind,
+        channel: input.channel,
+        status: "sent",
+        draftBody: input.draftBody,
+        sentBody: input.draftBody,
+        resumeId: null,
+        createdAt: now,
+        sentAt: now,
+      })
+      .returning({ id: outreachT.id });
 
     const [lead] = await tx
       .select({ company: leadsT.company })
@@ -180,18 +183,22 @@ export async function markSentAction(input: {
       .where(and(eq(leadsT.id, input.leadId), eq(leadsT.userId, userId)));
 
     const seq = await nextSequence(tx, userId, input.leadId);
+    // Schedule intervalDays ahead, keeping the current time of day.
     const due = new Date();
     due.setDate(due.getDate() + intervalDays);
-    const dueDate = ymd(due);
+    const dueAt = due.toISOString();
+    const dueDay = ymd(due);
 
     const [rem] = await tx
       .insert(remindersT)
       .values({
         userId,
         leadId: input.leadId,
-        outreachMessageId: null,
+        // Link the reminder to the message it follows up, so we can explain why
+        // it exists ("Follow-up on your … to …").
+        outreachMessageId: msg.id,
         sequence: seq,
-        dueDate,
+        dueDate: dueAt,
         outcome: "pending",
         manual: false,
       })
@@ -203,7 +210,7 @@ export async function markSentAction(input: {
       reminderId: rem.id,
       title: `Follow up — ${lead?.company ?? "lead"}`,
       kind: "follow-up",
-      dueDate,
+      dueDate: dueDay,
       status: "open",
     });
   });
@@ -225,7 +232,7 @@ async function nextSequence(
 
 export async function addReminderManualAction(input: {
   leadId: string;
-  dueDate: string; // YYYY-MM-DD
+  dueDate: string; // ISO datetime
   label: string;
   outreachMessageId: string | null;
 }) {
@@ -255,7 +262,7 @@ export async function addReminderManualAction(input: {
       reminderId: rem.id,
       title: input.label || `Follow up — ${lead?.company ?? "lead"}`,
       kind: "follow-up",
-      dueDate: input.dueDate,
+      dueDate: input.dueDate.slice(0, 10), // task board is day-granular
       status: "open",
     });
   });
@@ -291,7 +298,7 @@ export async function snoozeReminderAction(id: string, newDueDate: string) {
       .where(and(eq(remindersT.id, id), eq(remindersT.userId, userId)));
     await tx
       .update(tasksT)
-      .set({ status: "open", completedAt: null, dueDate: newDueDate })
+      .set({ status: "open", completedAt: null, dueDate: newDueDate.slice(0, 10) })
       .where(and(eq(tasksT.reminderId, id), eq(tasksT.userId, userId)));
   });
 }

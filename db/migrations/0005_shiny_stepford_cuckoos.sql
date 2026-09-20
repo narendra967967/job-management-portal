@@ -1,0 +1,1 @@
+ALTER TABLE "reminders" ALTER COLUMN "due_date" SET DATA TYPE timestamp with time zone;

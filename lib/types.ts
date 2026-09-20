@@ -132,7 +132,14 @@ export interface JobLead {
  * contact, so there's enough to actually work it. Derived, not a stored status.
  */
 export function isReadyForAction(lead: JobLead): boolean {
-  return isJobOpen(lead.status) && lead.hasJd && lead.contactCount > 0;
+  return (
+    isJobOpen(lead.status) &&
+    lead.hasJd &&
+    lead.contactCount > 0 &&
+    // Once you've reached out, it's no longer "ready to action" — it moves to
+    // the Outreached view.
+    !lead.hasOutreach
+  );
 }
 
 export interface JobLeadDetail {
@@ -187,10 +194,14 @@ export interface Reminder {
   outreachMessageId: string | null;
   leadId: string;
   sequence: number; // 1 = Reminder 1, 2 = Reminder 2, ...
-  dueDate: string; // ISO date
+  dueDate: string; // ISO datetime (date + time)
   outcome: ReminderOutcome;
   label?: string; // optional note for manual reminders
   manual: boolean;
+  // Human explanation of why this reminder exists (e.g. "Follow-up on your
+  // referral ask to Priya Nair"), derived server-side. Undefined when there's
+  // nothing to add beyond the sequence.
+  reason?: string;
 }
 
 export interface Resume {

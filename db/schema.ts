@@ -226,7 +226,9 @@ export const reminders = pgTable(
       { onDelete: "set null" },
     ),
     sequence: integer("sequence").notNull(),
-    dueDate: date("due_date", { mode: "string" }).notNull(),
+    // Full timestamp (date + time) so reminders can be scheduled for a time of
+    // day, not just a day.
+    dueDate: timestamp("due_date", { withTimezone: true, mode: "string" }).notNull(),
     outcome: reminderOutcome("outcome").notNull().default("pending"),
     manual: boolean("manual").notNull().default(false),
     label: text("label"),

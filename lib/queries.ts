@@ -24,6 +24,7 @@ import {
   user as userT,
   userSettings as settingsT,
 } from "@/db/schema";
+import { OUTREACH_KIND_LABELS } from "@/lib/types";
 import type {
   AiSettings,
   Contact,
@@ -207,6 +208,24 @@ export async function loadWorkspace(userId: string): Promise<WorkspaceData> {
     sentAt: ymd(m.sentAt),
   }));
 
+  // Lookups for explaining why each reminder exists.
+  const outreachById = new Map(outreachRows.map((m) => [m.id, m]));
+  const contactById = new Map(contactRows.map((c) => [c.id, c]));
+  const reminderReason = (r: (typeof reminderRows)[number]): string | undefined => {
+    if (r.manual) return r.label ?? undefined;
+    if (r.outreachMessageId) {
+      const m = outreachById.get(r.outreachMessageId);
+      if (m) {
+        const kind = OUTREACH_KIND_LABELS[m.kind].toLowerCase();
+        const c = m.contactId ? contactById.get(m.contactId) : undefined;
+        return c
+          ? `Follow-up on your ${kind} to ${c.name}`
+          : `Follow-up on your ${kind}`;
+      }
+    }
+    return undefined;
+  };
+
   const reminders: Reminder[] = reminderRows.map((r) => ({
     id: r.id,
     outreachMessageId: r.outreachMessageId,
@@ -216,6 +235,7 @@ export async function loadWorkspace(userId: string): Promise<WorkspaceData> {
     outcome: r.outcome,
     label: r.label ?? undefined,
     manual: r.manual,
+    reason: reminderReason(r),
   }));
 
   const tasks: Task[] = taskRows.map((t) => ({

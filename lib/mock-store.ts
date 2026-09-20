@@ -662,7 +662,8 @@ export function useLeadTimeline(leadId: string): TimelineEvent[] {
   }
 
   for (const r of leadReminders) {
-    const label = r.manual ? r.label || "Manual reminder" : `Reminder ${r.sequence}`;
+    const label =
+      r.reason ?? (r.manual ? r.label || "Manual reminder" : `Reminder ${r.sequence}`);
     events.push({
       id: `rem-${r.id}`,
       kind: "reminder",
