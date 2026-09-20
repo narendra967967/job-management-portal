@@ -89,17 +89,62 @@ interface SettingsSection {
   render: () => React.ReactNode;
 }
 
-const SECTIONS: SettingsSection[] = [
-  { id: "profile", label: "Profile", icon: User, render: () => <ProfileCard /> },
-  { id: "google", label: "Gmail connection", icon: Mail, render: () => <GoogleCard /> },
-  { id: "schedule", label: "Sync schedule", icon: RefreshCw, render: () => <SyncScheduleCard /> },
-  { id: "issues", label: "Ingestion issues", icon: AlertTriangle, render: () => <IngestionIssuesCard /> },
-  { id: "ai", label: "AI provider", icon: Sparkles, render: () => <AiProviderCard /> },
-  { id: "prompts", label: "AI prompts", icon: Wand2, render: () => <AiPromptsCard /> },
-  { id: "followups", label: "Follow-ups", icon: Bell, render: () => <FollowUpsCard /> },
-  { id: "resumes", label: "Resumes", icon: FileText, render: () => <ResumesCard /> },
-  { id: "account", label: "Account", icon: ShieldCheck, render: () => <AccountCard /> },
+const SECTION = {
+  profile: { id: "profile", label: "Profile", icon: User, render: () => <ProfileCard /> },
+  google: { id: "google", label: "Gmail connection", icon: Mail, render: () => <GoogleCard /> },
+  schedule: { id: "schedule", label: "Sync schedule", icon: RefreshCw, render: () => <SyncScheduleCard /> },
+  issues: { id: "issues", label: "Ingestion issues", icon: AlertTriangle, render: () => <IngestionIssuesCard /> },
+  ai: { id: "ai", label: "AI provider", icon: Sparkles, render: () => <AiProviderCard /> },
+  prompts: { id: "prompts", label: "AI prompts", icon: Wand2, render: () => <AiPromptsCard /> },
+  followups: { id: "followups", label: "Follow-ups", icon: Bell, render: () => <FollowUpsCard /> },
+  resumes: { id: "resumes", label: "Resumes", icon: FileText, render: () => <ResumesCard /> },
+  account: { id: "account", label: "Account", icon: ShieldCheck, render: () => <AccountCard /> },
+} satisfies Record<string, SettingsSection>;
+
+// Grouped and ordered by how central each area is to capturing and acting on
+// leads: identity first, then the email pipeline that feeds everything, then
+// AI enrichment, then outreach. Account (log out) sits on its own at the end.
+const GROUPS: { label: string; items: SettingsSection[] }[] = [
+  { label: "General", items: [SECTION.profile] },
+  { label: "Email & sync", items: [SECTION.google, SECTION.schedule, SECTION.issues] },
+  { label: "AI", items: [SECTION.ai, SECTION.prompts] },
+  { label: "Outreach", items: [SECTION.followups, SECTION.resumes] },
 ];
+const FOOTER: SettingsSection[] = [SECTION.account];
+const SECTIONS: SettingsSection[] = [...GROUPS.flatMap((g) => g.items), ...FOOTER];
+
+function TabButton({
+  section,
+  active,
+  onSelect,
+}: {
+  section: SettingsSection;
+  active: boolean;
+  onSelect: (id: string) => void;
+}) {
+  const Icon = section.icon;
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(section.id)}
+      aria-current={active ? "page" : undefined}
+      className={cn(
+        "flex shrink-0 items-center gap-2.5 rounded-lg px-3 py-2 text-sm whitespace-nowrap transition-colors lg:w-full",
+        active
+          ? "bg-primary/10 font-semibold text-primary shadow-sm ring-1 ring-primary/10"
+          : "font-medium text-muted-foreground hover:bg-muted hover:text-foreground",
+      )}
+    >
+      <Icon
+        className={cn(
+          "size-4 shrink-0",
+          active ? "text-primary" : "text-muted-foreground/70",
+        )}
+      />
+      {section.label}
+    </button>
+  );
+}
 
 export default function SettingsPage() {
   const [active, setActive] = useState(SECTIONS[0].id);
@@ -115,34 +160,53 @@ export default function SettingsPage() {
       </div>
 
       <div className="mt-5 lg:flex lg:gap-6">
-        {/* Section nav — horizontal scroll strip until there's room for a
-            sidebar (lg); the app's own left rail already appears at md, so a
-            second sidebar there would squeeze the panel into a scroll. */}
+        {/* Mobile / tablet: flat horizontal strip. The app's own left rail
+            already appears at md, so a second sidebar there would squeeze the
+            panel into a horizontal scroll — the grouped sidebar waits for lg. */}
         <nav
           aria-label="Settings sections"
-          className="-mx-4 flex gap-1 overflow-x-auto px-4 pb-1 lg:mx-0 lg:w-56 lg:shrink-0 lg:flex-col lg:gap-0.5 lg:overflow-visible lg:px-0 lg:pb-0"
+          className="-mx-4 flex gap-1 overflow-x-auto px-4 pb-1 lg:hidden"
         >
-          {SECTIONS.map((s) => {
-            const Icon = s.icon;
-            const selected = s.id === active;
-            return (
-              <button
+          {SECTIONS.map((s) => (
+            <TabButton
+              key={s.id}
+              section={s}
+              active={s.id === active}
+              onSelect={setActive}
+            />
+          ))}
+        </nav>
+
+        {/* Desktop: grouped vertical sidebar. */}
+        <nav
+          aria-label="Settings sections"
+          className="hidden lg:block lg:w-56 lg:shrink-0 lg:space-y-5"
+        >
+          {GROUPS.map((g) => (
+            <div key={g.label} className="space-y-1">
+              <p className="px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+                {g.label}
+              </p>
+              {g.items.map((s) => (
+                <TabButton
+                  key={s.id}
+                  section={s}
+                  active={s.id === active}
+                  onSelect={setActive}
+                />
+              ))}
+            </div>
+          ))}
+          <div className="space-y-1 border-t pt-4">
+            {FOOTER.map((s) => (
+              <TabButton
                 key={s.id}
-                type="button"
-                onClick={() => setActive(s.id)}
-                aria-current={selected ? "page" : undefined}
-                className={cn(
-                  "flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors lg:w-full",
-                  selected
-                    ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                )}
-              >
-                <Icon className="size-4 shrink-0" />
-                {s.label}
-              </button>
-            );
-          })}
+                section={s}
+                active={s.id === active}
+                onSelect={setActive}
+              />
+            ))}
+          </div>
         </nav>
 
         <div className="mt-4 min-w-0 flex-1 lg:mt-0">{current.render()}</div>
