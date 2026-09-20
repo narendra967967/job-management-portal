@@ -791,8 +791,12 @@ export function useNotifications(): StoreNotification[] {
       leadId: lead.id,
     });
   }
-  for (const l of allLeads) {
-    if (l.status !== "new") continue;
+  // Newest leads first, so the panel's top entries are the most recent
+  // captures (and shift down as new alerts arrive).
+  const newLeads = allLeads
+    .filter((l) => l.status === "new")
+    .sort((a, b) => b.capturedAt.localeCompare(a.capturedAt));
+  for (const l of newLeads) {
     items.push({
       id: `lead-${l.id}`,
       kind: "new-lead",

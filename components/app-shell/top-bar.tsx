@@ -73,10 +73,14 @@ export function TopBarStats({ className }: { className?: string }) {
 }
 
 /** Bell with a dropdown of notifications; each opens its lead. */
+const MAX_NOTIFICATIONS = 5;
+
 export function NotificationsMenu() {
   const router = useRouter();
   const notifications = useNotifications();
   const unread = notifications.length;
+  // Only ever show the five most recent; the rest live on their pages.
+  const top = notifications.slice(0, MAX_NOTIFICATIONS);
 
   return (
     <DropdownMenu>
@@ -87,7 +91,7 @@ export function NotificationsMenu() {
         <Bell className="size-5" aria-hidden />
         {unread > 0 && (
           <span className="absolute top-1 right-1 flex min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-medium text-primary-foreground tabular-nums">
-            {unread}
+            {unread > 99 ? "99+" : unread}
           </span>
         )}
       </DropdownMenuTrigger>
@@ -101,34 +105,41 @@ export function NotificationsMenu() {
             You&apos;re all caught up.
           </p>
         ) : (
-          notifications.map((n) => (
-            <DropdownMenuItem
-              key={n.id}
-              className="items-start gap-2.5 py-2"
-              onClick={() => router.push(`/leads/${n.leadId}`)}
-            >
-              <span
-                className={cn(
-                  "mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md",
-                  n.kind === "reminder-due"
-                    ? "bg-status-reviewing text-status-reviewing-foreground"
-                    : "bg-ai-muted text-ai",
-                )}
+          <div className="max-h-80 overflow-y-auto">
+            {top.map((n) => (
+              <DropdownMenuItem
+                key={n.id}
+                className="items-start gap-2.5 py-2"
+                onClick={() => router.push(`/leads/${n.leadId}`)}
               >
-                {n.kind === "reminder-due" ? (
-                  <Clock className="size-3.5" aria-hidden />
-                ) : (
-                  <Sparkles className="size-3.5" aria-hidden />
-                )}
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="text-sm font-medium">{n.title}</span>
-                <span className="block truncate text-xs text-muted-foreground">
-                  {n.detail}
+                <span
+                  className={cn(
+                    "mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md",
+                    n.kind === "reminder-due"
+                      ? "bg-status-reviewing text-status-reviewing-foreground"
+                      : "bg-ai-muted text-ai",
+                  )}
+                >
+                  {n.kind === "reminder-due" ? (
+                    <Clock className="size-3.5" aria-hidden />
+                  ) : (
+                    <Sparkles className="size-3.5" aria-hidden />
+                  )}
                 </span>
-              </span>
-            </DropdownMenuItem>
-          ))
+                <span className="min-w-0 flex-1">
+                  <span className="text-sm font-medium">{n.title}</span>
+                  <span className="block truncate text-xs text-muted-foreground">
+                    {n.detail}
+                  </span>
+                </span>
+              </DropdownMenuItem>
+            ))}
+          </div>
+        )}
+        {unread > top.length && (
+          <p className="px-2 pt-1 text-center text-[11px] text-muted-foreground">
+            +{unread - top.length} more
+          </p>
         )}
         <DropdownMenuSeparator />
         <DropdownMenuItem
