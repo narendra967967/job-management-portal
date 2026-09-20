@@ -35,6 +35,29 @@ function friendly(err: unknown): string {
   return msg || "AI request failed.";
 }
 
+/* ---------------- Save JD only (FR-3.1) — no AI ---------------- */
+
+export async function saveJdAction(
+  leadId: string,
+  jdText: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const userId = await getCurrentUserId();
+  const text = jdText.trim();
+  if (!text) return { ok: false, error: "Paste the job description first." };
+
+  const [lead] = await db
+    .select({ id: leadsT.id })
+    .from(leadsT)
+    .where(and(eq(leadsT.id, leadId), eq(leadsT.userId, userId)));
+  if (!lead) return { ok: false, error: "Lead not found." };
+
+  await db
+    .insert(detailsT)
+    .values({ leadId, jdText: text })
+    .onConflictDoUpdate({ target: detailsT.leadId, set: { jdText: text } });
+  return { ok: true };
+}
+
 /* ---------------- JD summary (FR-3.3) — stores JD + summary ---------------- */
 
 export async function summarizeJdAction(

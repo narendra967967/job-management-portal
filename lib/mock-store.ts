@@ -41,7 +41,7 @@ import {
   updateSyncIntervalAction,
 } from "@/actions/settings";
 import { syncMyGmailAction } from "@/actions/gmail-sync";
-import { summarizeJdAction } from "@/actions/ai";
+import { saveJdAction, summarizeJdAction } from "@/actions/ai";
 import type { SyncResult } from "@/lib/gmail-sync";
 import type { GmailSyncStatus, IngestError } from "@/lib/queries";
 import { contactPersonKey, isJobOpen } from "@/lib/types";
@@ -435,6 +435,16 @@ export async function deleteResume(id: string) {
 export async function disconnectGoogle() {
   await disconnectGoogleAction();
   await refresh();
+}
+
+/** Save a lead's JD (no AI), then refresh so the saved detail reflects live. */
+export async function saveJd(
+  leadId: string,
+  jdText: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const res = await saveJdAction(leadId, jdText);
+  await refresh();
+  return res;
 }
 
 /** Summarize a lead's JD with AI; also persists the JD (+ summary) to the lead

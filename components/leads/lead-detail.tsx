@@ -41,6 +41,7 @@ import {
   useDefaultResumeId,
   setLeadStatus,
   deleteContact,
+  saveJd,
   summarizeJd,
 } from "@/lib/mock-store";
 import { cn } from "@/lib/utils";
@@ -239,7 +240,26 @@ function OverviewTab({ leadId, detail }: { leadId: string; detail?: JobLeadDetai
   const [jd, setJd] = useState(detail?.jdText ?? "");
   const [summary, setSummary] = useState(detail?.aiSummary ?? "");
   const [busy, setBusy] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
+
+  async function save() {
+    if (!jd.trim()) {
+      setError("Paste the job description first.");
+      return;
+    }
+    setError("");
+    setSaving(true);
+    const res = await saveJd(leadId, jd);
+    if (res.ok) {
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1500);
+    } else {
+      setError(res.error);
+    }
+    setSaving(false);
+  }
 
   async function summarize() {
     if (!jd.trim()) {
@@ -271,17 +291,24 @@ function OverviewTab({ leadId, detail }: { leadId: string; detail?: JobLeadDetai
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <button
             type="button"
+            onClick={save}
+            disabled={saving || busy}
+            className="inline-flex min-h-10 items-center gap-2 rounded-lg border px-3.5 text-sm font-medium hover:bg-muted disabled:opacity-60"
+          >
+            {saving ? "Saving…" : "Save JD"}
+          </button>
+          <button
+            type="button"
             onClick={summarize}
-            disabled={busy}
+            disabled={saving || busy}
             className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-ai px-3.5 text-sm font-medium text-ai-foreground hover:bg-ai/90 disabled:opacity-60"
           >
             <Sparkles className="size-4" aria-hidden />
-            {busy ? "Summarizing…" : "Summarize with AI"}
+            {busy ? "Summarizing…" : "Save & Summarize with AI"}
           </button>
-          <p className="flex items-start gap-1.5 text-xs text-ai">
-            <Sparkles className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-            Summarizing saves the description to this lead.
-          </p>
+          {saved && (
+            <span className="text-xs text-status-applied-foreground">Saved</span>
+          )}
         </div>
       </section>
 
