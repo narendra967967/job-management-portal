@@ -121,6 +121,18 @@ export interface JobLead {
   capturedAt: string; // ISO date
   contactCount: number;
   hasDueReminder: boolean;
+  /** A job description has been saved for this lead. */
+  hasJd: boolean;
+  /** At least one outreach message exists for this lead. */
+  hasOutreach: boolean;
+}
+
+/**
+ * "Ready for action" — an open lead that has both a saved JD and at least one
+ * contact, so there's enough to actually work it. Derived, not a stored status.
+ */
+export function isReadyForAction(lead: JobLead): boolean {
+  return isJobOpen(lead.status) && lead.hasJd && lead.contactCount > 0;
 }
 
 export interface JobLeadDetail {

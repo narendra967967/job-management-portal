@@ -15,6 +15,10 @@ import {
   LogOut,
   Menu,
   X,
+  Rocket,
+  Send,
+  ChevronDown,
+  type LucideIcon,
 } from "lucide-react";
 import { Logo } from "@/components/app-shell/logo";
 import { useProfile } from "@/lib/mock-store";
@@ -38,47 +42,124 @@ function initials(name: string) {
     .join("");
 }
 
-const navItems = [
-  { href: "/leads", label: "Leads", icon: LayoutGrid },
-  { href: "/todo", label: "To-do", icon: ListChecks },
-  { href: "/contacts", label: "Contacts", icon: Users },
-  { href: "/outreach", label: "Outreach", icon: MessageSquare },
-  { href: "/reminders", label: "Reminders", icon: Bell },
+interface NavItem {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+}
+
+// Sidebar is organised into collapsible groups.
+const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
+  {
+    label: "Leads",
+    items: [
+      { href: "/leads", label: "Leads", icon: LayoutGrid },
+      { href: "/ready", label: "Ready to action", icon: Rocket },
+      { href: "/outreached", label: "Outreached", icon: Send },
+      { href: "/archive", label: "Archive", icon: Archive },
+    ],
+  },
+  {
+    label: "Follow-up",
+    items: [
+      { href: "/todo", label: "To-do", icon: ListChecks },
+      { href: "/reminders", label: "Reminders", icon: Bell },
+    ],
+  },
+  {
+    label: "Network",
+    items: [
+      { href: "/contacts", label: "Contacts", icon: Users },
+      { href: "/outreach", label: "Outreach", icon: MessageSquare },
+    ],
+  },
 ];
 
-// Secondary items — shown in the desktop sidebar + mobile drawer, but not the
-// space-constrained bottom tab bar.
-const secondaryNavItems = [
-  { href: "/archive", label: "Archive", icon: Archive },
+// Mobile bottom tab bar — the five most-used destinations (space-constrained).
+const BOTTOM_NAV: NavItem[] = [
+  { href: "/leads", label: "Leads", icon: LayoutGrid },
+  { href: "/ready", label: "Ready", icon: Rocket },
+  { href: "/outreached", label: "Outreached", icon: Send },
+  { href: "/todo", label: "To-do", icon: ListChecks },
+  { href: "/reminders", label: "Reminders", icon: Bell },
 ];
 
 function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(href + "/");
 }
 
+function NavLink({
+  href,
+  label,
+  icon: Icon,
+  pathname,
+}: NavItem & { pathname: string }) {
+  const active = isActive(pathname, href);
+  return (
+    <Link
+      href={href}
+      className={cn(
+        "relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
+        active
+          ? "bg-gradient-to-r from-primary/12 to-primary/[0.03] font-semibold text-primary before:absolute before:top-1/2 before:left-0 before:h-5 before:w-1 before:-translate-y-1/2 before:rounded-r-full before:bg-primary"
+          : "font-medium text-muted-foreground hover:bg-sidebar-accent hover:text-foreground",
+      )}
+    >
+      <Icon className="size-5 shrink-0" aria-hidden />
+      {label}
+    </Link>
+  );
+}
+
+/** A collapsible group of nav links. Auto-expands if it holds the active route. */
+function NavGroup({
+  label,
+  items,
+  pathname,
+}: {
+  label: string;
+  items: NavItem[];
+  pathname: string;
+}) {
+  const [open, setOpen] = useState(true);
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className="flex w-full items-center justify-between rounded-lg px-3 py-1.5 text-[11px] font-semibold tracking-wide text-muted-foreground/70 uppercase transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+      >
+        <span>{label}</span>
+        <ChevronDown
+          className={cn("size-3.5 transition-transform", !open && "-rotate-90")}
+          aria-hidden
+        />
+      </button>
+      {open && (
+        <div className="mt-0.5 space-y-1">
+          {items.map((item) => (
+            <NavLink key={item.href} {...item} pathname={pathname} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** Persistent left sidebar — desktop only (md+). */
 export function SidebarNav() {
   const pathname = usePathname();
   return (
-    <nav className="flex flex-col gap-1 p-3">
-      {[...navItems, ...secondaryNavItems].map(({ href, label, icon: Icon }) => {
-        const active = isActive(pathname, href);
-        return (
-          <Link
-            key={href}
-            href={href}
-            className={cn(
-              "relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
-              active
-                ? "bg-gradient-to-r from-primary/12 to-primary/[0.03] font-semibold text-primary before:absolute before:top-1/2 before:left-0 before:h-5 before:w-1 before:-translate-y-1/2 before:rounded-r-full before:bg-primary"
-                : "font-medium text-muted-foreground hover:bg-sidebar-accent hover:text-foreground",
-            )}
-          >
-            <Icon className="size-5 shrink-0" aria-hidden />
-            {label}
-          </Link>
-        );
-      })}
+    <nav className="flex flex-col gap-3 p-3">
+      {NAV_GROUPS.map((g) => (
+        <NavGroup
+          key={g.label}
+          label={g.label}
+          items={g.items}
+          pathname={pathname}
+        />
+      ))}
     </nav>
   );
 }
@@ -242,7 +323,7 @@ export function BottomNav() {
   const pathname = usePathname();
   return (
     <nav className="grid shrink-0 grid-cols-5 border-t bg-card pb-[env(safe-area-inset-bottom)] md:hidden">
-      {navItems.map(({ href, label, icon: Icon }) => {
+      {BOTTOM_NAV.map(({ href, label, icon: Icon }) => {
         const active = isActive(pathname, href);
         return (
           <Link

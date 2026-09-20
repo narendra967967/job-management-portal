@@ -29,9 +29,9 @@ import {
 import {
   CLOSE_OUTCOME_LABELS,
   LEAD_STATUS_LABELS,
-  LEAD_STATUSES,
   OPEN_LEAD_STATUSES,
   isJobOpen,
+  isReadyForAction,
   type CloseOutcome,
   type JobLead,
   type LeadStatus,
@@ -216,7 +216,9 @@ const BUCKET_META: Record<
 };
 const ARCHIVE_BUCKETS: ArchiveBucket[] = ["stale", "closed", "discarded"];
 
-export function LeadsBrowser({ scope = "all" }: { scope?: "all" | "archive" }) {
+export type LeadsScope = "all" | "archive" | "ready" | "outreached";
+
+export function LeadsBrowser({ scope = "all" }: { scope?: LeadsScope }) {
   const allLeads = useLeads();
   const resumes = useResumes();
   const allReminders = useReminders();
@@ -244,15 +246,27 @@ export function LeadsBrowser({ scope = "all" }: { scope?: "all" | "archive" }) {
         ? "discarded"
         : "stale";
 
-  // "archive" scope shows only stale / closed / discarded leads.
+  // Each scope narrows the base set:
+  //  - archive: terminal (closed/discarded) + stale
+  //  - ready: open leads with a JD *and* a contact (ready to work)
+  //  - outreached: open leads that have had outreach sent
+  //  - all (default): active/open leads only (terminal ones live in Archive)
   const leads = useMemo(
-    () =>
-      scope === "archive"
-        ? allLeads.filter(
+    () => {
+      switch (scope) {
+        case "archive":
+          return allLeads.filter(
             (l) =>
               l.status === "closed" || l.status === "discarded" || isStale(l),
-          )
-        : allLeads,
+          );
+        case "ready":
+          return allLeads.filter(isReadyForAction);
+        case "outreached":
+          return allLeads.filter((l) => isJobOpen(l.status) && l.hasOutreach);
+        default:
+          return allLeads.filter((l) => isJobOpen(l.status));
+      }
+    },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [allLeads, scope, pendingLeadIds, staleCutoff],
   );
@@ -457,12 +471,7 @@ export function LeadsBrowser({ scope = "all" }: { scope?: "all" | "archive" }) {
   return (
     <div className="space-y-4">
       {/* Metric row — each box also filters the list. Hidden on mobile. */}
-      <div
-        className={cn(
-          "hidden gap-2.5 sm:grid",
-          scope === "archive" ? "sm:grid-cols-3" : "sm:grid-cols-5",
-        )}
-      >
+      <div className="hidden gap-2.5 sm:grid sm:grid-cols-3">
         {scope === "archive"
           ? ARCHIVE_BUCKETS.map((b) => {
               const meta = BUCKET_META[b];
@@ -478,7 +487,7 @@ export function LeadsBrowser({ scope = "all" }: { scope?: "all" | "archive" }) {
                 />
               );
             })
-          : LEAD_STATUSES.map((s) => {
+          : OPEN_LEAD_STATUSES.map((s) => {
               const meta = STATUS_META[s];
               return (
                 <MetricBox
@@ -611,7 +620,7 @@ export function LeadsBrowser({ scope = "all" }: { scope?: "all" | "archive" }) {
                     onValueChange={(v) => setStatusFilter(v as StatusFilter)}
                     options={[
                       { value: "all", label: "All statuses" },
-                      ...LEAD_STATUSES.map((s) => ({
+                      ...OPEN_LEAD_STATUSES.map((s) => ({
                         value: s,
                         label: LEAD_STATUS_LABELS[s],
                       })),
@@ -1142,6 +1151,7 @@ function LeadCard({
     return toISODate(d);
   })();
   const stale = open && !hasPendingReminder && lead.capturedAt < staleCutoff;
+  const ready = open && lead.hasJd && contactCount > 0;
 
   // Stop card-body clicks/keys from firing on the header & footer controls.
   const stop = {
@@ -1273,6 +1283,15 @@ function LeadCard({
             <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
               <Users className="size-3" aria-hidden />
               {contactCount}
+            </span>
+          )}
+          {ready && (
+            <span
+              className="inline-flex items-center gap-1 rounded-md bg-status-applied px-2 py-0.5 text-[11px] font-medium text-status-applied-foreground"
+              title="Has a job description and a contact — ready to work"
+            >
+              <CheckCircle2 className="size-3" aria-hidden />
+              Ready
             </span>
           )}
           {lead.hasDueReminder && (

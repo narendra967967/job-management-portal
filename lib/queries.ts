@@ -148,6 +148,10 @@ export async function loadWorkspace(userId: string): Promise<WorkspaceData> {
   const dueByLead = new Set(
     reminderRows.filter((r) => r.outcome === "pending").map((r) => r.leadId),
   );
+  const jdByLead = new Set(
+    detailRows.filter((d) => d.jdText && d.jdText.trim()).map((d) => d.leadId),
+  );
+  const outreachByLead = new Set(outreachRows.map((m) => m.leadId));
 
   const leads: JobLead[] = leadRows.map((l) => ({
     id: l.id,
@@ -164,6 +168,8 @@ export async function loadWorkspace(userId: string): Promise<WorkspaceData> {
     capturedAt: ymd(l.capturedAt)!,
     contactCount: contactCountByLead.get(l.id) ?? 0,
     hasDueReminder: dueByLead.has(l.id),
+    hasJd: jdByLead.has(l.id),
+    hasOutreach: outreachByLead.has(l.id),
   }));
 
   const details: Record<string, JobLeadDetail> = {};
