@@ -54,7 +54,7 @@ async function main() {
     name: "Narendra Gupta",
     email: DEV_EMAIL,
     emailVerified: true,
-    mobile: "+1 (555) 018-2245",
+    mobile: "+91 9876543210",
     createdAt: new Date(),
     updatedAt: new Date(),
   });

@@ -49,6 +49,13 @@ import {
 } from "@/lib/mock-store";
 import { buildGmailQuery } from "@/lib/use-gmail-settings";
 import {
+  COUNTRY_CODES,
+  isValidEmail,
+  joinMobile,
+  splitMobile,
+  validateMobile,
+} from "@/lib/validation";
+import {
   DEFAULT_SUMMARY_PROMPT,
   DEFAULT_DRAFT_PROMPT,
 } from "@/lib/ai-prompts";
@@ -217,18 +224,57 @@ export default function SettingsPage() {
 
 /* ---------------- Profile ---------------- */
 
+const DIAL_ITEMS: Record<string, string> = Object.fromEntries(
+  COUNTRY_CODES.map((c) => [c.dial, `${c.flag} ${c.dial}`]),
+);
+
+interface ProfileErrors {
+  name?: string;
+  email?: string;
+  mobile?: string;
+}
+
 function ProfileCard() {
   const profile = useProfile();
+  const initialMobile = splitMobile(profile.mobile);
   const [name, setName] = useState(profile.name);
   const [email, setEmail] = useState(profile.email);
-  const [mobile, setMobile] = useState(profile.mobile);
+  const [dial, setDial] = useState(initialMobile.dial);
+  const [national, setNational] = useState(initialMobile.national);
+  const [errors, setErrors] = useState<ProfileErrors>({});
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
+    const m = splitMobile(profile.mobile);
     setName(profile.name);
     setEmail(profile.email);
-    setMobile(profile.mobile);
+    setDial(m.dial);
+    setNational(m.national);
+    setErrors({});
   }, [profile]);
+
+  function validate(): ProfileErrors {
+    const next: ProfileErrors = {};
+    if (!name.trim()) next.name = "Name is required.";
+    if (!email.trim()) next.email = "Email is required.";
+    else if (!isValidEmail(email)) next.email = "Enter a valid email address.";
+    const mobileError = validateMobile(dial, national);
+    if (mobileError) next.mobile = mobileError;
+    return next;
+  }
+
+  function save() {
+    const next = validate();
+    setErrors(next);
+    if (Object.keys(next).length > 0) return;
+    updateProfile({
+      name: name.trim(),
+      email: email.trim(),
+      mobile: joinMobile(dial, national),
+    });
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1500);
+  }
 
   return (
     <section className="rounded-2xl border bg-card p-4 md:p-5">
@@ -238,33 +284,72 @@ function ProfileCard() {
       </p>
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <Field label="Name">
-          <Input value={name} onChange={(e) => setName(e.target.value)} />
+          <Input
+            value={name}
+            onChange={(e) => {
+              setName(e.target.value);
+              if (errors.name) setErrors((p) => ({ ...p, name: undefined }));
+            }}
+            aria-invalid={!!errors.name}
+            required
+          />
+          {errors.name && (
+            <span className="text-[11px] text-destructive">{errors.name}</span>
+          )}
         </Field>
         <Field label="Mobile number">
-          <Input
-            value={mobile}
-            onChange={(e) => setMobile(e.target.value)}
-            inputMode="tel"
-          />
+          <div className="flex gap-2">
+            <Select
+              items={DIAL_ITEMS}
+              value={dial}
+              onValueChange={(v) => setDial(v ?? dial)}
+            >
+              <SelectTrigger className="w-24 shrink-0">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {COUNTRY_CODES.map((c) => (
+                  <SelectItem key={c.iso} value={c.dial}>
+                    {c.flag} {c.dial}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Input
+              value={national}
+              onChange={(e) => {
+                setNational(e.target.value.replace(/\D/g, "").slice(0, 10));
+                if (errors.mobile) setErrors((p) => ({ ...p, mobile: undefined }));
+              }}
+              inputMode="numeric"
+              autoComplete="tel-national"
+              placeholder="98765 43210"
+              aria-invalid={!!errors.mobile}
+              className="flex-1"
+            />
+          </div>
+          {errors.mobile && (
+            <span className="text-[11px] text-destructive">{errors.mobile}</span>
+          )}
         </Field>
         <Field label="Email">
           <Input
             type="email"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              if (errors.email) setErrors((p) => ({ ...p, email: undefined }));
+            }}
+            aria-invalid={!!errors.email}
+            required
           />
+          {errors.email && (
+            <span className="text-[11px] text-destructive">{errors.email}</span>
+          )}
         </Field>
       </div>
       <div className="mt-4 flex items-center gap-3">
-        <Button
-          onClick={() => {
-            updateProfile({ name, email, mobile });
-            setSaved(true);
-            setTimeout(() => setSaved(false), 1500);
-          }}
-        >
-          Save changes
-        </Button>
+        <Button onClick={save}>Save changes</Button>
         {saved && (
           <span className="text-xs text-status-applied-foreground">Saved</span>
         )}
@@ -284,6 +369,7 @@ function GoogleCard() {
   const [subjectKeywords, setSubjectKeywords] = useState("");
   const [lookbackDays, setLookbackDays] = useState(30);
   const [saved, setSaved] = useState(false);
+  const [sendersError, setSendersError] = useState("");
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState("");
 
@@ -324,6 +410,14 @@ function GoogleCard() {
   const query = buildGmailQuery(draft);
 
   function save() {
+    const badSenders = draft.senders.filter((s) => !isValidEmail(s));
+    if (badSenders.length > 0) {
+      setSendersError(
+        `Not a valid email address: ${badSenders.join(", ")}. Put one address per line.`,
+      );
+      return;
+    }
+    setSendersError("");
     updateSettings(draft);
     setSaved(true);
     setTimeout(() => setSaved(false), 1500);
@@ -408,10 +502,17 @@ function GoogleCard() {
           <Field label="From addresses (one per line)">
             <Textarea
               value={sendersText}
-              onChange={(e) => setSendersText(e.target.value)}
+              onChange={(e) => {
+                setSendersText(e.target.value);
+                if (sendersError) setSendersError("");
+              }}
               placeholder="jobalerts-noreply@linkedin.com"
+              aria-invalid={!!sendersError}
               className="min-h-20 font-mono text-[13px]"
             />
+            {sendersError && (
+              <span className="text-[11px] text-destructive">{sendersError}</span>
+            )}
           </Field>
 
           <div className="grid gap-3 sm:grid-cols-2">
@@ -859,6 +960,13 @@ function AiPromptsCard() {
 
 /* ---------------- Follow-ups ---------------- */
 
+/** Days settings are whole numbers in 1–365. */
+function clampDays(raw: string): number {
+  const n = Math.round(Number(raw));
+  if (!Number.isFinite(n) || n < 1) return 1;
+  return Math.min(365, n);
+}
+
 function FollowUpsCard() {
   const [settings, update] = useAppSettings();
   return (
@@ -872,10 +980,12 @@ function FollowUpsCard() {
           <Input
             type="number"
             min={1}
+            max={365}
+            step={1}
             value={settings.reminderIntervalDays}
             onChange={(e) =>
               update({
-                reminderIntervalDays: Math.max(1, Number(e.target.value) || 1),
+                reminderIntervalDays: clampDays(e.target.value),
               })
             }
           />
@@ -884,10 +994,10 @@ function FollowUpsCard() {
           <Input
             type="number"
             min={1}
+            max={365}
+            step={1}
             value={settings.staleLeadDays}
-            onChange={(e) =>
-              update({ staleLeadDays: Math.max(1, Number(e.target.value) || 1) })
-            }
+            onChange={(e) => update({ staleLeadDays: clampDays(e.target.value) })}
           />
         </Field>
       </div>

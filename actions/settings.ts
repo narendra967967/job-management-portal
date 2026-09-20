@@ -17,6 +17,7 @@ import {
   userSettings as settingsT,
 } from "@/db/schema";
 import type { AiProvider } from "@/lib/types";
+import { isValidEmail, splitMobile, validateMobile } from "@/lib/validation";
 
 /** Ensure a user_settings row exists, then merge `set` into it. */
 async function upsertSettings(userId: string, set: Record<string, unknown>) {
@@ -34,13 +35,28 @@ export async function updateProfileAction(input: {
   mobile: string;
 }) {
   const userId = await getCurrentUserId();
+  const name = input.name.trim();
+  const email = input.email.trim();
+  const mobile = input.mobile.trim();
+  if (!name) throw new Error("Name is required.");
+  if (!isValidEmail(email)) throw new Error("Enter a valid email address.");
+  const { dial, national } = splitMobile(mobile);
+  const mobileError = validateMobile(dial, national);
+  if (mobileError) throw new Error(mobileError);
   await db
     .update(userT)
-    .set({ name: input.name, email: input.email, mobile: input.mobile })
+    .set({ name, email, mobile })
     .where(eq(userT.id, userId));
 }
 
 /* ---------------- follow-ups ---------------- */
+
+/** Whole number of days, clamped to 1–365. */
+function clampDays(n: number): number {
+  const r = Math.round(n);
+  if (!Number.isFinite(r) || r < 1) return 1;
+  return Math.min(365, r);
+}
 
 export async function updateFollowUpsAction(input: {
   reminderIntervalDays: number;
@@ -48,8 +64,8 @@ export async function updateFollowUpsAction(input: {
 }) {
   const userId = await getCurrentUserId();
   await upsertSettings(userId, {
-    reminderIntervalDays: input.reminderIntervalDays,
-    staleLeadDays: input.staleLeadDays,
+    reminderIntervalDays: clampDays(input.reminderIntervalDays),
+    staleLeadDays: clampDays(input.staleLeadDays),
   });
 }
 
@@ -143,8 +159,13 @@ export async function updateGmailConfigAction(input: {
   lookbackDays: number;
 }) {
   const userId = await getCurrentUserId();
+  const senders = input.senders.map((s) => s.trim()).filter(Boolean);
+  const badSenders = senders.filter((s) => !isValidEmail(s));
+  if (badSenders.length > 0) {
+    throw new Error(`Invalid sender address: ${badSenders.join(", ")}`);
+  }
   const set = {
-    senders: input.senders,
+    senders,
     label: input.label || null,
     subjectKeywords: input.subjectKeywords || null,
     lookbackDays: input.lookbackDays,
