@@ -60,6 +60,7 @@ import {
   DEFAULT_DRAFT_PROMPT,
 } from "@/lib/ai-prompts";
 import { signOutToHome, connectGoogle } from "@/lib/auth-client";
+import { previewPromptAction } from "@/actions/ai";
 import { Textarea } from "@/components/ui/textarea";
 import {
   AI_PROVIDER_DEFAULT_MODEL,
@@ -874,21 +875,74 @@ function AiProviderCard() {
 
 /* ---------------- AI prompts ---------------- */
 
+type PromptType = "summary" | "draft";
+
+const SAMPLE_DRAFT_CONTEXT = `Message type: Cold outreach
+Recipient: Priya Nair, Staff Product Manager (Referral)
+Role: Senior Product Manager at Stripe
+My resume: PM — Payments focus
+Job context: Own the payments acceptance experience at scale — reliability, cross-functional leadership, remote (US).`;
+
 function AiPromptsCard() {
   const prompts = useAiPrompts();
   const [summary, setSummary] = useState(prompts.summary);
   const [draft, setDraft] = useState(prompts.draft);
-  const [saved, setSaved] = useState(false);
+  const prev = useRef(prompts);
+  const [savedType, setSavedType] = useState<PromptType | null>(null);
 
+  // Test modal state.
+  const [testType, setTestType] = useState<PromptType | null>(null);
+  const [testInput, setTestInput] = useState("");
+  const [testResult, setTestResult] = useState("");
+  const [testing, setTesting] = useState(false);
+  const [testError, setTestError] = useState("");
+
+  // Only reset a field when its *saved* value changes, so saving one prompt
+  // (which refreshes the store) doesn't wipe an unsaved edit to the other.
   useEffect(() => {
-    setSummary(prompts.summary);
-    setDraft(prompts.draft);
+    if (prompts.summary !== prev.current.summary) setSummary(prompts.summary);
+    if (prompts.draft !== prev.current.draft) setDraft(prompts.draft);
+    prev.current = prompts;
   }, [prompts]);
 
-  function save() {
-    updateAiPrompts({ summary, draft });
-    setSaved(true);
-    setTimeout(() => setSaved(false), 1500);
+  const valueOf = (t: PromptType) => (t === "summary" ? summary : draft);
+  const defaultOf = (t: PromptType) =>
+    t === "summary" ? DEFAULT_SUMMARY_PROMPT : DEFAULT_DRAFT_PROMPT;
+
+  // Save just one prompt; keep the other at its currently-saved value.
+  function saveOne(t: PromptType) {
+    updateAiPrompts({
+      summary: t === "summary" ? summary : prompts.summary,
+      draft: t === "draft" ? draft : prompts.draft,
+    });
+    setSavedType(t);
+    setTimeout(() => setSavedType((s) => (s === t ? null : s)), 1500);
+  }
+
+  function openTest(t: PromptType) {
+    setTestType(t);
+    setTestResult("");
+    setTestError("");
+    setTestInput(t === "draft" ? SAMPLE_DRAFT_CONTEXT : "");
+  }
+
+  async function runTest() {
+    if (!testType) return;
+    setTesting(true);
+    setTestError("");
+    setTestResult("");
+    // Test the current (unsaved) prompt, falling back to the default if empty.
+    const system = valueOf(testType).trim() || defaultOf(testType);
+    const res = await previewPromptAction(system, testInput);
+    if (res.ok) setTestResult(res.output);
+    else setTestError(res.error);
+    setTesting(false);
+  }
+
+  function saveFromTest() {
+    if (!testType) return;
+    saveOne(testType);
+    setTestType(null);
   }
 
   return (
@@ -897,64 +951,170 @@ function AiPromptsCard() {
       <p className="mt-0.5 text-xs text-muted-foreground">
         Customize the instructions used by “Summarize with AI” and “Draft with
         AI”. Leave blank to use the default. Write instructions only — the pasted
-        job description and the lead/contact details are added automatically.
+        job description and the lead/contact details are added automatically. Use
+        <span className="font-medium"> Test</span> to preview a prompt before
+        saving it.
       </p>
 
-      <div className="mt-4 space-y-4">
-        <div>
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-muted-foreground">
-              Summarize prompt
-            </span>
-            {summary && (
-              <button
-                type="button"
-                onClick={() => setSummary("")}
-                className="text-[11px] font-medium text-muted-foreground hover:text-foreground"
-              >
-                Reset to default
-              </button>
-            )}
-          </div>
-          <Textarea
-            value={summary}
-            onChange={(e) => setSummary(e.target.value)}
-            placeholder={DEFAULT_SUMMARY_PROMPT}
-            className="mt-1.5 min-h-24"
-          />
-        </div>
-
-        <div>
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-muted-foreground">
-              Draft outreach prompt
-            </span>
-            {draft && (
-              <button
-                type="button"
-                onClick={() => setDraft("")}
-                className="text-[11px] font-medium text-muted-foreground hover:text-foreground"
-              >
-                Reset to default
-              </button>
-            )}
-          </div>
-          <Textarea
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            placeholder={DEFAULT_DRAFT_PROMPT}
-            className="mt-1.5 min-h-32"
-          />
-        </div>
-
-        <div className="flex items-center gap-3">
-          <Button onClick={save}>Save prompts</Button>
-          {saved && (
-            <span className="text-xs text-status-applied-foreground">Saved</span>
-          )}
-        </div>
+      <div className="mt-4 space-y-6">
+        <PromptEditor
+          label="Summarize prompt"
+          value={summary}
+          onChange={setSummary}
+          onReset={() => setSummary("")}
+          onTest={() => openTest("summary")}
+          onSave={() => saveOne("summary")}
+          saved={savedType === "summary"}
+          placeholder={DEFAULT_SUMMARY_PROMPT}
+          minHeight="min-h-24"
+        />
+        <PromptEditor
+          label="Draft outreach prompt"
+          value={draft}
+          onChange={setDraft}
+          onReset={() => setDraft("")}
+          onTest={() => openTest("draft")}
+          onSave={() => saveOne("draft")}
+          saved={savedType === "draft"}
+          placeholder={DEFAULT_DRAFT_PROMPT}
+          minHeight="min-h-32"
+        />
       </div>
+
+      <Dialog
+        open={testType !== null}
+        onOpenChange={(o) => !o && !testing && setTestType(null)}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              Test {testType === "draft" ? "draft outreach" : "summarize"} prompt
+            </DialogTitle>
+            <DialogDescription>
+              Run your prompt against sample text and review the result. Nothing
+              is saved until you approve it.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-1">
+            <div className="space-y-1.5">
+              <Label htmlFor="prompt-test-input">
+                {testType === "draft"
+                  ? "Sample context"
+                  : "Sample job description"}
+              </Label>
+              <Textarea
+                id="prompt-test-input"
+                value={testInput}
+                onChange={(e) => setTestInput(e.target.value)}
+                placeholder={
+                  testType === "draft"
+                    ? "Recipient, role, resume, job context…"
+                    : "Paste a job description to summarize…"
+                }
+                className="min-h-28"
+              />
+            </div>
+
+            <Button onClick={runTest} disabled={testing || !testInput.trim()}>
+              <Sparkles className="size-4" aria-hidden />
+              {testing
+                ? "Running…"
+                : testResult
+                  ? "Run again"
+                  : testType === "draft"
+                    ? "Draft & test"
+                    : "Summarize & test"}
+            </Button>
+
+            {testError && (
+              <p className="text-xs text-destructive">{testError}</p>
+            )}
+            {testResult && (
+              <div className="space-y-1.5">
+                <Label>Generated result</Label>
+                <div className="max-h-48 overflow-y-auto rounded-lg border bg-muted/40 p-3 text-sm whitespace-pre-wrap">
+                  {testResult}
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  Happy with this? Save the prompt. Otherwise close, tweak it,
+                  and test again.
+                </p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setTestType(null)}
+              disabled={testing}
+            >
+              Cancel
+            </Button>
+            <Button onClick={saveFromTest} disabled={!testResult || testing}>
+              <Check className="size-4" aria-hidden />
+              Looks good — save prompt
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </section>
+  );
+}
+
+function PromptEditor({
+  label,
+  value,
+  onChange,
+  onReset,
+  onTest,
+  onSave,
+  saved,
+  placeholder,
+  minHeight,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  onReset: () => void;
+  onTest: () => void;
+  onSave: () => void;
+  saved: boolean;
+  placeholder: string;
+  minHeight: string;
+}) {
+  return (
+    <div>
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-medium text-muted-foreground">{label}</span>
+        {value && (
+          <button
+            type="button"
+            onClick={onReset}
+            className="text-[11px] font-medium text-muted-foreground hover:text-foreground"
+          >
+            Reset to default
+          </button>
+        )}
+      </div>
+      <Textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className={cn("mt-1.5", minHeight)}
+      />
+      <div className="mt-2 flex items-center gap-2">
+        <Button variant="outline" onClick={onTest}>
+          <Sparkles className="size-4" aria-hidden />
+          Test
+        </Button>
+        <Button onClick={onSave}>Save</Button>
+        {saved && (
+          <span className="text-xs text-status-applied-foreground">Saved</span>
+        )}
+      </div>
+    </div>
   );
 }
 
