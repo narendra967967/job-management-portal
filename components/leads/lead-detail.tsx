@@ -12,6 +12,7 @@ import {
   MapPin,
   Pencil,
   Trash2,
+  UserPlus,
 } from "lucide-react";
 import {
   CLOSE_OUTCOME_LABELS,
@@ -27,11 +28,16 @@ import {
   type Resume,
 } from "@/lib/types";
 import { StatusBadge } from "@/components/leads/status-badge";
-import { LeadActions, AddContactDialog } from "@/components/leads/lead-actions";
+import {
+  LeadActions,
+  AddContactDialog,
+  useLeadActionDialogs,
+} from "@/components/leads/lead-actions";
 import { ReminderActions } from "@/components/leads/reminder-actions";
 import { LeadTimeline } from "@/components/leads/lead-timeline";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
 import { MarkdownLite, looksLikeMarkdown } from "@/components/ui/markdown-lite";
 import { computeFitScore, fitBand } from "@/lib/fit";
 import {
@@ -219,10 +225,10 @@ export function LeadDetailContent({
           <OverviewTab leadId={lead.id} detail={detail} />
         </TabsContent>
         <TabsContent value="contacts" className="mt-4">
-          <ContactsTab lead={lead} />
+          <ContactsTab lead={lead} canAct={open} />
         </TabsContent>
         <TabsContent value="outreach" className="mt-4">
-          <OutreachTab leadId={lead.id} />
+          <OutreachTab lead={lead} resumes={resumes} canAct={open} />
         </TabsContent>
         <TabsContent value="reminders" className="mt-4">
           <RemindersTab leadId={lead.id} />
@@ -336,17 +342,28 @@ function OverviewTab({ leadId, detail }: { leadId: string; detail?: JobLeadDetai
 
 /* ---------------- Contacts (read list) ---------------- */
 
-function ContactsTab({ lead }: { lead: JobLead }) {
+function ContactsTab({ lead, canAct }: { lead: JobLead; canAct: boolean }) {
   const contacts = useContactsForLead(lead.id);
   const [editing, setEditing] = useState<Contact | null>(null);
+  const [adding, setAdding] = useState(false);
 
   return (
     <>
+      <div className="mb-3 flex justify-end">
+        <Button
+          onClick={() => setAdding(true)}
+          disabled={!canAct}
+          title={canAct ? "Add contact" : "Reopen this job to add contacts"}
+        >
+          <UserPlus className="size-4" aria-hidden />
+          Add contact
+        </Button>
+      </div>
       {contacts.length === 0 ? (
         <EmptyState
           icon={<Users className="size-5" aria-hidden />}
           title="No contacts yet"
-          body="Use the actions menu (⋯) above to add a recruiter or referral."
+          body="Add a recruiter, hiring manager, or referral for this lead."
         />
       ) : (
         <ul className="space-y-2.5">
@@ -364,8 +381,13 @@ function ContactsTab({ lead }: { lead: JobLead }) {
       <AddContactDialog
         lead={lead}
         contact={editing ?? undefined}
-        open={editing !== null}
-        onOpenChange={(o) => !o && setEditing(null)}
+        open={editing !== null || adding}
+        onOpenChange={(o) => {
+          if (!o) {
+            setEditing(null);
+            setAdding(false);
+          }
+        }}
       />
     </>
   );
@@ -428,20 +450,49 @@ function ContactCard({
 
 /* ---------------- Outreach (read history) ---------------- */
 
-function OutreachTab({ leadId }: { leadId: string }) {
-  const outreach = useOutreachForLead(leadId);
+function OutreachTab({
+  lead,
+  resumes,
+  canAct,
+}: {
+  lead: JobLead;
+  resumes: Resume[];
+  canAct: boolean;
+}) {
+  const outreach = useOutreachForLead(lead.id);
+  const { openDialog, dialogs } = useLeadActionDialogs(lead, resumes);
+
+  const draftButton = (
+    <div className="mb-3 flex justify-end">
+      <Button
+        onClick={() => openDialog("outreach")}
+        disabled={!canAct}
+        title={canAct ? "Draft outreach" : "Reopen this job to draft outreach"}
+      >
+        <Send className="size-4" aria-hidden />
+        Draft outreach
+      </Button>
+    </div>
+  );
+
   if (outreach.length === 0) {
     return (
-      <EmptyState
-        icon={<Send className="size-5" aria-hidden />}
-        title="No messages yet"
-        body="Use the actions menu (⋯) above to draft outreach for a contact."
-      />
+      <>
+        {draftButton}
+        <EmptyState
+          icon={<Send className="size-5" aria-hidden />}
+          title="No messages yet"
+          body="Draft an outreach message for one of your contacts."
+        />
+        {dialogs}
+      </>
     );
   }
   return (
-    <ul className="space-y-2.5">
-      {outreach.map((m) => (
+    <>
+      {draftButton}
+      <ul className="space-y-2.5">
+        {outreach.map((m) => (
         <li key={m.id} className="rounded-xl border bg-card p-4">
           <div className="flex items-center justify-between gap-2">
             <span className="text-sm font-medium">
@@ -462,8 +513,10 @@ function OutreachTab({ leadId }: { leadId: string }) {
             {m.sentBody ?? m.draftBody}
           </p>
         </li>
-      ))}
-    </ul>
+        ))}
+      </ul>
+      {dialogs}
+    </>
   );
 }
 
