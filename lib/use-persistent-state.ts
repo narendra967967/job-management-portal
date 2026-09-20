@@ -16,8 +16,10 @@ export const PERSIST_KEYS = {
   leadsFilters: "jmp.leads.filters", // session (reset on logout)
 } as const;
 
-// Session-scoped keys wiped on logout.
-const SESSION_KEYS = [PERSIST_KEYS.leadsFilters];
+// Session-scoped state is wiped on logout. Filters live under this prefix:
+// - "jmp.leads.filters"       (Kanban)
+// - "jmp.leadsBrowser.<scope>" (list view, per scope)
+const SESSION_KEY_PREFIX = "jmp.leads";
 
 function getStore(kind: StoreKind): Storage | null {
   if (typeof window === "undefined") return null;
@@ -32,12 +34,15 @@ function getStore(kind: StoreKind): Storage | null {
 export function clearSessionPersistedState() {
   const s = getStore("session");
   if (!s) return;
-  for (const key of SESSION_KEYS) {
-    try {
-      s.removeItem(key);
-    } catch {
-      /* ignore */
+  try {
+    const keys: string[] = [];
+    for (let i = 0; i < s.length; i++) {
+      const k = s.key(i);
+      if (k && k.startsWith(SESSION_KEY_PREFIX)) keys.push(k);
     }
+    for (const k of keys) s.removeItem(k);
+  } catch {
+    /* ignore */
   }
 }
 

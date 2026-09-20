@@ -285,6 +285,68 @@ export function LeadsBrowser({ scope = "all" }: { scope?: LeadsScope }) {
   const [sort, setSort] = useState<Sort>("newest");
   const [page, setPage] = useState(1);
   const search = useSearchQuery();
+
+  // Persist the toolbar (filters + sort) per scope across reloads — on mobile
+  // and desktop alike. Session-scoped so it resets on logout (cleared by
+  // clearSessionPersistedState).
+  const filtersKey = `jmp.leadsBrowser.${scope}`;
+  const [filtersLoaded, setFiltersLoaded] = useState(false);
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(filtersKey);
+      if (raw) {
+        const v = JSON.parse(raw) as Record<string, unknown>;
+        if (typeof v.statusFilter === "string") setStatusFilter(v.statusFilter as StatusFilter);
+        if (typeof v.bucketFilter === "string") setBucketFilter(v.bucketFilter as ArchiveBucket | "all");
+        if (typeof v.locationFilter === "string") setLocationFilter(v.locationFilter as LocationFilter);
+        if (typeof v.countryFilter === "string") setCountryFilter(v.countryFilter);
+        if (typeof v.titleFilter === "string") setTitleFilter(v.titleFilter);
+        if (typeof v.tagFilter === "string") setTagFilter(v.tagFilter);
+        if (typeof v.dateRange === "string") setDateRange(v.dateRange as DateRange);
+        if (typeof v.customFrom === "string") setCustomFrom(v.customFrom);
+        if (typeof v.customTo === "string") setCustomTo(v.customTo);
+        if (typeof v.sort === "string") setSort(v.sort as Sort);
+      }
+    } catch {
+      /* ignore corrupt value */
+    }
+    setFiltersLoaded(true);
+  }, [filtersKey]);
+  useEffect(() => {
+    if (!filtersLoaded) return;
+    try {
+      sessionStorage.setItem(
+        filtersKey,
+        JSON.stringify({
+          statusFilter,
+          bucketFilter,
+          locationFilter,
+          countryFilter,
+          titleFilter,
+          tagFilter,
+          dateRange,
+          customFrom,
+          customTo,
+          sort,
+        }),
+      );
+    } catch {
+      /* ignore quota/private-mode errors */
+    }
+  }, [
+    filtersLoaded,
+    filtersKey,
+    statusFilter,
+    bucketFilter,
+    locationFilter,
+    countryFilter,
+    titleFilter,
+    tagFilter,
+    dateRange,
+    customFrom,
+    customTo,
+    sort,
+  ]);
   const allTags = useMemo(
     () => [...new Set(leads.flatMap((l) => l.tags))].sort(),
     [leads],
