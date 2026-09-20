@@ -16,6 +16,7 @@ import { nextCookies } from "better-auth/next-js";
 import { db } from "@/lib/db";
 import { account, session, user, verification } from "@/db/schema";
 import { hashPassword, verifyPassword } from "@/lib/password";
+import { provisionUserDefaults } from "@/lib/provision";
 
 export const auth = betterAuth({
   secret: process.env.BETTER_AUTH_SECRET,
@@ -54,6 +55,16 @@ export const auth = betterAuth({
   user: {
     additionalFields: {
       mobile: { type: "string", required: false },
+    },
+  },
+  databaseHooks: {
+    user: {
+      create: {
+        // Give every newly created user their default settings rows.
+        after: async (u) => {
+          await provisionUserDefaults(u.id);
+        },
+      },
     },
   },
   // Must be the last plugin so Server Actions can set auth cookies.
