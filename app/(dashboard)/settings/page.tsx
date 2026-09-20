@@ -1088,15 +1088,12 @@ function ResumesCard() {
 
       <ul className="mt-4 space-y-2">
         {resumes.map((r) => (
-          <li
-            key={r.id}
-            className="flex items-center gap-3 rounded-lg border p-3"
-          >
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-              <FileText className="size-4" aria-hidden />
-            </span>
+          <li key={r.id} className="rounded-lg border p-3">
             {editingId === r.id ? (
-              <>
+              <div className="flex items-center gap-2">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                  <FileText className="size-4" aria-hidden />
+                </span>
                 <Input
                   value={editLabel}
                   onChange={(e) => setEditLabel(e.target.value)}
@@ -1119,10 +1116,14 @@ function ResumesCard() {
                 >
                   <X className="size-4" aria-hidden />
                 </button>
-              </>
+              </div>
             ) : (
-              <>
-                <div className="min-w-0 flex-1">
+              <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:gap-3">
+                <div className="flex min-w-0 items-center gap-3 sm:flex-1">
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                    <FileText className="size-4" aria-hidden />
+                  </span>
+                  <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <p className="truncate text-sm font-medium">{r.label}</p>
                     {r.id === defaultResumeId && (
@@ -1142,7 +1143,9 @@ function ResumesCard() {
                       {formatSize(r.sizeKb)}
                     </span>
                   </p>
+                  </div>
                 </div>
+                <div className="flex items-center justify-end gap-0.5">
                 <button
                   type="button"
                   aria-label={
@@ -1185,7 +1188,8 @@ function ResumesCard() {
                 >
                   <Trash2 className="size-4" aria-hidden />
                 </button>
-              </>
+                </div>
+              </div>
             )}
           </li>
         ))}
