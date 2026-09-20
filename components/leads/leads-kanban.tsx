@@ -50,6 +50,7 @@ import {
   EMPTY_LEAD_FILTERS,
   type LeadFilterValue,
 } from "@/components/leads/lead-filters";
+import { usePersistentState, PERSIST_KEYS } from "@/lib/use-persistent-state";
 import {
   Dialog,
   DialogContent,
@@ -85,8 +86,17 @@ export function LeadsKanban() {
   const [{ staleLeadDays }] = useAppSettings();
   const search = useSearchQuery();
 
-  const [columns, setColumns] = useState<LeadStatus[]>(DEFAULT_COLUMNS);
-  const [filters, setFilters] = useState<LeadFilterValue>(EMPTY_LEAD_FILTERS);
+  // Columns persist across reload AND logout/login (localStorage); filters
+  // persist across reload but reset on logout (sessionStorage).
+  const [columns, setColumns] = usePersistentState<LeadStatus[]>(
+    PERSIST_KEYS.kanbanColumns,
+    DEFAULT_COLUMNS,
+  );
+  const [filters, setFilters] = usePersistentState<LeadFilterValue>(
+    PERSIST_KEYS.leadsFilters,
+    EMPTY_LEAD_FILTERS,
+    "session",
+  );
   const [activeId, setActiveId] = useState<string | null>(null);
   const [detailLead, setDetailLead] = useState<JobLead | null>(null);
   // Lead awaiting a close outcome (dragged onto the Closed column).

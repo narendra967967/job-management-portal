@@ -4,6 +4,7 @@
 // Google is linked/unlinked from Settings for Gmail access only.
 
 import { createAuthClient } from "better-auth/react";
+import { clearSessionPersistedState } from "@/lib/use-persistent-state";
 
 export const authClient = createAuthClient();
 
@@ -27,6 +28,8 @@ export async function signOutToHome() {
   try {
     await authClient.signOut();
   } finally {
+    // Reset session-scoped UI state (filters) so the next login starts clean.
+    clearSessionPersistedState();
     window.location.href = "/";
   }
 }

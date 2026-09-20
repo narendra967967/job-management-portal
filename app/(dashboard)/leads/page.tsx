@@ -1,16 +1,20 @@
 "use client";
 
-import { useState } from "react";
 import { List, Columns3 } from "lucide-react";
 import { LeadsBrowser } from "@/components/leads/leads-browser";
 import { LeadsKanban } from "@/components/leads/leads-kanban";
 import { useIsDesktop } from "@/lib/use-media-query";
+import { usePersistentState, PERSIST_KEYS } from "@/lib/use-persistent-state";
 import { cn } from "@/lib/utils";
 
 type View = "list" | "board";
 
 export default function LeadsPage() {
-  const [view, setView] = useState<View>("list");
+  // Persisted across reload AND logout/login (localStorage).
+  const [view, setView] = usePersistentState<View>(
+    PERSIST_KEYS.leadsView,
+    "list",
+  );
   const isDesktop = useIsDesktop();
   // The board is a laptop-only view; on smaller screens we always show the list
   // (mobile board design comes later), and the toggle is hidden there. Gating on
