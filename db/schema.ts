@@ -69,7 +69,11 @@ export const reminderOutcome = pgEnum("reminder_outcome", [
 ]);
 export const taskKind = pgEnum("task_kind", ["follow-up", "decision", "manual"]);
 export const taskStatus = pgEnum("task_status", ["open", "done"]);
-export const aiProvider = pgEnum("ai_provider", ["openai", "anthropic"]);
+export const aiProvider = pgEnum("ai_provider", [
+  "openai",
+  "anthropic",
+  "openrouter",
+]);
 export const resumeFileType = pgEnum("resume_file_type", ["pdf", "doc", "docx"]);
 
 /* ------------------------------------------------------------------ */
