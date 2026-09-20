@@ -14,6 +14,13 @@ import {
   DEFAULT_DRAFT_PROMPT,
 } from "@/lib/ai-prompts";
 import {
+  contactTextSchema,
+  draftInputSchema,
+  jdInputSchema,
+  parseInput,
+  promptPreviewSchema,
+} from "@/lib/schemas";
+import {
   contacts as contactsT,
   jobLeadDetails as detailsT,
   jobLeads as leadsT,
@@ -42,8 +49,12 @@ export async function saveJdAction(
   jdText: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const userId = await getCurrentUserId();
-  const text = jdText.trim();
-  if (!text) return { ok: false, error: "Paste the job description first." };
+  let text: string;
+  try {
+    ({ leadId, jdText: text } = parseInput(jdInputSchema, { leadId, jdText }));
+  } catch (err) {
+    return { ok: false, error: friendly(err) };
+  }
 
   const [lead] = await db
     .select({ id: leadsT.id })
@@ -65,8 +76,12 @@ export async function summarizeJdAction(
   jdText: string,
 ): Promise<{ ok: true; summary: string } | { ok: false; error: string }> {
   const userId = await getCurrentUserId();
-  const text = jdText.trim();
-  if (!text) return { ok: false, error: "Paste the job description first." };
+  let text: string;
+  try {
+    ({ leadId, jdText: text } = parseInput(jdInputSchema, { leadId, jdText }));
+  } catch (err) {
+    return { ok: false, error: friendly(err) };
+  }
 
   const [lead] = await db
     .select({ id: leadsT.id })
@@ -113,9 +128,12 @@ export async function structureContactAction(
   pastedText: string,
 ): Promise<{ ok: true; contact: ParsedContact } | { ok: false; error: string }> {
   const userId = await getCurrentUserId();
-  const text = pastedText.trim();
-  if (!text)
-    return { ok: false, error: "Paste the hiring-team or referral text first." };
+  let text: string;
+  try {
+    text = parseInput(contactTextSchema, pastedText);
+  } catch (err) {
+    return { ok: false, error: friendly(err) };
+  }
 
   try {
     const raw = await aiComplete(
@@ -160,6 +178,11 @@ export async function draftOutreachAction(input: {
   resumeLabel: string;
 }): Promise<{ ok: true; draft: string } | { ok: false; error: string }> {
   const userId = await getCurrentUserId();
+  try {
+    input = parseInput(draftInputSchema, input) as typeof input;
+  } catch (err) {
+    return { ok: false, error: friendly(err) };
+  }
 
   const [lead] = await db
     .select({ title: leadsT.title, company: leadsT.company })
@@ -200,6 +223,29 @@ export async function draftOutreachAction(input: {
     const system = s?.p?.trim() || DEFAULT_DRAFT_PROMPT;
     const draft = await aiComplete(userId, system, context, 500);
     return { ok: true, draft };
+  } catch (err) {
+    return { ok: false, error: friendly(err) };
+  }
+}
+
+/* ---------------- Prompt preview / test (no DB write) --------------------- */
+
+// Run an unsaved prompt against sample input so the user can eyeball the result
+// before saving it in Settings → AI prompts. Uses the current user's key.
+export async function previewPromptAction(
+  system: string,
+  input: string,
+): Promise<{ ok: true; output: string } | { ok: false; error: string }> {
+  const userId = await getCurrentUserId();
+  let parsed: { system: string; input: string };
+  try {
+    parsed = parseInput(promptPreviewSchema, { system, input });
+  } catch (err) {
+    return { ok: false, error: friendly(err) };
+  }
+  try {
+    const output = await aiComplete(userId, parsed.system, parsed.input, 500);
+    return { ok: true, output };
   } catch (err) {
     return { ok: false, error: friendly(err) };
   }

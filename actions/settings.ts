@@ -16,8 +16,20 @@ import {
   user as userT,
   userSettings as settingsT,
 } from "@/db/schema";
+import {
+  aiKeySchema,
+  aiPromptsSchema,
+  aiProviderSchema,
+  followUpsSchema,
+  gmailConfigSchema,
+  parseInput,
+  profileSchema,
+  resumeMetaSchema,
+  syncIntervalSchema,
+  zId,
+} from "@/lib/schemas";
+import { z } from "zod";
 import type { AiProvider } from "@/lib/types";
-import { isValidEmail, splitMobile, validateMobile } from "@/lib/validation";
 
 /** Ensure a user_settings row exists, then merge `set` into it. */
 async function upsertSettings(userId: string, set: Record<string, unknown>) {
@@ -35,14 +47,7 @@ export async function updateProfileAction(input: {
   mobile: string;
 }) {
   const userId = await getCurrentUserId();
-  const name = input.name.trim();
-  const email = input.email.trim();
-  const mobile = input.mobile.trim();
-  if (!name) throw new Error("Name is required.");
-  if (!isValidEmail(email)) throw new Error("Enter a valid email address.");
-  const { dial, national } = splitMobile(mobile);
-  const mobileError = validateMobile(dial, national);
-  if (mobileError) throw new Error(mobileError);
+  const { name, email, mobile } = parseInput(profileSchema, input);
   await db
     .update(userT)
     .set({ name, email, mobile })
@@ -51,28 +56,23 @@ export async function updateProfileAction(input: {
 
 /* ---------------- follow-ups ---------------- */
 
-/** Whole number of days, clamped to 1–365. */
-function clampDays(n: number): number {
-  const r = Math.round(n);
-  if (!Number.isFinite(r) || r < 1) return 1;
-  return Math.min(365, r);
-}
-
 export async function updateFollowUpsAction(input: {
   reminderIntervalDays: number;
   staleLeadDays: number;
 }) {
   const userId = await getCurrentUserId();
-  await upsertSettings(userId, {
-    reminderIntervalDays: clampDays(input.reminderIntervalDays),
-    staleLeadDays: clampDays(input.staleLeadDays),
-  });
+  const { reminderIntervalDays, staleLeadDays } = parseInput(
+    followUpsSchema,
+    input,
+  );
+  await upsertSettings(userId, { reminderIntervalDays, staleLeadDays });
 }
 
 /* ---------------- default resume ---------------- */
 
-export async function setDefaultResumeAction(resumeId: string) {
+export async function setDefaultResumeAction(id: string) {
   const userId = await getCurrentUserId();
+  const resumeId = parseInput(zId, id);
   await db.transaction(async (tx) => {
     // Exactly one default per user (also enforced by a partial unique index).
     await tx
@@ -100,16 +100,16 @@ export async function updateAiSettingsAction(input: {
   model: string;
 }) {
   const userId = await getCurrentUserId();
+  const { provider, model } = parseInput(aiProviderSchema, input);
   await upsertSettings(userId, {
-    aiProvider: input.provider,
-    aiModel: input.model || null,
+    aiProvider: provider,
+    aiModel: model || null,
   });
 }
 
 export async function saveAiKeyAction(plainKey: string) {
   const userId = await getCurrentUserId();
-  const key = plainKey.trim();
-  if (key.length < 8) throw new Error("Invalid API key.");
+  const key = parseInput(aiKeySchema, plainKey);
   await upsertSettings(userId, {
     aiKeyCiphertext: encryptSecret(key),
     aiKeyLast4: key.slice(-4),
@@ -127,19 +127,18 @@ export async function updateAiPromptsAction(input: {
   draft: string;
 }) {
   const userId = await getCurrentUserId();
+  const { summary, draft } = parseInput(aiPromptsSchema, input);
   await upsertSettings(userId, {
-    promptSummary: input.summary.trim() || null,
-    promptDraft: input.draft.trim() || null,
+    promptSummary: summary.trim() || null,
+    promptDraft: draft.trim() || null,
   });
 }
 
 /* ---------------- sync schedule ---------------- */
 
-const ALLOWED_INTERVALS = [1, 3, 6, 12, 24];
-
 export async function updateSyncIntervalAction(hours: number) {
   const userId = await getCurrentUserId();
-  const h = ALLOWED_INTERVALS.includes(hours) ? hours : 24;
+  const h = parseInput(syncIntervalSchema, hours);
   await upsertSettings(userId, { syncIntervalHours: h });
 }
 
@@ -159,16 +158,12 @@ export async function updateGmailConfigAction(input: {
   lookbackDays: number;
 }) {
   const userId = await getCurrentUserId();
-  const senders = input.senders.map((s) => s.trim()).filter(Boolean);
-  const badSenders = senders.filter((s) => !isValidEmail(s));
-  if (badSenders.length > 0) {
-    throw new Error(`Invalid sender address: ${badSenders.join(", ")}`);
-  }
+  const parsed = parseInput(gmailConfigSchema, input);
   const set = {
-    senders,
-    label: input.label || null,
-    subjectKeywords: input.subjectKeywords || null,
-    lookbackDays: input.lookbackDays,
+    senders: parsed.senders,
+    label: parsed.label || null,
+    subjectKeywords: parsed.subjectKeywords || null,
+    lookbackDays: parsed.lookbackDays,
   };
   await db
     .insert(gmailConfigT)
@@ -195,32 +190,39 @@ export async function addResumeAction(input: {
   sizeKb: number;
 }) {
   const userId = await getCurrentUserId();
+  const meta = parseInput(resumeMetaSchema, input);
   // File bytes aren't stored yet (nothing reads them until AI drafting lands in
   // Milestone C) — store metadata with a placeholder blobUrl.
   await db.insert(resumesT).values({
     userId,
-    label: input.label,
-    fileName: input.fileName,
-    fileType: input.fileType,
-    sizeKb: input.sizeKb,
-    blobUrl: `local://${input.fileName}`,
+    label: meta.label,
+    fileName: meta.fileName,
+    fileType: meta.fileType,
+    sizeKb: meta.sizeKb,
+    blobUrl: `local://${meta.fileName}`,
     isDefault: false,
   });
 }
 
 export async function renameResumeAction(id: string, label: string) {
   const userId = await getCurrentUserId();
+  const resumeId = parseInput(zId, id);
+  const cleanLabel = parseInput(
+    z.string().trim().min(1, "Give this resume a name.").max(120),
+    label,
+  );
   await db
     .update(resumesT)
-    .set({ label })
-    .where(and(eq(resumesT.id, id), eq(resumesT.userId, userId)));
+    .set({ label: cleanLabel })
+    .where(and(eq(resumesT.id, resumeId), eq(resumesT.userId, userId)));
 }
 
 export async function deleteResumeAction(id: string) {
   const userId = await getCurrentUserId();
+  const resumeId = parseInput(zId, id);
   // user_settings.default_resume_id FK is ON DELETE SET NULL, so clearing the
   // default is automatic.
   await db
     .delete(resumesT)
-    .where(and(eq(resumesT.id, id), eq(resumesT.userId, userId)));
+    .where(and(eq(resumesT.id, resumeId), eq(resumesT.userId, userId)));
 }

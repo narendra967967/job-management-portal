@@ -16,6 +16,7 @@ import {
   addReminderManualAction,
   completeTaskAction,
   deleteContactAction,
+  deleteLeadsAction,
   deleteReminderAction,
   getWorkspace,
   markSentAction,
@@ -230,6 +231,13 @@ export async function setLeadStatus(
   closeOutcome: CloseOutcome | null = null,
 ) {
   await setLeadStatusAction(leadId, status, closeOutcome);
+  await refresh();
+}
+
+/** Permanently delete one or more leads (Archive trash). */
+export async function deleteLeads(ids: string[]) {
+  if (ids.length === 0) return;
+  await deleteLeadsAction(ids);
   await refresh();
 }
 

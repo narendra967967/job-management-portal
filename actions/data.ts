@@ -7,9 +7,10 @@
 // Every write is scoped to the current user (getCurrentUserId) and, where it
 // touches multiple rows, wrapped in a transaction.
 
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { getCurrentUserId } from "@/lib/current-user";
+import { deleteLeadsSchema, parseInput } from "@/lib/schemas";
 import { loadWorkspace, type WorkspaceData } from "@/lib/queries";
 import {
   contacts as contactsT,
@@ -74,6 +75,19 @@ export async function setLeadStatusAction(
         );
     }
   });
+}
+
+/**
+ * Permanently delete leads (used by the Archive trash). All children — details,
+ * contacts, outreach, reminders, tasks — are removed by the ON DELETE CASCADE
+ * foreign keys, so deleting the lead rows is enough. Scoped to the current user.
+ */
+export async function deleteLeadsAction(ids: string[]) {
+  const userId = await getCurrentUserId();
+  const clean = parseInput(deleteLeadsSchema, ids);
+  await db
+    .delete(leadsT)
+    .where(and(eq(leadsT.userId, userId), inArray(leadsT.id, clean)));
 }
 
 /* ---------------- contacts ---------------- */
