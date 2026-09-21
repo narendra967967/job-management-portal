@@ -82,6 +82,8 @@ async function main() {
       fileType: "pdf",
       sizeKb: 212,
       blobUrl: "seed://Gupta_PM_Payments.pdf",
+      resumeText:
+        "Product Manager, 6 yrs in fintech/payments. Led payment acceptance and checkout at a mid-size PSP; owned reliability and cross-functional delivery. Skills: product strategy, experimentation, SQL, stakeholder management. Remote-friendly.",
       isDefault: true,
     },
     {

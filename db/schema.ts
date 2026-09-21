@@ -292,6 +292,9 @@ export const resumes = pgTable(
     // Phase 3: file lives in blob storage (Vercel Blob/S3/R2) — the Vercel FS
     // is read-only, so we store a URL, not bytes.
     blobUrl: text("blob_url").notNull(),
+    // Pasted plain-text of the resume, used by AI fit-scoring (null until the
+    // user adds it in Settings).
+    resumeText: text("resume_text"),
     isDefault: boolean("is_default").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -330,6 +333,7 @@ export const userSettings = pgTable("user_settings", {
   // User-customized AI instruction prompts (null = use the built-in default).
   promptSummary: text("prompt_summary"),
   promptDraft: text("prompt_draft"),
+  promptScore: text("prompt_score"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -338,6 +342,43 @@ export const userSettings = pgTable("user_settings", {
     .defaultNow()
     .$onUpdate(() => new Date()),
 });
+
+/**
+ * Cached AI fit score for a (lead, resume) pair. Computed on demand (never
+ * automatically), so the UI shows "NC" until the user triggers a score/rescore.
+ * One row per (user, lead, resume); a rescore overwrites it.
+ */
+export const fitScores = pgTable(
+  "fit_scores",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    leadId: uuid("lead_id")
+      .notNull()
+      .references(() => jobLeads.id, { onDelete: "cascade" }),
+    resumeId: uuid("resume_id")
+      .notNull()
+      .references(() => resumes.id, { onDelete: "cascade" }),
+    score: integer("score").notNull(),
+    rationale: text("rationale"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [
+    uniqueIndex("fit_scores_user_lead_resume_uq").on(
+      t.userId,
+      t.leadId,
+      t.resumeId,
+    ),
+  ],
+);
 
 /** One row per user — the Gmail ingestion rules (Settings → Which emails to read). */
 export const gmailConfig = pgTable("gmail_config", {

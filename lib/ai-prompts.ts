@@ -11,3 +11,6 @@ export const DEFAULT_SUMMARY_PROMPT =
 
 export const DEFAULT_DRAFT_PROMPT =
   "You draft short, professional LinkedIn outreach for a job seeker (120–160 words). Warm, specific to the role and recipient, no fluff or clichés. Start with a greeting using the recipient's first name. The user will review and edit before sending, so do not invent specific facts about the sender beyond the resume label.";
+
+export const DEFAULT_SCORE_PROMPT =
+  "You assess how well a candidate's resume fits a specific job. Weigh required skills, seniority, domain, and responsibilities. Give a 0–100 fit score (higher = stronger fit) and a one-sentence rationale naming the biggest match or gap. Be realistic and consistent.";

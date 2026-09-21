@@ -38,10 +38,11 @@ import {
   useResumes,
   useDefaultResumeId,
   useAppSettings,
+  useFitScore,
   setLeadStatus,
 } from "@/lib/mock-store";
 import { useSearchQuery } from "@/lib/search-store";
-import { computeFitScore, fitBand } from "@/lib/fit";
+import { fitBand } from "@/lib/fit";
 import { StatusBadge } from "@/components/leads/status-badge";
 import { LeadDetailDialog } from "@/components/leads/lead-detail-dialog";
 import {
@@ -375,8 +376,8 @@ function KanbanCard({
   resumeId: string;
   overlay?: boolean;
 }) {
-  const fit = computeFitScore(lead.id, resumeId);
-  const band = fitBand(fit);
+  const cached = useFitScore(lead.id, resumeId);
+  const band = cached ? fitBand(cached.score) : null;
   const open = isJobOpen(lead.status);
   const ready = open && lead.hasJd && lead.contactCount > 0 && !lead.hasOutreach;
   const stale =
@@ -394,11 +395,11 @@ function KanbanCard({
         <span
           className={cn(
             "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold tabular-nums",
-            band.chip,
+            cached && band ? band.chip : "bg-muted text-muted-foreground",
           )}
         >
           <Gauge className="size-2.5" aria-hidden />
-          {fit}
+          {cached ? cached.score : "NC"}
         </span>
       </div>
       <p className="line-clamp-2 text-sm font-medium leading-snug">{lead.title}</p>

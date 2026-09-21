@@ -12,6 +12,7 @@ import { aiComplete, AI_NOT_CONFIGURED } from "@/lib/ai";
 import {
   DEFAULT_SUMMARY_PROMPT,
   DEFAULT_DRAFT_PROMPT,
+  DEFAULT_SCORE_PROMPT,
 } from "@/lib/ai-prompts";
 import {
   contactTextSchema,
@@ -19,11 +20,14 @@ import {
   jdInputSchema,
   parseInput,
   promptPreviewSchema,
+  scoreFitSchema,
 } from "@/lib/schemas";
 import {
   contacts as contactsT,
+  fitScores as fitScoresT,
   jobLeadDetails as detailsT,
   jobLeads as leadsT,
+  resumes as resumesT,
   userSettings as settingsT,
 } from "@/db/schema";
 import {
@@ -223,6 +227,113 @@ export async function draftOutreachAction(input: {
     const system = s?.p?.trim() || DEFAULT_DRAFT_PROMPT;
     const draft = await aiComplete(userId, system, context, 500);
     return { ok: true, draft };
+  } catch (err) {
+    return { ok: false, error: friendly(err) };
+  }
+}
+
+/* ---------------- Fit scoring (FR — AI, on demand) ------------------------ */
+
+// Score a lead against a resume with the configured AI provider and cache the
+// result. Never runs automatically — triggered by the user's Calculate/Rescore
+// button — because it spends tokens per call.
+export async function scoreFitAction(
+  leadId: string,
+  resumeId: string,
+): Promise<
+  { ok: true; score: number; rationale: string } | { ok: false; error: string }
+> {
+  const userId = await getCurrentUserId();
+  let input: { leadId: string; resumeId: string };
+  try {
+    input = parseInput(scoreFitSchema, { leadId, resumeId });
+  } catch (err) {
+    return { ok: false, error: friendly(err) };
+  }
+
+  const [lead] = await db
+    .select({ title: leadsT.title, company: leadsT.company })
+    .from(leadsT)
+    .where(and(eq(leadsT.id, input.leadId), eq(leadsT.userId, userId)));
+  if (!lead) return { ok: false, error: "Lead not found." };
+
+  const [detail] = await db
+    .select({ jdText: detailsT.jdText, aiSummary: detailsT.aiSummary })
+    .from(detailsT)
+    .where(and(eq(detailsT.leadId, input.leadId), eq(detailsT.userId, userId)));
+  const jd = detail?.aiSummary?.trim() || detail?.jdText?.trim();
+  if (!jd) {
+    return { ok: false, error: "Add a job description for this lead first." };
+  }
+
+  const [resume] = await db
+    .select({ label: resumesT.label, text: resumesT.resumeText })
+    .from(resumesT)
+    .where(and(eq(resumesT.id, input.resumeId), eq(resumesT.userId, userId)));
+  if (!resume) return { ok: false, error: "Resume not found." };
+  const resumeText = resume.text?.trim();
+  if (!resumeText) {
+    return {
+      ok: false,
+      error: `Add the résumé text for "${resume.label}" in Settings → Resumes first.`,
+    };
+  }
+
+  try {
+    const [s] = await db
+      .select({ p: settingsT.promptScore })
+      .from(settingsT)
+      .where(eq(settingsT.userId, userId));
+    const base = s?.p?.trim() || DEFAULT_SCORE_PROMPT;
+    // Enforce a parseable output regardless of the (possibly custom) prompt.
+    const system = `${base}\n\nReply with ONLY minified JSON: {"score": <integer 0-100>, "rationale": "<one sentence>"}. No other text.`;
+    const context = [
+      `Role: ${lead.title} at ${lead.company}`,
+      `Job description / summary:\n${jd}`,
+      `Candidate resume (${resume.label}):\n${resumeText}`,
+    ].join("\n\n");
+
+    const raw = await aiComplete(userId, system, context, 300);
+    const json = raw.replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
+
+    let score: number | undefined;
+    let rationale = "";
+    try {
+      const parsed = JSON.parse(json) as { score?: unknown; rationale?: unknown };
+      score = Math.round(Number(parsed.score));
+      rationale = (parsed.rationale ?? "").toString();
+    } catch {
+      // Fallback for a non-JSON custom prompt: take the first 0–100 number.
+      const m = raw.match(/\b(100|\d{1,2})\b/);
+      if (m) {
+        score = Number(m[1]);
+        rationale = raw.trim().slice(0, 300);
+      }
+    }
+    if (score === undefined || !Number.isFinite(score)) {
+      return {
+        ok: false,
+        error:
+          "Couldn't read a score from the AI response — try again or adjust the score prompt.",
+      };
+    }
+    score = Math.max(0, Math.min(100, score));
+
+    await db
+      .insert(fitScoresT)
+      .values({
+        userId,
+        leadId: input.leadId,
+        resumeId: input.resumeId,
+        score,
+        rationale: rationale || null,
+      })
+      .onConflictDoUpdate({
+        target: [fitScoresT.userId, fitScoresT.leadId, fitScoresT.resumeId],
+        set: { score, rationale: rationale || null },
+      });
+
+    return { ok: true, score, rationale };
   } catch (err) {
     return { ok: false, error: friendly(err) };
   }

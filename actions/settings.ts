@@ -25,6 +25,7 @@ import {
   parseInput,
   profileSchema,
   resumeMetaSchema,
+  resumeTextSchema,
   syncIntervalSchema,
   zId,
 } from "@/lib/schemas";
@@ -125,13 +126,39 @@ export async function removeAiKeyAction() {
 export async function updateAiPromptsAction(input: {
   summary: string;
   draft: string;
+  score: string;
 }) {
   const userId = await getCurrentUserId();
-  const { summary, draft } = parseInput(aiPromptsSchema, input);
+  const { summary, draft, score } = parseInput(aiPromptsSchema, input);
   await upsertSettings(userId, {
     promptSummary: summary.trim() || null,
     promptDraft: draft.trim() || null,
+    promptScore: score.trim() || null,
   });
+}
+
+/* ---------------- resume text (for AI fit scoring) ---------------- */
+
+/** Read a resume's pasted text for editing in Settings. */
+export async function getResumeTextAction(id: string): Promise<string> {
+  const userId = await getCurrentUserId();
+  const resumeId = parseInput(zId, id);
+  const [r] = await db
+    .select({ text: resumesT.resumeText })
+    .from(resumesT)
+    .where(and(eq(resumesT.id, resumeId), eq(resumesT.userId, userId)));
+  return r?.text ?? "";
+}
+
+/** Save a resume's pasted text. */
+export async function updateResumeTextAction(id: string, text: string) {
+  const userId = await getCurrentUserId();
+  const resumeId = parseInput(zId, id);
+  const clean = parseInput(resumeTextSchema, text);
+  await db
+    .update(resumesT)
+    .set({ resumeText: clean.trim() || null })
+    .where(and(eq(resumesT.id, resumeId), eq(resumesT.userId, userId)));
 }
 
 /* ---------------- sync schedule ---------------- */

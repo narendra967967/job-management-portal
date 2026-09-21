@@ -1,9 +1,8 @@
-// Job ↔ resume "fit score".
+// Job ↔ resume "fit score" — display helpers.
 //
-// PHASE 1 PLACEHOLDER: a deterministic pseudo-score derived from the lead +
-// resume ids so the UI has something stable to render. Phase 3 replaces
-// `computeFitScore` with a real Server Action that scores the pasted job
-// description against the selected resume via the configured AI provider.
+// Scores are now real AI values computed on demand (actions/ai.scoreFitAction)
+// and cached per (lead, resume). This module just maps a numeric score to a
+// label/colour band; a lead with no cached score shows "NC" in the UI.
 
 export interface FitBand {
   label: string;
@@ -11,17 +10,6 @@ export interface FitBand {
   chip: string;
   text: string;
   advice: string;
-}
-
-/** Stable 0–100-ish score for a (lead, resume) pair. Range ~45–95. */
-export function computeFitScore(leadId: string, resumeId: string): number {
-  const s = `${leadId}::${resumeId}`;
-  let h = 2166136261;
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return 45 + (Math.abs(h) % 51); // 45..95
 }
 
 export function fitBand(score: number): FitBand {

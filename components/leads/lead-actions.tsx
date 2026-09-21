@@ -29,7 +29,7 @@ import {
   type OutreachKind,
   type Resume,
 } from "@/lib/types";
-import { computeFitScore, fitBand } from "@/lib/fit";
+import { fitBand } from "@/lib/fit";
 import { draftOutreachAction, structureContactAction } from "@/actions/ai";
 import {
   addContact,
@@ -38,6 +38,7 @@ import {
   updateContact,
   useContactsForLead,
   useOutreachForLead,
+  useFitScore,
 } from "@/lib/mock-store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -591,8 +592,8 @@ function DraftOutreachDialog({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  const fit = computeFitScore(lead.id, resumeId);
-  const band = fitBand(fit);
+  const cached = useFitScore(lead.id, resumeId);
+  const band = cached ? fitBand(cached.score) : null;
   const contactItems = Object.fromEntries(contacts.map((c) => [c.id, c.name]));
   const resumeItems = Object.fromEntries(
     resumes.map((r) => [r.id, r.isDefault ? `${r.label} · default` : r.label]),
@@ -745,25 +746,29 @@ function DraftOutreachDialog({
             </Field>
           </div>
 
-          {/* Fit score for the selected resume — updates when the resume changes */}
+          {/* Fit score for the selected resume (from the lead's saved score) */}
           <div className="flex items-center gap-3 rounded-lg border bg-muted/30 p-3">
             <span
               className={cn(
                 "flex size-12 shrink-0 flex-col items-center justify-center rounded-full text-sm font-semibold tabular-nums",
-                band.chip,
+                cached && band ? band.chip : "bg-muted text-muted-foreground",
               )}
             >
-              {fit}
+              {cached ? cached.score : "NC"}
             </span>
             <div className="min-w-0">
               <p className="flex items-center gap-1.5 text-sm font-medium">
-                {band.label}
+                {cached && band ? band.label : "Not scored"}
                 <span className="rounded bg-ai-muted px-1.5 py-0.5 text-[10px] font-medium text-ai">
                   <Sparkles className="mr-0.5 inline size-2.5" aria-hidden />
-                  preview
+                  AI
                 </span>
               </p>
-              <p className="text-xs text-muted-foreground">{band.advice}</p>
+              <p className="text-xs text-muted-foreground">
+                {cached && band
+                  ? cached.rationale || band.advice
+                  : "Score this resume from the lead's detail view."}
+              </p>
             </div>
           </div>
 

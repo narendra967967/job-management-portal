@@ -12,6 +12,7 @@ import { db } from "@/lib/db";
 import {
   account as accountT,
   contacts as contactsT,
+  fitScores as fitScoresT,
   gmailConfig as gmailConfigT,
   gmailIngestErrors as errorsT,
   gmailSyncState as syncStateT,
@@ -24,10 +25,11 @@ import {
   user as userT,
   userSettings as settingsT,
 } from "@/db/schema";
-import { OUTREACH_KIND_LABELS } from "@/lib/types";
+import { OUTREACH_KIND_LABELS, fitScoreKey } from "@/lib/types";
 import type {
   AiSettings,
   Contact,
+  FitScore,
   GoogleConnection,
   JobLead,
   JobLeadDetail,
@@ -85,7 +87,9 @@ export interface WorkspaceData {
   syncIntervalHours: number;
   gmailSync: GmailSyncStatus;
   ingestErrors: IngestError[];
-  aiPrompts: { summary: string; draft: string };
+  aiPrompts: { summary: string; draft: string; score: string };
+  /** Cached fit scores keyed by fitScoreKey(leadId, resumeId). */
+  fitScores: Record<string, FitScore>;
 }
 
 /** Everything the dashboard needs for one user, in UI-ready shapes. */
@@ -104,6 +108,7 @@ export async function loadWorkspace(userId: string): Promise<WorkspaceData> {
     googleAccountRows,
     syncStateRows,
     errorRows,
+    fitScoreRows,
   ] = await Promise.all([
     db.select().from(leadsT).where(eq(leadsT.userId, userId)),
     db.select().from(detailsT).where(eq(detailsT.userId, userId)),
@@ -139,6 +144,7 @@ export async function loadWorkspace(userId: string): Promise<WorkspaceData> {
       .where(eq(errorsT.userId, userId))
       .orderBy(desc(errorsT.createdAt))
       .limit(20),
+    db.select().from(fitScoresT).where(eq(fitScoresT.userId, userId)),
   ]);
 
   // Per-lead derived fields (contactCount, hasDueReminder) — computed in JS
@@ -258,7 +264,16 @@ export async function loadWorkspace(userId: string): Promise<WorkspaceData> {
     sizeKb: r.sizeKb,
     updatedAt: ymd(r.updatedAt)!,
     isDefault: r.isDefault,
+    hasText: !!(r.resumeText && r.resumeText.trim()),
   }));
+
+  const fitScores: Record<string, FitScore> = {};
+  for (const f of fitScoreRows) {
+    fitScores[fitScoreKey(f.leadId, f.resumeId)] = {
+      score: f.score,
+      rationale: f.rationale,
+    };
+  }
 
   const settings = settingsRow[0];
   const gmail = gmailRow[0];
@@ -332,6 +347,8 @@ export async function loadWorkspace(userId: string): Promise<WorkspaceData> {
     aiPrompts: {
       summary: settings?.promptSummary ?? "",
       draft: settings?.promptDraft ?? "",
+      score: settings?.promptScore ?? "",
     },
+    fitScores,
   };
 }

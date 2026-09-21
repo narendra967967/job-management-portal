@@ -47,13 +47,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { MarkdownLite, looksLikeMarkdown } from "@/components/ui/markdown-lite";
-import { computeFitScore, fitBand } from "@/lib/fit";
+import { fitBand } from "@/lib/fit";
 import {
   useContactsForLead,
   useOutreachForLead,
   useRemindersForLead,
   useLeadStatus,
   useDefaultResumeId,
+  useFitScore,
+  scoreFit,
   setLeadStatus,
   deleteContact,
   saveJd,
@@ -120,26 +122,31 @@ export function LeadDetailContent({
 
   const [defaultResumeId] = useDefaultResumeId();
   const incomingResumeId = resumeId || defaultResumeId;
-  // `scored` = the resume the shown score is based on; `selected` = the resume
-  // picked in the dropdown, applied on Rescore.
-  const [scoredResumeId, setScoredResumeId] = useState(incomingResumeId);
+  // The resume the score is shown for; changing it shows that resume's cached
+  // score (or NC) and rescoring computes it fresh.
   const [selectedResumeId, setSelectedResumeId] = useState(incomingResumeId);
-  const [rescored, setRescored] = useState(false);
   useEffect(() => {
-    setScoredResumeId(incomingResumeId);
     setSelectedResumeId(incomingResumeId);
   }, [lead.id, incomingResumeId]);
 
-  const fit = computeFitScore(lead.id, scoredResumeId);
-  const band = fitBand(fit);
+  const cached = useFitScore(lead.id, selectedResumeId);
+  const band = cached ? fitBand(cached.score) : null;
   const resumeLabel =
-    resumes.find((r) => r.id === scoredResumeId)?.label ?? "resume";
+    resumes.find((r) => r.id === selectedResumeId)?.label ?? "resume";
+  const [scoring, setScoring] = useState(false);
+  const [scoreError, setScoreError] = useState("");
 
-  function rescore() {
-    setScoredResumeId(selectedResumeId);
-    onResumeChange?.(selectedResumeId);
-    setRescored(true);
-    setTimeout(() => setRescored(false), 1500);
+  function pickResume(id: string) {
+    setSelectedResumeId(id);
+    onResumeChange?.(id);
+    setScoreError("");
+  }
+  async function runScore() {
+    setScoring(true);
+    setScoreError("");
+    const res = await scoreFit(lead.id, selectedResumeId);
+    if (!res.ok) setScoreError(res.error);
+    setScoring(false);
   }
 
   return (
@@ -188,33 +195,47 @@ export function LeadDetailContent({
           </span>
         </div>
 
-        {/* Fit score vs the chosen (or default) resume */}
+        {/* AI fit score vs the selected resume — computed on demand */}
         <div className="mt-4 rounded-xl border bg-muted/30 p-3">
           <div className="flex items-center gap-3">
             <span
               className={cn(
                 "flex size-12 shrink-0 items-center justify-center rounded-full text-base font-semibold tabular-nums",
-                band.chip,
+                cached && band ? band.chip : "bg-muted text-muted-foreground",
               )}
             >
-              {fit}
+              {cached ? cached.score : "NC"}
             </span>
             <div className="min-w-0">
               <p className="flex flex-wrap items-center gap-x-1.5 text-sm font-medium">
-                {band.label}
+                {cached && band ? band.label : "Not calculated"}
                 <span className="rounded bg-ai-muted px-1.5 py-0.5 text-[10px] font-medium text-ai">
                   <Sparkles className="mr-0.5 inline size-2.5" aria-hidden />
-                  preview
+                  AI
                 </span>
               </p>
               <p className="text-xs text-muted-foreground">
-                {band.advice} · scored vs{" "}
-                <span className="font-medium text-foreground">{resumeLabel}</span>
+                {cached && band ? (
+                  <>
+                    {cached.rationale || band.advice} · scored vs{" "}
+                    <span className="font-medium text-foreground">
+                      {resumeLabel}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    Not scored yet for{" "}
+                    <span className="font-medium text-foreground">
+                      {resumeLabel}
+                    </span>
+                    .
+                  </>
+                )}
               </p>
             </div>
           </div>
 
-          {/* Re-score against a different resume */}
+          {/* Score / rescore against the chosen resume (AI, on demand) */}
           {resumes.length > 0 && (
             <div className="mt-3 flex flex-col gap-2 border-t pt-3 sm:flex-row sm:items-end">
               <label className="min-w-0 flex-1 space-y-1">
@@ -229,7 +250,7 @@ export function LeadDetailContent({
                     ]),
                   )}
                   value={selectedResumeId}
-                  onValueChange={(v) => setSelectedResumeId(v ?? selectedResumeId)}
+                  onValueChange={(v) => pickResume(v ?? selectedResumeId)}
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue />
@@ -244,18 +265,17 @@ export function LeadDetailContent({
                   </SelectContent>
                 </Select>
               </label>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" onClick={rescore}>
-                  <RefreshCw className="size-4" aria-hidden />
-                  Rescore
-                </Button>
-                {rescored && (
-                  <span className="text-xs text-status-applied-foreground">
-                    Rescored
-                  </span>
-                )}
-              </div>
+              <Button variant="outline" onClick={runScore} disabled={scoring}>
+                <RefreshCw
+                  className={cn("size-4", scoring && "animate-spin")}
+                  aria-hidden
+                />
+                {scoring ? "Scoring…" : cached ? "Rescore" : "Calculate score"}
+              </Button>
             </div>
+          )}
+          {scoreError && (
+            <p className="mt-2 text-xs text-destructive">{scoreError}</p>
           )}
         </div>
 

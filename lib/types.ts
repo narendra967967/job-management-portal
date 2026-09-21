@@ -212,6 +212,18 @@ export interface Resume {
   sizeKb: number;
   updatedAt: string;
   isDefault?: boolean; // the resume used for a lead's fit score unless overridden
+  hasText?: boolean; // whether pasted resume text is stored (drives AI scoring)
+}
+
+/** Cached AI fit score for a (lead, resume) pair. */
+export interface FitScore {
+  score: number; // 0–100
+  rationale: string | null;
+}
+
+/** Key for the fit-scores map: one score per (lead, resume) pair. */
+export function fitScoreKey(leadId: string, resumeId: string): string {
+  return `${leadId}::${resumeId}`;
 }
 
 export const RESUME_ACCEPT = ".pdf,.doc,.docx";

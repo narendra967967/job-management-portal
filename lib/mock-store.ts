@@ -30,6 +30,7 @@ import {
   clearIngestErrorsAction,
   deleteResumeAction,
   disconnectGoogleAction,
+  getResumeTextAction,
   removeAiKeyAction,
   renameResumeAction,
   saveAiKeyAction,
@@ -39,13 +40,14 @@ import {
   updateAiPromptsAction,
   updateGmailConfigAction,
   updateProfileAction,
+  updateResumeTextAction,
   updateSyncIntervalAction,
 } from "@/actions/settings";
 import { syncMyGmailAction } from "@/actions/gmail-sync";
-import { saveJdAction, summarizeJdAction } from "@/actions/ai";
+import { saveJdAction, summarizeJdAction, scoreFitAction } from "@/actions/ai";
 import type { SyncResult } from "@/lib/gmail-sync";
 import type { GmailSyncStatus, IngestError } from "@/lib/queries";
-import { contactPersonKey, isJobOpen } from "@/lib/types";
+import { contactPersonKey, isJobOpen, fitScoreKey } from "@/lib/types";
 import {
   CLOSE_OUTCOME_LABELS,
   LEAD_STATUS_LABELS,
@@ -58,6 +60,7 @@ import type {
   CloseOutcome,
   ConnectionType,
   Contact,
+  FitScore,
   GoogleConnection,
   JobLead,
   JobLeadDetail,
@@ -106,7 +109,8 @@ let gmailConfig: GmailConfigData = {
 let syncIntervalHours = 24;
 let gmailSync: GmailSyncStatus = { lastSyncedAt: null, lastRunAt: null, lastError: null };
 let ingestErrors: IngestError[] = [];
-let aiPrompts = { summary: "", draft: "" };
+let aiPrompts = { summary: "", draft: "", score: "" };
+let fitScores: Record<string, FitScore> = {};
 let hydrated = false;
 
 const listeners = new Set<() => void>();
@@ -140,6 +144,7 @@ function apply(data: WorkspaceData) {
   gmailSync = data.gmailSync;
   ingestErrors = data.ingestErrors;
   aiPrompts = data.aiPrompts;
+  fitScores = data.fitScores;
 }
 
 /** Called by WorkspaceProvider during render so the first snapshot has data.
@@ -505,11 +510,44 @@ export async function clearIngestErrors() {
 }
 
 const getAiPrompts = () => aiPrompts;
-export function useAiPrompts(): { summary: string; draft: string } {
+export function useAiPrompts(): { summary: string; draft: string; score: string } {
   return useSyncExternalStore(subscribe, getAiPrompts, getAiPrompts);
 }
-export async function updateAiPrompts(input: { summary: string; draft: string }) {
+export async function updateAiPrompts(input: {
+  summary: string;
+  draft: string;
+  score: string;
+}) {
   await updateAiPromptsAction(input);
+  await refresh();
+}
+
+/* ---------------- fit scores (AI, on-demand) ---------------- */
+
+const getFitScores = () => fitScores;
+/** Cached fit score for a (lead, resume) pair, or null if not calculated. */
+export function useFitScore(
+  leadId: string,
+  resumeId: string,
+): FitScore | null {
+  const all = useSyncExternalStore(subscribe, getFitScores, getFitScores);
+  return all[fitScoreKey(leadId, resumeId)] ?? null;
+}
+
+/** Compute/refresh the AI fit score for a (lead, resume) pair. */
+export async function scoreFit(leadId: string, resumeId: string) {
+  const res = await scoreFitAction(leadId, resumeId);
+  if (res.ok) await refresh();
+  return res;
+}
+
+/* ---------------- resume text (for AI scoring) ---------------- */
+
+export function getResumeText(id: string): Promise<string> {
+  return getResumeTextAction(id);
+}
+export async function updateResumeText(id: string, text: string) {
+  await updateResumeTextAction(id, text);
   await refresh();
 }
 

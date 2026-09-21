@@ -40,7 +40,7 @@ import { StatusBadge } from "@/components/leads/status-badge";
 import { useLeadActionDialogs } from "@/components/leads/lead-actions";
 import { LeadDetailDialog } from "@/components/leads/lead-detail-dialog";
 import { LeadRemindersDialog } from "@/components/leads/lead-reminders-dialog";
-import { computeFitScore, fitBand } from "@/lib/fit";
+import { fitBand } from "@/lib/fit";
 import { useSearchQuery } from "@/lib/search-store";
 import {
   useLeads,
@@ -50,6 +50,7 @@ import {
   useRemindersForLead,
   useDefaultResumeId,
   useAppSettings,
+  useFitScore,
   setLeadStatus,
   deleteLeads,
 } from "@/lib/mock-store";
@@ -1200,8 +1201,8 @@ function LeadCard({
   const leadReminders = useRemindersForLead(lead.id);
   const contactCount = useContactsForLead(lead.id).length;
 
-  const fit = computeFitScore(lead.id, resumeId);
-  const band = fitBand(fit);
+  const cached = useFitScore(lead.id, resumeId);
+  const band = cached ? fitBand(cached.score) : null;
   const resumeLabel =
     resumes.find((r) => r.id === resumeId)?.label ?? "resume";
   const open = isJobOpen(status);
@@ -1320,14 +1321,14 @@ function LeadCard({
           <span
             className={cn(
               "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-semibold tabular-nums",
-              band.chip,
+              cached && band ? band.chip : "bg-muted text-muted-foreground",
             )}
           >
             <Gauge className="size-3" aria-hidden />
-            {fit}
+            {cached ? cached.score : "NC"}
           </span>
           <span className="min-w-0 truncate text-[11px] text-muted-foreground">
-            {band.label} · {resumeLabel}
+            {cached && band ? band.label : "Not scored"} · {resumeLabel}
           </span>
         </div>
         <div className="mt-auto flex flex-wrap items-center gap-1.5 pt-3">

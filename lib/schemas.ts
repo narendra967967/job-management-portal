@@ -74,7 +74,10 @@ export const aiKeySchema = z.string().trim().min(8, "Enter a valid API key.");
 export const aiPromptsSchema = z.object({
   summary: z.string().max(8000),
   draft: z.string().max(8000),
+  score: z.string().max(8000),
 });
+
+export const resumeTextSchema = z.string().max(50000);
 
 export const syncIntervalSchema = z.coerce
   .number()
@@ -123,6 +126,12 @@ export const deleteLeadsSchema = z
   .array(zId)
   .min(1, "Select at least one lead.")
   .max(500);
+
+/** AI fit-scoring of a lead against a resume. */
+export const scoreFitSchema = z.object({
+  leadId: zId,
+  resumeId: zId,
+});
 
 /* ---------------- helper ---------------- */
 

@@ -20,6 +20,7 @@ import {
   Sparkles,
   Wand2,
   Bell,
+  ScrollText,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -31,6 +32,8 @@ import {
   addResume,
   renameResume,
   deleteResume,
+  getResumeText,
+  updateResumeText,
   useAppSettings,
   useGmailSettings,
   useGoogle,
@@ -58,6 +61,7 @@ import {
 import {
   DEFAULT_SUMMARY_PROMPT,
   DEFAULT_DRAFT_PROMPT,
+  DEFAULT_SCORE_PROMPT,
 } from "@/lib/ai-prompts";
 import { signOutToHome, connectGoogle } from "@/lib/auth-client";
 import { previewPromptAction } from "@/actions/ai";
@@ -877,7 +881,7 @@ function AiProviderCard() {
 
 /* ---------------- AI prompts ---------------- */
 
-type PromptType = "summary" | "draft";
+type PromptType = "summary" | "draft" | "score";
 
 const SAMPLE_DRAFT_CONTEXT = `Message type: Cold outreach
 Recipient: Priya Nair, Staff Product Manager (Referral)
@@ -885,10 +889,18 @@ Role: Senior Product Manager at Stripe
 My resume: PM — Payments focus
 Job context: Own the payments acceptance experience at scale — reliability, cross-functional leadership, remote (US).`;
 
+const SAMPLE_SCORE_CONTEXT = `Role: Senior Product Manager at Stripe
+Job description / summary:
+Own the payments acceptance experience at scale — reliability, cross-functional leadership, remote (US).
+
+Candidate resume (PM — Payments focus):
+Product manager, 6 yrs in fintech/payments. Led acceptance & checkout at a mid-size PSP. Strong cross-functional leadership; some large-scale reliability exposure.`;
+
 function AiPromptsCard() {
   const prompts = useAiPrompts();
   const [summary, setSummary] = useState(prompts.summary);
   const [draft, setDraft] = useState(prompts.draft);
+  const [score, setScore] = useState(prompts.score);
   const prev = useRef(prompts);
   const [savedType, setSavedType] = useState<PromptType | null>(null);
 
@@ -904,18 +916,25 @@ function AiPromptsCard() {
   useEffect(() => {
     if (prompts.summary !== prev.current.summary) setSummary(prompts.summary);
     if (prompts.draft !== prev.current.draft) setDraft(prompts.draft);
+    if (prompts.score !== prev.current.score) setScore(prompts.score);
     prev.current = prompts;
   }, [prompts]);
 
-  const valueOf = (t: PromptType) => (t === "summary" ? summary : draft);
+  const valueOf = (t: PromptType) =>
+    t === "summary" ? summary : t === "draft" ? draft : score;
   const defaultOf = (t: PromptType) =>
-    t === "summary" ? DEFAULT_SUMMARY_PROMPT : DEFAULT_DRAFT_PROMPT;
+    t === "summary"
+      ? DEFAULT_SUMMARY_PROMPT
+      : t === "draft"
+        ? DEFAULT_DRAFT_PROMPT
+        : DEFAULT_SCORE_PROMPT;
 
-  // Save just one prompt; keep the other at its currently-saved value.
+  // Save just one prompt; keep the others at their currently-saved value.
   function saveOne(t: PromptType) {
     updateAiPrompts({
       summary: t === "summary" ? summary : prompts.summary,
       draft: t === "draft" ? draft : prompts.draft,
+      score: t === "score" ? score : prompts.score,
     });
     setSavedType(t);
     setTimeout(() => setSavedType((s) => (s === t ? null : s)), 1500);
@@ -925,7 +944,13 @@ function AiPromptsCard() {
     setTestType(t);
     setTestResult("");
     setTestError("");
-    setTestInput(t === "draft" ? SAMPLE_DRAFT_CONTEXT : "");
+    setTestInput(
+      t === "draft"
+        ? SAMPLE_DRAFT_CONTEXT
+        : t === "score"
+          ? SAMPLE_SCORE_CONTEXT
+          : "",
+    );
   }
 
   async function runTest() {
@@ -951,11 +976,11 @@ function AiPromptsCard() {
     <section className="rounded-2xl border bg-card p-4 md:p-5">
       <h2 className="text-sm font-medium">AI prompts</h2>
       <p className="mt-0.5 text-xs text-muted-foreground">
-        Customize the instructions used by “Summarize with AI” and “Draft with
-        AI”. Leave blank to use the default. Write instructions only — the pasted
-        job description and the lead/contact details are added automatically. Use
-        <span className="font-medium"> Test</span> to preview a prompt before
-        saving it.
+        Customize the instructions used by “Summarize with AI”, “Draft with AI”,
+        and fit scoring. Leave blank to use the default. Write instructions only
+        — the job description, resume, and lead/contact details are added
+        automatically. Use <span className="font-medium">Test</span> to preview a
+        prompt before saving it.
       </p>
 
       <div className="mt-4 space-y-6">
@@ -981,6 +1006,17 @@ function AiPromptsCard() {
           placeholder={DEFAULT_DRAFT_PROMPT}
           minHeight="min-h-32"
         />
+        <PromptEditor
+          label="Fit score prompt"
+          value={score}
+          onChange={setScore}
+          onReset={() => setScore("")}
+          onTest={() => openTest("score")}
+          onSave={() => saveOne("score")}
+          saved={savedType === "score"}
+          placeholder={DEFAULT_SCORE_PROMPT}
+          minHeight="min-h-24"
+        />
       </div>
 
       <Dialog
@@ -990,7 +1026,13 @@ function AiPromptsCard() {
         <DialogContent className="sm:max-w-xl lg:max-w-3xl">
           <DialogHeader>
             <DialogTitle>
-              Test {testType === "draft" ? "draft outreach" : "summarize"} prompt
+              Test{" "}
+              {testType === "draft"
+                ? "draft outreach"
+                : testType === "score"
+                  ? "fit score"
+                  : "summarize"}{" "}
+              prompt
             </DialogTitle>
             <DialogDescription>
               Run your prompt against sample text and review the result. Nothing
@@ -1003,7 +1045,9 @@ function AiPromptsCard() {
               <Label htmlFor="prompt-test-input">
                 {testType === "draft"
                   ? "Sample context"
-                  : "Sample job description"}
+                  : testType === "score"
+                    ? "Sample job + resume"
+                    : "Sample job description"}
               </Label>
               <Textarea
                 id="prompt-test-input"
@@ -1012,7 +1056,9 @@ function AiPromptsCard() {
                 placeholder={
                   testType === "draft"
                     ? "Recipient, role, resume, job context…"
-                    : "Paste a job description to summarize…"
+                    : testType === "score"
+                      ? "Job description + candidate resume…"
+                      : "Paste a job description to summarize…"
                 }
                 className="min-h-28"
               />
@@ -1026,7 +1072,9 @@ function AiPromptsCard() {
                   ? "Run again"
                   : testType === "draft"
                     ? "Draft & test"
-                    : "Summarize & test"}
+                    : testType === "score"
+                      ? "Score & test"
+                      : "Summarize & test"}
             </Button>
 
             {testError && (
@@ -1199,6 +1247,32 @@ function ResumesCard() {
   const [pending, setPending] = useState<PendingFile | null>(null);
   const [pendingName, setPendingName] = useState("");
   const [nameError, setNameError] = useState("");
+  // Resume-text editor (paste plain text used by AI fit scoring).
+  const [textEditId, setTextEditId] = useState<string | null>(null);
+  const [textValue, setTextValue] = useState("");
+  const [textLoading, setTextLoading] = useState(false);
+  const [textSaving, setTextSaving] = useState(false);
+
+  async function openText(id: string) {
+    setTextEditId(id);
+    setTextValue("");
+    setTextLoading(true);
+    try {
+      setTextValue(await getResumeText(id));
+    } finally {
+      setTextLoading(false);
+    }
+  }
+  async function saveText() {
+    if (!textEditId) return;
+    setTextSaving(true);
+    try {
+      await updateResumeText(textEditId, textValue);
+      setTextEditId(null);
+    } finally {
+      setTextSaving(false);
+    }
+  }
 
   function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -1308,10 +1382,30 @@ function ResumesCard() {
                     <span className="whitespace-nowrap">
                       {formatSize(r.sizeKb)}
                     </span>
+                    <span aria-hidden>·</span>
+                    <span
+                      className={cn(
+                        "whitespace-nowrap font-medium",
+                        r.hasText
+                          ? "text-status-applied-foreground"
+                          : "text-muted-foreground/70",
+                      )}
+                    >
+                      {r.hasText ? "Text added" : "No text"}
+                    </span>
                   </p>
                   </div>
                 </div>
                 <div className="flex items-center justify-end gap-0.5">
+                <button
+                  type="button"
+                  aria-label={`Edit résumé text for ${r.label}`}
+                  title="Résumé text (used for AI scoring)"
+                  onClick={() => openText(r.id)}
+                  className="flex size-11 items-center justify-center rounded-md sm:size-9 text-muted-foreground hover:bg-muted hover:text-foreground"
+                >
+                  <ScrollText className="size-4" aria-hidden />
+                </button>
                 <button
                   type="button"
                   aria-label={
@@ -1450,6 +1544,46 @@ function ResumesCard() {
               Cancel
             </Button>
             <Button onClick={confirmUpload}>Add resume</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Paste résumé text (used by AI fit scoring) */}
+      <Dialog
+        open={textEditId !== null}
+        onOpenChange={(o) => !o && !textSaving && setTextEditId(null)}
+      >
+        <DialogContent className="sm:max-w-lg lg:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Résumé text</DialogTitle>
+            <DialogDescription>
+              Paste the plain text of this résumé. It&apos;s used only to score
+              how well leads fit — nothing is sent anywhere until you press
+              Calculate/Rescore on a lead.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-1">
+            <Textarea
+              value={textLoading ? "" : textValue}
+              onChange={(e) => setTextValue(e.target.value)}
+              placeholder={
+                textLoading ? "Loading…" : "Paste your résumé text here…"
+              }
+              disabled={textLoading}
+              className="max-h-[50vh] min-h-56"
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setTextEditId(null)}
+              disabled={textSaving}
+            >
+              Cancel
+            </Button>
+            <Button onClick={saveText} disabled={textSaving || textLoading}>
+              {textSaving ? "Saving…" : "Save text"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
