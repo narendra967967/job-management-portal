@@ -13,7 +13,7 @@ import { randomUUID } from "node:crypto";
 import { config } from "dotenv";
 import { Pool } from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import * as schema from "./schema";
 import { hashPassword } from "../lib/password";
 
@@ -30,6 +30,26 @@ async function main() {
   if (!url) throw new Error("DATABASE_URL is not set (.env.local).");
   const pool = new Pool({ connectionString: url });
   const db = drizzle(pool, { schema });
+
+  // Safety guard: seeding CLEARS every app table. Refuse to run against a DB
+  // that already holds data unless --force is passed, so real leads/résumés
+  // aren't wiped by accident.
+  const force = process.argv.includes("--force");
+  const [{ n: existingLeads }] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(schema.jobLeads);
+  if (existingLeads > 0 && !force) {
+    console.error(
+      `\n⛔ Refusing to seed: the database already has ${existingLeads} lead(s).`,
+    );
+    console.error(
+      "   Seeding CLEARS all app data (leads, contacts, reminders, résumés, …)\n" +
+        "   and re-inserts the demo set. To wipe and reseed anyway, run:\n\n" +
+        "     npm run db:seed -- --force\n",
+    );
+    await pool.end();
+    process.exit(1);
+  }
 
   const d = (s: string) => new Date(`${s}T12:00:00Z`);
 
