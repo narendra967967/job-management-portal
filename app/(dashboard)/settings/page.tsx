@@ -25,6 +25,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import {
   useProfile,
   updateProfile,
@@ -1241,6 +1242,7 @@ interface PendingFile {
 
 function ResumesCard() {
   const resumes = useResumes();
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const [defaultResumeId, setDefaultResumeId] = useDefaultResumeId();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState("");
@@ -1478,7 +1480,18 @@ function ResumesCard() {
                 <button
                   type="button"
                   aria-label={`Delete ${r.label}`}
-                  onClick={() => deleteResume(r.id)}
+                  onClick={async () => {
+                    if (
+                      await confirm({
+                        title: "Delete résumé?",
+                        description: `"${r.label}" and its stored file and text will be permanently removed. This can't be undone.`,
+                        confirmLabel: "Delete",
+                        destructive: true,
+                      })
+                    ) {
+                      deleteResume(r.id);
+                    }
+                  }}
                   className="flex size-11 items-center justify-center rounded-md sm:size-9 text-muted-foreground hover:bg-muted hover:text-destructive"
                 >
                   <Trash2 className="size-4" aria-hidden />
@@ -1628,6 +1641,8 @@ function ResumesCard() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {confirmDialog}
     </section>
   );
 }
