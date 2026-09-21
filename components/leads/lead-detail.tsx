@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -13,6 +13,7 @@ import {
   Pencil,
   Trash2,
   UserPlus,
+  RefreshCw,
 } from "lucide-react";
 import {
   CLOSE_OUTCOME_LABELS,
@@ -38,6 +39,13 @@ import { LeadTimeline } from "@/components/leads/lead-timeline";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { MarkdownLite, looksLikeMarkdown } from "@/components/ui/markdown-lite";
 import { computeFitScore, fitBand } from "@/lib/fit";
 import {
@@ -94,9 +102,13 @@ export function LeadDetailContent({
   detail,
   resumes,
   resumeId,
+  onResumeChange,
 }: Props & {
   /** Resume to score against; falls back to the user's default resume. */
   resumeId?: string;
+  /** Called when the user rescores against a different resume (so the caller
+   *  — e.g. the leads card — can reflect the new choice). */
+  onResumeChange?: (resumeId: string) => void;
 }) {
   const contacts = useContactsForLead(lead.id);
   // Status is owned by the store so it stays in sync everywhere and closing a
@@ -107,11 +119,28 @@ export function LeadDetailContent({
   const open = isJobOpen(status);
 
   const [defaultResumeId] = useDefaultResumeId();
-  const scoredResumeId = resumeId || defaultResumeId;
+  const incomingResumeId = resumeId || defaultResumeId;
+  // `scored` = the resume the shown score is based on; `selected` = the resume
+  // picked in the dropdown, applied on Rescore.
+  const [scoredResumeId, setScoredResumeId] = useState(incomingResumeId);
+  const [selectedResumeId, setSelectedResumeId] = useState(incomingResumeId);
+  const [rescored, setRescored] = useState(false);
+  useEffect(() => {
+    setScoredResumeId(incomingResumeId);
+    setSelectedResumeId(incomingResumeId);
+  }, [lead.id, incomingResumeId]);
+
   const fit = computeFitScore(lead.id, scoredResumeId);
   const band = fitBand(fit);
   const resumeLabel =
     resumes.find((r) => r.id === scoredResumeId)?.label ?? "resume";
+
+  function rescore() {
+    setScoredResumeId(selectedResumeId);
+    onResumeChange?.(selectedResumeId);
+    setRescored(true);
+    setTimeout(() => setRescored(false), 1500);
+  }
 
   return (
     <div className="space-y-5">
@@ -160,27 +189,74 @@ export function LeadDetailContent({
         </div>
 
         {/* Fit score vs the chosen (or default) resume */}
-        <div className="mt-4 flex items-center gap-3 rounded-xl border bg-muted/30 p-3">
-          <span
-            className={cn(
-              "flex size-12 shrink-0 items-center justify-center rounded-full text-base font-semibold tabular-nums",
-              band.chip,
-            )}
-          >
-            {fit}
-          </span>
-          <div className="min-w-0">
-            <p className="flex flex-wrap items-center gap-x-1.5 text-sm font-medium">
-              {band.label}
-              <span className="rounded bg-ai-muted px-1.5 py-0.5 text-[10px] font-medium text-ai">
-                <Sparkles className="mr-0.5 inline size-2.5" aria-hidden />
-                preview
-              </span>
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {band.advice} · scored vs {resumeLabel}
-            </p>
+        <div className="mt-4 rounded-xl border bg-muted/30 p-3">
+          <div className="flex items-center gap-3">
+            <span
+              className={cn(
+                "flex size-12 shrink-0 items-center justify-center rounded-full text-base font-semibold tabular-nums",
+                band.chip,
+              )}
+            >
+              {fit}
+            </span>
+            <div className="min-w-0">
+              <p className="flex flex-wrap items-center gap-x-1.5 text-sm font-medium">
+                {band.label}
+                <span className="rounded bg-ai-muted px-1.5 py-0.5 text-[10px] font-medium text-ai">
+                  <Sparkles className="mr-0.5 inline size-2.5" aria-hidden />
+                  preview
+                </span>
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {band.advice} · scored vs{" "}
+                <span className="font-medium text-foreground">{resumeLabel}</span>
+              </p>
+            </div>
           </div>
+
+          {/* Re-score against a different resume */}
+          {resumes.length > 0 && (
+            <div className="mt-3 flex flex-col gap-2 border-t pt-3 sm:flex-row sm:items-end">
+              <label className="min-w-0 flex-1 space-y-1">
+                <span className="text-xs font-medium text-muted-foreground">
+                  Score against resume
+                </span>
+                <Select
+                  items={Object.fromEntries(
+                    resumes.map((r) => [
+                      r.id,
+                      r.isDefault ? `${r.label} · default` : r.label,
+                    ]),
+                  )}
+                  value={selectedResumeId}
+                  onValueChange={(v) => setSelectedResumeId(v ?? selectedResumeId)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {resumes.map((r) => (
+                      <SelectItem key={r.id} value={r.id}>
+                        {r.label}
+                        {r.isDefault ? " · default" : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </label>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" onClick={rescore}>
+                  <RefreshCw className="size-4" aria-hidden />
+                  Rescore
+                </Button>
+                {rescored && (
+                  <span className="text-xs text-status-applied-foreground">
+                    Rescored
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="mt-4">

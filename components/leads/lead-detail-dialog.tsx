@@ -21,12 +21,14 @@ export function LeadDetailDialog({
   lead,
   resumes,
   resumeId,
+  onResumeChange,
   open,
   onOpenChange,
 }: {
   lead: JobLead | null;
   resumes: Resume[];
   resumeId?: string;
+  onResumeChange?: (resumeId: string) => void;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -44,6 +46,7 @@ export function LeadDetailDialog({
               detail={detail}
               resumes={resumes}
               resumeId={resumeId}
+              onResumeChange={onResumeChange}
             />
             <Link
               href={`/leads/${lead.id}`}

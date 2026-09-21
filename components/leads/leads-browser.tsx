@@ -828,6 +828,9 @@ export function LeadsBrowser({ scope = "all" }: { scope?: LeadsScope }) {
         lead={detailLead}
         resumes={resumes}
         resumeId={detailLead ? resumeIdFor(detailLead.id) : undefined}
+        onResumeChange={(rid) =>
+          detailLead && setResumeFor(detailLead.id, rid)
+        }
         open={detailLead !== null}
         onOpenChange={(o) => !o && setDetailLead(null)}
       />
