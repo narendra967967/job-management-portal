@@ -26,11 +26,12 @@ import {
   updateContactAction,
 } from "@/actions/data";
 import {
-  addResumeAction,
   clearIngestErrorsAction,
   deleteResumeAction,
   disconnectGoogleAction,
+  getResumeFileAction,
   getResumeTextAction,
+  uploadResumeAction,
   removeAiKeyAction,
   renameResumeAction,
   saveAiKeyAction,
@@ -425,14 +426,19 @@ export async function removeAiKey() {
   await refresh();
 }
 
-export async function addResume(input: {
-  label: string;
-  fileName: string;
-  fileType: "pdf" | "doc" | "docx";
-  sizeKb: number;
-}) {
-  await addResumeAction(input);
-  await refresh();
+/** Upload a résumé file (server extracts + stores text). Returns the result. */
+export async function uploadResume(file: File, label: string) {
+  const fd = new FormData();
+  fd.append("file", file);
+  fd.append("label", label);
+  const res = await uploadResumeAction(fd);
+  if (res.ok) await refresh();
+  return res;
+}
+
+/** Fetch a stored résumé file for download. */
+export function getResumeFile(id: string) {
+  return getResumeFileAction(id);
 }
 
 export async function renameResume(id: string, label: string) {

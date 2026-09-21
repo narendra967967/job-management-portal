@@ -226,8 +226,11 @@ export function fitScoreKey(leadId: string, resumeId: string): string {
   return `${leadId}::${resumeId}`;
 }
 
-export const RESUME_ACCEPT = ".pdf,.doc,.docx";
-export const RESUME_ALLOWED_EXT = ["pdf", "doc", "docx"] as const;
+// Only PDF and DOCX — these extract to text reliably for AI scoring. (Legacy
+// .doc is intentionally excluded.) The DB enum still lists "doc" for historical
+// rows, but new uploads are restricted to these.
+export const RESUME_ACCEPT = ".pdf,.docx";
+export const RESUME_ALLOWED_EXT = ["pdf", "docx"] as const;
 export const RESUME_MAX_BYTES = 5 * 1024 * 1024; // 5 MB
 
 export interface Profile {

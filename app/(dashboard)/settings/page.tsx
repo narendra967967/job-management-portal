@@ -21,6 +21,7 @@ import {
   Wand2,
   Bell,
   ScrollText,
+  Download,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -29,11 +30,12 @@ import {
   updateProfile,
   useResumes,
   useDefaultResumeId,
-  addResume,
+  uploadResume,
   renameResume,
   deleteResume,
   getResumeText,
   updateResumeText,
+  getResumeFile,
   useAppSettings,
   useGmailSettings,
   useGoogle,
@@ -1245,8 +1247,10 @@ function ResumesCard() {
   const [error, setError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   const [pending, setPending] = useState<PendingFile | null>(null);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [pendingName, setPendingName] = useState("");
   const [nameError, setNameError] = useState("");
+  const [uploading, setUploading] = useState(false);
   // Resume-text editor (paste plain text used by AI fit scoring).
   const [textEditId, setTextEditId] = useState<string | null>(null);
   const [textValue, setTextValue] = useState("");
@@ -1279,11 +1283,12 @@ function ResumesCard() {
     if (!file) return;
     const ext = (file.name.split(".").pop() ?? "").toLowerCase();
     if (!(RESUME_ALLOWED_EXT as readonly string[]).includes(ext)) {
-      setError("Upload a PDF or Word document (.pdf, .doc, .docx).");
+      setError("Upload a PDF or Word file (.pdf, .docx).");
     } else if (file.size > RESUME_MAX_BYTES) {
       setError("File must be under 5 MB.");
     } else {
       setError("");
+      setPendingFile(file);
       setPending({
         fileName: file.name,
         fileType: ext as Resume["fileType"],
@@ -1295,21 +1300,41 @@ function ResumesCard() {
     if (fileRef.current) fileRef.current.value = "";
   }
 
-  function confirmUpload() {
-    if (!pending) return;
+  async function confirmUpload() {
+    if (!pendingFile) return;
     const label = pendingName.trim();
     if (!label) {
       setNameError("Give this resume a name.");
       return;
     }
-    addResume({
-      label,
-      fileName: pending.fileName,
-      fileType: pending.fileType,
-      sizeKb: pending.sizeKb,
-    });
+    setUploading(true);
+    setNameError("");
+    const res = await uploadResume(pendingFile, label);
+    setUploading(false);
+    if (!res.ok) {
+      setNameError(res.error);
+      return;
+    }
     setPending(null);
+    setPendingFile(null);
     setPendingName("");
+  }
+
+  async function downloadResume(id: string) {
+    const res = await getResumeFile(id);
+    if (!res.ok) {
+      setError(res.error);
+      return;
+    }
+    const bytes = Uint8Array.from(atob(res.base64), (c) => c.charCodeAt(0));
+    const url = URL.createObjectURL(
+      new Blob([bytes], { type: res.contentType }),
+    );
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = res.fileName;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   function saveEdit(id: string) {
@@ -1322,8 +1347,9 @@ function ResumesCard() {
     <section className="rounded-2xl border bg-card p-4 md:p-5">
       <h2 className="text-sm font-medium">Resumes</h2>
       <p className="mt-0.5 text-xs text-muted-foreground">
-        Upload PDF or Word files to pick from when drafting outreach. The
-        default resume is used to score how well each lead fits.
+        Upload PDF or Word (.docx) résumés. On upload the text is extracted and
+        stored for AI fit scoring — edit it any time with the{" "}
+        <ScrollText className="inline size-3" aria-hidden /> button.
       </p>
 
       <ul className="mt-4 space-y-2">
@@ -1397,6 +1423,15 @@ function ResumesCard() {
                   </div>
                 </div>
                 <div className="flex items-center justify-end gap-0.5">
+                <button
+                  type="button"
+                  aria-label={`Download ${r.label}`}
+                  title="Download file"
+                  onClick={() => downloadResume(r.id)}
+                  className="flex size-11 items-center justify-center rounded-md sm:size-9 text-muted-foreground hover:bg-muted hover:text-foreground"
+                >
+                  <Download className="size-4" aria-hidden />
+                </button>
                 <button
                   type="button"
                   aria-label={`Edit résumé text for ${r.label}`}
@@ -1476,15 +1511,16 @@ function ResumesCard() {
         Upload resume
       </Button>
       <p className="mt-2 text-[11px] text-muted-foreground">
-        PDF or Word (.pdf, .doc, .docx), up to 5 MB.
+        PDF or Word (.pdf, .docx), up to 5 MB.
       </p>
       {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
 
       <Dialog
         open={pending !== null}
         onOpenChange={(o) => {
-          if (!o) {
+          if (!o && !uploading) {
             setPending(null);
+            setPendingFile(null);
             setPendingName("");
             setNameError("");
           }
@@ -1494,7 +1530,8 @@ function ResumesCard() {
           <DialogHeader>
             <DialogTitle>Name this resume</DialogTitle>
             <DialogDescription>
-              A short name to recognise it by when drafting outreach.
+              A short name to recognise it by. The text is extracted on upload
+              for AI scoring.
             </DialogDescription>
           </DialogHeader>
 
@@ -1535,15 +1572,19 @@ function ResumesCard() {
           <DialogFooter>
             <Button
               variant="outline"
+              disabled={uploading}
               onClick={() => {
                 setPending(null);
+                setPendingFile(null);
                 setPendingName("");
                 setNameError("");
               }}
             >
               Cancel
             </Button>
-            <Button onClick={confirmUpload}>Add resume</Button>
+            <Button onClick={confirmUpload} disabled={uploading}>
+              {uploading ? "Adding…" : "Add resume"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

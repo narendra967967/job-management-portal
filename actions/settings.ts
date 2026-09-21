@@ -13,6 +13,7 @@ import {
   gmailConfig as gmailConfigT,
   gmailIngestErrors as errorsT,
   resumes as resumesT,
+  resumeFiles as resumeFilesT,
   user as userT,
   userSettings as settingsT,
 } from "@/db/schema";
@@ -24,13 +25,13 @@ import {
   gmailConfigSchema,
   parseInput,
   profileSchema,
-  resumeMetaSchema,
   resumeTextSchema,
   syncIntervalSchema,
   zId,
 } from "@/lib/schemas";
 import { z } from "zod";
-import type { AiProvider } from "@/lib/types";
+import { RESUME_MAX_BYTES, type AiProvider } from "@/lib/types";
+import { extractResumeText } from "@/lib/resume-extract";
 
 /** Ensure a user_settings row exists, then merge `set` into it. */
 async function upsertSettings(userId: string, set: Record<string, unknown>) {
@@ -210,25 +211,89 @@ export async function disconnectGoogleAction() {
 
 /* ---------------- resumes ---------------- */
 
-export async function addResumeAction(input: {
-  label: string;
-  fileName: string;
-  fileType: "pdf" | "doc" | "docx";
-  sizeKb: number;
-}) {
+/**
+ * Upload a résumé: store the file bytes, extract the text (used for AI
+ * scoring), and create the résumé row. Accepts .pdf and .docx only.
+ */
+export async function uploadResumeAction(
+  formData: FormData,
+): Promise<{ ok: true; resumeId: string } | { ok: false; error: string }> {
   const userId = await getCurrentUserId();
-  const meta = parseInput(resumeMetaSchema, input);
-  // File bytes aren't stored yet (nothing reads them until AI drafting lands in
-  // Milestone C) — store metadata with a placeholder blobUrl.
-  await db.insert(resumesT).values({
+  const file = formData.get("file");
+  const label = parseInput(
+    z.string().trim().min(1, "Give this résumé a name.").max(120),
+    formData.get("label"),
+  );
+  if (!(file instanceof File)) return { ok: false, error: "No file provided." };
+  if (file.size > RESUME_MAX_BYTES) {
+    return { ok: false, error: "File must be under 5 MB." };
+  }
+  const ext = (file.name.split(".").pop() ?? "").toLowerCase();
+  if (ext !== "pdf" && ext !== "docx") {
+    return { ok: false, error: "Upload a PDF or Word (.docx) file." };
+  }
+
+  const bytes = Buffer.from(await file.arrayBuffer());
+  let text = "";
+  try {
+    text = await extractResumeText(bytes, ext);
+  } catch {
+    // Extraction can fail on scanned/oddly-encoded files — keep the file and
+    // let the user paste the text manually.
+    text = "";
+  }
+
+  const [row] = await db
+    .insert(resumesT)
+    .values({
+      userId,
+      label,
+      fileName: file.name,
+      fileType: ext,
+      sizeKb: Math.max(1, Math.round(file.size / 1024)),
+      blobUrl: "db", // bytes live in resume_files, not blob storage
+      resumeText: text || null,
+      isDefault: false,
+    })
+    .returning({ id: resumesT.id });
+
+  await db.insert(resumeFilesT).values({
+    resumeId: row.id,
     userId,
-    label: meta.label,
-    fileName: meta.fileName,
-    fileType: meta.fileType,
-    sizeKb: meta.sizeKb,
-    blobUrl: `local://${meta.fileName}`,
-    isDefault: false,
+    contentType: file.type || "application/octet-stream",
+    data: bytes,
   });
+
+  return { ok: true, resumeId: row.id };
+}
+
+/** Fetch a stored résumé file for download (base64-encoded). */
+export async function getResumeFileAction(id: string): Promise<
+  { ok: true; fileName: string; contentType: string; base64: string } | {
+    ok: false;
+    error: string;
+  }
+> {
+  const userId = await getCurrentUserId();
+  const resumeId = parseInput(zId, id);
+  const [meta] = await db
+    .select({ fileName: resumesT.fileName })
+    .from(resumesT)
+    .where(and(eq(resumesT.id, resumeId), eq(resumesT.userId, userId)));
+  if (!meta) return { ok: false, error: "Résumé not found." };
+  const [f] = await db
+    .select({ contentType: resumeFilesT.contentType, data: resumeFilesT.data })
+    .from(resumeFilesT)
+    .where(
+      and(eq(resumeFilesT.resumeId, resumeId), eq(resumeFilesT.userId, userId)),
+    );
+  if (!f) return { ok: false, error: "No file stored for this résumé." };
+  return {
+    ok: true,
+    fileName: meta.fileName,
+    contentType: f.contentType,
+    base64: f.data.toString("base64"),
+  };
 }
 
 export async function renameResumeAction(id: string, label: string) {

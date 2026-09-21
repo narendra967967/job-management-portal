@@ -24,9 +24,17 @@ import {
   timestamp,
   uniqueIndex,
   index,
+  customType,
 } from "drizzle-orm/pg-core";
 
 import { user } from "./auth-schema";
+
+// Raw bytes column (node-postgres returns/accepts a Buffer).
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType() {
+    return "bytea";
+  },
+});
 
 // Auth tables live alongside app tables in every migration.
 export * from "./auth-schema";
@@ -341,6 +349,26 @@ export const userSettings = pgTable("user_settings", {
     .notNull()
     .defaultNow()
     .$onUpdate(() => new Date()),
+});
+
+/**
+ * The uploaded résumé file bytes, kept out of the resumes table so they're
+ * never pulled into a workspace read. One file per résumé (stored in Postgres
+ * for now; swap to blob storage at go-live). Text is extracted at upload and
+ * lives in resumes.resume_text.
+ */
+export const resumeFiles = pgTable("resume_files", {
+  resumeId: uuid("resume_id")
+    .primaryKey()
+    .references(() => resumes.id, { onDelete: "cascade" }),
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  contentType: text("content_type").notNull(),
+  data: bytea("data").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 /**
