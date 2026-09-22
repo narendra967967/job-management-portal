@@ -64,6 +64,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import {
   Select,
   SelectContent,
@@ -1436,7 +1437,10 @@ function StatusControl({
   status: LeadStatus;
   onChange: (status: LeadStatus, outcome?: CloseOutcome | null) => void;
 }) {
+  const { confirm, dialog } = useConfirm();
   return (
+    <>
+      {dialog}
     <DropdownMenu>
       <DropdownMenuTrigger
         aria-label="Change status"
@@ -1464,7 +1468,21 @@ function StatusControl({
         <DropdownMenuGroup>
           <DropdownMenuLabel>Close out</DropdownMenuLabel>
         </DropdownMenuGroup>
-        <DropdownMenuItem onClick={() => onChange("discarded")}>
+        <DropdownMenuItem
+          onClick={async () => {
+            if (
+              await confirm({
+                title: "Discard this lead?",
+                description:
+                  "It moves to Archive and any pending follow-ups are cancelled. You can reopen it later.",
+                confirmLabel: "Discard",
+                destructive: true,
+              })
+            ) {
+              onChange("discarded");
+            }
+          }}
+        >
           <Archive className="size-4" aria-hidden />
           Discard
         </DropdownMenuItem>
@@ -1483,6 +1501,7 @@ function StatusControl({
         </DropdownMenuSub>
       </DropdownMenuContent>
     </DropdownMenu>
+    </>
   );
 }
 

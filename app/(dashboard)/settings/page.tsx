@@ -373,6 +373,7 @@ function ProfileCard() {
 function GoogleCard() {
   const google = useGoogle();
   const [settings, updateSettings] = useGmailSettings();
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   const [sendersText, setSendersText] = useState("");
   const [label, setLabel] = useState("");
@@ -474,7 +475,22 @@ function GoogleCard() {
               <Button onClick={runSync} disabled={syncing}>
                 {syncing ? "Syncing…" : "Sync now"}
               </Button>
-              <Button variant="outline" onClick={() => disconnectGoogle()}>
+              <Button
+                variant="outline"
+                onClick={async () => {
+                  if (
+                    await confirm({
+                      title: "Disconnect Google?",
+                      description:
+                        "Gmail sync will stop until you reconnect. Your captured leads stay.",
+                      confirmLabel: "Disconnect",
+                      destructive: true,
+                    })
+                  ) {
+                    disconnectGoogle();
+                  }
+                }}
+              >
                 Disconnect
               </Button>
             </div>
@@ -589,6 +605,7 @@ function GoogleCard() {
           </div>
         </div>
       </div>
+      {confirmDialog}
     </section>
   );
 }
@@ -680,6 +697,7 @@ function SyncScheduleCard() {
 
 function IngestionIssuesCard() {
   const errors = useIngestErrors();
+  const { confirm, dialog: confirmDialog } = useConfirm();
   return (
     <section className="rounded-2xl border bg-card p-4 md:p-5">
       <div className="flex items-start justify-between gap-3">
@@ -690,11 +708,26 @@ function IngestionIssuesCard() {
           </p>
         </div>
         {errors.length > 0 && (
-          <Button variant="outline" onClick={() => clearIngestErrors()}>
+          <Button
+            variant="outline"
+            onClick={async () => {
+              if (
+                await confirm({
+                  title: "Clear ingestion issues?",
+                  description: `All ${errors.length} logged parse issue${errors.length === 1 ? "" : "s"} will be removed. This can't be undone.`,
+                  confirmLabel: "Clear",
+                  destructive: true,
+                })
+              ) {
+                clearIngestErrors();
+              }
+            }}
+          >
             Clear
           </Button>
         )}
       </div>
+      {confirmDialog}
 
       {errors.length === 0 ? (
         <p className="mt-4 rounded-lg border border-dashed p-4 text-center text-xs text-muted-foreground">
@@ -725,6 +758,7 @@ function IngestionIssuesCard() {
 
 function AiProviderCard() {
   const ai = useAiSettings();
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const [provider, setProvider] = useState<AiProvider>(ai.provider);
   const [model, setModel] = useState(ai.model);
   const [keyInput, setKeyInput] = useState("");
@@ -761,7 +795,18 @@ function AiProviderCard() {
     setTimeout(() => setSaved(false), 1500);
   }
 
-  function removeKey() {
+  async function removeKey() {
+    if (
+      !(await confirm({
+        title: "Remove API key?",
+        description:
+          "AI features (summaries, drafting, fit scoring) will stop working until you add a key again.",
+        confirmLabel: "Remove",
+        destructive: true,
+      }))
+    ) {
+      return;
+    }
     removeAiKey();
     setKeyInput("");
     setEditingKey(true);
@@ -878,6 +923,7 @@ function AiProviderCard() {
           never sent to the browser or exposed in client code.
         </p>
       </div>
+      {confirmDialog}
     </section>
   );
 }

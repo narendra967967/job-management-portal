@@ -47,6 +47,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { MarkdownLite, looksLikeMarkdown } from "@/components/ui/markdown-lite";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { fitBand } from "@/lib/fit";
 import {
   useContactsForLead,
@@ -440,6 +441,7 @@ function OverviewTab({ leadId, detail }: { leadId: string; detail?: JobLeadDetai
 
 function ContactsTab({ lead, canAct }: { lead: JobLead; canAct: boolean }) {
   const contacts = useContactsForLead(lead.id);
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const [editing, setEditing] = useState<Contact | null>(null);
   const [adding, setAdding] = useState(false);
 
@@ -468,7 +470,18 @@ function ContactsTab({ lead, canAct }: { lead: JobLead; canAct: boolean }) {
               <ContactCard
                 contact={c}
                 onEdit={() => setEditing(c)}
-                onDelete={() => deleteContact(c.id)}
+                onDelete={async () => {
+                  if (
+                    await confirm({
+                      title: "Delete contact?",
+                      description: `${c.name} will be removed from this lead. This can't be undone.`,
+                      confirmLabel: "Delete",
+                      destructive: true,
+                    })
+                  ) {
+                    deleteContact(c.id);
+                  }
+                }}
               />
             </li>
           ))}
@@ -485,6 +498,7 @@ function ContactsTab({ lead, canAct }: { lead: JobLead; canAct: boolean }) {
           }
         }}
       />
+      {confirmDialog}
     </>
   );
 }

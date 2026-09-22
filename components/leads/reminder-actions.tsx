@@ -9,6 +9,7 @@ import {
   snoozeReminder,
 } from "@/lib/mock-store";
 import { Input } from "@/components/ui/input";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -52,9 +53,11 @@ const iconBtn =
 export function ReminderActions({ reminder }: { reminder: Reminder }) {
   const done = reminder.outcome !== "pending";
   const [custom, setCustom] = useState("");
+  const { confirm, dialog } = useConfirm();
 
   return (
     <div className="flex shrink-0 items-center gap-0.5">
+      {dialog}
       {done ? (
         <button
           type="button"
@@ -142,7 +145,19 @@ export function ReminderActions({ reminder }: { reminder: Reminder }) {
         type="button"
         aria-label="Delete reminder"
         title="Delete"
-        onClick={() => deleteReminder(reminder.id)}
+        onClick={async () => {
+          if (
+            await confirm({
+              title: "Delete reminder?",
+              description:
+                "This reminder and its follow-up task will be removed. This can't be undone.",
+              confirmLabel: "Delete",
+              destructive: true,
+            })
+          ) {
+            deleteReminder(reminder.id);
+          }
+        }}
         className={`${iconBtn} hover:text-destructive`}
       >
         <Trash2 className="size-4" aria-hidden />

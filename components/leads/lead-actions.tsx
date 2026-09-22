@@ -41,6 +41,7 @@ import {
   useFitScore,
 } from "@/lib/mock-store";
 import { Button } from "@/components/ui/button";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -101,6 +102,7 @@ export function LeadActions({
 }) {
   const router = useRouter();
   const [dialog, setDialog] = useState<DialogKind>(null);
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const canActNow = canAct ?? isJobOpen(status);
 
   return (
@@ -151,7 +153,21 @@ export function LeadActions({
                 ))}
               </DropdownMenuRadioGroup>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => onStatusChange?.("discarded")}>
+              <DropdownMenuItem
+                onClick={async () => {
+                  if (
+                    await confirm({
+                      title: "Discard this lead?",
+                      description:
+                        "It moves to Archive and any pending follow-ups are cancelled. You can reopen it later.",
+                      confirmLabel: "Discard",
+                      destructive: true,
+                    })
+                  ) {
+                    onStatusChange?.("discarded");
+                  }
+                }}
+              >
                 <Archive className="size-4" aria-hidden />
                 Discard
               </DropdownMenuItem>
@@ -206,6 +222,7 @@ export function LeadActions({
         dialog={dialog}
         onDialogChange={setDialog}
       />
+      {confirmDialog}
     </>
   );
 }

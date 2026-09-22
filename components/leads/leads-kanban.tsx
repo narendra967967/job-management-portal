@@ -52,6 +52,7 @@ import {
   type LeadFilterValue,
 } from "@/components/leads/lead-filters";
 import { usePersistentState, PERSIST_KEYS } from "@/lib/use-persistent-state";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import {
   Dialog,
   DialogContent,
@@ -86,6 +87,7 @@ export function LeadsKanban() {
   const [defaultResumeId] = useDefaultResumeId();
   const [{ staleLeadDays }] = useAppSettings();
   const search = useSearchQuery();
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   // Columns persist across reload AND logout/login (localStorage); filters
   // persist across reload but reset on logout (sessionStorage).
@@ -157,7 +159,7 @@ export function LeadsKanban() {
     setActiveId(String(e.active.id));
   }
 
-  function onDragEnd(e: DragEndEvent) {
+  async function onDragEnd(e: DragEndEvent) {
     setActiveId(null);
     const { active, over } = e;
     if (!over) return;
@@ -168,6 +170,15 @@ export function LeadsKanban() {
       setClosingLead(lead); // ask for an outcome before closing
       return;
     }
+    if (target === "discarded") {
+      const ok = await confirm({
+        title: "Discard this lead?",
+        description: `"${lead.title}" moves to Archive and any pending follow-ups are cancelled. You can reopen it later.`,
+        confirmLabel: "Discard",
+        destructive: true,
+      });
+      if (!ok) return;
+    }
     setLeadStatus(lead.id, target);
   }
 
@@ -176,6 +187,7 @@ export function LeadsKanban() {
 
   return (
     <div className="space-y-3">
+      {confirmDialog}
       {/* Filters (everything but status — status is the columns) */}
       <LeadFilters leads={allLeads} value={filters} onChange={setFilters} />
 
