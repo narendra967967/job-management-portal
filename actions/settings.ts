@@ -45,15 +45,12 @@ async function upsertSettings(userId: string, set: Record<string, unknown>) {
 
 export async function updateProfileAction(input: {
   name: string;
-  email: string;
   mobile: string;
 }) {
   const userId = await getCurrentUserId();
-  const { name, email, mobile } = parseInput(profileSchema, input);
-  await db
-    .update(userT)
-    .set({ name, email, mobile })
-    .where(eq(userT.id, userId));
+  // Email is the unique login ID and is intentionally NOT updatable here.
+  const { name, mobile } = parseInput(profileSchema, input);
+  await db.update(userT).set({ name, mobile }).where(eq(userT.id, userId));
 }
 
 /* ---------------- follow-ups ---------------- */

@@ -38,9 +38,9 @@ const zEnum = <T extends readonly string[]>(values: T, msg: string) =>
 
 /* ---------------- settings ---------------- */
 
+// Email is the unique login ID and isn't editable from the profile form.
 export const profileSchema = z.object({
   name: z.string().trim().min(1, "Name is required.").max(120),
-  email: zEmail,
   mobile: zMobile,
 });
 

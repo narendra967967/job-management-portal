@@ -399,11 +399,7 @@ export function useAiSettings(): AiSettings {
   return useSyncExternalStore(subscribe, getAiSettings, getAiSettings);
 }
 
-export async function updateProfile(input: {
-  name: string;
-  email: string;
-  mobile: string;
-}) {
+export async function updateProfile(input: { name: string; mobile: string }) {
   await updateProfileAction(input);
   await refresh();
 }

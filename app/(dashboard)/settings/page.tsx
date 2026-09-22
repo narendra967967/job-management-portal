@@ -240,7 +240,6 @@ const DIAL_ITEMS: Record<string, string> = Object.fromEntries(
 
 interface ProfileErrors {
   name?: string;
-  email?: string;
   mobile?: string;
 }
 
@@ -248,7 +247,6 @@ function ProfileCard() {
   const profile = useProfile();
   const initialMobile = splitMobile(profile.mobile);
   const [name, setName] = useState(profile.name);
-  const [email, setEmail] = useState(profile.email);
   const [dial, setDial] = useState(initialMobile.dial);
   const [national, setNational] = useState(initialMobile.national);
   const [errors, setErrors] = useState<ProfileErrors>({});
@@ -257,17 +255,15 @@ function ProfileCard() {
   useEffect(() => {
     const m = splitMobile(profile.mobile);
     setName(profile.name);
-    setEmail(profile.email);
     setDial(m.dial);
     setNational(m.national);
     setErrors({});
   }, [profile]);
 
+  // Email is the login identifier — read-only here (change it via an admin).
   function validate(): ProfileErrors {
     const next: ProfileErrors = {};
     if (!name.trim()) next.name = "Name is required.";
-    if (!email.trim()) next.email = "Email is required.";
-    else if (!isValidEmail(email)) next.email = "Enter a valid email address.";
     const mobileError = validateMobile(dial, national);
     if (mobileError) next.mobile = mobileError;
     return next;
@@ -279,7 +275,6 @@ function ProfileCard() {
     if (Object.keys(next).length > 0) return;
     updateProfile({
       name: name.trim(),
-      email: email.trim(),
       mobile: joinMobile(dial, national),
     });
     setSaved(true);
@@ -342,20 +337,17 @@ function ProfileCard() {
             <span className="text-[11px] text-destructive">{errors.mobile}</span>
           )}
         </Field>
-        <Field label="Email">
+        <Field label="Email (login ID)">
           <Input
             type="email"
-            value={email}
-            onChange={(e) => {
-              setEmail(e.target.value);
-              if (errors.email) setErrors((p) => ({ ...p, email: undefined }));
-            }}
-            aria-invalid={!!errors.email}
-            required
+            value={profile.email}
+            readOnly
+            disabled
+            title="Your login email can't be changed here"
           />
-          {errors.email && (
-            <span className="text-[11px] text-destructive">{errors.email}</span>
-          )}
+          <span className="text-[11px] text-muted-foreground">
+            Used to sign in — can&apos;t be changed here.
+          </span>
         </Field>
       </div>
       <div className="mt-4 flex items-center gap-3">
