@@ -9,8 +9,12 @@ import { clearSessionPersistedState } from "@/lib/use-persistent-state";
 export const authClient = createAuthClient();
 
 /** Email + password sign-in. Returns { error } on failure. */
-export function signInEmail(email: string, password: string) {
-  return authClient.signIn.email({ email, password });
+export function signInEmail(
+  email: string,
+  password: string,
+  rememberMe = true,
+) {
+  return authClient.signIn.email({ email, password, rememberMe });
 }
 
 /** Link the current user's Google account (read-only Gmail), returning to
