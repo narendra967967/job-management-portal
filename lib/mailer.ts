@@ -20,34 +20,74 @@ export interface MailInput {
   text?: string;
 }
 
-async function loadConfig() {
+interface ResolvedSmtp {
+  host: string;
+  port: number;
+  secure: boolean;
+  user?: string;
+  pass?: string;
+  fromEmail: string;
+  fromName?: string;
+}
+
+/**
+ * Resolve SMTP settings: the DB row (admin-managed, encrypted password) takes
+ * precedence; otherwise fall back to environment variables. Returns null when
+ * neither is set (callers then log the reset link instead).
+ *
+ * Env fallback keys: SMTP_HOST, SMTP_PORT (default 587), SMTP_SECURE ("true"),
+ * SMTP_USER, SMTP_PASS, SMTP_FROM, SMTP_FROM_NAME.
+ */
+async function resolveConfig(): Promise<ResolvedSmtp | null> {
   const [c] = await db
     .select()
     .from(smtpConfig)
     .where(eq(smtpConfig.id, "app"))
     .limit(1);
-  if (!c || !c.enabled || !c.host || !c.fromEmail) return null;
-  return c;
+  if (c && c.enabled && c.host && c.fromEmail) {
+    return {
+      host: c.host,
+      port: c.port,
+      secure: c.secure,
+      user: c.username ?? undefined,
+      pass: c.passwordCiphertext ? decryptSecret(c.passwordCiphertext) : undefined,
+      fromEmail: c.fromEmail,
+      fromName: c.fromName ?? undefined,
+    };
+  }
+
+  const host = process.env.SMTP_HOST;
+  const fromEmail = process.env.SMTP_FROM;
+  if (host && fromEmail) {
+    return {
+      host,
+      port: Number(process.env.SMTP_PORT ?? 587),
+      secure: process.env.SMTP_SECURE === "true",
+      user: process.env.SMTP_USER || undefined,
+      pass: process.env.SMTP_PASS || undefined,
+      fromEmail,
+      fromName: process.env.SMTP_FROM_NAME || undefined,
+    };
+  }
+
+  return null;
 }
 
-/** True when SMTP is set up and enabled. */
+/** True when SMTP is set up (DB row or env). */
 export async function isMailConfigured(): Promise<boolean> {
-  return (await loadConfig()) !== null;
+  return (await resolveConfig()) !== null;
 }
 
 /** Send an email. Throws SMTP_NOT_CONFIGURED when SMTP isn't set up. */
 export async function sendMail(input: MailInput): Promise<void> {
-  const c = await loadConfig();
+  const c = await resolveConfig();
   if (!c) throw new Error(SMTP_NOT_CONFIGURED);
 
   const transport = nodemailer.createTransport({
     host: c.host,
     port: c.port,
     secure: c.secure,
-    auth:
-      c.username && c.passwordCiphertext
-        ? { user: c.username, pass: decryptSecret(c.passwordCiphertext) }
-        : undefined,
+    auth: c.user && c.pass ? { user: c.user, pass: c.pass } : undefined,
   });
 
   await transport.sendMail({
