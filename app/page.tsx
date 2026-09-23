@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { Sparkles, Gauge, Send } from "lucide-react";
 import { Logo } from "@/components/app-shell/logo";
 import { LoginForm } from "@/components/auth/sign-in";
+import { BrandDoodles } from "@/components/auth/brand-doodles";
 import { getSessionUserId } from "@/lib/current-user";
 
 const HIGHLIGHTS = [
@@ -30,6 +31,8 @@ export default async function LoginPage() {
     <main className="min-h-dvh lg:grid lg:grid-cols-2">
       {/* Brand panel — desktop only */}
       <aside className="relative hidden overflow-hidden bg-gradient-to-br from-primary to-[oklch(0.5_0.2_305)] p-12 text-primary-foreground lg:flex lg:flex-col lg:justify-between">
+        {/* doodle line-art behind the content */}
+        <BrandDoodles />
         {/* soft decorative glows */}
         <div
           aria-hidden
