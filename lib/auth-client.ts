@@ -17,6 +17,28 @@ export function signInEmail(
   return authClient.signIn.email({ email, password, rememberMe });
 }
 
+/** Request a password-reset email; the link lands on /reset-password. */
+export function requestPasswordReset(email: string) {
+  return authClient.requestPasswordReset({
+    email,
+    redirectTo: "/reset-password",
+  });
+}
+
+/** Set a new password using the token from the reset link. */
+export function resetPassword(token: string, newPassword: string) {
+  return authClient.resetPassword({ token, newPassword });
+}
+
+/** Change the signed-in user's password (verifies the current one). */
+export function changePassword(currentPassword: string, newPassword: string) {
+  return authClient.changePassword({
+    currentPassword,
+    newPassword,
+    revokeOtherSessions: true,
+  });
+}
+
 /** Link the current user's Google account (read-only Gmail), returning to
  *  Settings. Requires GOOGLE_CLIENT_ID/SECRET to be configured. */
 export function connectGoogle() {

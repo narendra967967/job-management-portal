@@ -57,6 +57,13 @@
       "when": 1790008558120,
       "tag": "0007_tiny_colossus",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790185193830,
+      "tag": "0008_green_malcolm_colcord",
+      "breakpoints": true
     }
   ]
 }

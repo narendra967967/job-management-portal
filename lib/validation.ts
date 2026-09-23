@@ -77,3 +77,19 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export function isValidEmail(s: string): boolean {
   return EMAIL_RE.test(s.trim());
 }
+
+/** Minimum password length (matches Better Auth's minPasswordLength). */
+export const MIN_PASSWORD_LENGTH = 8;
+
+/** Rough password strength for a UI hint (0–4). Not a security control. */
+export function passwordStrength(pw: string): { score: number; label: string } {
+  let s = 0;
+  if (pw.length >= MIN_PASSWORD_LENGTH) s++;
+  if (pw.length >= 12) s++;
+  if (/[a-z]/.test(pw) && /[A-Z]/.test(pw)) s++;
+  if (/\d/.test(pw)) s++;
+  if (/[^A-Za-z0-9]/.test(pw)) s++;
+  const score = Math.min(4, s);
+  const label = ["Very weak", "Weak", "Fair", "Good", "Strong"][score];
+  return { score, label };
+}

@@ -1,15 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { Eye, EyeOff, LogIn } from "lucide-react";
+import Link from "next/link";
+import { LogIn } from "lucide-react";
 import { signInEmail } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 
 export function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [show, setShow] = useState(false);
   const [remember, setRemember] = useState(true);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -45,32 +46,24 @@ export function LoginForm() {
         />
       </label>
 
-      <label className="block space-y-1.5">
-        <span className="text-xs font-medium text-muted-foreground">
-          Password
-        </span>
-        <div className="relative">
-          <Input
-            type={show ? "text" : "password"}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete="current-password"
-            className="h-10 pr-10"
-          />
-          <button
-            type="button"
-            onClick={() => setShow((s) => !s)}
-            aria-label={show ? "Hide password" : "Show password"}
-            className="absolute top-1/2 right-1 flex size-8 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-medium text-muted-foreground">
+            Password
+          </span>
+          <Link
+            href="/forgot-password"
+            className="text-xs font-medium text-primary hover:underline"
           >
-            {show ? (
-              <EyeOff className="size-4" aria-hidden />
-            ) : (
-              <Eye className="size-4" aria-hidden />
-            )}
-          </button>
+            Forgot password?
+          </Link>
         </div>
-      </label>
+        <PasswordInput
+          value={password}
+          onChange={setPassword}
+          autoComplete="current-password"
+        />
+      </div>
 
       <label className="flex items-center gap-2 text-xs text-muted-foreground select-none">
         <input

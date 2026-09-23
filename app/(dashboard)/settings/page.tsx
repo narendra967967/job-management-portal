@@ -60,14 +60,17 @@ import {
   joinMobile,
   splitMobile,
   validateMobile,
+  MIN_PASSWORD_LENGTH,
 } from "@/lib/validation";
 import {
   DEFAULT_SUMMARY_PROMPT,
   DEFAULT_DRAFT_PROMPT,
   DEFAULT_SCORE_PROMPT,
 } from "@/lib/ai-prompts";
-import { signOutToHome, connectGoogle } from "@/lib/auth-client";
+import { signOutToHome, connectGoogle, changePassword } from "@/lib/auth-client";
 import { previewPromptAction } from "@/actions/ai";
+import { PasswordInput } from "@/components/ui/password-input";
+import { PasswordStrength } from "@/components/ui/password-strength";
 import { MarkdownLite, looksLikeMarkdown } from "@/components/ui/markdown-lite";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -1688,13 +1691,87 @@ function ResumesCard() {
 /* ---------------- Account ---------------- */
 
 function AccountCard() {
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
+  const [confirmPw, setConfirmPw] = useState("");
+  const [error, setError] = useState("");
+  const [saved, setSaved] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  async function changePw() {
+    if (!current || !next) {
+      setError("Enter your current and new password.");
+      return;
+    }
+    if (next.length < MIN_PASSWORD_LENGTH) {
+      setError(`New password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
+      return;
+    }
+    if (next !== confirmPw) {
+      setError("New passwords don't match.");
+      return;
+    }
+    setError("");
+    setBusy(true);
+    const res = await changePassword(current, next);
+    setBusy(false);
+    if (res?.error) {
+      setError(res.error.message ?? "Couldn't change password.");
+      return;
+    }
+    setCurrent("");
+    setNext("");
+    setConfirmPw("");
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  }
+
   return (
     <section className="rounded-2xl border bg-card p-4 md:p-5">
       <h2 className="text-sm font-medium">Account</h2>
       <p className="mt-0.5 text-xs text-muted-foreground">
-        Single-user access to this workspace.
+        Change your password or sign out.
       </p>
-      <div className="mt-4">
+
+      <div className="mt-4 space-y-3">
+        <Field label="Current password">
+          <PasswordInput
+            value={current}
+            onChange={setCurrent}
+            autoComplete="current-password"
+          />
+        </Field>
+        <div>
+          <Field label="New password">
+            <PasswordInput
+              value={next}
+              onChange={setNext}
+              autoComplete="new-password"
+            />
+          </Field>
+          <PasswordStrength value={next} />
+        </div>
+        <Field label="Confirm new password">
+          <PasswordInput
+            value={confirmPw}
+            onChange={setConfirmPw}
+            autoComplete="new-password"
+          />
+        </Field>
+        {error && <p className="text-xs text-destructive">{error}</p>}
+        <div className="flex items-center gap-3">
+          <Button onClick={changePw} disabled={busy}>
+            {busy ? "Updating…" : "Change password"}
+          </Button>
+          {saved && (
+            <span className="text-xs text-status-applied-foreground">
+              Password updated
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="mt-5 border-t pt-4">
         <Button variant="destructive" onClick={signOutToHome}>
           <LogOut className="size-4" aria-hidden />
           Log out

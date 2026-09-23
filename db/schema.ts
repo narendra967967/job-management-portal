@@ -408,6 +408,27 @@ export const fitScores = pgTable(
   ],
 );
 
+/**
+ * App-level SMTP settings for outbound system email (password resets). A single
+ * row (id = "app"); a future admin dashboard edits it. The password is
+ * encrypted at rest (lib/crypto), like the AI key.
+ */
+export const smtpConfig = pgTable("smtp_config", {
+  id: text("id").primaryKey().default("app"),
+  host: text("host").notNull(),
+  port: integer("port").notNull().default(587),
+  secure: boolean("secure").notNull().default(false),
+  username: text("username"),
+  passwordCiphertext: text("password_ciphertext"),
+  fromEmail: text("from_email").notNull(),
+  fromName: text("from_name"),
+  enabled: boolean("enabled").notNull().default(false),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date()),
+});
+
 /** One row per user — the Gmail ingestion rules (Settings → Which emails to read). */
 export const gmailConfig = pgTable("gmail_config", {
   userId: text("user_id")

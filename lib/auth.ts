@@ -17,6 +17,7 @@ import { db } from "@/lib/db";
 import { account, session, user, verification } from "@/db/schema";
 import { hashPassword, verifyPassword } from "@/lib/password";
 import { provisionUserDefaults } from "@/lib/provision";
+import { sendMail, SMTP_NOT_CONFIGURED } from "@/lib/mailer";
 
 export const auth = betterAuth({
   secret: process.env.BETTER_AUTH_SECRET,
@@ -33,6 +34,32 @@ export const auth = betterAuth({
     password: {
       hash: hashPassword,
       verify: ({ hash, password }) => verifyPassword(hash, password),
+    },
+    // Reset link is emailed via SMTP (config in DB). When SMTP isn't set up
+    // yet, log the link so the flow is testable locally without email.
+    sendResetPassword: async ({ user, url }) => {
+      const subject = "Reset your Job Management Portal password";
+      const html = `<p>We received a request to reset your password.</p>
+<p><a href="${url}">Reset your password</a> — this link expires in 1 hour.</p>
+<p>If you didn't request this, you can ignore this email.</p>`;
+      try {
+        await sendMail({
+          to: user.email,
+          subject,
+          html,
+          text: `Reset your password: ${url}`,
+        });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg === SMTP_NOT_CONFIGURED) {
+          console.log(
+            `\n[password-reset] SMTP not configured — reset link for ${user.email}:\n${url}\n`,
+          );
+        } else {
+          console.error("[password-reset] email send failed:", msg);
+          console.log(`[password-reset] link for ${user.email}: ${url}`);
+        }
+      }
     },
   },
   socialProviders: {
