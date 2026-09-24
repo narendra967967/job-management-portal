@@ -38,7 +38,7 @@ import { ReminderActions } from "@/components/leads/reminder-actions";
 import { LeadTimeline } from "@/components/leads/lead-timeline";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -197,7 +197,7 @@ export function LeadDetailContent({
         </div>
 
         {/* AI fit score vs the selected resume — computed on demand */}
-        <div className="mt-4 rounded-xl border bg-muted/30 p-3">
+        <div className="mt-4 rounded-xl border bg-muted/30 p-4">
           <div className="flex items-center gap-3">
             <span
               className={cn(
@@ -285,7 +285,7 @@ export function LeadDetailContent({
             href={lead.canonicalJobUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 sm:min-h-10"
+            className={cn(buttonVariants({ variant: "outline" }), "px-4")}
           >
             <ExternalLink className="size-4" aria-hidden />
             Open on LinkedIn
@@ -396,23 +396,22 @@ function OverviewTab({ leadId, detail }: { leadId: string; detail?: JobLeadDetai
         />
         {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <button
-            type="button"
+          <Button
+            variant="outline"
             onClick={save}
             disabled={saving || busy}
-            className="inline-flex min-h-10 items-center gap-2 rounded-lg border px-3.5 text-sm font-medium hover:bg-muted disabled:opacity-60"
+            className="px-3.5"
           >
             {saving ? "Saving…" : "Save JD"}
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
             onClick={summarize}
             disabled={saving || busy}
-            className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-ai px-3.5 text-sm font-medium text-ai-foreground hover:bg-ai/90 disabled:opacity-60"
+            className="border-transparent bg-ai px-3.5 text-ai-foreground hover:bg-ai/90"
           >
             <Sparkles className="size-4" aria-hidden />
             {busy ? "Summarizing…" : "Save & Summarize with AI"}
-          </button>
+          </Button>
           {saved && (
             <span className="text-xs text-status-applied-foreground">Saved</span>
           )}
