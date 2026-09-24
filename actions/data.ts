@@ -99,11 +99,34 @@ export async function deleteLeadsAction(ids: string[]) {
 }
 
 /**
+ * Normalize a job URL into a stable per-user dedupe key. A LinkedIn URL yields
+ * its numeric job id (so a manual add collides with the same job captured from
+ * Gmail); any other URL yields a normalized `url:<host+path+query>` — host
+ * lowercased, `www.`/hash/trailing-slash stripped — so the same link can't be
+ * added twice by one user. Uniqueness is scoped per user by the DB constraint,
+ * so different users can each save the same job.
+ */
+function dedupeKeyForUrl(rawUrl: string): string {
+  const linkedInId = extractLinkedInJobId(rawUrl);
+  if (linkedInId) return linkedInId;
+  try {
+    const u = new URL(rawUrl);
+    u.hash = "";
+    u.hostname = u.hostname.toLowerCase().replace(/^www\./, "");
+    return `url:${u.toString().replace(/\/+$/, "")}`;
+  } catch {
+    // Not a parseable URL (schema already rejects those) — fall back to text.
+    return `url:${rawUrl.trim().toLowerCase().replace(/\/+$/, "")}`;
+  }
+}
+
+/**
  * Manually create a lead (the "Add lead" modal), with an optional inline
  * contact. Derives the fields the form doesn't ask for:
- *  - linkedinJobId: parsed from the job URL when it's a LinkedIn link, else a
- *    synthetic `manual-<uuid>` so manual leads never collide on the
- *    UNIQUE(user, linkedin_job_id) dedupe key.
+ *  - linkedinJobId (the dedupe key): from the job URL when one is given
+ *    (LinkedIn id, else normalized URL) so the same link can't be added twice
+ *    by one user; a lead with no URL gets a synthetic `manual-<uuid>` and is
+ *    always allowed (there's nothing to match on).
  *  - postedRelative: "just now" (there's no real posting age for a manual add).
  *  - capturedAt / status default handled by the column / schema.
  *
@@ -136,9 +159,11 @@ export async function createLeadAction(input: {
     return { ok: false, error: e instanceof Error ? e.message : "Invalid input." };
   }
 
-  // A LinkedIn URL gives us the real dedupe key; anything else is synthetic.
-  const linkedinJobId =
-    (data.jobUrl && extractLinkedInJobId(data.jobUrl)) || `manual-${randomUUID()}`;
+  // A job URL (LinkedIn or otherwise) is the per-user dedupe key; with no URL
+  // there's nothing to match on, so allow it via a synthetic key.
+  const linkedinJobId = data.jobUrl
+    ? dedupeKeyForUrl(data.jobUrl)
+    : `manual-${randomUUID()}`;
 
   try {
     const id = await db.transaction(async (tx) => {

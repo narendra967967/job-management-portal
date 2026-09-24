@@ -303,7 +303,7 @@ function AddLeadDialog({
             placeholder="https://www.linkedin.com/jobs/view/…"
           />
           <span className="text-[11px] text-muted-foreground">
-            Optional. A LinkedIn link is used to avoid duplicate leads.
+            Optional. The job link is used to avoid adding the same job twice.
           </span>
         </Field>
 
