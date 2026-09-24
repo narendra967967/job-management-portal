@@ -16,17 +16,18 @@
 
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useRef,
   useState,
-  type ClipboardEvent,
   type KeyboardEvent,
 } from "react";
 import { useRouter } from "next/navigation";
 import {
   Plus,
   ClipboardList,
+  ClipboardPaste,
   X,
   Sparkles,
   ImagePlus,
@@ -501,6 +502,7 @@ function AiExtractPanel({
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [canReadClipboard, setCanReadClipboard] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
   // Revoke the object URL when the preview changes or the panel unmounts.
@@ -510,7 +512,16 @@ function AiExtractPanel({
     };
   }, [preview]);
 
-  function acceptImage(f: File) {
+  // Whether the async Clipboard API is available (for the explicit paste button).
+  useEffect(() => {
+    setCanReadClipboard(
+      typeof navigator !== "undefined" &&
+        typeof navigator.clipboard?.read === "function",
+    );
+  }, []);
+
+  // Stable so the document-paste listener can register once.
+  const acceptImage = useCallback((f: File) => {
     if (!IMAGE_TYPES.includes(f.type)) {
       toast.error("Unsupported image", "Use a PNG, JPEG, or WebP image.");
       return;
@@ -519,10 +530,34 @@ function AiExtractPanel({
       toast.error("Image too large", "Maximum size is 5 MB.");
       return;
     }
-    if (preview) URL.revokeObjectURL(preview);
     setFile(f);
-    setPreview(URL.createObjectURL(f));
-  }
+    setPreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return URL.createObjectURL(f);
+    });
+  }, []);
+
+  // Ctrl/Cmd+V anywhere on this tab pastes a clipboard image (e.g. after a
+  // Win+Shift+S screenshot). Scoped to when the AI panel is mounted; text
+  // pastes into inputs are left alone (we only act on image items).
+  useEffect(() => {
+    function onDocPaste(e: ClipboardEvent) {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (const it of items) {
+        if (it.type.startsWith("image/")) {
+          const f = it.getAsFile();
+          if (f) {
+            e.preventDefault();
+            acceptImage(f);
+          }
+          return;
+        }
+      }
+    }
+    document.addEventListener("paste", onDocPaste);
+    return () => document.removeEventListener("paste", onDocPaste);
+  }, [acceptImage]);
 
   function clearImage() {
     if (preview) URL.revokeObjectURL(preview);
@@ -531,16 +566,29 @@ function AiExtractPanel({
     if (fileInput.current) fileInput.current.value = "";
   }
 
-  function onPaste(e: ClipboardEvent) {
-    const img = Array.from(e.clipboardData.items).find((i) =>
-      i.type.startsWith("image/"),
-    );
-    if (img) {
-      const f = img.getAsFile();
-      if (f) {
-        e.preventDefault();
-        acceptImage(f);
+  /** Explicit "Paste from clipboard" button — reads the clipboard on click. */
+  async function pasteFromClipboard() {
+    try {
+      const items = await navigator.clipboard.read();
+      for (const item of items) {
+        const type = item.types.find((t) => t.startsWith("image/"));
+        if (type) {
+          const blob = await item.getType(type);
+          acceptImage(
+            new File([blob], "clipboard-image", { type: blob.type }),
+          );
+          return;
+        }
       }
+      toast.error(
+        "No image in clipboard",
+        "Copy a screenshot first (Win+Shift+S), then try again.",
+      );
+    } catch {
+      toast.error(
+        "Clipboard blocked",
+        "Your browser blocked clipboard access — press Ctrl/Cmd+V instead.",
+      );
     }
   }
 
@@ -576,7 +624,7 @@ function AiExtractPanel({
   }
 
   return (
-    <div className="space-y-4" onPaste={onPaste}>
+    <div className="space-y-4">
       <div className="rounded-lg border border-ai/30 bg-ai-muted/40 p-3">
         <p className="flex items-center gap-1.5 text-sm font-medium text-ai">
           <Sparkles className="size-4" aria-hidden />
@@ -619,15 +667,32 @@ function AiExtractPanel({
             </button>
           </div>
         ) : (
-          <button
-            type="button"
-            onClick={() => fileInput.current?.click()}
-            className="flex w-full flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-input py-6 text-sm text-muted-foreground transition-colors hover:bg-muted/50"
-          >
+          <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-input py-6 text-center text-sm text-muted-foreground">
             <ImagePlus className="size-6" aria-hidden />
-            <span>Choose an image, or paste one here (Ctrl/Cmd+V)</span>
-            <span className="text-[11px]">PNG, JPEG or WebP · up to 5 MB</span>
-          </button>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fileInput.current?.click()}
+              >
+                Choose image
+              </Button>
+              {canReadClipboard && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={pasteFromClipboard}
+                  className="gap-1.5"
+                >
+                  <ClipboardPaste className="size-3.5" aria-hidden />
+                  Paste from clipboard
+                </Button>
+              )}
+            </div>
+            <span className="text-[11px]">
+              …or press Ctrl/Cmd+V · PNG, JPEG or WebP · up to 5 MB
+            </span>
+          </div>
         )}
         <input
           ref={fileInput}
