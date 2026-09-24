@@ -239,7 +239,7 @@ function AddLeadDialog({
     <ActionDialog
       open={open}
       onOpenChange={onOpenChange}
-      contentClassName="sm:max-w-xl"
+      contentClassName="sm:max-w-2xl lg:max-w-3xl"
       icon={<ClipboardList className="size-4" aria-hidden />}
       title="Add lead"
       description="Add a job manually — the same as one captured from your inbox."
@@ -358,23 +358,25 @@ function AddLeadDialog({
           </div>
         )}
 
-        <Field label="Job description">
-          <Textarea
-            value={jd}
-            onChange={(e) => setJd(e.target.value)}
-            placeholder="Paste the full job description (optional — you can add it later)…"
-            className="min-h-24"
-          />
-        </Field>
+        <div className="grid gap-3 lg:grid-cols-2">
+          <Field label="Job description">
+            <Textarea
+              value={jd}
+              onChange={(e) => setJd(e.target.value)}
+              placeholder="Paste the full job description (optional — you can add it later)…"
+              className="min-h-28"
+            />
+          </Field>
 
-        <Field label="Notes">
-          <Textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Anything to remember about this role (optional)…"
-            className="min-h-16"
-          />
-        </Field>
+          <Field label="Notes">
+            <Textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Anything to remember about this role (optional)…"
+              className="min-h-28"
+            />
+          </Field>
+        </div>
 
         {/* Optional inline contact */}
         <div className="rounded-lg border bg-muted/30 p-3">
