@@ -101,6 +101,13 @@ export const jdInputSchema = z.object({
   jdText: z.string().trim().min(1, "Paste the job description first.").max(50000),
 });
 
+/** Free text pasted into the "Add with AI" tab for lead extraction. */
+export const leadExtractTextSchema = z
+  .string()
+  .trim()
+  .min(20, "Paste a bit more text so the AI has something to work with.")
+  .max(20000);
+
 export const contactTextSchema = z
   .string()
   .trim()

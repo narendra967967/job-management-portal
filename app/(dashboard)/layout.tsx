@@ -11,6 +11,7 @@ import {
   TopBarSearch,
 } from "@/components/app-shell/top-bar";
 import { AutoSync } from "@/components/app-shell/auto-sync";
+import { Toaster } from "@/components/ui/toast";
 import {
   AddLeadProvider,
   HeaderAddLeadButton,
@@ -71,6 +72,7 @@ export default async function DashboardLayout({
       {/* Mobile-only floating "Add lead" button (above the bottom nav). */}
       <AddLeadFab />
       </div>
+      <Toaster />
     </AddLeadProvider>
     </WorkspaceProvider>
   );

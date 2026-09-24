@@ -8,7 +8,12 @@
 import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { getCurrentUserId } from "@/lib/current-user";
-import { aiComplete, AI_NOT_CONFIGURED } from "@/lib/ai";
+import {
+  aiComplete,
+  aiCompleteVision,
+  AI_NOT_CONFIGURED,
+  type VisionImage,
+} from "@/lib/ai";
 import {
   DEFAULT_SUMMARY_PROMPT,
   DEFAULT_DRAFT_PROMPT,
@@ -18,6 +23,7 @@ import {
   contactTextSchema,
   draftInputSchema,
   jdInputSchema,
+  leadExtractTextSchema,
   parseInput,
   promptPreviewSchema,
   scoreFitSchema,
@@ -336,6 +342,123 @@ export async function scoreFitAction(
     return { ok: true, score, rationale };
   } catch (err) {
     return { ok: false, error: friendly(err) };
+  }
+}
+
+/* ---------------- Lead extraction (Add-lead "Add with AI" tab) ------------ */
+
+/** Lead fields the AI extractor fills into the manual Add-lead form. */
+export interface ExtractedLead {
+  title: string;
+  company: string;
+  location: string;
+  remote: boolean;
+  jobUrl: string;
+  tags: string[];
+  jdText: string;
+}
+
+const LEAD_EXTRACT_SYSTEM = [
+  "You extract a single job lead from the content provided (a job posting, an",
+  "email, or a screenshot of one).",
+  'Reply with ONLY minified JSON, no markdown fences, matching exactly:',
+  '{"title":"","company":"","location":"","remote":false,"jobUrl":"","tags":[],"jdText":""}',
+  "- title: the job title.",
+  "- company: the hiring company.",
+  "- location: city / region, else \"\".",
+  "- remote: true ONLY if the role is explicitly remote.",
+  "- jobUrl: the application / posting URL if visibly present, else \"\".",
+  "- tags: up to 6 short skill or seniority keywords.",
+  "- jdText: the job description text, cleaned of boilerplate; \"\" if none.",
+  'Use "", [] or false for anything not present. Never invent values.',
+].join("\n");
+
+// Accepted screenshot types + size cap for the image path.
+const IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp"];
+const IMAGE_MAX_BYTES = 5 * 1024 * 1024; // 5 MB
+
+/** Coerce the model's JSON into a safe ExtractedLead (bad shapes → empties). */
+function sanitizeExtracted(raw: string): ExtractedLead {
+  const json = raw.replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
+  const p = JSON.parse(json) as Partial<Record<keyof ExtractedLead, unknown>>;
+  const str = (v: unknown) => (v == null ? "" : String(v)).trim();
+  const tags = Array.isArray(p.tags)
+    ? [...new Set(p.tags.map((t) => String(t).trim()).filter(Boolean))].slice(0, 6)
+    : [];
+  return {
+    title: str(p.title).slice(0, 200),
+    company: str(p.company).slice(0, 200),
+    location: str(p.location).slice(0, 200),
+    remote: p.remote === true || String(p.remote).toLowerCase() === "true",
+    jobUrl: str(p.jobUrl).slice(0, 2048),
+    tags,
+    jdText: str(p.jdText).slice(0, 50000),
+  };
+}
+
+function extractFailure(err: unknown): { ok: false; error: string } {
+  if (err instanceof SyntaxError) {
+    return {
+      ok: false,
+      error:
+        "Couldn't read structured details from that — try clearer text/image, or fill the form manually.",
+    };
+  }
+  return { ok: false, error: friendly(err) };
+}
+
+/** Extract lead fields from a pasted paragraph / job description. */
+export async function extractLeadFromTextAction(
+  text: string,
+): Promise<{ ok: true; lead: ExtractedLead } | { ok: false; error: string }> {
+  const userId = await getCurrentUserId();
+  let clean: string;
+  try {
+    clean = parseInput(leadExtractTextSchema, text);
+  } catch (err) {
+    return { ok: false, error: friendly(err) };
+  }
+  try {
+    const raw = await aiComplete(userId, LEAD_EXTRACT_SYSTEM, clean, 1200);
+    return { ok: true, lead: sanitizeExtracted(raw) };
+  } catch (err) {
+    return extractFailure(err);
+  }
+}
+
+/** Extract lead fields from a pasted / uploaded screenshot (vision model). */
+export async function extractLeadFromImageAction(
+  formData: FormData,
+): Promise<{ ok: true; lead: ExtractedLead } | { ok: false; error: string }> {
+  const userId = await getCurrentUserId();
+
+  const file = formData.get("image");
+  if (!(file instanceof File) || file.size === 0) {
+    return { ok: false, error: "Add an image to extract from." };
+  }
+  if (!IMAGE_TYPES.includes(file.type)) {
+    return { ok: false, error: "Use a PNG, JPEG, or WebP image." };
+  }
+  if (file.size > IMAGE_MAX_BYTES) {
+    return { ok: false, error: "Image is too large (max 5 MB)." };
+  }
+
+  const image: VisionImage = {
+    base64: Buffer.from(await file.arrayBuffer()).toString("base64"),
+    mimeType: file.type,
+  };
+
+  try {
+    const raw = await aiCompleteVision(
+      userId,
+      LEAD_EXTRACT_SYSTEM,
+      "Extract the job lead from this screenshot.",
+      image,
+      1200,
+    );
+    return { ok: true, lead: sanitizeExtracted(raw) };
+  } catch (err) {
+    return extractFailure(err);
   }
 }
 
