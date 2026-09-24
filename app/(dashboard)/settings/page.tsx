@@ -71,6 +71,7 @@ import { signOutToHome, connectGoogle, changePassword } from "@/lib/auth-client"
 import { previewPromptAction } from "@/actions/ai";
 import { PasswordInput } from "@/components/ui/password-input";
 import { PasswordStrength } from "@/components/ui/password-strength";
+import { toast } from "@/components/ui/toast";
 import { MarkdownLite, looksLikeMarkdown } from "@/components/ui/markdown-lite";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -384,14 +385,26 @@ function GoogleCard() {
     setSyncMsg("");
     try {
       const r = await syncGmail();
-      setSyncMsg(
-        r.connected
-          ? `Fetched ${r.fetched}, added ${r.inserted} new, renewed ${r.renewed}` +
-              (r.errors ? `, ${r.errors} parse issue${r.errors === 1 ? "" : "s"}.` : ".")
-          : (r.message ?? "Not connected."),
-      );
+      if (r.connected) {
+        const summary =
+          `Fetched ${r.fetched}, added ${r.inserted} new, renewed ${r.renewed}` +
+          (r.errors ? `, ${r.errors} parse issue${r.errors === 1 ? "" : "s"}.` : ".");
+        setSyncMsg(summary);
+        toast.success(
+          r.inserted === 1
+            ? "1 new lead captured"
+            : `${r.inserted} new leads captured`,
+          summary,
+        );
+      } else {
+        const msg = r.message ?? "Not connected.";
+        setSyncMsg(msg);
+        toast.error("Gmail not synced", msg);
+      }
     } catch (e) {
-      setSyncMsg(e instanceof Error ? e.message : "Sync failed.");
+      const msg = e instanceof Error ? e.message : "Sync failed.";
+      setSyncMsg(msg);
+      toast.error("Sync failed", msg);
     } finally {
       setSyncing(false);
     }

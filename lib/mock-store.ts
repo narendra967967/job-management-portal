@@ -16,6 +16,7 @@ import {
   addReminderManualAction,
   completeTaskAction,
   createLeadAction,
+  updateLeadAction,
   deleteContactAction,
   deleteLeadsAction,
   deleteReminderAction,
@@ -282,11 +283,40 @@ export async function createLead(input: {
   return res;
 }
 
+/** Edit a lead's core fields + JD/notes. Refreshes on success; returns the
+ *  result so the dialog can surface validation / duplicate-URL errors. */
+export async function updateLead(
+  leadId: string,
+  input: {
+    title: string;
+    company: string;
+    location: string;
+    remote: boolean;
+    jobUrl: string;
+    status: LeadStatus;
+    tags: string[];
+    jdText: string;
+    notes: string;
+  },
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const res = await updateLeadAction(leadId, input);
+  if (res.ok) await refresh();
+  return res;
+}
+
 /** Permanently delete one or more leads (Archive trash). */
 export async function deleteLeads(ids: string[]) {
   if (ids.length === 0) return;
-  await deleteLeadsAction(ids);
-  await refresh();
+  try {
+    await deleteLeadsAction(ids);
+    await refresh();
+    toast.success(
+      ids.length === 1 ? "Lead deleted" : `${ids.length} leads deleted`,
+      "This can't be undone.",
+    );
+  } catch (e) {
+    toast.error("Couldn't delete", e instanceof Error ? e.message : undefined);
+  }
 }
 
 export async function addContact(input: {
@@ -325,8 +355,13 @@ export async function updateContact(
 }
 
 export async function deleteContact(id: string) {
-  await deleteContactAction(id);
-  await refresh();
+  try {
+    await deleteContactAction(id);
+    await refresh();
+    toast.success("Contact removed");
+  } catch (e) {
+    toast.error("Couldn't remove contact", e instanceof Error ? e.message : undefined);
+  }
 }
 
 /** Mark a drafted message sent + schedule the follow-up reminder/task. The
@@ -338,8 +373,13 @@ export async function markSent(input: {
   channel: string;
   draftBody: string;
 }) {
-  await markSentAction(input);
-  await refresh();
+  try {
+    await markSentAction(input);
+    await refresh();
+    toast.success("Message marked as sent", "Follow-up reminder scheduled.");
+  } catch (e) {
+    toast.error("Couldn't mark as sent", e instanceof Error ? e.message : undefined);
+  }
 }
 
 export async function addReminderManual(input: {
@@ -348,28 +388,53 @@ export async function addReminderManual(input: {
   label: string;
   outreachMessageId: string | null;
 }) {
-  await addReminderManualAction(input);
-  await refresh();
+  try {
+    await addReminderManualAction(input);
+    await refresh();
+    toast.success("Reminder added");
+  } catch (e) {
+    toast.error("Couldn't add reminder", e instanceof Error ? e.message : undefined);
+  }
 }
 
 export async function setReminderOutcome(id: string, outcome: ReminderOutcome) {
-  await setReminderOutcomeAction(id, outcome);
-  await refresh();
+  try {
+    await setReminderOutcomeAction(id, outcome);
+    await refresh();
+    toast.success("Reminder updated", REMINDER_OUTCOME_LABELS[outcome]);
+  } catch (e) {
+    toast.error("Couldn't update reminder", e instanceof Error ? e.message : undefined);
+  }
 }
 
 export async function snoozeReminder(id: string, newDueDate: string) {
-  await snoozeReminderAction(id, newDueDate);
-  await refresh();
+  try {
+    await snoozeReminderAction(id, newDueDate);
+    await refresh();
+    toast.success("Reminder snoozed");
+  } catch (e) {
+    toast.error("Couldn't snooze reminder", e instanceof Error ? e.message : undefined);
+  }
 }
 
 export async function deleteReminder(id: string) {
-  await deleteReminderAction(id);
-  await refresh();
+  try {
+    await deleteReminderAction(id);
+    await refresh();
+    toast.success("Reminder deleted");
+  } catch (e) {
+    toast.error("Couldn't delete reminder", e instanceof Error ? e.message : undefined);
+  }
 }
 
 export async function completeTask(id: string) {
-  await completeTaskAction(id);
-  await refresh();
+  try {
+    await completeTaskAction(id);
+    await refresh();
+    toast.success("Task completed");
+  } catch (e) {
+    toast.error("Couldn't complete task", e instanceof Error ? e.message : undefined);
+  }
 }
 
 /* ---------------- settings & resumes (persist, then refresh) -------------- */

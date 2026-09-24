@@ -6,8 +6,8 @@
 // one form and one piece of state no matter how it's triggered.
 //
 // The dialog has two tabs:
-//  - "Add manually": the form mirroring the job_leads + job_lead_details columns
-//    the user can set, plus an optional inline contact.
+//  - "Add manually": the core lead fields (shared LeadCoreFields, reused by the
+//    Edit dialog) plus an optional inline contact.
 //  - "Add with AI": paste a job description or a screenshot; the AI extracts the
 //    fields into the manual form, which the user reviews and submits.
 //
@@ -46,7 +46,7 @@ import {
   extractLeadFromTextAction,
   type ExtractedLead,
 } from "@/actions/ai";
-import { ActionDialog, Field } from "@/components/leads/lead-actions";
+import { ActionDialog, Field } from "@/components/leads/action-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -59,6 +59,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 
 /* ------------------------------------------------------------------ */
 /* Provider + hook — one shared dialog for all entry points            */
@@ -130,15 +131,221 @@ export function AddLeadFab() {
 }
 
 /* ------------------------------------------------------------------ */
-/* The dialog                                                          */
+/* Shared lead-core fields (used by Add + Edit)                        */
 /* ------------------------------------------------------------------ */
 
-const MAX_TAGS = 15;
+export const MAX_TAGS = 15;
 
-// Only the open statuses can be set at creation time.
+/** The lead fields both the Add and Edit dialogs collect (no contact). */
+export interface LeadCoreValue {
+  title: string;
+  company: string;
+  location: string;
+  remote: boolean;
+  jobUrl: string;
+  status: LeadStatus;
+  tags: string[];
+  jdText: string;
+  notes: string;
+}
+
+export const EMPTY_LEAD_CORE: LeadCoreValue = {
+  title: "",
+  company: "",
+  location: "",
+  remote: false,
+  jobUrl: "",
+  status: "new",
+  tags: [],
+  jdText: "",
+  notes: "",
+};
+
+// Only the open statuses can be set here.
 const STATUS_ITEMS = Object.fromEntries(
   OPEN_LEAD_STATUSES.map((s) => [s, LEAD_STATUS_LABELS[s]]),
 ) as Record<string, string>;
+
+/** True when the string looks like an http(s) URL (mirror of the server rule). */
+export function looksLikeUrl(v: string): boolean {
+  return /^https?:\/\/[^\s.]+\.[^\s]+$/i.test(v.trim());
+}
+
+export function LeadCoreFields({
+  value,
+  onChange,
+  showStatus = true,
+}: {
+  value: LeadCoreValue;
+  onChange: (patch: Partial<LeadCoreValue>) => void;
+  /** Whether to show the Status select (Add shows it; Edit hides it). */
+  showStatus?: boolean;
+}) {
+  const [tagInput, setTagInput] = useState("");
+
+  function commitTag(raw: string) {
+    const t = raw.trim().replace(/,+$/, "").trim();
+    if (!t) return;
+    if (t.length > 40) {
+      toast.error("Tag too long", "Each tag must be 40 characters or fewer.");
+      return;
+    }
+    if (value.tags.length >= MAX_TAGS) return;
+    if (!value.tags.includes(t)) onChange({ tags: [...value.tags, t] });
+    setTagInput("");
+  }
+
+  function onTagKeyDown(e: KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter" || e.key === ",") {
+      e.preventDefault();
+      commitTag(tagInput);
+    } else if (e.key === "Backspace" && !tagInput && value.tags.length) {
+      onChange({ tags: value.tags.slice(0, -1) });
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <Field label="Job title *">
+        <Input
+          value={value.title}
+          onChange={(e) => onChange({ title: e.target.value })}
+          placeholder="e.g. Senior Product Manager"
+        />
+      </Field>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="Company *">
+          <Input
+            value={value.company}
+            onChange={(e) => onChange({ company: e.target.value })}
+            placeholder="e.g. Acme Corp"
+          />
+        </Field>
+        <Field label="Location *">
+          <Input
+            value={value.location}
+            onChange={(e) => onChange({ location: e.target.value })}
+            placeholder="e.g. Bengaluru, India"
+          />
+        </Field>
+      </div>
+
+      <label className="flex items-center gap-2.5">
+        <input
+          type="checkbox"
+          checked={value.remote}
+          onChange={(e) => onChange({ remote: e.target.checked })}
+          className="size-4 rounded border-input accent-primary"
+        />
+        <span className="text-sm">This role is remote</span>
+      </label>
+
+      <Field label="Job URL *">
+        <Input
+          type="url"
+          value={value.jobUrl}
+          onChange={(e) => onChange({ jobUrl: e.target.value })}
+          placeholder="https://www.linkedin.com/jobs/view/…"
+        />
+        <span className="text-[11px] text-muted-foreground">
+          Required. The job link is the unique key used to avoid adding the same
+          job twice.
+        </span>
+      </Field>
+
+      <div className={cn("grid gap-3", showStatus && "sm:grid-cols-2")}>
+        {showStatus && (
+          <Field label="Status">
+            <Select
+              items={STATUS_ITEMS}
+              value={value.status}
+              onValueChange={(v) => onChange({ status: (v as LeadStatus) ?? "new" })}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {OPEN_LEAD_STATUSES.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {LEAD_STATUS_LABELS[s]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+        )}
+        <Field label="Tags">
+          <Input
+            value={tagInput}
+            onChange={(e) => setTagInput(e.target.value)}
+            onKeyDown={onTagKeyDown}
+            onBlur={() => commitTag(tagInput)}
+            placeholder="Type and press Enter"
+            disabled={value.tags.length >= MAX_TAGS}
+          />
+        </Field>
+      </div>
+      {value.tags.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {value.tags.map((t) => (
+            <span
+              key={t}
+              className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-xs font-medium"
+            >
+              {t}
+              <button
+                type="button"
+                aria-label={`Remove ${t}`}
+                onClick={() => onChange({ tags: value.tags.filter((x) => x !== t) })}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <X className="size-3" aria-hidden />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      <div className="grid gap-3 lg:grid-cols-2">
+        <Field label="Job description">
+          <Textarea
+            value={value.jdText}
+            onChange={(e) => onChange({ jdText: e.target.value })}
+            placeholder="Paste the full job description (optional — you can add it later)…"
+            className="min-h-28"
+          />
+        </Field>
+        <Field label="Notes">
+          <Textarea
+            value={value.notes}
+            onChange={(e) => onChange({ notes: e.target.value })}
+            placeholder="Anything to remember about this role (optional)…"
+            className="min-h-28"
+          />
+        </Field>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Validate required lead-core fields on the client for instant feedback (the
+ * server is still the source of truth). Returns an error message or null.
+ */
+export function validateLeadCore(v: LeadCoreValue): string | null {
+  if (!v.title.trim()) return "Job title is required.";
+  if (!v.company.trim()) return "Company is required.";
+  if (!v.location.trim()) return "Location is required.";
+  if (!v.jobUrl.trim()) return "Job URL is required.";
+  if (!looksLikeUrl(v.jobUrl))
+    return "Enter a valid Job URL starting with http:// or https://.";
+  return null;
+}
+
+/* ------------------------------------------------------------------ */
+/* The Add dialog                                                      */
+/* ------------------------------------------------------------------ */
 
 function AddLeadDialog({
   open,
@@ -150,18 +357,7 @@ function AddLeadDialog({
   const router = useRouter();
 
   const [mode, setMode] = useState<"manual" | "ai">("manual");
-
-  // Core lead fields.
-  const [title, setTitle] = useState("");
-  const [company, setCompany] = useState("");
-  const [location, setLocation] = useState("");
-  const [remote, setRemote] = useState(false);
-  const [jobUrl, setJobUrl] = useState("");
-  const [status, setStatus] = useState<LeadStatus>("new");
-  const [tags, setTags] = useState<string[]>([]);
-  const [tagInput, setTagInput] = useState("");
-  const [jd, setJd] = useState("");
-  const [notes, setNotes] = useState("");
+  const [core, setCore] = useState<LeadCoreValue>(EMPTY_LEAD_CORE);
 
   // Optional inline contact.
   const [cName, setCName] = useState("");
@@ -171,20 +367,13 @@ function AddLeadDialog({
 
   const [saving, setSaving] = useState(false);
 
-  // Reset every field when the dialog opens.
+  const patch = (p: Partial<LeadCoreValue>) => setCore((c) => ({ ...c, ...p }));
+
+  // Reset everything when the dialog opens.
   useEffect(() => {
     if (!open) return;
     setMode("manual");
-    setTitle("");
-    setCompany("");
-    setLocation("");
-    setRemote(false);
-    setJobUrl("");
-    setStatus("new");
-    setTags([]);
-    setTagInput("");
-    setJd("");
-    setNotes("");
+    setCore(EMPTY_LEAD_CORE);
     setCName("");
     setCTitle("");
     setCUrl("");
@@ -194,41 +383,20 @@ function AddLeadDialog({
 
   /** Fill the manual form from an AI extraction, then switch to review it. */
   function applyExtracted(lead: ExtractedLead) {
-    if (lead.title) setTitle(lead.title);
-    if (lead.company) setCompany(lead.company);
-    if (lead.location) setLocation(lead.location);
-    setRemote(lead.remote);
-    if (lead.jobUrl) setJobUrl(lead.jobUrl);
-    if (lead.tags.length) setTags(lead.tags.slice(0, MAX_TAGS));
-    if (lead.jdText) setJd(lead.jdText);
+    const p: Partial<LeadCoreValue> = { remote: lead.remote };
+    if (lead.title) p.title = lead.title;
+    if (lead.company) p.company = lead.company;
+    if (lead.location) p.location = lead.location;
+    if (lead.jobUrl) p.jobUrl = lead.jobUrl;
+    if (lead.tags.length) p.tags = lead.tags.slice(0, MAX_TAGS);
+    if (lead.jdText) p.jdText = lead.jdText;
+    patch(p);
     setMode("manual");
   }
 
-  function commitTag(raw: string) {
-    const t = raw.trim().replace(/,+$/, "").trim();
-    if (!t) return;
-    if (t.length > 40) {
-      toast.error("Tag too long", "Each tag must be 40 characters or fewer.");
-      return;
-    }
-    if (tags.length >= MAX_TAGS) return;
-    if (!tags.includes(t)) setTags((prev) => [...prev, t]);
-    setTagInput("");
-  }
-
-  function onTagKeyDown(e: KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "Enter" || e.key === ",") {
-      e.preventDefault();
-      commitTag(tagInput);
-    } else if (e.key === "Backspace" && !tagInput && tags.length) {
-      setTags((prev) => prev.slice(0, -1));
-    }
-  }
-
   async function save() {
-    if (!title.trim()) return toast.error("Job title is required.");
-    if (!company.trim()) return toast.error("Company is required.");
-    if (!location.trim()) return toast.error("Location is required.");
+    const err = validateLeadCore(core);
+    if (err) return toast.error(err);
     if (!cName.trim() && (cTitle.trim() || cUrl.trim())) {
       return toast.error(
         "Incomplete contact",
@@ -238,15 +406,7 @@ function AddLeadDialog({
 
     setSaving(true);
     const res = await createLead({
-      title,
-      company,
-      location,
-      remote,
-      jobUrl,
-      status,
-      tags,
-      jdText: jd,
-      notes,
+      ...core,
       contact: cName.trim()
         ? { name: cName, title: cTitle, linkedinUrl: cUrl, connectionType: cType }
         : undefined,
@@ -254,7 +414,7 @@ function AddLeadDialog({
     setSaving(false);
 
     if (res.ok) {
-      toast.success("Lead added", `${title.trim()} · ${company.trim()}`);
+      toast.success("Lead added", `${core.title.trim()} · ${core.company.trim()}`);
       onOpenChange(false);
       router.push(`/leads/${res.id}`);
     } else {
@@ -303,127 +463,9 @@ function AddLeadDialog({
           </TabsTrigger>
         </TabsList>
 
-        {/* ---------------- Manual form ---------------- */}
         <TabsContent value="manual" className="mt-4">
           <div className="space-y-4">
-            <Field label="Job title *">
-              <Input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="e.g. Senior Product Manager"
-              />
-            </Field>
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="Company *">
-                <Input
-                  value={company}
-                  onChange={(e) => setCompany(e.target.value)}
-                  placeholder="e.g. Acme Corp"
-                />
-              </Field>
-              <Field label="Location *">
-                <Input
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                  placeholder="e.g. Bengaluru, India"
-                />
-              </Field>
-            </div>
-
-            <label className="flex items-center gap-2.5">
-              <input
-                type="checkbox"
-                checked={remote}
-                onChange={(e) => setRemote(e.target.checked)}
-                className="size-4 rounded border-input accent-primary"
-              />
-              <span className="text-sm">This role is remote</span>
-            </label>
-
-            <Field label="Job URL">
-              <Input
-                type="url"
-                value={jobUrl}
-                onChange={(e) => setJobUrl(e.target.value)}
-                placeholder="https://www.linkedin.com/jobs/view/…"
-              />
-              <span className="text-[11px] text-muted-foreground">
-                Optional. The job link is used to avoid adding the same job twice.
-              </span>
-            </Field>
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="Status">
-                <Select
-                  items={STATUS_ITEMS}
-                  value={status}
-                  onValueChange={(v) => setStatus((v as LeadStatus) ?? "new")}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {OPEN_LEAD_STATUSES.map((s) => (
-                      <SelectItem key={s} value={s}>
-                        {LEAD_STATUS_LABELS[s]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
-              <Field label="Tags">
-                <Input
-                  value={tagInput}
-                  onChange={(e) => setTagInput(e.target.value)}
-                  onKeyDown={onTagKeyDown}
-                  onBlur={() => commitTag(tagInput)}
-                  placeholder="Type and press Enter"
-                  disabled={tags.length >= MAX_TAGS}
-                />
-              </Field>
-            </div>
-            {tags.length > 0 && (
-              <div className="flex flex-wrap gap-1.5">
-                {tags.map((t) => (
-                  <span
-                    key={t}
-                    className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-xs font-medium"
-                  >
-                    {t}
-                    <button
-                      type="button"
-                      aria-label={`Remove ${t}`}
-                      onClick={() =>
-                        setTags((prev) => prev.filter((x) => x !== t))
-                      }
-                      className="text-muted-foreground hover:text-foreground"
-                    >
-                      <X className="size-3" aria-hidden />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
-
-            <div className="grid gap-3 lg:grid-cols-2">
-              <Field label="Job description">
-                <Textarea
-                  value={jd}
-                  onChange={(e) => setJd(e.target.value)}
-                  placeholder="Paste the full job description (optional — you can add it later)…"
-                  className="min-h-28"
-                />
-              </Field>
-              <Field label="Notes">
-                <Textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Anything to remember about this role (optional)…"
-                  className="min-h-28"
-                />
-              </Field>
-            </div>
+            <LeadCoreFields value={core} onChange={patch} />
 
             {/* Optional inline contact */}
             <div className="rounded-lg border bg-muted/30 p-3">
@@ -477,7 +519,6 @@ function AddLeadDialog({
           </div>
         </TabsContent>
 
-        {/* ---------------- AI extraction ---------------- */}
         <TabsContent value="ai" className="mt-4">
           <AiExtractPanel onExtracted={applyExtracted} />
         </TabsContent>
@@ -574,9 +615,7 @@ function AiExtractPanel({
         const type = item.types.find((t) => t.startsWith("image/"));
         if (type) {
           const blob = await item.getType(type);
-          acceptImage(
-            new File([blob], "clipboard-image", { type: blob.type }),
-          );
+          acceptImage(new File([blob], "clipboard-image", { type: blob.type }));
           return;
         }
       }

@@ -7,15 +7,16 @@
 // Every write is scoped to the current user (getCurrentUserId) and, where it
 // touches multiple rows, wrapped in a transaction.
 
-import { randomUUID } from "node:crypto";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { getCurrentUserId } from "@/lib/current-user";
 import {
   createLeadSchema,
+  editLeadSchema,
   deleteLeadsSchema,
   parseInput,
   type CreateLeadInput,
+  type EditLeadInput,
 } from "@/lib/schemas";
 import { extractLinkedInJobId } from "@/lib/linkedin-parser";
 import { loadWorkspace, type WorkspaceData } from "@/lib/queries";
@@ -159,11 +160,8 @@ export async function createLeadAction(input: {
     return { ok: false, error: e instanceof Error ? e.message : "Invalid input." };
   }
 
-  // A job URL (LinkedIn or otherwise) is the per-user dedupe key; with no URL
-  // there's nothing to match on, so allow it via a synthetic key.
-  const linkedinJobId = data.jobUrl
-    ? dedupeKeyForUrl(data.jobUrl)
-    : `manual-${randomUUID()}`;
+  // The job URL (required) is the per-user dedupe key.
+  const linkedinJobId = dedupeKeyForUrl(data.jobUrl);
 
   try {
     const id = await db.transaction(async (tx) => {
@@ -220,6 +218,77 @@ export async function createLeadAction(input: {
       };
     }
     return { ok: false, error: "Couldn't save the lead. Please try again." };
+  }
+}
+
+/**
+ * Edit a lead's core fields (title/company/location/remote/jobUrl/tags/status)
+ * and its JD/notes. Changing the URL recomputes the per-user dedupe key, so a
+ * URL that collides with another of the user's leads is rejected (repetition
+ * avoided). Scoped to the current user; returns a friendly result.
+ */
+export async function updateLeadAction(
+  leadId: string,
+  input: EditLeadInput,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const userId = await getCurrentUserId();
+
+  let data: EditLeadInput;
+  try {
+    data = parseInput(editLeadSchema, input);
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Invalid input." };
+  }
+
+  const linkedinJobId = dedupeKeyForUrl(data.jobUrl);
+
+  try {
+    await db.transaction(async (tx) => {
+      const [row] = await tx
+        .update(leadsT)
+        .set({
+          title: data.title,
+          company: data.company,
+          location: data.location,
+          remote: data.remote,
+          tags: data.tags,
+          canonicalJobUrl: data.jobUrl,
+          linkedinJobId,
+          // status is intentionally not edited here (managed by the status control).
+        })
+        .where(and(eq(leadsT.id, leadId), eq(leadsT.userId, userId)))
+        .returning({ id: leadsT.id });
+
+      if (!row) throw new Error("LEAD_NOT_FOUND");
+
+      // Upsert the detail row for JD / notes.
+      await tx
+        .insert(detailsT)
+        .values({
+          leadId,
+          userId,
+          jdText: data.jdText || null,
+          notes: data.notes || null,
+        })
+        .onConflictDoUpdate({
+          target: detailsT.leadId,
+          set: { jdText: data.jdText || null, notes: data.notes || null },
+        });
+    });
+    return { ok: true };
+  } catch (e) {
+    const code = (e as { code?: string })?.code;
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg === "LEAD_NOT_FOUND") {
+      return { ok: false, error: "Lead not found." };
+    }
+    if (code === "23505" || msg.includes("job_leads_user_linkedin_job_id_uq")) {
+      return {
+        ok: false,
+        error: "That job URL is already used by another of your leads.",
+      };
+    }
+    return { ok: false, error: "Couldn't update the lead. Please try again." };
   }
 }
 

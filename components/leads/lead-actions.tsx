@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   MoreHorizontal,
   Eye,
+  Pencil,
   UserPlus,
   BellPlus,
   Sparkles,
@@ -52,14 +53,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { ActionDialog, Field } from "@/components/leads/action-dialog";
+import { EditLeadDialog } from "@/components/leads/edit-lead-dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -76,7 +71,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
-type DialogKind = "contact" | "reminder" | "outreach" | null;
+type DialogKind = "contact" | "reminder" | "outreach" | "edit" | null;
 
 export function LeadActions({
   lead,
@@ -136,6 +131,10 @@ export function LeadActions({
               View details
             </DropdownMenuItem>
           )}
+          <DropdownMenuItem onClick={() => setDialog("edit")}>
+            <Pencil className="size-4" aria-hidden />
+            Edit lead
+          </DropdownMenuItem>
           <DropdownMenuSub>
             <DropdownMenuSubTrigger>
               <CircleDot className="size-4" aria-hidden />
@@ -251,6 +250,11 @@ export function LeadActionDialogs({
 }) {
   return (
     <>
+      <EditLeadDialog
+        lead={lead}
+        open={dialog === "edit"}
+        onOpenChange={(o) => onDialogChange(o ? "edit" : null)}
+      />
       <AddContactDialog
         lead={lead}
         open={dialog === "contact"}
@@ -820,65 +824,3 @@ function DraftOutreachDialog({
   );
 }
 
-/* ------------------------------------------------------------------ */
-/* Shared dialog shell + field                                         */
-/* ------------------------------------------------------------------ */
-
-export function ActionDialog({
-  open,
-  onOpenChange,
-  icon,
-  title,
-  description,
-  children,
-  footer,
-  contentClassName,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  icon: React.ReactNode;
-  title: string;
-  description?: string;
-  children: React.ReactNode;
-  footer: React.ReactNode;
-  /** Override the popup width/height (defaults to sm:max-w-lg). */
-  contentClassName?: string;
-}) {
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className={cn(
-          "max-h-[90dvh] overflow-y-auto sm:max-w-lg",
-          contentClassName,
-        )}
-      >
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <span className="flex size-7 items-center justify-center rounded-md bg-primary/10 text-primary">
-              {icon}
-            </span>
-            {title}
-          </DialogTitle>
-          {description && <DialogDescription>{description}</DialogDescription>}
-        </DialogHeader>
-        <div className="py-1">{children}</div>
-        <DialogFooter>{footer}</DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-export function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <label className="block space-y-1.5">
-      <span className="text-xs font-medium text-muted-foreground">{label}</span>
-      {children}
-    </label>
-  );
-}

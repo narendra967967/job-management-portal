@@ -132,22 +132,23 @@ export const promptPreviewSchema = z.object({
 
 /* ---------------- data / leads ---------------- */
 
-/** Manual lead creation (the "Add lead" modal). Mirrors the job_leads +
- *  job_lead_details columns the form can set, plus an optional inline contact.
- *  Fields the user never sets (linkedinJobId, capturedAt, postedRelative, …) are
- *  derived server-side in createLeadAction. */
+/** Lead create/edit. Mirrors the job_leads + job_lead_details columns the form
+ *  can set. Fields the user never sets (linkedinJobId, capturedAt,
+ *  postedRelative, …) are derived server-side. The job URL is REQUIRED and is
+ *  the per-user uniqueness key (repetition is rejected). */
 
-// Only the open statuses are offered manually; closing a lead (with an outcome)
+// Only the open statuses are offered here; closing a lead (with an outcome)
 // stays in the existing detail-page flow.
 const OPEN_STATUS = ["new", "reviewing", "applied"] as const;
 
-/** Optional http(s) URL — "" is allowed (manual lead with no link). */
-const zOptionalUrl = z
+/** Required http(s) URL — the per-user dedupe key. */
+const zRequiredUrl = z
   .string()
   .trim()
+  .min(1, "Job URL is required.")
   .max(2048, "That URL is too long.")
   .refine(
-    (v) => v === "" || /^https?:\/\/[^\s.]+\.[^\s]+$/i.test(v),
+    (v) => /^https?:\/\/[^\s.]+\.[^\s]+$/i.test(v),
     "Enter a valid URL starting with http:// or https://.",
   );
 
@@ -164,13 +165,15 @@ const zLeadContact = z.object({
   ),
 });
 
-export const createLeadSchema = z.object({
+// Core fields shared by create and edit. Status is intentionally NOT here —
+// create adds it (open statuses only); edit leaves status to its own control so
+// editing details can't accidentally reopen a closed/archived lead.
+const leadCoreShape = {
   title: z.string().trim().min(1, "Job title is required.").max(200),
   company: z.string().trim().min(1, "Company is required.").max(200),
   location: z.string().trim().min(1, "Location is required.").max(200),
   remote: z.boolean().default(false),
-  jobUrl: zOptionalUrl.default(""),
-  status: zEnum(OPEN_STATUS, "Pick a valid status.").default("new"),
+  jobUrl: zRequiredUrl,
   tags: z
     .array(z.string())
     .default([])
@@ -183,10 +186,19 @@ export const createLeadSchema = z.object({
     ),
   jdText: z.string().trim().max(50000).default(""),
   notes: z.string().trim().max(10000).default(""),
+} as const;
+
+export const createLeadSchema = z.object({
+  ...leadCoreShape,
+  status: zEnum(OPEN_STATUS, "Pick a valid status.").default("new"),
   contact: zLeadContact.optional(),
 });
 
+// Edit ignores any extra keys (e.g. a status carried by the shared form value).
+export const editLeadSchema = z.object(leadCoreShape);
+
 export type CreateLeadInput = z.infer<typeof createLeadSchema>;
+export type EditLeadInput = z.infer<typeof editLeadSchema>;
 
 /** Permanently delete a set of leads — 1..500 ids. */
 export const deleteLeadsSchema = z
