@@ -15,6 +15,7 @@ import {
   addContactAction,
   addReminderManualAction,
   completeTaskAction,
+  createLeadAction,
   deleteContactAction,
   deleteLeadsAction,
   deleteReminderAction,
@@ -238,6 +239,30 @@ export async function setLeadStatus(
 ) {
   await setLeadStatusAction(leadId, status, closeOutcome);
   await refresh();
+}
+
+/** Create a lead manually (Add-lead modal); refreshes on success so the new
+ *  lead appears. Returns the action result so the dialog can surface errors. */
+export async function createLead(input: {
+  title: string;
+  company: string;
+  location: string;
+  remote: boolean;
+  jobUrl: string;
+  status: LeadStatus;
+  tags: string[];
+  jdText: string;
+  notes: string;
+  contact?: {
+    name: string;
+    title: string;
+    linkedinUrl: string;
+    connectionType: ConnectionType;
+  };
+}): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  const res = await createLeadAction(input);
+  if (res.ok) await refresh();
+  return res;
 }
 
 /** Permanently delete one or more leads (Archive trash). */

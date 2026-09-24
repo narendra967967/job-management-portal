@@ -10,7 +10,11 @@ import "server-only";
 
 import { z } from "zod";
 import { splitMobile, validateMobile } from "@/lib/validation";
-import { OUTREACH_KIND_LABELS, RESUME_ALLOWED_EXT } from "@/lib/types";
+import {
+  CONNECTION_TYPE_LABELS,
+  OUTREACH_KIND_LABELS,
+  RESUME_ALLOWED_EXT,
+} from "@/lib/types";
 
 /* ---------------- shared primitives ---------------- */
 
@@ -120,6 +124,62 @@ export const promptPreviewSchema = z.object({
 });
 
 /* ---------------- data / leads ---------------- */
+
+/** Manual lead creation (the "Add lead" modal). Mirrors the job_leads +
+ *  job_lead_details columns the form can set, plus an optional inline contact.
+ *  Fields the user never sets (linkedinJobId, capturedAt, postedRelative, …) are
+ *  derived server-side in createLeadAction. */
+
+// Only the open statuses are offered manually; closing a lead (with an outcome)
+// stays in the existing detail-page flow.
+const OPEN_STATUS = ["new", "reviewing", "applied"] as const;
+
+/** Optional http(s) URL — "" is allowed (manual lead with no link). */
+const zOptionalUrl = z
+  .string()
+  .trim()
+  .max(2048, "That URL is too long.")
+  .refine(
+    (v) => v === "" || /^https?:\/\/[^\s.]+\.[^\s]+$/i.test(v),
+    "Enter a valid URL starting with http:// or https://.",
+  );
+
+/** Optional inline contact captured alongside the lead. */
+const zLeadContact = z.object({
+  name: z.string().trim().min(1, "Contact name is required.").max(120),
+  title: z.string().trim().max(120).default(""),
+  // Kept lenient (matches the existing Add-contact form, which accepts
+  // "linkedin.com/in/…" without a scheme).
+  linkedinUrl: z.string().trim().max(2048).default(""),
+  connectionType: zEnum(
+    Object.keys(CONNECTION_TYPE_LABELS),
+    "Unknown connection type.",
+  ),
+});
+
+export const createLeadSchema = z.object({
+  title: z.string().trim().min(1, "Job title is required.").max(200),
+  company: z.string().trim().min(1, "Company is required.").max(200),
+  location: z.string().trim().min(1, "Location is required.").max(200),
+  remote: z.boolean().default(false),
+  jobUrl: zOptionalUrl.default(""),
+  status: zEnum(OPEN_STATUS, "Pick a valid status.").default("new"),
+  tags: z
+    .array(z.string())
+    .default([])
+    .transform((arr) =>
+      [...new Set(arr.map((s) => s.trim()).filter(Boolean))].slice(0, 15),
+    )
+    .refine(
+      (arr) => arr.every((t) => t.length <= 40),
+      "Each tag must be 40 characters or fewer.",
+    ),
+  jdText: z.string().trim().max(50000).default(""),
+  notes: z.string().trim().max(10000).default(""),
+  contact: zLeadContact.optional(),
+});
+
+export type CreateLeadInput = z.infer<typeof createLeadSchema>;
 
 /** Permanently delete a set of leads — 1..500 ids. */
 export const deleteLeadsSchema = z

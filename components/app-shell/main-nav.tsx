@@ -21,6 +21,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Logo } from "@/components/app-shell/logo";
+import { SidebarAddLeadButton } from "@/components/leads/add-lead-dialog";
 import { useProfile } from "@/lib/mock-store";
 import { signOutToHome } from "@/lib/auth-client";
 import {
@@ -152,6 +153,7 @@ export function SidebarNav() {
   const pathname = usePathname();
   return (
     <nav className="flex flex-col gap-3 p-3">
+      <SidebarAddLeadButton />
       {NAV_GROUPS.map((g) => (
         <NavGroup
           key={g.label}
@@ -304,7 +306,9 @@ export function MobileNav() {
               <div
                 className="flex min-h-0 flex-1 flex-col overflow-y-auto"
                 onClick={(e) => {
-                  if ((e.target as HTMLElement).closest("a")) setOpen(false);
+                  const el = e.target as HTMLElement;
+                  if (el.closest("a") || el.closest("[data-closes-nav]"))
+                    setOpen(false);
                 }}
               >
                 <SidebarNav />

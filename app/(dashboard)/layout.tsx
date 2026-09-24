@@ -11,6 +11,11 @@ import {
   TopBarSearch,
 } from "@/components/app-shell/top-bar";
 import { AutoSync } from "@/components/app-shell/auto-sync";
+import {
+  AddLeadProvider,
+  HeaderAddLeadButton,
+  AddLeadFab,
+} from "@/components/leads/add-lead-dialog";
 import { getCurrentUserId } from "@/lib/current-user";
 import { loadWorkspace } from "@/lib/queries";
 import { WorkspaceProvider } from "@/lib/workspace-provider";
@@ -27,6 +32,7 @@ export default async function DashboardLayout({
     // always pinned to the visible bottom (no reliance on position:fixed).
     <WorkspaceProvider initial={workspace}>
     <AutoSync />
+    <AddLeadProvider>
     <div className="flex h-dvh flex-col overflow-hidden bg-background md:flex-row">
       {/* Desktop sidebar */}
       <aside className="hidden w-60 shrink-0 flex-col overflow-y-auto border-r border-sidebar-border bg-sidebar md:flex">
@@ -48,6 +54,7 @@ export default async function DashboardLayout({
             <TopBarSearch />
             <div className="ml-auto flex items-center gap-1.5 sm:gap-2.5">
               <TopBarStats className="hidden sm:flex" />
+              <HeaderAddLeadButton />
               <NotificationsMenu />
             </div>
           </div>
@@ -60,7 +67,11 @@ export default async function DashboardLayout({
         {/* Mobile bottom nav — a flex child pinned below <main>, not fixed. */}
         <BottomNav />
       </div>
+
+      {/* Mobile-only floating "Add lead" button (above the bottom nav). */}
+      <AddLeadFab />
       </div>
+    </AddLeadProvider>
     </WorkspaceProvider>
   );
 }

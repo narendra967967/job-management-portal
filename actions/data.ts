@@ -7,14 +7,22 @@
 // Every write is scoped to the current user (getCurrentUserId) and, where it
 // touches multiple rows, wrapped in a transaction.
 
+import { randomUUID } from "node:crypto";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { getCurrentUserId } from "@/lib/current-user";
-import { deleteLeadsSchema, parseInput } from "@/lib/schemas";
+import {
+  createLeadSchema,
+  deleteLeadsSchema,
+  parseInput,
+  type CreateLeadInput,
+} from "@/lib/schemas";
+import { extractLinkedInJobId } from "@/lib/linkedin-parser";
 import { loadWorkspace, type WorkspaceData } from "@/lib/queries";
 import {
   contacts as contactsT,
   jobLeads as leadsT,
+  jobLeadDetails as detailsT,
   outreachMessages as outreachT,
   reminders as remindersT,
   tasks as tasksT,
@@ -88,6 +96,106 @@ export async function deleteLeadsAction(ids: string[]) {
   await db
     .delete(leadsT)
     .where(and(eq(leadsT.userId, userId), inArray(leadsT.id, clean)));
+}
+
+/**
+ * Manually create a lead (the "Add lead" modal), with an optional inline
+ * contact. Derives the fields the form doesn't ask for:
+ *  - linkedinJobId: parsed from the job URL when it's a LinkedIn link, else a
+ *    synthetic `manual-<uuid>` so manual leads never collide on the
+ *    UNIQUE(user, linkedin_job_id) dedupe key.
+ *  - postedRelative: "just now" (there's no real posting age for a manual add).
+ *  - capturedAt / status default handled by the column / schema.
+ *
+ * Returns a discriminated result so the dialog can show inline errors
+ * (validation or a duplicate) instead of throwing.
+ */
+export async function createLeadAction(input: {
+  title: string;
+  company: string;
+  location: string;
+  remote: boolean;
+  jobUrl: string;
+  status: LeadStatus;
+  tags: string[];
+  jdText: string;
+  notes: string;
+  contact?: {
+    name: string;
+    title: string;
+    linkedinUrl: string;
+    connectionType: ConnectionType;
+  };
+}): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  const userId = await getCurrentUserId();
+
+  let data: CreateLeadInput;
+  try {
+    data = parseInput(createLeadSchema, input);
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Invalid input." };
+  }
+
+  // A LinkedIn URL gives us the real dedupe key; anything else is synthetic.
+  const linkedinJobId =
+    (data.jobUrl && extractLinkedInJobId(data.jobUrl)) || `manual-${randomUUID()}`;
+
+  try {
+    const id = await db.transaction(async (tx) => {
+      const [row] = await tx
+        .insert(leadsT)
+        .values({
+          userId,
+          linkedinJobId,
+          title: data.title,
+          company: data.company,
+          location: data.location,
+          remote: data.remote,
+          tags: data.tags,
+          postedRelative: "just now",
+          canonicalJobUrl: data.jobUrl,
+          status: data.status as LeadStatus,
+        })
+        .returning({ id: leadsT.id });
+
+      const leadId = row.id;
+
+      // Detail row only when there's something to store.
+      if (data.jdText || data.notes) {
+        await tx.insert(detailsT).values({
+          leadId,
+          userId,
+          jdText: data.jdText || null,
+          notes: data.notes || null,
+        });
+      }
+
+      if (data.contact) {
+        await tx.insert(contactsT).values({
+          userId,
+          leadId,
+          name: data.contact.name,
+          title: data.contact.title,
+          linkedinUrl: data.contact.linkedinUrl || null,
+          connectionType: data.contact.connectionType as ConnectionType,
+          aiParsed: false,
+        });
+      }
+
+      return leadId;
+    });
+    return { ok: true, id };
+  } catch (e) {
+    const code = (e as { code?: string })?.code;
+    const msg = e instanceof Error ? e.message : String(e);
+    if (code === "23505" || msg.includes("job_leads_user_linkedin_job_id_uq")) {
+      return {
+        ok: false,
+        error: "This job looks like it's already in your leads.",
+      };
+    }
+    return { ok: false, error: "Couldn't save the lead. Please try again." };
+  }
 }
 
 /* ---------------- contacts ---------------- */

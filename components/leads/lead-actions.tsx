@@ -824,7 +824,7 @@ function DraftOutreachDialog({
 /* Shared dialog shell + field                                         */
 /* ------------------------------------------------------------------ */
 
-function ActionDialog({
+export function ActionDialog({
   open,
   onOpenChange,
   icon,
@@ -832,6 +832,7 @@ function ActionDialog({
   description,
   children,
   footer,
+  contentClassName,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -840,10 +841,17 @@ function ActionDialog({
   description?: string;
   children: React.ReactNode;
   footer: React.ReactNode;
+  /** Override the popup width/height (defaults to sm:max-w-lg). */
+  contentClassName?: string;
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
+      <DialogContent
+        className={cn(
+          "max-h-[90dvh] overflow-y-auto sm:max-w-lg",
+          contentClassName,
+        )}
+      >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <span className="flex size-7 items-center justify-center rounded-md bg-primary/10 text-primary">
@@ -860,7 +868,7 @@ function ActionDialog({
   );
 }
 
-function Field({
+export function Field({
   label,
   children,
 }: {
