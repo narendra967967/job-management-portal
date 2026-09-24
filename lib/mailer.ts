@@ -44,13 +44,18 @@ async function resolveConfig(): Promise<ResolvedSmtp | null> {
     .from(smtpConfig)
     .where(eq(smtpConfig.id, "app"))
     .limit(1);
+  // App passwords (e.g. Gmail) are shown with spaces — strip them.
+  const clean = (v?: string | null) => v?.replace(/\s+/g, "") || undefined;
+
   if (c && c.enabled && c.host && c.fromEmail) {
     return {
       host: c.host,
       port: c.port,
       secure: c.secure,
       user: c.username ?? undefined,
-      pass: c.passwordCiphertext ? decryptSecret(c.passwordCiphertext) : undefined,
+      pass: c.passwordCiphertext
+        ? clean(decryptSecret(c.passwordCiphertext))
+        : undefined,
       fromEmail: c.fromEmail,
       fromName: c.fromName ?? undefined,
     };
@@ -64,7 +69,7 @@ async function resolveConfig(): Promise<ResolvedSmtp | null> {
       port: Number(process.env.SMTP_PORT ?? 587),
       secure: process.env.SMTP_SECURE === "true",
       user: process.env.SMTP_USER || undefined,
-      pass: process.env.SMTP_PASS || undefined,
+      pass: clean(process.env.SMTP_PASS),
       fromEmail,
       fromName: process.env.SMTP_FROM_NAME || undefined,
     };
