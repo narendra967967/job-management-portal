@@ -70,11 +70,11 @@ interface Props {
   resumes: Resume[];
 }
 
-// Selected tab uses the primary color (overrides the primitive's neutral pill).
-// `group/tab` lets the count badge react to the active state too.
-const tabActive =
-  "group/tab data-active:bg-primary data-active:text-primary-foreground " +
-  "dark:data-active:border-transparent dark:data-active:bg-primary dark:data-active:text-primary-foreground";
+// Underline tabs: muted by default, primary text + primary underline when
+// active. `group/tab` lets the count badge react to the active state.
+const tabTrigger =
+  "group/tab flex-none rounded-none px-3 py-2.5 text-sm font-medium " +
+  "data-active:text-primary data-active:after:bottom-0 data-active:after:bg-primary";
 
 export function LeadDetail(props: Props) {
   return (
@@ -295,25 +295,28 @@ export function LeadDetailContent({
 
       {/* Tabbed sections — read views. Adding is done via the actions menu. */}
       <Tabs defaultValue="overview">
-        <TabsList className="w-full justify-start overflow-x-auto">
-          <TabsTrigger value="overview" className={tabActive}>
+        <TabsList
+          variant="line"
+          className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-none border-b border-border bg-transparent p-0"
+        >
+          <TabsTrigger value="overview" className={tabTrigger}>
             Overview
           </TabsTrigger>
-          <TabsTrigger value="contacts" className={tabActive}>
+          <TabsTrigger value="contacts" className={tabTrigger}>
             Contacts
             {contacts.length > 0 && (
-              <span className="ml-1.5 rounded-full bg-muted px-1.5 text-[11px] tabular-nums group-data-active/tab:bg-primary-foreground/20 group-data-active/tab:text-primary-foreground">
+              <span className="ml-1.5 rounded-full bg-muted px-1.5 text-[11px] tabular-nums text-muted-foreground group-data-active/tab:bg-primary/10 group-data-active/tab:text-primary">
                 {contacts.length}
               </span>
             )}
           </TabsTrigger>
-          <TabsTrigger value="outreach" className={tabActive}>
+          <TabsTrigger value="outreach" className={tabTrigger}>
             Outreach
           </TabsTrigger>
-          <TabsTrigger value="reminders" className={tabActive}>
+          <TabsTrigger value="reminders" className={tabTrigger}>
             Reminders
           </TabsTrigger>
-          <TabsTrigger value="timeline" className={tabActive}>
+          <TabsTrigger value="timeline" className={tabTrigger}>
             Timeline
           </TabsTrigger>
         </TabsList>
