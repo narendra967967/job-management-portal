@@ -93,7 +93,8 @@ export function parseLinkedInAlert(html: string): LeadDraft[] {
       company,
       location,
       remote,
-      tags,
+      // LinkedIn can repeat a badge (e.g. "Easy Apply") within a card — dedupe.
+      tags: [...new Set(tags)],
       postedRelative: "",
       canonicalJobUrl: `https://www.linkedin.com/jobs/view/${id}`,
     });

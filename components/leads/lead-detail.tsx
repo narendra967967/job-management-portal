@@ -183,9 +183,9 @@ export function LeadDetailContent({
               {CLOSE_OUTCOME_LABELS[closeOutcome]}
             </span>
           )}
-          {lead.tags.map((tag) => (
+          {lead.tags.map((tag, i) => (
             <span
-              key={tag}
+              key={`${tag}-${i}`}
               className="rounded-md bg-ai-muted px-2 py-0.5 text-[11px] font-medium text-ai"
             >
               {tag}
