@@ -47,6 +47,7 @@ import {
 } from "@/actions/settings";
 import { syncMyGmailAction } from "@/actions/gmail-sync";
 import { saveJdAction, summarizeJdAction, scoreFitAction } from "@/actions/ai";
+import { toast } from "@/components/ui/toast";
 import type { SyncResult } from "@/lib/gmail-sync";
 import type { GmailSyncStatus, IngestError } from "@/lib/queries";
 import { contactPersonKey, isJobOpen, fitScoreKey } from "@/lib/types";
@@ -232,13 +233,29 @@ export function useLeadStatus(leadId: string): {
 
 /* ---------------- mutations (persist, then refresh) ---------------- */
 
+/** Friendly toast message for a status change. */
+function statusToast(status: LeadStatus, outcome: CloseOutcome | null) {
+  if (status === "discarded") return toast.success("Lead discarded", "Moved to Archive.");
+  if (status === "closed")
+    return toast.success(
+      "Lead closed",
+      outcome ? CLOSE_OUTCOME_LABELS[outcome] : undefined,
+    );
+  return toast.success("Status updated", `Marked as ${LEAD_STATUS_LABELS[status]}.`);
+}
+
 export async function setLeadStatus(
   leadId: string,
   status: LeadStatus,
   closeOutcome: CloseOutcome | null = null,
 ) {
-  await setLeadStatusAction(leadId, status, closeOutcome);
-  await refresh();
+  try {
+    await setLeadStatusAction(leadId, status, closeOutcome);
+    await refresh();
+    statusToast(status, closeOutcome);
+  } catch (e) {
+    toast.error("Couldn't update lead", e instanceof Error ? e.message : undefined);
+  }
 }
 
 /** Create a lead manually (Add-lead modal); refreshes on success so the new
@@ -280,8 +297,13 @@ export async function addContact(input: {
   connectionType: ConnectionType;
   aiParsed: boolean;
 }) {
-  await addContactAction(input);
-  await refresh();
+  try {
+    await addContactAction(input);
+    await refresh();
+    toast.success("Contact added", input.name);
+  } catch (e) {
+    toast.error("Couldn't add contact", e instanceof Error ? e.message : undefined);
+  }
 }
 
 export async function updateContact(
@@ -293,8 +315,13 @@ export async function updateContact(
     connectionType: ConnectionType;
   },
 ) {
-  await updateContactAction(id, patch);
-  await refresh();
+  try {
+    await updateContactAction(id, patch);
+    await refresh();
+    toast.success("Contact updated", patch.name);
+  } catch (e) {
+    toast.error("Couldn't update contact", e instanceof Error ? e.message : undefined);
+  }
 }
 
 export async function deleteContact(id: string) {
