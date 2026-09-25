@@ -31,6 +31,7 @@ import {
   LEAD_STATUSES,
   fitScoreKey,
   isJobOpen,
+  isReadyForAction,
   type CloseOutcome,
   type FitScore,
   type JobLead,
@@ -103,6 +104,9 @@ type SortKey =
   | "added-asc"
   | "score-desc"
   | "score-asc"
+  | "ready-first"
+  | "due-first"
+  | "stale-first"
   | "company-asc"
   | "title-asc";
 
@@ -113,22 +117,29 @@ const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: "added-asc", label: "Oldest added" },
   { value: "score-desc", label: "Score: high → low" },
   { value: "score-asc", label: "Score: low → high" },
+  { value: "ready-first", label: "Ready first" },
+  { value: "due-first", label: "Due reminder first" },
+  { value: "stale-first", label: "Stale first" },
   { value: "company-asc", label: "Company A–Z" },
   { value: "title-asc", label: "Title A–Z" },
 ];
 
 /**
- * Sort a column's cards. Unscored ("NC") cards always sink to the bottom on a
- * score sort so the ranked, scored cards stay at the top.
+ * Sort a column's cards. Unscored ("NC") cards sink to the bottom on a score
+ * sort; the actionability sorts (ready/due/stale) bring matching cards to the
+ * top, then fall back to a sensible secondary order.
  */
 function sortLeads(
   leads: JobLead[],
   sort: SortKey,
   scores: Record<string, FitScore>,
   resumeId: string,
+  staleCutoff: string,
 ): JobLead[] {
   const arr = [...leads];
   const scoreOf = (l: JobLead) => scores[fitScoreKey(l.id, resumeId)]?.score;
+  const isStale = (l: JobLead) =>
+    isJobOpen(l.status) && !l.hasDueReminder && l.capturedAt < staleCutoff;
   switch (sort) {
     case "added-asc":
       arr.sort((a, b) => a.capturedAt.localeCompare(b.capturedAt));
@@ -156,6 +167,30 @@ function sortLeads(
       });
       break;
     }
+    case "ready-first":
+      // Ready-to-action leads first, then newest.
+      arr.sort(
+        (a, b) =>
+          Number(isReadyForAction(b)) - Number(isReadyForAction(a)) ||
+          b.capturedAt.localeCompare(a.capturedAt),
+      );
+      break;
+    case "due-first":
+      // Leads with a due follow-up first, then newest.
+      arr.sort(
+        (a, b) =>
+          Number(b.hasDueReminder) - Number(a.hasDueReminder) ||
+          b.capturedAt.localeCompare(a.capturedAt),
+      );
+      break;
+    case "stale-first":
+      // Gone-quiet leads first, oldest of those at the very top to chase.
+      arr.sort(
+        (a, b) =>
+          Number(isStale(b)) - Number(isStale(a)) ||
+          a.capturedAt.localeCompare(b.capturedAt),
+      );
+      break;
     case "added-desc":
     default:
       arr.sort((a, b) => b.capturedAt.localeCompare(a.capturedAt));
@@ -413,8 +448,8 @@ function Column({
   const { setNodeRef, isOver } = useDroppable({ id: status });
   const scores = useAllFitScores();
   const sortedLeads = useMemo(
-    () => sortLeads(leads, sort, scores, resumeId),
-    [leads, sort, scores, resumeId],
+    () => sortLeads(leads, sort, scores, resumeId, staleCutoff),
+    [leads, sort, scores, resumeId, staleCutoff],
   );
   const sortLabel =
     SORT_OPTIONS.find((o) => o.value === sort)?.label ?? "Sort";
