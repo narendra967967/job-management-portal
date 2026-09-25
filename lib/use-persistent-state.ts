@@ -13,6 +13,7 @@ type StoreKind = "local" | "session";
 export const PERSIST_KEYS = {
   leadsView: "jmp.leads.view", // local
   kanbanColumns: "jmp.kanban.columns", // local
+  kanbanSort: "jmp.kanban.sort", // local (per-column sort)
   leadsFilters: "jmp.leads.filters", // session (reset on logout)
 } as const;
 

@@ -23,13 +23,16 @@ import {
   Clock,
   AlertTriangle,
   CheckCircle2,
+  ArrowDownUp,
 } from "lucide-react";
 import {
   CLOSE_OUTCOME_LABELS,
   LEAD_STATUS_LABELS,
   LEAD_STATUSES,
+  fitScoreKey,
   isJobOpen,
   type CloseOutcome,
+  type FitScore,
   type JobLead,
   type LeadStatus,
 } from "@/lib/types";
@@ -39,8 +42,18 @@ import {
   useDefaultResumeId,
   useAppSettings,
   useFitScore,
+  useAllFitScores,
   setLeadStatus,
 } from "@/lib/mock-store";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useSearchQuery } from "@/lib/search-store";
 import { fitBand } from "@/lib/fit";
 import { StatusBadge } from "@/components/leads/status-badge";
@@ -72,7 +85,82 @@ const COL_ACCENT: Record<LeadStatus, string> = {
   closed: "bg-status-closed-foreground",
 };
 
+// Colour-coded, prominent count pill per column.
+const COL_COUNT: Record<LeadStatus, string> = {
+  new: "bg-status-new text-status-new-foreground",
+  reviewing: "bg-status-reviewing text-status-reviewing-foreground",
+  applied: "bg-status-applied text-status-applied-foreground",
+  discarded: "bg-status-discarded text-status-discarded-foreground",
+  closed: "bg-status-closed text-status-closed-foreground",
+};
+
 const DEFAULT_COLUMNS: LeadStatus[] = ["new", "reviewing", "applied"];
+
+// Per-column card sorting.
+type SortKey =
+  | "added-desc"
+  | "added-asc"
+  | "score-desc"
+  | "score-asc"
+  | "company-asc"
+  | "title-asc";
+
+const DEFAULT_SORT: SortKey = "added-desc";
+
+const SORT_OPTIONS: { value: SortKey; label: string }[] = [
+  { value: "added-desc", label: "Newest added" },
+  { value: "added-asc", label: "Oldest added" },
+  { value: "score-desc", label: "Score: high → low" },
+  { value: "score-asc", label: "Score: low → high" },
+  { value: "company-asc", label: "Company A–Z" },
+  { value: "title-asc", label: "Title A–Z" },
+];
+
+/**
+ * Sort a column's cards. Unscored ("NC") cards always sink to the bottom on a
+ * score sort so the ranked, scored cards stay at the top.
+ */
+function sortLeads(
+  leads: JobLead[],
+  sort: SortKey,
+  scores: Record<string, FitScore>,
+  resumeId: string,
+): JobLead[] {
+  const arr = [...leads];
+  const scoreOf = (l: JobLead) => scores[fitScoreKey(l.id, resumeId)]?.score;
+  switch (sort) {
+    case "added-asc":
+      arr.sort((a, b) => a.capturedAt.localeCompare(b.capturedAt));
+      break;
+    case "company-asc":
+      arr.sort(
+        (a, b) =>
+          a.company.localeCompare(b.company) || a.title.localeCompare(b.title),
+      );
+      break;
+    case "title-asc":
+      arr.sort((a, b) => a.title.localeCompare(b.title));
+      break;
+    case "score-desc":
+    case "score-asc": {
+      const dir = sort === "score-desc" ? -1 : 1;
+      arr.sort((a, b) => {
+        const sa = scoreOf(a);
+        const sb = scoreOf(b);
+        if (sa === undefined && sb === undefined)
+          return b.capturedAt.localeCompare(a.capturedAt);
+        if (sa === undefined) return 1; // NC last
+        if (sb === undefined) return -1;
+        return (sa - sb) * dir;
+      });
+      break;
+    }
+    case "added-desc":
+    default:
+      arr.sort((a, b) => b.capturedAt.localeCompare(a.capturedAt));
+  }
+  return arr;
+}
 
 /** Local YYYY-MM-DD for the stale check. */
 function toISODate(d: Date): string {
@@ -99,6 +187,11 @@ export function LeadsKanban() {
     PERSIST_KEYS.leadsFilters,
     EMPTY_LEAD_FILTERS,
     "session",
+  );
+  // Per-column sort (persists across reload/login).
+  const [sorts, setSorts] = usePersistentState<Partial<Record<LeadStatus, SortKey>>>(
+    PERSIST_KEYS.kanbanSort,
+    {},
   );
   const [activeId, setActiveId] = useState<string | null>(null);
   const [detailLead, setDetailLead] = useState<JobLead | null>(null);
@@ -139,9 +232,7 @@ export function LeadsKanban() {
       closed: [],
     };
     for (const l of filtered) map[l.status].push(l);
-    // Newest first within each column.
-    for (const s of LEAD_STATUSES)
-      map[s].sort((a, b) => b.capturedAt.localeCompare(a.capturedAt));
+    // Ordering is applied per-column (by each column's chosen sort).
     return map;
   }, [filtered]);
 
@@ -234,6 +325,8 @@ export function LeadsKanban() {
                 leads={byStatus[s]}
                 staleCutoff={staleCutoff}
                 resumeId={defaultResumeId}
+                sort={sorts[s] ?? DEFAULT_SORT}
+                onSortChange={(k) => setSorts((prev) => ({ ...prev, [s]: k }))}
                 onOpen={setDetailLead}
               />
             ))
@@ -304,25 +397,74 @@ function Column({
   leads,
   staleCutoff,
   resumeId,
+  sort,
+  onSortChange,
   onOpen,
 }: {
   status: LeadStatus;
   leads: JobLead[];
   staleCutoff: string;
   resumeId: string;
+  sort: SortKey;
+  onSortChange: (sort: SortKey) => void;
   onOpen: (lead: JobLead) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: status });
+  const scores = useAllFitScores();
+  const sortedLeads = useMemo(
+    () => sortLeads(leads, sort, scores, resumeId),
+    [leads, sort, scores, resumeId],
+  );
+  const sortLabel =
+    SORT_OPTIONS.find((o) => o.value === sort)?.label ?? "Sort";
+  const sorted = sort !== DEFAULT_SORT;
+
   return (
     <div className="flex h-full w-72 shrink-0 flex-col rounded-xl border bg-muted/30">
       <div className="flex items-center justify-between gap-2 border-b px-3 py-2">
-        <div className="flex items-center gap-2">
-          <span className={cn("size-2 rounded-full", COL_ACCENT[status])} aria-hidden />
-          <span className="text-sm font-medium">{LEAD_STATUS_LABELS[status]}</span>
+        <div className="flex min-w-0 items-center gap-2">
+          <span className={cn("size-2.5 rounded-full", COL_ACCENT[status])} aria-hidden />
+          <span className="truncate text-sm font-semibold">
+            {LEAD_STATUS_LABELS[status]}
+          </span>
+          <span
+            className={cn(
+              "inline-flex min-w-6 items-center justify-center rounded-full px-2 py-0.5 text-xs font-bold tabular-nums",
+              COL_COUNT[status],
+            )}
+          >
+            {leads.length}
+          </span>
         </div>
-        <span className="rounded-full bg-muted px-1.5 text-[11px] font-medium tabular-nums text-muted-foreground">
-          {leads.length}
-        </span>
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            aria-label={`Sort ${LEAD_STATUS_LABELS[status]} · ${sortLabel}`}
+            title={`Sort: ${sortLabel}`}
+            className={cn(
+              "relative flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+              sorted && "text-primary",
+            )}
+          >
+            <ArrowDownUp className="size-4" aria-hidden />
+            {sorted && (
+              <span className="absolute -top-0.5 -right-0.5 size-1.5 rounded-full bg-primary" />
+            )}
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuLabel>Sort cards</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuRadioGroup
+              value={sort}
+              onValueChange={(v) => onSortChange(v as SortKey)}
+            >
+              {SORT_OPTIONS.map((o) => (
+                <DropdownMenuRadioItem key={o.value} value={o.value}>
+                  {o.label}
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
       <div
         ref={setNodeRef}
@@ -331,7 +473,7 @@ function Column({
           isOver && "bg-primary/5 ring-2 ring-inset ring-primary/30",
         )}
       >
-        {leads.map((lead) => (
+        {sortedLeads.map((lead) => (
           <DraggableCard
             key={lead.id}
             lead={lead}

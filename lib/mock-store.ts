@@ -653,6 +653,12 @@ export function useFitScore(
   return all[fitScoreKey(leadId, resumeId)] ?? null;
 }
 
+/** The whole fit-scores map (keyed by fitScoreKey) — for sorting a column by
+ *  score without a hook per card. */
+export function useAllFitScores(): Record<string, FitScore> {
+  return useSyncExternalStore(subscribe, getFitScores, getFitScores);
+}
+
 /** Compute/refresh the AI fit score for a (lead, resume) pair. */
 export async function scoreFit(leadId: string, resumeId: string) {
   const res = await scoreFitAction(leadId, resumeId);
