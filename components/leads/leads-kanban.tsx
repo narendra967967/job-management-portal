@@ -48,6 +48,7 @@ import {
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
@@ -451,7 +452,9 @@ function Column({
             )}
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuLabel>Sort cards</DropdownMenuLabel>
+            <DropdownMenuGroup>
+              <DropdownMenuLabel>Sort cards</DropdownMenuLabel>
+            </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuRadioGroup
               value={sort}
