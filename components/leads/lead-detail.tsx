@@ -37,7 +37,7 @@ import {
 import { ReminderActions } from "@/components/leads/reminder-actions";
 import { LeadTimeline } from "@/components/leads/lead-timeline";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
+import { MarkdownEditor } from "@/components/ui/markdown-editor";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Select,
@@ -388,12 +388,15 @@ function OverviewTab({ leadId, detail }: { leadId: string; detail?: JobLeadDetai
         <p className="mt-0.5 text-xs text-muted-foreground">
           Open the listing on LinkedIn, copy the description, and paste it here.
         </p>
-        <Textarea
-          value={jd}
-          onChange={(e) => setJd(e.target.value)}
-          placeholder="Paste the full job description…"
-          className="mt-3 min-h-32"
-        />
+        <div className="mt-3">
+          <MarkdownEditor
+            value={jd}
+            onChange={setJd}
+            placeholder="Paste the full job description…"
+            className="min-h-32"
+            ariaLabel="Job description"
+          />
+        </div>
         {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <Button
