@@ -50,6 +50,7 @@ import { ActionDialog, Field } from "@/components/leads/action-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { MarkdownEditor } from "@/components/ui/markdown-editor";
 import { toast } from "@/components/ui/toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -309,19 +310,21 @@ export function LeadCoreFields({
 
       <div className="grid gap-3 lg:grid-cols-2">
         <Field label="Job description">
-          <Textarea
+          <MarkdownEditor
             value={value.jdText}
-            onChange={(e) => onChange({ jdText: e.target.value })}
+            onChange={(v) => onChange({ jdText: v })}
             placeholder="Paste the full job description (optional — you can add it later)…"
             className="min-h-28"
+            ariaLabel="Job description"
           />
         </Field>
         <Field label="Notes">
-          <Textarea
+          <MarkdownEditor
             value={value.notes}
-            onChange={(e) => onChange({ notes: e.target.value })}
+            onChange={(v) => onChange({ notes: v })}
             placeholder="Anything to remember about this role (optional)…"
             className="min-h-28"
+            ariaLabel="Notes"
           />
         </Field>
       </div>
