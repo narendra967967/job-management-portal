@@ -9,6 +9,12 @@ import { db } from "@/lib/db";
 import { getCurrentUserId } from "@/lib/current-user";
 import { encryptSecret } from "@/lib/crypto";
 import {
+  isS3Configured,
+  putResumeObject,
+  getResumeObject,
+  deleteResumeObject,
+} from "@/lib/s3";
+import {
   account as accountT,
   gmailConfig as gmailConfigT,
   gmailIngestErrors as errorsT,
@@ -240,6 +246,7 @@ export async function uploadResumeAction(
     text = "";
   }
 
+  const contentType = file.type || "application/octet-stream";
   const [row] = await db
     .insert(resumesT)
     .values({
@@ -248,18 +255,40 @@ export async function uploadResumeAction(
       fileName: file.name,
       fileType: ext,
       sizeKb: Math.max(1, Math.round(file.size / 1024)),
-      blobUrl: "db", // bytes live in resume_files, not blob storage
+      // Placeholder; set to the S3 key (or "db") once the bytes are stored.
+      blobUrl: "pending",
       resumeText: text || null,
       isDefault: false,
     })
     .returning({ id: resumesT.id });
 
-  await db.insert(resumeFilesT).values({
-    resumeId: row.id,
-    userId,
-    contentType: file.type || "application/octet-stream",
-    data: bytes,
-  });
+  if (isS3Configured()) {
+    // Store the file in S3; keep the key in blobUrl.
+    const key = `resumes/${userId}/${row.id}.${ext}`;
+    try {
+      await putResumeObject(key, bytes, contentType);
+    } catch {
+      // Roll back the metadata row so we don't leave a dangling résumé.
+      await db.delete(resumesT).where(eq(resumesT.id, row.id));
+      return { ok: false, error: "Couldn't store the file. Please try again." };
+    }
+    await db
+      .update(resumesT)
+      .set({ blobUrl: key })
+      .where(eq(resumesT.id, row.id));
+  } else {
+    // Local dev: keep the bytes in Postgres (resume_files).
+    await db
+      .update(resumesT)
+      .set({ blobUrl: "db" })
+      .where(eq(resumesT.id, row.id));
+    await db.insert(resumeFilesT).values({
+      resumeId: row.id,
+      userId,
+      contentType,
+      data: bytes,
+    });
+  }
 
   return { ok: true, resumeId: row.id };
 }
@@ -274,10 +303,27 @@ export async function getResumeFileAction(id: string): Promise<
   const userId = await getCurrentUserId();
   const resumeId = parseInput(zId, id);
   const [meta] = await db
-    .select({ fileName: resumesT.fileName })
+    .select({ fileName: resumesT.fileName, blobUrl: resumesT.blobUrl })
     .from(resumesT)
     .where(and(eq(resumesT.id, resumeId), eq(resumesT.userId, userId)));
   if (!meta) return { ok: false, error: "Résumé not found." };
+
+  // S3-backed résumé: blobUrl holds the object key.
+  if (meta.blobUrl && meta.blobUrl !== "db" && meta.blobUrl !== "pending") {
+    try {
+      const { body, contentType } = await getResumeObject(meta.blobUrl);
+      return {
+        ok: true,
+        fileName: meta.fileName,
+        contentType: contentType || "application/octet-stream",
+        base64: body.toString("base64"),
+      };
+    } catch {
+      return { ok: false, error: "Couldn't fetch the file from storage." };
+    }
+  }
+
+  // DB-backed (local dev).
   const [f] = await db
     .select({ contentType: resumeFilesT.contentType, data: resumeFilesT.data })
     .from(resumeFilesT)
@@ -309,8 +355,27 @@ export async function renameResumeAction(id: string, label: string) {
 export async function deleteResumeAction(id: string) {
   const userId = await getCurrentUserId();
   const resumeId = parseInput(zId, id);
+
+  // Remove the S3 object first (best-effort); DB rows cascade below.
+  const [meta] = await db
+    .select({ blobUrl: resumesT.blobUrl })
+    .from(resumesT)
+    .where(and(eq(resumesT.id, resumeId), eq(resumesT.userId, userId)));
+  if (
+    meta?.blobUrl &&
+    meta.blobUrl !== "db" &&
+    meta.blobUrl !== "pending" &&
+    isS3Configured()
+  ) {
+    try {
+      await deleteResumeObject(meta.blobUrl);
+    } catch {
+      // Leave the orphaned object rather than blocking the delete.
+    }
+  }
+
   // user_settings.default_resume_id FK is ON DELETE SET NULL, so clearing the
-  // default is automatic.
+  // default is automatic. resume_files cascades on the resumes FK.
   await db
     .delete(resumesT)
     .where(and(eq(resumesT.id, resumeId), eq(resumesT.userId, userId)));
