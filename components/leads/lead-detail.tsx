@@ -14,6 +14,12 @@ import {
   Trash2,
   UserPlus,
   RefreshCw,
+  CheckCircle2,
+  XCircle,
+  Undo2,
+  CircleSlash,
+  Archive,
+  type LucideIcon,
 } from "lucide-react";
 import {
   CLOSE_OUTCOME_LABELS,
@@ -75,6 +81,32 @@ interface Props {
 const tabTrigger =
   "group/tab flex-none rounded-none px-3 py-2.5 text-sm font-medium " +
   "data-active:text-primary data-active:after:bottom-0 data-active:after:bg-primary";
+
+// Per-close-outcome banner styling shown on the detail modal (why it closed).
+const OUTCOME_BANNER: Record<
+  CloseOutcome,
+  { icon: LucideIcon; className: string }
+> = {
+  offer: {
+    icon: CheckCircle2,
+    className:
+      "border-status-applied-foreground/25 bg-status-applied text-status-applied-foreground",
+  },
+  rejected: {
+    icon: XCircle,
+    className: "border-destructive/25 bg-destructive/10 text-destructive",
+  },
+  withdrawn: {
+    icon: Undo2,
+    className:
+      "border-status-reviewing-foreground/25 bg-status-reviewing text-status-reviewing-foreground",
+  },
+  "no-response": {
+    icon: CircleSlash,
+    className:
+      "border-status-discarded-foreground/25 bg-status-discarded text-status-discarded-foreground",
+  },
+};
 
 export function LeadDetail(props: Props) {
   return (
@@ -177,12 +209,44 @@ export function LeadDetailContent({
           </div>
         </div>
 
+        {/* Why this lead is closed / discarded — prominent on the detail view. */}
+        {status === "closed" &&
+          closeOutcome &&
+          (() => {
+            const { icon: Icon, className } = OUTCOME_BANNER[closeOutcome];
+            return (
+              <div
+                className={cn(
+                  "mt-3 flex items-start gap-2 rounded-lg border px-3 py-2",
+                  className,
+                )}
+              >
+                <Icon className="mt-0.5 size-4 shrink-0" aria-hidden />
+                <div className="min-w-0 text-sm">
+                  <p className="font-semibold">
+                    Closed — {CLOSE_OUTCOME_LABELS[closeOutcome]}
+                  </p>
+                  <p className="text-xs opacity-80">
+                    Reopen it from the status menu if you need to work it again.
+                  </p>
+                </div>
+              </div>
+            );
+          })()}
+        {status === "discarded" && (
+          <div className="mt-3 flex items-start gap-2 rounded-lg border border-status-discarded-foreground/25 bg-status-discarded px-3 py-2 text-status-discarded-foreground">
+            <Archive className="mt-0.5 size-4 shrink-0" aria-hidden />
+            <div className="min-w-0 text-sm">
+              <p className="font-semibold">Discarded</p>
+              <p className="text-xs opacity-80">
+                Moved to Archive and pending follow-ups were cancelled. Reopen it
+                from the status menu.
+              </p>
+            </div>
+          </div>
+        )}
+
         <div className="mt-3 flex flex-wrap items-center gap-1.5">
-          {status === "closed" && closeOutcome && (
-            <span className="rounded-md bg-status-closed px-2 py-0.5 text-[11px] font-medium text-status-closed-foreground">
-              {CLOSE_OUTCOME_LABELS[closeOutcome]}
-            </span>
-          )}
           {lead.tags.map((tag, i) => (
             <span
               key={`${tag}-${i}`}
