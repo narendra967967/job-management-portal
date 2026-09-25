@@ -459,9 +459,14 @@ function AddLeadDialog({
         onValueChange={(v) => setMode((v as "manual" | "ai") ?? "manual")}
       >
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="manual">Add manually</TabsTrigger>
-          <TabsTrigger value="ai" className="gap-1.5">
-            <Sparkles className="size-4" aria-hidden />
+          <TabsTrigger value="manual" className="font-medium data-active:text-primary">
+            Add manually
+          </TabsTrigger>
+          <TabsTrigger
+            value="ai"
+            className="gap-1.5 font-medium data-active:text-ai"
+          >
+            <Sparkles className="size-4 text-ai" aria-hidden />
             Add with AI
           </TabsTrigger>
         </TabsList>
