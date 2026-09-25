@@ -32,6 +32,7 @@ import {
   OPEN_LEAD_STATUSES,
   isJobOpen,
   isReadyForAction,
+  fitScoreKey,
   type CloseOutcome,
   type JobLead,
   type LeadStatus,
@@ -51,6 +52,7 @@ import {
   useDefaultResumeId,
   useAppSettings,
   useFitScore,
+  useAllFitScores,
   setLeadStatus,
   deleteLeads,
 } from "@/lib/mock-store";
@@ -68,7 +70,9 @@ import { useConfirm } from "@/components/ui/confirm-dialog";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -91,7 +95,52 @@ import { cn } from "@/lib/utils";
 type StatusFilter = "all" | LeadStatus;
 type LocationFilter = "all" | "remote";
 type DateRange = "all" | "7d" | "30d" | "90d" | "custom";
-type Sort = "newest" | "oldest";
+type Sort =
+  | "newest"
+  | "oldest"
+  | "score-desc"
+  | "score-asc"
+  | "ready-first"
+  | "due-first"
+  | "stale-first"
+  | "company-asc"
+  | "title-asc";
+
+// Grouped sort options for the list toolbar (mirrors the Kanban sort menu).
+const SORT_GROUPS: {
+  label: string;
+  options: { value: Sort; label: string }[];
+}[] = [
+  {
+    label: "Date added",
+    options: [
+      { value: "newest", label: "Newest first" },
+      { value: "oldest", label: "Oldest first" },
+    ],
+  },
+  {
+    label: "Fit score",
+    options: [
+      { value: "score-desc", label: "High → low" },
+      { value: "score-asc", label: "Low → high" },
+    ],
+  },
+  {
+    label: "Act now",
+    options: [
+      { value: "ready-first", label: "Ready first" },
+      { value: "due-first", label: "Due reminder first" },
+      { value: "stale-first", label: "Stale first" },
+    ],
+  },
+  {
+    label: "Alphabetical",
+    options: [
+      { value: "company-asc", label: "Company A–Z" },
+      { value: "title-asc", label: "Title A–Z" },
+    ],
+  },
+];
 
 const PAGE_SIZE = 15; // 3 columns × 5 rows on desktop.
 
@@ -224,6 +273,7 @@ export function LeadsBrowser({ scope = "all" }: { scope?: LeadsScope }) {
   const allLeads = useLeads();
   const resumes = useResumes();
   const allReminders = useReminders();
+  const fitScores = useAllFitScores();
   const [{ staleLeadDays }] = useAppSettings();
 
   // Stale = open lead, no pending follow-up, captured before the cutoff (FR-2.4).
@@ -451,13 +501,67 @@ export function LeadsBrowser({ scope = "all" }: { scope?: LeadsScope }) {
       );
     if (dateBounds.from) out = out.filter((l) => l.capturedAt >= dateBounds.from!);
     if (dateBounds.to) out = out.filter((l) => l.capturedAt <= dateBounds.to!);
-    out.sort((a, b) =>
-      sort === "newest"
-        ? b.capturedAt.localeCompare(a.capturedAt)
-        : a.capturedAt.localeCompare(b.capturedAt),
-    );
+
+    const scoreOf = (l: JobLead) =>
+      fitScores[fitScoreKey(l.id, resumeChoice[l.id] || defaultResumeId)]?.score;
+    const staleOf = (l: JobLead) =>
+      isJobOpen(l.status) && !pendingLeadIds.has(l.id) && l.capturedAt < staleCutoff;
+    const newest = (a: JobLead, b: JobLead) =>
+      b.capturedAt.localeCompare(a.capturedAt);
+
+    switch (sort) {
+      case "oldest":
+        out.sort((a, b) => a.capturedAt.localeCompare(b.capturedAt));
+        break;
+      case "company-asc":
+        out.sort(
+          (a, b) =>
+            a.company.localeCompare(b.company) || a.title.localeCompare(b.title),
+        );
+        break;
+      case "title-asc":
+        out.sort((a, b) => a.title.localeCompare(b.title));
+        break;
+      case "score-desc":
+      case "score-asc": {
+        const dir = sort === "score-desc" ? -1 : 1;
+        out.sort((a, b) => {
+          const sa = scoreOf(a);
+          const sb = scoreOf(b);
+          if (sa === undefined && sb === undefined) return newest(a, b);
+          if (sa === undefined) return 1; // NC last
+          if (sb === undefined) return -1;
+          return (sa - sb) * dir;
+        });
+        break;
+      }
+      case "ready-first":
+        out.sort(
+          (a, b) =>
+            Number(isReadyForAction(b)) - Number(isReadyForAction(a)) ||
+            newest(a, b),
+        );
+        break;
+      case "due-first":
+        out.sort(
+          (a, b) =>
+            Number(pendingLeadIds.has(b.id)) - Number(pendingLeadIds.has(a.id)) ||
+            newest(a, b),
+        );
+        break;
+      case "stale-first":
+        out.sort(
+          (a, b) =>
+            Number(staleOf(b)) - Number(staleOf(a)) ||
+            a.capturedAt.localeCompare(b.capturedAt),
+        );
+        break;
+      case "newest":
+      default:
+        out.sort(newest);
+    }
     return out;
-  }, [leads, scope, statusFilter, bucketFilter, locationFilter, countryFilter, titleFilter, tagFilter, search, dateBounds, sort]);
+  }, [leads, scope, statusFilter, bucketFilter, locationFilter, countryFilter, titleFilter, tagFilter, search, dateBounds, sort, fitScores, resumeChoice, defaultResumeId, pendingLeadIds, staleCutoff]);
 
   // Reset to the first page (and clear any selection) whenever the result set
   // changes.
@@ -596,10 +700,7 @@ export function LeadsBrowser({ scope = "all" }: { scope?: LeadsScope }) {
           value={sort}
           onValueChange={(v) => setSort(v as Sort)}
           className="ml-auto"
-          options={[
-            { value: "newest", label: "Newest first" },
-            { value: "oldest", label: "Oldest first" },
-          ]}
+          groups={SORT_GROUPS}
         />
       </div>
 
@@ -902,21 +1003,25 @@ function FilterSelect({
   value,
   onValueChange,
   options,
+  groups,
   className,
 }: {
   label: string;
   value: string;
   onValueChange: (value: string) => void;
-  options: { value: string; label: string }[];
+  /** Flat options, or use `groups` for labelled sections. */
+  options?: { value: string; label: string }[];
+  groups?: { label: string; options: { value: string; label: string }[] }[];
   className?: string;
 }) {
+  const flat = groups ? groups.flatMap((g) => g.options) : (options ?? []);
   return (
     <label className={cn("flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2", className)}>
       <span className="text-xs font-medium text-muted-foreground sm:sr-only">
         {label}
       </span>
       <Select
-        items={Object.fromEntries(options.map((o) => [o.value, o.label]))}
+        items={Object.fromEntries(flat.map((o) => [o.value, o.label]))}
         value={value}
         onValueChange={(v) => onValueChange(v ?? value)}
       >
@@ -927,11 +1032,22 @@ function FilterSelect({
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          {options.map((o) => (
-            <SelectItem key={o.value} value={o.value}>
-              {o.label}
-            </SelectItem>
-          ))}
+          {groups
+            ? groups.map((g) => (
+                <SelectGroup key={g.label}>
+                  <SelectLabel>{g.label}</SelectLabel>
+                  {g.options.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              ))
+            : flat.map((o) => (
+                <SelectItem key={o.value} value={o.value}>
+                  {o.label}
+                </SelectItem>
+              ))}
         </SelectContent>
       </Select>
     </label>
