@@ -4,7 +4,7 @@
 // dragging a card to another column changes its status (drag to Closed asks for
 // an outcome). Uses @dnd-kit. Mobile keeps the list view for now.
 
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -49,7 +49,6 @@ import {
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuGroup,
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
@@ -112,17 +111,48 @@ type SortKey =
 
 const DEFAULT_SORT: SortKey = "added-desc";
 
-const SORT_OPTIONS: { value: SortKey; label: string }[] = [
-  { value: "added-desc", label: "Newest added" },
-  { value: "added-asc", label: "Oldest added" },
-  { value: "score-desc", label: "Score: high → low" },
-  { value: "score-asc", label: "Score: low → high" },
-  { value: "ready-first", label: "Ready first" },
-  { value: "due-first", label: "Due reminder first" },
-  { value: "stale-first", label: "Stale first" },
-  { value: "company-asc", label: "Company A–Z" },
-  { value: "title-asc", label: "Title A–Z" },
+// Grouped by purpose so the menu is easy to scan.
+const SORT_GROUPS: {
+  label: string;
+  options: { value: SortKey; label: string }[];
+}[] = [
+  {
+    label: "Date added",
+    options: [
+      { value: "added-desc", label: "Newest first" },
+      { value: "added-asc", label: "Oldest first" },
+    ],
+  },
+  {
+    label: "Fit score",
+    options: [
+      { value: "score-desc", label: "High → low" },
+      { value: "score-asc", label: "Low → high" },
+    ],
+  },
+  {
+    label: "Act now",
+    options: [
+      { value: "ready-first", label: "Ready first" },
+      { value: "due-first", label: "Due reminder first" },
+      { value: "stale-first", label: "Stale first" },
+    ],
+  },
+  {
+    label: "Alphabetical",
+    options: [
+      { value: "company-asc", label: "Company A–Z" },
+      { value: "title-asc", label: "Title A–Z" },
+    ],
+  },
 ];
+
+// Flat lookup for the active-sort label (used in the trigger's title/aria).
+const SORT_LABELS: Record<SortKey, string> = Object.fromEntries(
+  SORT_GROUPS.flatMap((g) =>
+    g.options.map((o) => [o.value, `${g.label}: ${o.label}`]),
+  ),
+) as Record<SortKey, string>;
 
 /**
  * Sort a column's cards. Unscored ("NC") cards sink to the bottom on a score
@@ -451,8 +481,7 @@ function Column({
     () => sortLeads(leads, sort, scores, resumeId, staleCutoff),
     [leads, sort, scores, resumeId, staleCutoff],
   );
-  const sortLabel =
-    SORT_OPTIONS.find((o) => o.value === sort)?.label ?? "Sort";
+  const sortLabel = SORT_LABELS[sort] ?? "Sort";
   const sorted = sort !== DEFAULT_SORT;
 
   return (
@@ -486,19 +515,23 @@ function Column({
               <span className="absolute -top-0.5 -right-0.5 size-1.5 rounded-full bg-primary" />
             )}
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuGroup>
-              <DropdownMenuLabel>Sort cards</DropdownMenuLabel>
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
+          <DropdownMenuContent align="end" className="w-52">
             <DropdownMenuRadioGroup
               value={sort}
               onValueChange={(v) => onSortChange(v as SortKey)}
             >
-              {SORT_OPTIONS.map((o) => (
-                <DropdownMenuRadioItem key={o.value} value={o.value}>
-                  {o.label}
-                </DropdownMenuRadioItem>
+              {SORT_GROUPS.map((g, i) => (
+                <Fragment key={g.label}>
+                  {i > 0 && <DropdownMenuSeparator />}
+                  <DropdownMenuLabel className="text-[11px] font-semibold tracking-wide text-muted-foreground/70 uppercase">
+                    {g.label}
+                  </DropdownMenuLabel>
+                  {g.options.map((o) => (
+                    <DropdownMenuRadioItem key={o.value} value={o.value}>
+                      {o.label}
+                    </DropdownMenuRadioItem>
+                  ))}
+                </Fragment>
               ))}
             </DropdownMenuRadioGroup>
           </DropdownMenuContent>
