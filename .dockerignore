@@ -1,0 +1,17 @@
+# Keep the build context small and never ship secrets or local state.
+node_modules
+.next
+.git
+.gitignore
+.env*
+!.env*.example
+npm-debug.log*
+Dockerfile
+.dockerignore
+docker-compose*.yml
+README.md
+*.md
+.claude
+.vscode
+.idea
+coverage
