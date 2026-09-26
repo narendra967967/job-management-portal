@@ -1,50 +1,77 @@
 "use client";
 
-// Admin panel shell — sidebar + top bar. This is admin-only and intentionally
-// does NOT reuse any user-dashboard component, so admin styling can evolve
-// independently. Dark sidebar distinguishes the admin area from the user app.
+// Admin panel shell — grouped collapsible sidebar + top bar. Admin-only; does
+// NOT reuse any user-dashboard component so admin styling evolves independently.
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
-  Settings,
   Users,
+  Briefcase,
+  BookOpen,
+  Inbox,
   ScrollText,
+  Megaphone,
+  Settings,
   Sparkles,
+  Clock,
+  ChevronDown,
   Shield,
   LogOut,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-interface NavItem {
-  href: string;
+interface Item {
+  href?: string;
   label: string;
   icon: LucideIcon;
+  soon?: boolean;
+}
+interface Group {
+  label: string;
+  items: Item[];
 }
 
-const NAV: NavItem[] = [
-  { href: "/jmp-admin", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/jmp-admin/settings", label: "Settings", icon: Settings },
-];
-
-// Placeholders for features to be added later (non-clickable for now).
-const SOON: { label: string; icon: LucideIcon }[] = [
-  { label: "Users", icon: Users },
-  { label: "AI", icon: Sparkles },
-  { label: "Activity log", icon: ScrollText },
+const GROUPS: Group[] = [
+  { label: "Overview", items: [{ href: "/jmp-admin", label: "Dashboard", icon: LayoutDashboard }] },
+  {
+    label: "People & Content",
+    items: [
+      { href: "/jmp-admin/users", label: "Users", icon: Users },
+      { label: "Leads", icon: Briefcase, soon: true },
+      { label: "Knowledge base", icon: BookOpen, soon: true },
+    ],
+  },
+  {
+    label: "Operations",
+    items: [
+      { label: "Gmail health", icon: Inbox, soon: true },
+      { label: "Activity log", icon: ScrollText, soon: true },
+      { label: "Announcements", icon: Megaphone, soon: true },
+    ],
+  },
+  {
+    label: "Configuration",
+    items: [
+      { href: "/jmp-admin/settings", label: "Settings", icon: Settings },
+      { label: "AI & prompts", icon: Sparkles, soon: true },
+      { label: "Cron & schedule", icon: Clock, soon: true },
+    ],
+  },
 ];
 
 const TITLES: Record<string, string> = {
   "/jmp-admin": "Dashboard",
+  "/jmp-admin/users": "Users",
   "/jmp-admin/settings": "Settings",
 };
 
-function isActive(pathname: string, href: string) {
-  return href === "/jmp-admin"
-    ? pathname === "/jmp-admin"
-    : pathname === href || pathname.startsWith(href + "/");
+function isActive(pathname: string, href?: string) {
+  if (!href) return false;
+  return href === "/jmp-admin" ? pathname === "/jmp-admin" : pathname === href || pathname.startsWith(href + "/");
 }
 
 function Brand() {
@@ -61,43 +88,53 @@ function Brand() {
   );
 }
 
-function NavLinks({ pathname }: { pathname: string }) {
+function ItemRow({ item, pathname }: { item: Item; pathname: string }) {
+  const Icon = item.icon;
+  if (item.soon || !item.href) {
+    return (
+      <span className="flex cursor-default items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-500">
+        <Icon className="size-4 shrink-0" aria-hidden />
+        {item.label}
+        <span className="ml-auto rounded-full bg-slate-800 px-1.5 py-0.5 text-[9px] text-slate-400">soon</span>
+      </span>
+    );
+  }
+  const active = isActive(pathname, item.href);
   return (
-    <nav className="flex flex-col gap-1">
-      {NAV.map(({ href, label, icon: Icon }) => {
-        const active = isActive(pathname, href);
-        return (
-          <Link
-            key={href}
-            href={href}
-            className={cn(
-              "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-              active
-                ? "bg-slate-800 text-white before:mr-[-4px] before:h-4 before:w-1 before:rounded-full before:bg-primary"
-                : "text-slate-300 hover:bg-slate-800/60 hover:text-white",
-            )}
-          >
-            <Icon className="size-4 shrink-0" aria-hidden />
-            {label}
-          </Link>
-        );
-      })}
-      <p className="mt-3 px-3 text-[10px] font-semibold tracking-wide text-slate-500 uppercase">
-        Coming soon
-      </p>
-      {SOON.map(({ label, icon: Icon }) => (
-        <span
-          key={label}
-          className="flex cursor-default items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-500"
-        >
-          <Icon className="size-4 shrink-0" aria-hidden />
-          {label}
-          <span className="ml-auto rounded-full bg-slate-800 px-1.5 py-0.5 text-[9px] text-slate-400">
-            soon
-          </span>
-        </span>
-      ))}
-    </nav>
+    <Link
+      href={item.href}
+      className={cn(
+        "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+        active ? "bg-slate-800 text-white" : "text-slate-300 hover:bg-slate-800/60 hover:text-white",
+      )}
+    >
+      <Icon className="size-4 shrink-0" aria-hidden />
+      {item.label}
+    </Link>
+  );
+}
+
+function NavGroup({ group, pathname }: { group: Group; pathname: string }) {
+  const [open, setOpen] = useState(true);
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className="flex w-full items-center justify-between rounded-lg px-3 py-1.5 text-[10px] font-semibold tracking-wide text-slate-500 uppercase transition-colors hover:text-slate-300"
+      >
+        <span>{group.label}</span>
+        <ChevronDown className={cn("size-3.5 transition-transform", !open && "-rotate-90")} aria-hidden />
+      </button>
+      {open && (
+        <div className="mt-0.5 space-y-0.5">
+          {group.items.map((it) => (
+            <ItemRow key={it.label} item={it} pathname={pathname} />
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -105,6 +142,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const title = TITLES[pathname] ?? "Admin";
+  const mobileLinks = GROUPS.flatMap((g) => g.items).filter((i) => i.href && !i.soon);
 
   function logout() {
     // TODO: clear the admin session when auth is wired; UI-only for now.
@@ -114,64 +152,52 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-dvh flex-col bg-muted/30 md:flex-row">
       {/* Desktop sidebar */}
-      <aside className="hidden w-60 shrink-0 flex-col justify-between bg-slate-900 p-4 md:flex">
-        <div className="flex flex-col gap-6">
+      <aside className="hidden w-60 shrink-0 flex-col justify-between overflow-y-auto bg-slate-900 p-4 md:flex">
+        <div className="flex flex-col gap-5">
           <Brand />
-          <NavLinks pathname={pathname} />
+          <div className="flex flex-col gap-3">
+            {GROUPS.map((g) => (
+              <NavGroup key={g.label} group={g} pathname={pathname} />
+            ))}
+          </div>
         </div>
         <button
           type="button"
           onClick={logout}
-          className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-slate-800/60 hover:text-white"
+          className="mt-4 flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-slate-800/60 hover:text-white"
         >
           <LogOut className="size-4" aria-hidden />
           Log out
         </button>
       </aside>
 
-      {/* Mobile top bar */}
+      {/* Mobile top bar + nav row */}
       <div className="flex items-center justify-between gap-2 bg-slate-900 px-4 py-3 md:hidden">
         <Brand />
-        <button
-          type="button"
-          onClick={logout}
-          aria-label="Log out"
-          className="flex size-9 items-center justify-center rounded-lg text-slate-300 hover:bg-slate-800 hover:text-white"
-        >
+        <button type="button" onClick={logout} aria-label="Log out" className="flex size-9 items-center justify-center rounded-lg text-slate-300 hover:bg-slate-800 hover:text-white">
           <LogOut className="size-4" aria-hidden />
         </button>
       </div>
-      {/* Mobile nav row */}
       <div className="flex gap-1 overflow-x-auto bg-slate-900/95 px-3 pb-3 md:hidden">
-        {NAV.map(({ href, label, icon: Icon }) => {
-          const active = isActive(pathname, href);
+        {mobileLinks.map((it) => {
+          const Icon = it.icon;
+          const active = isActive(pathname, it.href);
           return (
-            <Link
-              key={href}
-              href={href}
-              className={cn(
-                "flex shrink-0 items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium",
-                active ? "bg-slate-800 text-white" : "text-slate-300",
-              )}
-            >
+            <Link key={it.href} href={it.href!} className={cn("flex shrink-0 items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium", active ? "bg-slate-800 text-white" : "text-slate-300")}>
               <Icon className="size-3.5" aria-hidden />
-              {label}
+              {it.label}
             </Link>
           );
         })}
       </div>
 
-      {/* Main column */}
+      {/* Main */}
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex items-center gap-3 border-b bg-card px-4 py-3 md:px-6">
           <h1 className="text-base font-semibold md:text-lg">{title}</h1>
           <span className="ml-auto flex items-center gap-2">
-            <span className="hidden text-sm text-muted-foreground sm:block">
-              admin@jmp
-            </span>
-            <span className="flex size-8 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
-              A
-            </span>
+            <span className="hidden text-sm text-muted-foreground sm:block">admin@jmp</span>
+            <span className="flex size-8 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">A</span>
           </span>
         </header>
         <main className="flex-1 p-4 md:p-6">{children}</main>
