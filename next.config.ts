@@ -6,12 +6,7 @@ const nextConfig: NextConfig = {
   output: "standalone",
   // Keep the résumé text extractors out of the bundle — they're Node-only and
   // used only inside Server Actions.
-  serverExternalPackages: [
-    "pdf-parse",
-    "mammoth",
-    "nodemailer",
-    "@aws-sdk/client-s3",
-  ],
+  serverExternalPackages: ["mammoth", "nodemailer", "@aws-sdk/client-s3"],
 };
 
 export default nextConfig;
