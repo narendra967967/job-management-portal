@@ -1,0 +1,77 @@
+name: Deploy preprod
+
+on:
+  push:
+    branches: [preprod]
+  workflow_dispatch:
+
+# One deploy at a time.
+concurrency:
+  group: deploy-preprod
+  cancel-in-progress: false
+
+permissions:
+  id-token: write # for AWS OIDC
+  contents: read
+
+env:
+  AWS_REGION: ap-south-1
+  ECR_REGISTRY: 504721334099.dkr.ecr.ap-south-1.amazonaws.com
+  ECR_REPOSITORY: jmp-app
+  INSTANCE_ID: i-085d2024533e968fd
+  ROLE_ARN: arn:aws:iam::504721334099:role/jmp-github-actions
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push image
+        run: |
+          set -euo pipefail
+          IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY"
+          docker build -t "$IMAGE:preprod-${GITHUB_SHA}" -t "$IMAGE:preprod-latest" .
+          docker push "$IMAGE:preprod-${GITHUB_SHA}"
+          docker push "$IMAGE:preprod-latest"
+
+      - name: Deploy on EC2 via SSM
+        run: |
+          set -euo pipefail
+          CMD_ID=$(aws ssm send-command \
+            --region "$AWS_REGION" \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name AWS-RunShellScript \
+            --comment "deploy preprod ${GITHUB_SHA::7}" \
+            --parameters 'commands=["cd /home/ubuntu/job-management-portal","sudo -u ubuntu git fetch origin","sudo -u ubuntu git reset --hard origin/preprod","sudo bash deploy/preprod-remote.sh"]' \
+            --query Command.CommandId --output text)
+          echo "SSM CommandId: $CMD_ID"
+
+          for i in $(seq 1 90); do
+            sleep 10
+            STATUS=$(aws ssm get-command-invocation \
+              --region "$AWS_REGION" --command-id "$CMD_ID" --instance-id "$INSTANCE_ID" \
+              --query Status --output text 2>/dev/null || echo Pending)
+            echo "Status: $STATUS"
+            if [ "$STATUS" = "Success" ]; then break; fi
+            if [ "$STATUS" = "Failed" ] || [ "$STATUS" = "Cancelled" ] || [ "$STATUS" = "TimedOut" ]; then
+              echo "----- stdout -----"
+              aws ssm get-command-invocation --region "$AWS_REGION" --command-id "$CMD_ID" --instance-id "$INSTANCE_ID" --query StandardOutputContent --output text
+              echo "----- stderr -----"
+              aws ssm get-command-invocation --region "$AWS_REGION" --command-id "$CMD_ID" --instance-id "$INSTANCE_ID" --query StandardErrorContent --output text
+              exit 1
+            fi
+          done
+
+          echo "----- deploy output -----"
+          aws ssm get-command-invocation --region "$AWS_REGION" --command-id "$CMD_ID" --instance-id "$INSTANCE_ID" --query StandardOutputContent --output text
+          if [ "$STATUS" != "Success" ]; then echo "Deploy did not reach Success"; exit 1; fi
