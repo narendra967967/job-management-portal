@@ -18,6 +18,12 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # Raise V8's heap ceiling — the type-check phase OOMs at the default (~460 MB)
 # on a 1 GB build host. Swap covers the overflow.
 ENV NODE_OPTIONS=--max-old-space-size=2048
+# Better Auth initializes when its module is imported during the build and warns
+# when no secret is present. Nothing is signed at build time — the REAL secret is
+# provided at runtime via --env-file — so this throwaway placeholder only
+# silences the build warning. It lives only in the builder stage; the runner
+# image never sets it, so runtime uses the real BETTER_AUTH_SECRET.
+ENV BETTER_AUTH_SECRET=build-time-placeholder-not-used-at-runtime
 # Use the stable (webpack) build for a reliable standalone bundle.
 RUN npx next build
 
