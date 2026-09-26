@@ -15,6 +15,9 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
+# Raise V8's heap ceiling — the type-check phase OOMs at the default (~460 MB)
+# on a 1 GB build host. Swap covers the overflow.
+ENV NODE_OPTIONS=--max-old-space-size=2048
 # Use the stable (webpack) build for a reliable standalone bundle.
 RUN npx next build
 
