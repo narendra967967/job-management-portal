@@ -13,6 +13,19 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/admin/ui/card";
+import {
+  AreaChart,
+  BarChart,
+  DonutChart,
+  VizStyle,
+} from "@/components/admin/ui/charts";
+import {
+  LEADS_OVER_TIME,
+  NEW_USERS_OVER_TIME,
+  AI_CALLS_OVER_TIME,
+  PLAN_MIX,
+  STATUS_MIX,
+} from "@/lib/admin/mock-metrics";
 
 // Admin dashboard home. Static mock data for now (UI-first); real numbers get
 // wired to the DB in the backend phase.
@@ -39,6 +52,8 @@ const ACTIVITY: { who: string; what: string; when: string }[] = [
 export default function AdminDashboardPage() {
   return (
     <div className="space-y-6">
+      <VizStyle />
+
       {/* Stat cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {STATS.map((s) => {
@@ -59,6 +74,62 @@ export default function AdminDashboardPage() {
             </Card>
           );
         })}
+      </div>
+
+      {/* Leads over time + plan mix */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle>Leads captured</CardTitle>
+            <CardDescription>Per week, across all users · last 8 weeks</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <AreaChart data={LEADS_OVER_TIME} unit="leads" />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Plan distribution</CardTitle>
+            <CardDescription>Users by subscription plan</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <DonutChart data={PLAN_MIX} centerLabel="Users" />
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* New users + AI calls + status mix */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <Card>
+          <CardHeader>
+            <CardTitle>New users</CardTitle>
+            <CardDescription>Added per month · last 6 months</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <BarChart data={NEW_USERS_OVER_TIME} unit="users" />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>AI calls</CardTitle>
+            <CardDescription>Per week · last 8 weeks</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <AreaChart data={AI_CALLS_OVER_TIME} unit="calls" />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Users by status</CardTitle>
+            <CardDescription>Active vs. inactive</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <DonutChart data={STATUS_MIX} centerLabel="Users" />
+          </CardContent>
+        </Card>
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
