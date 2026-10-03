@@ -21,7 +21,7 @@ export default function AdminLoginPage() {
     e.preventDefault();
     setBusy(true);
     // TODO: replace with real admin auth. UI-only for now.
-    setTimeout(() => router.push("/jmp-admin"), 400);
+    setTimeout(() => router.push("/jmp-admin/dashboard"), 400);
   }
 
   return (

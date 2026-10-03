@@ -36,7 +36,7 @@ interface Group {
 }
 
 const GROUPS: Group[] = [
-  { label: "Overview", items: [{ href: "/jmp-admin", label: "Dashboard", icon: LayoutDashboard }] },
+  { label: "Overview", items: [{ href: "/jmp-admin/dashboard", label: "Dashboard", icon: LayoutDashboard }] },
   {
     label: "People & Content",
     items: [
@@ -64,14 +64,14 @@ const GROUPS: Group[] = [
 ];
 
 const TITLES: Record<string, string> = {
-  "/jmp-admin": "Dashboard",
+  "/jmp-admin/dashboard": "Dashboard",
   "/jmp-admin/users": "Users",
   "/jmp-admin/settings": "Settings",
 };
 
 function isActive(pathname: string, href?: string) {
   if (!href) return false;
-  return href === "/jmp-admin" ? pathname === "/jmp-admin" : pathname === href || pathname.startsWith(href + "/");
+  return pathname === href || pathname.startsWith(href + "/");
 }
 
 function Brand() {
