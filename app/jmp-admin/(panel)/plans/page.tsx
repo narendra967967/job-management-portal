@@ -10,7 +10,6 @@ import { useState } from "react";
 import { Plus, Pencil, Trash2, Check, Users } from "lucide-react";
 import { Card } from "@/components/admin/ui/card";
 import { Button } from "@/components/admin/ui/button";
-import { Badge } from "@/components/admin/ui/badge";
 import { ConfirmDialog } from "@/components/admin/ui/confirm-dialog";
 import { PlanFormDialog, type PlanFormValues } from "@/components/admin/plans/plan-form-dialog";
 import {
@@ -86,18 +85,19 @@ export default function AdminPlansPage() {
         </Button>
       </div>
 
-      <div className="space-y-4">
-        {plans.map((plan) => (
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {plans.map((plan, i) => (
           <PlanCard
             key={plan.id}
             plan={plan}
+            accent={ACCENTS[i % ACCENTS.length]}
             onEdit={() => openEdit(plan)}
             onToggle={() => toggleStatus(plan)}
             onDelete={() => setDeleteTarget(plan)}
           />
         ))}
         {plans.length === 0 && (
-          <div className="rounded-2xl border border-dashed p-10 text-center text-sm text-muted-foreground">
+          <div className="rounded-2xl border border-dashed p-10 text-center text-sm text-muted-foreground lg:col-span-2">
             No plans yet.
           </div>
         )}
@@ -118,27 +118,34 @@ export default function AdminPlansPage() {
   );
 }
 
+// Per-card accent (colored gradient header + feature-check + ring). Cycled by
+// index; classes are literal so Tailwind picks them up. White text on the -600→
+// -700 gradients stays readable.
+type Accent = { grad: string; ring: string; check: string };
+const ACCENTS: Accent[] = [
+  { grad: "from-indigo-600 to-indigo-700", ring: "ring-indigo-400", check: "text-indigo-500" },
+  { grad: "from-emerald-600 to-emerald-700", ring: "ring-emerald-400", check: "text-emerald-500" },
+  { grad: "from-violet-600 to-violet-700", ring: "ring-violet-400", check: "text-violet-500" },
+  { grad: "from-rose-600 to-rose-700", ring: "ring-rose-400", check: "text-rose-500" },
+  { grad: "from-teal-600 to-teal-700", ring: "ring-teal-400", check: "text-teal-500" },
+  { grad: "from-fuchsia-600 to-fuchsia-700", ring: "ring-fuchsia-400", check: "text-fuchsia-500" },
+];
+
 function PriceBlock({ plan }: { plan: Plan }) {
-  if (plan.isFree) {
-    return <span className="text-xl font-semibold">Free</span>;
-  }
+  if (plan.isFree) return <span className="text-2xl font-bold">Free</span>;
   if (plan.monthlyPrice === 0 && plan.yearlyPrice === 0) {
-    return <span className="text-sm text-muted-foreground">No price set</span>;
+    return <span className="text-sm text-white/80">No price set</span>;
   }
   const savings = yearlySavingsPct(plan);
   return (
-    <div className="sm:text-right">
-      <div className="flex items-baseline gap-1 sm:justify-end">
-        <span className="text-2xl font-semibold tabular-nums">
-          {formatMoney(plan.monthlyPrice, plan.currency)}
-        </span>
-        <span className="text-sm text-muted-foreground">/mo</span>
+    <div className="text-right">
+      <div className="flex items-baseline justify-end gap-1">
+        <span className="text-2xl font-bold tabular-nums">{formatMoney(plan.monthlyPrice, plan.currency)}</span>
+        <span className="text-xs text-white/80">/mo</span>
       </div>
-      <div className="text-xs text-muted-foreground">
+      <div className="text-[11px] text-white/85">
         {formatMoney(plan.yearlyPrice, plan.currency)} / yr
-        {savings !== null && (
-          <span className="ml-1 font-medium text-status-applied-foreground">· save {savings}%</span>
-        )}
+        {savings !== null && <span className="ml-1 font-semibold">· save {savings}%</span>}
       </div>
     </div>
   );
@@ -146,11 +153,13 @@ function PriceBlock({ plan }: { plan: Plan }) {
 
 function PlanCard({
   plan,
+  accent,
   onEdit,
   onToggle,
   onDelete,
 }: {
   plan: Plan;
+  accent: Accent;
   onEdit: () => void;
   onToggle: () => void;
   onDelete: () => void;
@@ -165,33 +174,55 @@ function PlanCard({
       : "Delete plan";
 
   return (
-    <Card className={cn("overflow-hidden p-0", plan.popular && "ring-1 ring-primary/40")}>
-      {/* Header */}
-      <div className="flex flex-col gap-3 border-b border-border bg-muted/40 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap items-center gap-2">
-          <h3 className="text-base font-semibold">{plan.name}</h3>
-          <Badge variant={active ? "success" : "neutral"}>{active ? "Active" : "Inactive"}</Badge>
-          {plan.isFree && <Badge variant="neutral">Default</Badge>}
-          {plan.popular && <Badge variant="warning">Recommended</Badge>}
-          <code className="text-[11px] text-muted-foreground">{plan.code}</code>
+    <Card
+      className={cn(
+        "flex h-full flex-col overflow-hidden p-0",
+        plan.popular && `ring-2 ${accent.ring}`,
+      )}
+    >
+      {/* Colored header */}
+      <div
+        className={cn(
+          "bg-gradient-to-br px-5 py-4 text-white",
+          active ? accent.grad : "from-slate-500 to-slate-600",
+        )}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-lg font-semibold">{plan.name}</h3>
+              {plan.isFree && (
+                <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-medium">Default</span>
+              )}
+              {plan.popular && (
+                <span className="rounded-full bg-white/25 px-2 py-0.5 text-[10px] font-semibold">★ Recommended</span>
+              )}
+            </div>
+            <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-white/80">
+              <span className="rounded-full bg-white/15 px-1.5 py-0.5">{active ? "Active" : "Inactive"}</span>
+              <code>{plan.code}</code>
+            </div>
+          </div>
+          <div className="shrink-0">
+            <PriceBlock plan={plan} />
+          </div>
         </div>
-        <PriceBlock plan={plan} />
       </div>
 
       {/* Body */}
-      <div className="space-y-3 px-5 py-4">
+      <div className="flex flex-1 flex-col gap-3 px-5 py-4">
         {plan.description && <p className="text-sm text-muted-foreground">{plan.description}</p>}
         {plan.features.length > 0 && (
-          <ul className="grid gap-1.5 sm:grid-cols-2">
+          <ul className="space-y-1.5">
             {plan.features.map((f, i) => (
-              <li key={i} className="flex items-center gap-1.5 text-sm">
-                <Check className="size-3.5 shrink-0 text-status-applied-foreground" aria-hidden />
-                <span className="min-w-0 truncate">{f}</span>
+              <li key={i} className="flex items-center gap-2 text-sm">
+                <Check className={cn("size-4 shrink-0", accent.check)} aria-hidden />
+                <span className="min-w-0">{f}</span>
               </li>
             ))}
           </ul>
         )}
-        <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+        <div className="mt-auto flex items-center gap-1.5 pt-1 text-sm text-muted-foreground">
           <Users className="size-4" aria-hidden />
           <span className="font-semibold tabular-nums text-foreground">{plan.subscribers}</span>
           subscriber{plan.subscribers === 1 ? "" : "s"}
@@ -199,37 +230,28 @@ function PlanCard({
       </div>
 
       {/* Footer */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-muted/20 px-5 py-3">
-        <span className="text-[11px] text-muted-foreground">
-          {plan.isFree
-            ? "Default plan — assigned on onboarding."
-            : usedLock
-              ? `Used by ${plan.everSubscribed} user${plan.everSubscribed === 1 ? "" : "s"} over time.`
-              : ""}
-        </span>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" size="sm" onClick={onEdit}>
-            <Pencil /> Edit
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onToggle}
-            disabled={plan.isFree}
-            title={plan.isFree ? "The default (Free) plan stays active." : undefined}
-          >
-            {active ? "Deactivate" : "Activate"}
-          </Button>
-          <Button
-            variant={deleteDisabled ? "outline" : "destructive"}
-            size="sm"
-            onClick={onDelete}
-            disabled={deleteDisabled}
-            title={deleteTitle}
-          >
-            <Trash2 /> Delete
-          </Button>
-        </div>
+      <div className="flex items-center justify-end gap-2 border-t border-border bg-muted/30 px-5 py-3">
+        <Button variant="outline" size="sm" onClick={onEdit}>
+          <Pencil /> Edit
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onToggle}
+          disabled={plan.isFree}
+          title={plan.isFree ? "The default (Free) plan stays active." : undefined}
+        >
+          {active ? "Deactivate" : "Activate"}
+        </Button>
+        <Button
+          variant={deleteDisabled ? "outline" : "destructive"}
+          size="sm"
+          onClick={onDelete}
+          disabled={deleteDisabled}
+          title={deleteTitle}
+        >
+          <Trash2 /> Delete
+        </Button>
       </div>
     </Card>
   );
