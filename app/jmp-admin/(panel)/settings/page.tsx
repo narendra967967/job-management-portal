@@ -1,18 +1,23 @@
 "use client";
 
-// Admin "Account" settings — the admin's own profile, preferences, AI tools key,
-// and password. Mirrors the USER panel's settings design (grouped tab sidebar +
-// section cards) but is built from admin-only primitives (no shared user UI).
-// UI-first with local state; persistence comes later.
+// Settings — the single place for the admin's account AND all app-wide
+// configuration. Mirrors the user panel's settings design (grouped tab sidebar +
+// section cards), built from admin-only primitives. UI-first; most Application
+// sections are placeholders until their backends are wired.
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import {
   User,
   SlidersHorizontal,
   Sparkles,
+  Lock,
+  Cog,
+  Mail,
+  Wallet,
+  Receipt,
+  Wand2,
+  Clock,
   ShieldCheck,
-  LogOut,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/admin/ui/button";
@@ -32,25 +37,26 @@ const SECTION = {
   profile: { id: "profile", label: "Profile", icon: User, render: () => <ProfileCard /> },
   preferences: { id: "preferences", label: "Preferences", icon: SlidersHorizontal, render: () => <PreferencesCard /> },
   ai: { id: "ai", label: "AI integration", icon: Sparkles, render: () => <AiCard /> },
-  account: { id: "account", label: "Account", icon: ShieldCheck, render: () => <AccountCard /> },
+  password: { id: "password", label: "Password", icon: Lock, render: () => <PasswordCard /> },
+  general: { id: "general", label: "General", icon: Cog, render: () => <PlaceholderCard title="General" /> },
+  email: { id: "email", label: "Email / SMTP", icon: Mail, render: () => <PlaceholderCard title="Email / SMTP" /> },
+  payments: { id: "payments", label: "Payments", icon: Wallet, render: () => <PlaceholderCard title="Payments" /> },
+  taxes: { id: "taxes", label: "Taxes & GST", icon: Receipt, render: () => <PlaceholderCard title="Taxes & GST" /> },
+  prompts: { id: "prompts", label: "AI & prompts", icon: Wand2, render: () => <PlaceholderCard title="AI & prompts" /> },
+  cron: { id: "cron", label: "Cron & schedule", icon: Clock, render: () => <PlaceholderCard title="Cron & schedule" /> },
+  security: { id: "security", label: "Security", icon: ShieldCheck, render: () => <PlaceholderCard title="Security" /> },
 } satisfies Record<string, SettingsSection>;
 
 const GROUPS: { label: string; items: SettingsSection[] }[] = [
-  { label: "General", items: [SECTION.profile, SECTION.preferences] },
-  { label: "AI", items: [SECTION.ai] },
+  { label: "Account", items: [SECTION.profile, SECTION.preferences, SECTION.ai, SECTION.password] },
+  {
+    label: "Application",
+    items: [SECTION.general, SECTION.email, SECTION.payments, SECTION.taxes, SECTION.prompts, SECTION.cron, SECTION.security],
+  },
 ];
-const FOOTER: SettingsSection[] = [SECTION.account];
-const SECTIONS: SettingsSection[] = [...GROUPS.flatMap((g) => g.items), ...FOOTER];
+const SECTIONS: SettingsSection[] = GROUPS.flatMap((g) => g.items);
 
-function TabButton({
-  section,
-  active,
-  onSelect,
-}: {
-  section: SettingsSection;
-  active: boolean;
-  onSelect: (id: string) => void;
-}) {
+function TabButton({ section, active, onSelect }: { section: SettingsSection; active: boolean; onSelect: (id: string) => void }) {
   const Icon = section.icon;
   return (
     <button
@@ -78,35 +84,22 @@ export default function AdminSettingsPage() {
     <div className="mx-auto max-w-5xl">
       <div className="lg:flex lg:gap-6">
         {/* Mobile / tablet: horizontal strip */}
-        <nav
-          aria-label="Settings sections"
-          className="-mx-4 flex gap-1 overflow-x-auto px-4 pb-1 lg:hidden"
-        >
+        <nav aria-label="Settings sections" className="-mx-4 flex gap-1 overflow-x-auto px-4 pb-1 lg:hidden">
           {SECTIONS.map((s) => (
             <TabButton key={s.id} section={s} active={s.id === active} onSelect={setActive} />
           ))}
         </nav>
 
         {/* Desktop: grouped vertical sidebar */}
-        <nav
-          aria-label="Settings sections"
-          className="hidden lg:block lg:w-56 lg:shrink-0 lg:space-y-5"
-        >
+        <nav aria-label="Settings sections" className="hidden lg:block lg:w-56 lg:shrink-0 lg:space-y-5">
           {GROUPS.map((g) => (
             <div key={g.label} className="space-y-1">
-              <p className="px-3 text-[11px] font-semibold tracking-wider text-muted-foreground/60 uppercase">
-                {g.label}
-              </p>
+              <p className="px-3 text-[11px] font-semibold tracking-wider text-muted-foreground/60 uppercase">{g.label}</p>
               {g.items.map((s) => (
                 <TabButton key={s.id} section={s} active={s.id === active} onSelect={setActive} />
               ))}
             </div>
           ))}
-          <div className="space-y-1 border-t pt-4">
-            {FOOTER.map((s) => (
-              <TabButton key={s.id} section={s} active={s.id === active} onSelect={setActive} />
-            ))}
-          </div>
         </nav>
 
         <div className="mt-4 min-w-0 flex-1 lg:mt-0">{current.render()}</div>
@@ -147,10 +140,22 @@ function SaveRow({ onSave, label = "Save changes" }: { onSave?: () => void; labe
 const selectCls =
   "h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
 
-/* ---------------- Profile ---------------- */
+function PlaceholderCard({ title }: { title: string }) {
+  return (
+    <section className="rounded-2xl border bg-card p-4 md:p-5">
+      <div className="flex items-center gap-2">
+        <h2 className="text-sm font-medium">{title}</h2>
+        <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">soon</span>
+      </div>
+      <p className="mt-8 mb-4 text-center text-xs text-muted-foreground">Coming soon.</p>
+    </section>
+  );
+}
+
+/* ---------------- Account sections ---------------- */
 
 function ProfileCard() {
-  const [name, setName] = useState("Administrator");
+  const [name, setName] = useState("Narendra Gupta");
   return (
     <section className="rounded-2xl border bg-card p-4 md:p-5">
       <h2 className="text-sm font-medium">Profile</h2>
@@ -159,15 +164,13 @@ function ProfileCard() {
           <Input value={name} onChange={(e) => setName(e.target.value)} />
         </Field>
         <Field label="Email (sign-in)">
-          <Input value="admin@jmp" disabled title="Your login email can't be changed here" />
+          <Input value="narendragpt967967@gmail.com" disabled title="Your login email can't be changed here" />
         </Field>
       </div>
       <SaveRow />
     </section>
   );
 }
-
-/* ---------------- Preferences ---------------- */
 
 function PreferencesCard() {
   const [theme, setTheme] = useState("system");
@@ -197,8 +200,6 @@ function PreferencesCard() {
   );
 }
 
-/* ---------------- AI integration ---------------- */
-
 function AiCard() {
   const [provider, setProvider] = useState("openai");
   const [model, setModel] = useState("");
@@ -220,14 +221,7 @@ function AiCard() {
       </div>
       <div className="mt-3">
         <Field label="API key">
-          <Input
-            type="password"
-            value={key}
-            onChange={(e) => setKey(e.target.value)}
-            placeholder="sk-…"
-            autoComplete="off"
-            className="font-mono"
-          />
+          <Input type="password" value={key} onChange={(e) => setKey(e.target.value)} placeholder="sk-…" autoComplete="off" className="font-mono" />
         </Field>
       </div>
       <SaveRow label="Save key" />
@@ -235,10 +229,7 @@ function AiCard() {
   );
 }
 
-/* ---------------- Account (password + sign out) ---------------- */
-
-function AccountCard() {
-  const router = useRouter();
+function PasswordCard() {
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
   const [confirmPw, setConfirmPw] = useState("");
@@ -250,7 +241,6 @@ function AccountCard() {
     if (!isPasswordValid(next)) return setError("New password doesn't meet all the requirements below.");
     if (next !== confirmPw) return setError("New passwords don't match.");
     setError("");
-    // TODO: real password change when admin auth is wired.
     setCurrent("");
     setNext("");
     setConfirmPw("");
@@ -262,16 +252,10 @@ function AccountCard() {
 
   return (
     <section className="rounded-2xl border bg-card p-4 md:p-5">
-      <h2 className="text-sm font-medium">Account</h2>
-
+      <h2 className="text-sm font-medium">Password</h2>
       <div className="mt-4 space-y-3">
         <Field label="Current password">
-          <Input
-            type="password"
-            value={current}
-            onChange={(e) => setCurrent(e.target.value)}
-            autoComplete="current-password"
-          />
+          <Input type="password" value={current} onChange={(e) => setCurrent(e.target.value)} autoComplete="current-password" />
         </Field>
         <Field label="New password">
           <PasswordField value={next} onChange={setNext} placeholder="Create a strong password" />
@@ -288,17 +272,8 @@ function AccountCard() {
         {error && <p className="text-xs text-destructive">{error}</p>}
         <div className="flex items-center gap-3">
           <Button onClick={changePw}>Change password</Button>
-          {saved && (
-            <span className="text-xs text-status-applied-foreground">Password updated</span>
-          )}
+          {saved && <span className="text-xs text-status-applied-foreground">Password updated</span>}
         </div>
-      </div>
-
-      <div className="mt-5 border-t pt-4">
-        <Button variant="destructive" onClick={() => router.push("/jmp-admin/login")}>
-          <LogOut className="size-4" aria-hidden />
-          Log out
-        </Button>
       </div>
     </section>
   );

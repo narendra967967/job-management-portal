@@ -2,6 +2,8 @@
 
 // Admin panel shell — grouped collapsible sidebar + top bar. Admin-only; does
 // NOT reuse any user-dashboard component so admin styling evolves independently.
+// All configuration + the admin's account live on one Settings page, reached from
+// the sidebar footer.
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
@@ -21,25 +23,11 @@ import {
   Inbox,
   ScrollText,
   Settings,
-  SlidersHorizontal,
-  Sparkles,
-  Clock,
-  Mail,
-  Wallet,
-  Receipt,
-  Lock,
   ChevronDown,
   LogOut,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-} from "@/components/admin/ui/dropdown-menu";
 
 interface Item {
   href?: string;
@@ -51,6 +39,11 @@ interface Group {
   label: string;
   items: Item[];
 }
+
+const SETTINGS_HREF = "/jmp-admin/settings";
+
+// Mock admin identity (from the session once auth is wired).
+const ADMIN = { name: "Narendra Gupta", email: "narendragpt967967@gmail.com" };
 
 const GROUPS: Group[] = [
   { label: "Overview", items: [{ href: "/jmp-admin/dashboard", label: "Dashboard", icon: LayoutDashboard }] },
@@ -82,25 +75,13 @@ const GROUPS: Group[] = [
       { label: "Activity log", icon: ScrollText, soon: true },
     ],
   },
-  {
-    label: "Configuration",
-    items: [
-      { label: "General", icon: SlidersHorizontal, soon: true },
-      { label: "Email / SMTP", icon: Mail, soon: true },
-      { label: "Payments", icon: Wallet, soon: true },
-      { label: "Taxes & GST", icon: Receipt, soon: true },
-      { label: "AI & prompts", icon: Sparkles, soon: true },
-      { label: "Cron & schedule", icon: Clock, soon: true },
-      { label: "Security", icon: Lock, soon: true },
-    ],
-  },
 ];
 
 const TITLES: Record<string, string> = {
   "/jmp-admin/dashboard": "Dashboard",
   "/jmp-admin/users": "Users",
   "/jmp-admin/plans": "Plans & Pricing",
-  "/jmp-admin/settings": "Account",
+  "/jmp-admin/settings": "Settings",
 };
 
 function isActive(pathname: string, href?: string) {
@@ -111,14 +92,7 @@ function isActive(pathname: string, href?: string) {
 function Brand() {
   return (
     <div className="flex items-center gap-2">
-      <Image
-        src="/logo.png"
-        alt="JMP"
-        width={32}
-        height={32}
-        priority
-        className="size-8 shrink-0 rounded-full"
-      />
+      <Image src="/logo.png" alt="JMP" width={32} height={32} priority className="size-8 shrink-0 rounded-full" />
       <div className="leading-tight">
         <p className="text-sm font-semibold text-white">JMP Admin</p>
         <p className="text-[10px] text-slate-400">Control panel</p>
@@ -183,11 +157,49 @@ function NavGroup({ group, pathname }: { group: Group; pathname: string }) {
   );
 }
 
+function UserFooter({ pathname, onLogout }: { pathname: string; onLogout: () => void }) {
+  const settingsActive = isActive(pathname, SETTINGS_HREF);
+  return (
+    <div className="mt-4 space-y-1 border-t border-slate-800 pt-3">
+      <Link
+        href={SETTINGS_HREF}
+        className={cn(
+          "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+          settingsActive ? "bg-slate-800 text-white" : "text-slate-300 hover:bg-slate-800/60 hover:text-white",
+        )}
+      >
+        <Settings className="size-4 shrink-0" aria-hidden />
+        Settings
+      </Link>
+      <div className="flex items-center gap-2 rounded-lg px-2 py-2">
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+          {ADMIN.name.charAt(0)}
+        </span>
+        <div className="min-w-0 flex-1 leading-tight">
+          <p className="truncate text-xs font-medium text-white">{ADMIN.name}</p>
+          <p className="truncate text-[10px] text-slate-400">{ADMIN.email}</p>
+        </div>
+        <button
+          type="button"
+          onClick={onLogout}
+          aria-label="Log out"
+          className="shrink-0 rounded-md p-1.5 text-slate-400 transition-colors hover:bg-slate-800 hover:text-white"
+        >
+          <LogOut className="size-4" aria-hidden />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const title = TITLES[pathname] ?? "Admin";
-  const mobileLinks = GROUPS.flatMap((g) => g.items).filter((i) => i.href && !i.soon);
+  const mobileLinks: Item[] = [
+    ...GROUPS.flatMap((g) => g.items).filter((i) => i.href && !i.soon),
+    { href: SETTINGS_HREF, label: "Settings", icon: Settings },
+  ];
 
   function logout() {
     // TODO: clear the admin session when auth is wired; UI-only for now.
@@ -206,18 +218,34 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             ))}
           </div>
         </div>
+        <UserFooter pathname={pathname} onLogout={logout} />
       </aside>
 
       {/* Mobile top bar + nav row */}
-      <div className="flex items-center bg-slate-900 px-4 py-3 md:hidden">
+      <div className="flex items-center justify-between bg-slate-900 px-4 py-3 md:hidden">
         <Brand />
+        <button
+          type="button"
+          onClick={logout}
+          aria-label="Log out"
+          className="flex size-9 items-center justify-center rounded-lg text-slate-300 hover:bg-slate-800 hover:text-white"
+        >
+          <LogOut className="size-4" aria-hidden />
+        </button>
       </div>
       <div className="flex gap-1 overflow-x-auto bg-slate-900/95 px-3 pb-3 md:hidden">
         {mobileLinks.map((it) => {
           const Icon = it.icon;
           const active = isActive(pathname, it.href);
           return (
-            <Link key={it.href} href={it.href!} className={cn("flex shrink-0 items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium", active ? "bg-slate-800 text-white" : "text-slate-300")}>
+            <Link
+              key={it.href}
+              href={it.href!}
+              className={cn(
+                "flex shrink-0 items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium",
+                active ? "bg-slate-800 text-white" : "text-slate-300",
+              )}
+            >
               <Icon className="size-3.5" aria-hidden />
               {it.label}
             </Link>
@@ -229,21 +257,6 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex items-center gap-3 border-b bg-card px-4 py-3 md:px-6">
           <h1 className="text-base font-semibold md:text-lg">{title}</h1>
-          <DropdownMenu>
-            <DropdownMenuTrigger className="ml-auto flex items-center gap-2 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring">
-              <span className="hidden text-sm text-muted-foreground sm:block">admin@jmp</span>
-              <span className="flex size-8 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">A</span>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => router.push("/jmp-admin/settings")}>
-                <Settings /> Account settings
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem destructive onClick={logout}>
-                <LogOut /> Log out
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
         </header>
         <main className="flex-1 p-4 md:p-6">{children}</main>
       </div>
