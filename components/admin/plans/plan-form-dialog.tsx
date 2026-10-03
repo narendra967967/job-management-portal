@@ -58,11 +58,23 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+function Field({
+  label,
+  hint,
+  required,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  required?: boolean;
+  children: React.ReactNode;
+}) {
   return (
     <label className="block space-y-1.5">
       <Label className="text-xs text-muted-foreground">
-        {label} {hint && <span className="font-normal">{hint}</span>}
+        {label}
+        {required && <span className="text-destructive"> *</span>}
+        {hint && <span className="font-normal"> {hint}</span>}
       </Label>
       {children}
     </label>
@@ -126,25 +138,45 @@ export function PlanFormDialog({
   }
 
   function submit(status: PlanStatus) {
+    // Name (required) + a valid auto-code derived from it.
     if (!name.trim()) return setError("Name is required.");
-    const monthly = isFree ? 0 : Number(monthlyPrice) || 0;
-    const yearly = isFree ? 0 : Number(yearlyPrice) || 0;
+    if (!code) return setError("Name must include at least one letter or number.");
+
+    // Pricing — only for paid plans. 0 disables an interval; at least one required.
+    const monthly = isFree ? 0 : Math.round(Number(monthlyPrice));
+    const yearly = isFree ? 0 : Math.round(Number(yearlyPrice));
     if (!isFree) {
-      if (monthly < 0 || yearly < 0) return setError("Prices can't be negative.");
+      if (!Number.isFinite(monthly) || !Number.isFinite(yearly) || monthly < 0 || yearly < 0)
+        return setError("Enter valid prices (0 or more).");
       if (monthly === 0 && yearly === 0)
         return setError("Set a monthly or yearly price (0 disables an interval, but a paid plan needs at least one).");
     }
+
+    // Free access duration — only for the free plan (0 = never expires).
+    const freeDays = Math.round(Number(freeDurationDays));
+    if (isFree && (!Number.isFinite(freeDays) || freeDays < 0))
+      return setError("Enter a valid free access duration (0 or more days).");
+
+    // Résumé limit — required unless Unlimited is ticked.
+    let resumesLimit: number | null = null;
+    if (!resumesUnlimited) {
+      const n = Number(limitResumes);
+      if (limitResumes.trim() === "" || !Number.isFinite(n) || n < 0)
+        return setError("Enter a résumé upload limit, or tick Unlimited.");
+      resumesLimit = Math.round(n);
+    }
+
     onSave({
       name: name.trim(),
       code,
       description,
       accent,
       isFree,
-      freeDurationDays: isFree ? Math.max(0, Math.round(Number(freeDurationDays) || 0)) : 0,
-      monthlyPrice: Math.round(monthly),
-      yearlyPrice: Math.round(yearly),
+      freeDurationDays: isFree ? freeDays : 0,
+      monthlyPrice: monthly,
+      yearlyPrice: yearly,
       currency,
-      limitResumes: resumesUnlimited ? null : Math.max(0, Math.round(Number(limitResumes) || 0)),
+      limitResumes: resumesLimit,
       allowCustomPrompts,
       features: features.map((f) => f.trim()).filter(Boolean),
       status,
@@ -163,7 +195,7 @@ export function PlanFormDialog({
           {/* Basics */}
           <Section title="Basics">
             <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="Name">
+              <Field label="Name" required>
                 <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Pro" />
               </Field>
               <Field label="Code" hint="(auto)">
@@ -206,7 +238,7 @@ export function PlanFormDialog({
             <span>
               This is the <span className="font-medium">Free (default)</span> plan
               <span className="block text-xs text-muted-foreground">
-                Assigned on onboarding · no pricing · can&apos;t be deleted or deactivated. Only one plan can be free.
+                Assigned on onboarding · no pricing. Multiple free plans are allowed, but exactly one stays active at a time.
               </span>
             </span>
           </label>
@@ -299,19 +331,16 @@ export function PlanFormDialog({
             </Button>
           </Section>
 
-          {error && <p className="text-xs text-destructive">{error}</p>}
         </div>
+
+        {error && (
+          <p className="rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">{error}</p>
+        )}
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          {isFree ? (
-            <Button onClick={() => submit("active")}>{editing ? "Save changes" : "Save plan"}</Button>
-          ) : (
-            <>
-              <Button variant="outline" onClick={() => submit("inactive")}>Save as draft</Button>
-              <Button onClick={() => submit("active")}>Save &amp; activate</Button>
-            </>
-          )}
+          <Button variant="outline" onClick={() => submit("inactive")}>Save as draft</Button>
+          <Button onClick={() => submit("active")}>Save &amp; activate</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

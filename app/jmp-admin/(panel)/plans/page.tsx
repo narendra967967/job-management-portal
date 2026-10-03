@@ -45,22 +45,24 @@ export default function AdminPlansPage() {
 
   function savePlan(values: PlanFormValues) {
     setPlans((ps) => {
-      // Only one plan can be the free/default plan.
-      const cleared = values.isFree
-        ? ps.map((p) => (editing && p.id === editing.id ? p : { ...p, isFree: false }))
-        : ps;
-      if (editing) {
-        return cleared.map((p) => (p.id === editing.id ? { ...p, ...values } : p));
-      }
-      return [
-        ...cleared,
-        { ...values, id: `plan_${Date.now()}`, popular: false, subscribers: 0, everSubscribed: 0 },
-      ];
+      const id = editing ? editing.id : `plan_${Date.now()}`;
+      const base = editing
+        ? ps.map((p) => (p.id === id ? { ...p, ...values } : p))
+        : [...ps, { ...values, id, popular: false, subscribers: 0, everSubscribed: 0 }];
+      return normalizeFree(base, id);
     });
-    say(editing ? `Updated “${values.name}”.` : `Added “${values.name}” (${values.status === "active" ? "active" : "draft"}).`);
+    say(editing ? `Updated “${values.name}”.` : `Added “${values.name}”.`);
   }
 
   function toggleStatus(plan: Plan) {
+    if (plan.isFree) {
+      // Free plans behave like a radio: activating one deactivates the other free
+      // plans; the active one can't be switched off directly (activate another).
+      if (plan.status === "active") return;
+      setPlans((ps) => ps.map((p) => (p.isFree ? { ...p, status: p.id === plan.id ? "active" : "inactive" } : p)));
+      say(`${plan.name} is now the active free plan.`);
+      return;
+    }
     const next = plan.status === "active" ? "inactive" : "active";
     setPlans((ps) => ps.map((p) => (p.id === plan.id ? { ...p, status: next } : p)));
     say(`${plan.name} is now ${next === "active" ? "active" : "inactive"}.`);
@@ -148,6 +150,20 @@ export default function AdminPlansPage() {
   );
 }
 
+// Keep exactly one free plan active (a free plan can never sit with none active).
+// `preferId` is the plan just saved/activated: an active free one wins; otherwise an
+// already-active free is kept; otherwise the first free is forced active.
+function normalizeFree(plans: Plan[], preferId: string): Plan[] {
+  const frees = plans.filter((p) => p.isFree);
+  if (frees.length === 0) return plans;
+  const pref = plans.find((p) => p.id === preferId);
+  const activeId =
+    pref?.isFree && pref.status === "active"
+      ? pref.id
+      : (frees.find((p) => p.status === "active")?.id ?? (pref?.isFree ? pref.id : frees[0].id));
+  return plans.map((p) => (p.isFree ? { ...p, status: p.id === activeId ? "active" : "inactive" } : p));
+}
+
 function PriceBlock({ plan }: { plan: Plan }) {
   if (plan.isFree) return <span className="text-2xl font-bold">Free</span>;
   const m = plan.monthlyPrice > 0;
@@ -194,9 +210,10 @@ function PlanCard({
   const accent = ACCENTS[plan.accent];
   const active = plan.status === "active";
   const usedLock = plan.everSubscribed > 0;
-  const deleteDisabled = plan.isFree || usedLock;
-  const deleteTitle = plan.isFree
-    ? "The default (Free) plan can't be deleted."
+  const freeActiveLock = plan.isFree && active; // the active free plan must stay
+  const deleteDisabled = freeActiveLock || usedLock;
+  const deleteTitle = freeActiveLock
+    ? "Can't delete the active free plan. Activate another free plan first."
     : usedLock
       ? `Can't delete — ${plan.everSubscribed} user${plan.everSubscribed === 1 ? " has" : "s have"} used this plan. Deactivate instead.`
       : "Delete plan";
@@ -288,8 +305,8 @@ function PlanCard({
             variant="outline"
             size="sm"
             onClick={onToggle}
-            disabled={plan.isFree}
-            title={plan.isFree ? "The default (Free) plan stays active." : undefined}
+            disabled={freeActiveLock}
+            title={freeActiveLock ? "A free plan must stay active — activate another free plan to switch." : undefined}
           >
             {active ? "Deactivate" : "Activate"}
           </Button>
