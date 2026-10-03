@@ -1,17 +1,13 @@
 // Mock subscription plans for the admin Plans & Pricing screen (UI-first).
 // Replaced by real DB reads once billing is wired.
+//
+// Model: "Free" is its own plan, flagged `isFree` — the default assigned when a
+// user is onboarded, excluded from the renewal page, and never deletable/
+// deactivatable. Every paid plan carries BOTH a monthly and a yearly price
+// (those are the only intervals; no free-trial field).
 
 export type PlanStatus = "active" | "inactive";
-export type BillingCycle = "monthly" | "quarterly" | "half-yearly" | "yearly";
 export type Currency = "INR" | "USD";
-
-// Per-period suffix shown after the price (e.g. "₹499 / month").
-export const CYCLE_LABELS: Record<BillingCycle, string> = {
-  monthly: "month",
-  quarterly: "quarter",
-  "half-yearly": "6 months",
-  yearly: "year",
-};
 
 export const CURRENCY_SYMBOL: Record<Currency, string> = {
   INR: "₹",
@@ -24,10 +20,11 @@ export interface Plan {
   /** Internal key, stable across edits (used to map subscriptions to a plan). */
   code: string;
   description: string;
-  price: number;
+  /** The default/onboarding plan. Exactly one; no pricing; can't be deleted/deactivated. */
+  isFree: boolean;
+  monthlyPrice: number;
+  yearlyPrice: number;
   currency: Currency;
-  cycle: BillingCycle;
-  trialDays: number;
   features: string[];
   /** Highlight on the pricing page ("Recommended"). */
   popular: boolean;
@@ -38,9 +35,16 @@ export interface Plan {
   everSubscribed: number;
 }
 
-export function formatPrice(plan: Plan): string {
-  if (plan.price === 0) return "Free";
-  return `${CURRENCY_SYMBOL[plan.currency]}${plan.price.toLocaleString("en-IN")}`;
+export function formatMoney(amount: number, currency: Currency): string {
+  return `${CURRENCY_SYMBOL[currency]}${amount.toLocaleString("en-IN")}`;
+}
+
+/** Yearly discount vs. paying monthly for a year, or null if not applicable. */
+export function yearlySavingsPct(plan: Plan): number | null {
+  if (plan.monthlyPrice <= 0 || plan.yearlyPrice <= 0) return null;
+  const full = plan.monthlyPrice * 12;
+  const pct = Math.round((1 - plan.yearlyPrice / full) * 100);
+  return pct > 0 ? pct : null;
 }
 
 export const MOCK_PLANS: Plan[] = [
@@ -48,11 +52,11 @@ export const MOCK_PLANS: Plan[] = [
     id: "plan_free",
     name: "Free",
     code: "free",
-    description: "Get started and capture a handful of leads at no cost.",
-    price: 0,
+    description: "The default plan every user starts on when they're onboarded.",
+    isFree: true,
+    monthlyPrice: 0,
+    yearlyPrice: 0,
     currency: "INR",
-    cycle: "monthly",
-    trialDays: 0,
     features: ["Up to 20 leads", "1 résumé", "Manual Gmail sync", "Community support"],
     popular: false,
     status: "active",
@@ -60,74 +64,59 @@ export const MOCK_PLANS: Plan[] = [
     everSubscribed: 5,
   },
   {
-    id: "plan_monthly",
-    name: "Monthly",
-    code: "monthly",
-    description: "Full access billed every month.",
-    price: 499,
+    id: "plan_starter",
+    name: "Starter",
+    code: "starter",
+    description: "For active job seekers who want automation.",
+    isFree: false,
+    monthlyPrice: 299,
+    yearlyPrice: 2499,
     currency: "INR",
-    cycle: "monthly",
-    trialDays: 7,
-    features: ["Unlimited leads", "5 résumés", "500 AI calls / month", "Auto Gmail sync", "Email support"],
+    features: ["Unlimited leads", "3 résumés", "300 AI calls / month", "Auto Gmail sync", "Email support"],
     popular: false,
     status: "active",
     subscribers: 4,
     everSubscribed: 9,
   },
   {
-    id: "plan_quarterly",
-    name: "Quarterly",
-    code: "quarterly",
-    description: "Save vs. monthly, billed every 3 months.",
-    price: 1299,
+    id: "plan_pro",
+    name: "Pro",
+    code: "pro",
+    description: "Everything you need to run outreach at scale.",
+    isFree: false,
+    monthlyPrice: 599,
+    yearlyPrice: 4999,
     currency: "INR",
-    cycle: "quarterly",
-    trialDays: 7,
-    features: ["Everything in Monthly", "1,800 AI calls / quarter", "Priority email support"],
-    popular: false,
+    features: ["Everything in Starter", "10 résumés", "1,000 AI calls / month", "Priority email support"],
+    popular: true,
     status: "active",
-    subscribers: 2,
-    everSubscribed: 4,
+    subscribers: 5,
+    everSubscribed: 11,
   },
   {
-    id: "plan_half",
-    name: "Half-yearly",
-    code: "half-yearly",
-    description: "Six months of full access at a better rate.",
-    price: 2399,
+    id: "plan_business",
+    name: "Business",
+    code: "business",
+    description: "Highest limits and priority support.",
+    isFree: false,
+    monthlyPrice: 1299,
+    yearlyPrice: 10999,
     currency: "INR",
-    cycle: "half-yearly",
-    trialDays: 7,
-    features: ["Everything in Quarterly", "4,000 AI calls / 6 months"],
+    features: ["Everything in Pro", "Unlimited résumés", "5,000 AI calls / month", "Priority support"],
     popular: false,
     status: "active",
     subscribers: 2,
     everSubscribed: 3,
   },
   {
-    id: "plan_yearly",
-    name: "Yearly",
-    code: "yearly",
-    description: "Best value — two months free vs. monthly.",
-    price: 3999,
-    currency: "INR",
-    cycle: "yearly",
-    trialDays: 14,
-    features: ["Everything in Half-yearly", "10,000 AI calls / year", "Priority support"],
-    popular: true,
-    status: "active",
-    subscribers: 3,
-    everSubscribed: 6,
-  },
-  {
     id: "plan_beta",
     name: "Beta access",
     code: "beta",
     description: "Internal testing plan — not shown to users yet.",
-    price: 0,
+    isFree: false,
+    monthlyPrice: 0,
+    yearlyPrice: 0,
     currency: "INR",
-    cycle: "monthly",
-    trialDays: 0,
     features: ["All features unlocked"],
     popular: false,
     status: "inactive",

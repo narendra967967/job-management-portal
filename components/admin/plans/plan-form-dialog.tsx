@@ -1,8 +1,9 @@
 "use client";
 
 // Add / edit a subscription plan (admin). UI-first: onSave receives the values;
-// persistence + the billing wiring come later. Code is locked once the plan
-// exists so subscriptions keep mapping to it.
+// persistence + billing wiring come later. Code is locked once the plan exists so
+// subscriptions keep mapping to it. "Free" is a flagged default plan with no
+// pricing; every paid plan carries a monthly and a yearly price.
 
 import { useEffect, useState } from "react";
 import { Plus, X } from "lucide-react";
@@ -16,22 +17,16 @@ import {
 import { Button } from "@/components/admin/ui/button";
 import { Input } from "@/components/admin/ui/input";
 import { Label } from "@/components/admin/ui/label";
-import {
-  CYCLE_LABELS,
-  type Plan,
-  type PlanStatus,
-  type BillingCycle,
-  type Currency,
-} from "@/lib/admin/mock-plans";
+import { type Plan, type PlanStatus, type Currency } from "@/lib/admin/mock-plans";
 
 export interface PlanFormValues {
   name: string;
   code: string;
   description: string;
-  price: number;
+  isFree: boolean;
+  monthlyPrice: number;
+  yearlyPrice: number;
   currency: Currency;
-  cycle: BillingCycle;
-  trialDays: number;
   features: string[];
   popular: boolean;
   status: PlanStatus;
@@ -70,10 +65,10 @@ export function PlanFormDialog({
   const [code, setCode] = useState("");
   const [codeTouched, setCodeTouched] = useState(false);
   const [description, setDescription] = useState("");
-  const [price, setPrice] = useState("0");
+  const [isFree, setIsFree] = useState(false);
+  const [monthlyPrice, setMonthlyPrice] = useState("0");
+  const [yearlyPrice, setYearlyPrice] = useState("0");
   const [currency, setCurrency] = useState<Currency>("INR");
-  const [cycle, setCycle] = useState<BillingCycle>("monthly");
-  const [trialDays, setTrialDays] = useState("0");
   const [features, setFeatures] = useState<string[]>([""]);
   const [popular, setPopular] = useState(false);
   const [status, setStatus] = useState<PlanStatus>("active");
@@ -85,10 +80,10 @@ export function PlanFormDialog({
     setCode(plan?.code ?? "");
     setCodeTouched(!!plan);
     setDescription(plan?.description ?? "");
-    setPrice(String(plan?.price ?? 0));
+    setIsFree(plan?.isFree ?? false);
+    setMonthlyPrice(String(plan?.monthlyPrice ?? 0));
+    setYearlyPrice(String(plan?.yearlyPrice ?? 0));
     setCurrency(plan?.currency ?? "INR");
-    setCycle(plan?.cycle ?? "monthly");
-    setTrialDays(String(plan?.trialDays ?? 0));
     setFeatures(plan && plan.features.length ? [...plan.features] : [""]);
     setPopular(plan?.popular ?? false);
     setStatus(plan?.status ?? "active");
@@ -114,17 +109,20 @@ export function PlanFormDialog({
   function save() {
     if (!name.trim()) return setError("Name is required.");
     if (!code.trim()) return setError("Code is required.");
-    const priceNum = Number(price);
-    if (!Number.isFinite(priceNum) || priceNum < 0) return setError("Enter a valid price (0 or more).");
-    const trialNum = Math.max(0, Math.round(Number(trialDays) || 0));
+    const monthly = isFree ? 0 : Number(monthlyPrice);
+    const yearly = isFree ? 0 : Number(yearlyPrice);
+    if (!isFree) {
+      if (!Number.isFinite(monthly) || monthly < 0) return setError("Enter a valid monthly price (0 or more).");
+      if (!Number.isFinite(yearly) || yearly < 0) return setError("Enter a valid yearly price (0 or more).");
+    }
     onSave({
       name: name.trim(),
       code: slugify(code),
       description: description.trim(),
-      price: Math.round(priceNum),
+      isFree,
+      monthlyPrice: Math.round(monthly),
+      yearlyPrice: Math.round(yearly),
       currency,
-      cycle,
-      trialDays: trialNum,
       features: features.map((f) => f.trim()).filter(Boolean),
       popular,
       status,
@@ -142,7 +140,7 @@ export function PlanFormDialog({
         <div className="max-h-[65vh] space-y-4 overflow-y-auto pr-1">
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Name">
-              <Input value={name} onChange={(e) => onName(e.target.value)} placeholder="e.g. Monthly" />
+              <Input value={name} onChange={(e) => onName(e.target.value)} placeholder="e.g. Pro" />
             </Field>
             <Field label="Code" hint={editing ? "(locked)" : "(internal id)"}>
               <Input
@@ -151,7 +149,7 @@ export function PlanFormDialog({
                   setCodeTouched(true);
                   setCode(e.target.value);
                 }}
-                placeholder="monthly"
+                placeholder="pro"
                 disabled={editing}
               />
             </Field>
@@ -165,63 +163,66 @@ export function PlanFormDialog({
             />
           </Field>
 
-          <div className="grid gap-4 sm:grid-cols-3">
-            <Field label="Price">
-              <Input
-                type="number"
-                min={0}
-                step={1}
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                placeholder="0"
-              />
-            </Field>
-            <Field label="Currency">
-              <select className={selectCls} value={currency} onChange={(e) => setCurrency(e.target.value as Currency)}>
-                <option value="INR">₹ INR</option>
-                <option value="USD">$ USD</option>
-              </select>
-            </Field>
-            <Field label="Billing cycle">
-              <select className={selectCls} value={cycle} onChange={(e) => setCycle(e.target.value as BillingCycle)}>
-                {(Object.keys(CYCLE_LABELS) as BillingCycle[]).map((c) => (
-                  <option key={c} value={c}>
-                    {c === "monthly" ? "Monthly" : c === "quarterly" ? "Quarterly" : c === "half-yearly" ? "Half-yearly" : "Yearly"}
-                  </option>
-                ))}
-              </select>
-            </Field>
-          </div>
+          <label className="flex items-start gap-2 rounded-lg border border-input bg-muted/30 p-3 text-sm">
+            <input
+              type="checkbox"
+              checked={isFree}
+              onChange={(e) => setIsFree(e.target.checked)}
+              className="mt-0.5 size-4 cursor-pointer rounded border-input accent-primary"
+            />
+            <span>
+              This is the <span className="font-medium">Free (default)</span> plan
+              <span className="block text-xs text-muted-foreground">
+                Assigned on onboarding · no pricing · can&apos;t be deleted or deactivated. Only one plan can be free.
+              </span>
+            </span>
+          </label>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Free trial (days)" hint="(0 = none)">
-              <Input type="number" min={0} step={1} value={trialDays} onChange={(e) => setTrialDays(e.target.value)} />
-            </Field>
-            <Field label="Status">
-              <select className={selectCls} value={status} onChange={(e) => setStatus(e.target.value as PlanStatus)}>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </select>
-            </Field>
-          </div>
+          {!isFree && (
+            <div className="grid gap-4 sm:grid-cols-3">
+              <Field label="Monthly price">
+                <Input
+                  type="number"
+                  min={0}
+                  step={1}
+                  value={monthlyPrice}
+                  onChange={(e) => setMonthlyPrice(e.target.value)}
+                  placeholder="0"
+                />
+              </Field>
+              <Field label="Yearly price">
+                <Input
+                  type="number"
+                  min={0}
+                  step={1}
+                  value={yearlyPrice}
+                  onChange={(e) => setYearlyPrice(e.target.value)}
+                  placeholder="0"
+                />
+              </Field>
+              <Field label="Currency">
+                <select className={selectCls} value={currency} onChange={(e) => setCurrency(e.target.value as Currency)}>
+                  <option value="INR">₹ INR</option>
+                  <option value="USD">$ USD</option>
+                </select>
+              </Field>
+            </div>
+          )}
+
+          <Field label="Status">
+            <select className={selectCls} value={status} onChange={(e) => setStatus(e.target.value as PlanStatus)}>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </Field>
 
           <div className="space-y-1.5">
             <Label className="text-xs text-muted-foreground">Features</Label>
             <div className="space-y-2">
               {features.map((f, i) => (
                 <div key={i} className="flex items-center gap-2">
-                  <Input
-                    value={f}
-                    onChange={(e) => setFeature(i, e.target.value)}
-                    placeholder={`Feature ${i + 1}`}
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    aria-label="Remove feature"
-                    onClick={() => removeFeature(i)}
-                  >
+                  <Input value={f} onChange={(e) => setFeature(i, e.target.value)} placeholder={`Feature ${i + 1}`} />
+                  <Button type="button" variant="outline" size="icon" aria-label="Remove feature" onClick={() => removeFeature(i)}>
                     <X />
                   </Button>
                 </div>

@@ -1,8 +1,10 @@
 "use client";
 
 // Plans & Pricing (Sales & Revenue). UI-first with local mock state; billing is
-// wired later. Card-per-row list with activate/deactivate, edit, add, and a
-// delete that's blocked once any user has ever been on the plan.
+// wired later. Card-per-row list (header / body / footer) with activate/
+// deactivate, edit, add, and a delete blocked once any user has ever been on the
+// plan. "Free" is a flagged default plan — can't be deleted or deactivated, and
+// only one plan can be free.
 
 import { useState } from "react";
 import { Plus, Pencil, Trash2, Check, Users } from "lucide-react";
@@ -13,10 +15,11 @@ import { ConfirmDialog } from "@/components/admin/ui/confirm-dialog";
 import { PlanFormDialog, type PlanFormValues } from "@/components/admin/plans/plan-form-dialog";
 import {
   MOCK_PLANS,
-  CYCLE_LABELS,
-  formatPrice,
+  formatMoney,
+  yearlySavingsPct,
   type Plan,
 } from "@/lib/admin/mock-plans";
+import { cn } from "@/lib/utils";
 
 export default function AdminPlansPage() {
   const [plans, setPlans] = useState<Plan[]>(MOCK_PLANS);
@@ -40,16 +43,20 @@ export default function AdminPlansPage() {
   }
 
   function savePlan(values: PlanFormValues) {
-    if (editing) {
-      setPlans((ps) => ps.map((p) => (p.id === editing.id ? { ...p, ...values } : p)));
-      say(`Updated “${values.name}”.`);
-    } else {
-      setPlans((ps) => [
-        ...ps,
+    setPlans((ps) => {
+      // Only one plan can be the free/default plan.
+      const cleared = values.isFree
+        ? ps.map((p) => (editing && p.id === editing.id ? p : { ...p, isFree: false }))
+        : ps;
+      if (editing) {
+        return cleared.map((p) => (p.id === editing.id ? { ...p, ...values } : p));
+      }
+      return [
+        ...cleared,
         { ...values, id: `plan_${Date.now()}`, subscribers: 0, everSubscribed: 0 },
-      ]);
-      say(`Added “${values.name}”.`);
-    }
+      ];
+    });
+    say(editing ? `Updated “${values.name}”.` : `Added “${values.name}”.`);
   }
 
   function toggleStatus(plan: Plan) {
@@ -96,12 +103,7 @@ export default function AdminPlansPage() {
         )}
       </div>
 
-      <PlanFormDialog
-        open={formOpen}
-        onOpenChange={setFormOpen}
-        plan={editing}
-        onSave={savePlan}
-      />
+      <PlanFormDialog open={formOpen} onOpenChange={setFormOpen} plan={editing} onSave={savePlan} />
 
       <ConfirmDialog
         open={deleteTarget !== null}
@@ -112,6 +114,32 @@ export default function AdminPlansPage() {
         destructive
         onConfirm={confirmDelete}
       />
+    </div>
+  );
+}
+
+function PriceBlock({ plan }: { plan: Plan }) {
+  if (plan.isFree) {
+    return <span className="text-xl font-semibold">Free</span>;
+  }
+  if (plan.monthlyPrice === 0 && plan.yearlyPrice === 0) {
+    return <span className="text-sm text-muted-foreground">No price set</span>;
+  }
+  const savings = yearlySavingsPct(plan);
+  return (
+    <div className="sm:text-right">
+      <div className="flex items-baseline gap-1 sm:justify-end">
+        <span className="text-2xl font-semibold tabular-nums">
+          {formatMoney(plan.monthlyPrice, plan.currency)}
+        </span>
+        <span className="text-sm text-muted-foreground">/mo</span>
+      </div>
+      <div className="text-xs text-muted-foreground">
+        {formatMoney(plan.yearlyPrice, plan.currency)} / yr
+        {savings !== null && (
+          <span className="ml-1 font-medium text-status-applied-foreground">· save {savings}%</span>
+        )}
+      </div>
     </div>
   );
 }
@@ -127,84 +155,80 @@ function PlanCard({
   onToggle: () => void;
   onDelete: () => void;
 }) {
-  const locked = plan.everSubscribed > 0; // ever taken → can't delete, only deactivate
   const active = plan.status === "active";
+  const usedLock = plan.everSubscribed > 0; // ever taken → can't delete
+  const deleteDisabled = plan.isFree || usedLock;
+  const deleteTitle = plan.isFree
+    ? "The default (Free) plan can't be deleted."
+    : usedLock
+      ? `Can't delete — ${plan.everSubscribed} user${plan.everSubscribed === 1 ? " has" : "s have"} used this plan. Deactivate instead.`
+      : "Delete plan";
 
   return (
-    <Card className="p-5">
-      <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
-        {/* Details */}
-        <div className="min-w-0 flex-1 space-y-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-base font-semibold">{plan.name}</h3>
-            <Badge variant={active ? "success" : "neutral"}>{active ? "Active" : "Inactive"}</Badge>
-            {plan.popular && <Badge variant="warning">Recommended</Badge>}
-            <code className="text-[11px] text-muted-foreground">{plan.code}</code>
-          </div>
-
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-2xl font-semibold tabular-nums">{formatPrice(plan)}</span>
-            {plan.price > 0 && (
-              <span className="text-sm text-muted-foreground">/ {CYCLE_LABELS[plan.cycle]}</span>
-            )}
-            {plan.trialDays > 0 && (
-              <span className="ml-1 text-xs text-muted-foreground">· {plan.trialDays}-day free trial</span>
-            )}
-          </div>
-
-          {plan.description && (
-            <p className="text-sm text-muted-foreground">{plan.description}</p>
-          )}
-
-          {plan.features.length > 0 && (
-            <ul className="grid gap-1.5 sm:grid-cols-2">
-              {plan.features.map((f, i) => (
-                <li key={i} className="flex items-center gap-1.5 text-sm">
-                  <Check className="size-3.5 shrink-0 text-status-applied-foreground" aria-hidden />
-                  <span className="min-w-0 truncate">{f}</span>
-                </li>
-              ))}
-            </ul>
-          )}
+    <Card className={cn("overflow-hidden p-0", plan.popular && "ring-1 ring-primary/40")}>
+      {/* Header */}
+      <div className="flex flex-col gap-3 border-b border-border bg-muted/40 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="text-base font-semibold">{plan.name}</h3>
+          <Badge variant={active ? "success" : "neutral"}>{active ? "Active" : "Inactive"}</Badge>
+          {plan.isFree && <Badge variant="neutral">Default</Badge>}
+          {plan.popular && <Badge variant="warning">Recommended</Badge>}
+          <code className="text-[11px] text-muted-foreground">{plan.code}</code>
         </div>
+        <PriceBlock plan={plan} />
+      </div>
 
-        {/* Subscribers + actions */}
-        <div className="flex shrink-0 flex-col gap-4 md:w-52 md:border-l md:border-border md:pl-5">
-          <div className="flex items-center gap-2">
-            <Users className="size-4 text-muted-foreground" aria-hidden />
-            <span className="text-sm">
-              <span className="font-semibold tabular-nums">{plan.subscribers}</span>
-              <span className="text-muted-foreground"> subscriber{plan.subscribers === 1 ? "" : "s"}</span>
-            </span>
-          </div>
+      {/* Body */}
+      <div className="space-y-3 px-5 py-4">
+        {plan.description && <p className="text-sm text-muted-foreground">{plan.description}</p>}
+        {plan.features.length > 0 && (
+          <ul className="grid gap-1.5 sm:grid-cols-2">
+            {plan.features.map((f, i) => (
+              <li key={i} className="flex items-center gap-1.5 text-sm">
+                <Check className="size-3.5 shrink-0 text-status-applied-foreground" aria-hidden />
+                <span className="min-w-0 truncate">{f}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+          <Users className="size-4" aria-hidden />
+          <span className="font-semibold tabular-nums text-foreground">{plan.subscribers}</span>
+          subscriber{plan.subscribers === 1 ? "" : "s"}
+        </div>
+      </div>
 
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" onClick={onEdit}>
-              <Pencil /> Edit
-            </Button>
-            <Button variant="outline" size="sm" onClick={onToggle}>
-              {active ? "Deactivate" : "Activate"}
-            </Button>
-            <Button
-              variant={locked ? "outline" : "destructive"}
-              size="sm"
-              onClick={onDelete}
-              disabled={locked}
-              title={
-                locked
-                  ? `Can't delete — ${plan.everSubscribed} user${plan.everSubscribed === 1 ? " has" : "s have"} used this plan. Deactivate instead.`
-                  : "Delete plan"
-              }
-            >
-              <Trash2 /> Delete
-            </Button>
-          </div>
-
-          {locked && (
-            <p className="text-[11px] text-muted-foreground">
-              Used by {plan.everSubscribed} user{plan.everSubscribed === 1 ? "" : "s"} over time — delete is locked.
-            </p>
-          )}
+      {/* Footer */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-muted/20 px-5 py-3">
+        <span className="text-[11px] text-muted-foreground">
+          {plan.isFree
+            ? "Default plan — assigned on onboarding."
+            : usedLock
+              ? `Used by ${plan.everSubscribed} user${plan.everSubscribed === 1 ? "" : "s"} over time.`
+              : ""}
+        </span>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" onClick={onEdit}>
+            <Pencil /> Edit
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onToggle}
+            disabled={plan.isFree}
+            title={plan.isFree ? "The default (Free) plan stays active." : undefined}
+          >
+            {active ? "Deactivate" : "Activate"}
+          </Button>
+          <Button
+            variant={deleteDisabled ? "outline" : "destructive"}
+            size="sm"
+            onClick={onDelete}
+            disabled={deleteDisabled}
+            title={deleteTitle}
+          >
+            <Trash2 /> Delete
+          </Button>
         </div>
       </div>
     </Card>
