@@ -16,6 +16,7 @@ import {
   Settings,
   Sparkles,
   Clock,
+  Mail,
   ChevronDown,
   Shield,
   LogOut,
@@ -55,6 +56,7 @@ const GROUPS: Group[] = [
     label: "Configuration",
     items: [
       { href: "/jmp-admin/settings", label: "Settings", icon: Settings },
+      { label: "Email / SMTP", icon: Mail, soon: true },
       { label: "AI & prompts", icon: Sparkles, soon: true },
       { label: "Cron & schedule", icon: Clock, soon: true },
     ],
