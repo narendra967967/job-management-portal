@@ -3,7 +3,7 @@
 // Admin panel shell — grouped collapsible sidebar + top bar. Admin-only; does
 // NOT reuse any user-dashboard component so admin styling evolves independently.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -148,7 +148,13 @@ function ItemRow({ item, pathname }: { item: Item; pathname: string }) {
 }
 
 function NavGroup({ group, pathname }: { group: Group; pathname: string }) {
-  const [open, setOpen] = useState(true);
+  // Collapsed by default; the group holding the active page opens on load and
+  // whenever navigation moves the active page into it.
+  const hasActive = group.items.some((it) => isActive(pathname, it.href));
+  const [open, setOpen] = useState(hasActive);
+  useEffect(() => {
+    setOpen(hasActive);
+  }, [hasActive]);
   return (
     <div>
       <button
