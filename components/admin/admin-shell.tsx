@@ -5,7 +5,7 @@
 // All configuration + the admin's account live on one Settings page, reached from
 // the sidebar footer.
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -128,13 +128,9 @@ function ItemRow({ item, pathname }: { item: Item; pathname: string }) {
 }
 
 function NavGroup({ group, pathname }: { group: Group; pathname: string }) {
-  // Collapsed by default; the group holding the active page opens on load and
-  // whenever navigation moves the active page into it.
-  const hasActive = group.items.some((it) => isActive(pathname, it.href));
-  const [open, setOpen] = useState(hasActive);
-  useEffect(() => {
-    setOpen(hasActive);
-  }, [hasActive]);
+  // Static like the user dashboard: all groups open by default; the toggle still
+  // lets you collapse one manually.
+  const [open, setOpen] = useState(true);
   return (
     <div>
       <button
