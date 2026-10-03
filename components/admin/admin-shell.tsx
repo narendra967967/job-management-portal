@@ -14,15 +14,24 @@ import {
   ScrollText,
   Megaphone,
   Settings,
+  SlidersHorizontal,
   Sparkles,
   Clock,
   Mail,
+  Lock,
   ChevronDown,
   Shield,
   LogOut,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "@/components/admin/ui/dropdown-menu";
 
 interface Item {
   href?: string;
@@ -55,10 +64,11 @@ const GROUPS: Group[] = [
   {
     label: "Configuration",
     items: [
-      { href: "/jmp-admin/settings", label: "Settings", icon: Settings },
+      { label: "General", icon: SlidersHorizontal, soon: true },
       { label: "Email / SMTP", icon: Mail, soon: true },
       { label: "AI & prompts", icon: Sparkles, soon: true },
       { label: "Cron & schedule", icon: Clock, soon: true },
+      { label: "Security", icon: Lock, soon: true },
     ],
   },
 ];
@@ -66,7 +76,7 @@ const GROUPS: Group[] = [
 const TITLES: Record<string, string> = {
   "/jmp-admin/dashboard": "Dashboard",
   "/jmp-admin/users": "Users",
-  "/jmp-admin/settings": "Settings",
+  "/jmp-admin/settings": "Account",
 };
 
 function isActive(pathname: string, href?: string) {
@@ -161,22 +171,11 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             ))}
           </div>
         </div>
-        <button
-          type="button"
-          onClick={logout}
-          className="mt-4 flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-slate-800/60 hover:text-white"
-        >
-          <LogOut className="size-4" aria-hidden />
-          Log out
-        </button>
       </aside>
 
       {/* Mobile top bar + nav row */}
-      <div className="flex items-center justify-between gap-2 bg-slate-900 px-4 py-3 md:hidden">
+      <div className="flex items-center bg-slate-900 px-4 py-3 md:hidden">
         <Brand />
-        <button type="button" onClick={logout} aria-label="Log out" className="flex size-9 items-center justify-center rounded-lg text-slate-300 hover:bg-slate-800 hover:text-white">
-          <LogOut className="size-4" aria-hidden />
-        </button>
       </div>
       <div className="flex gap-1 overflow-x-auto bg-slate-900/95 px-3 pb-3 md:hidden">
         {mobileLinks.map((it) => {
@@ -195,10 +194,21 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex items-center gap-3 border-b bg-card px-4 py-3 md:px-6">
           <h1 className="text-base font-semibold md:text-lg">{title}</h1>
-          <span className="ml-auto flex items-center gap-2">
-            <span className="hidden text-sm text-muted-foreground sm:block">admin@jmp</span>
-            <span className="flex size-8 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">A</span>
-          </span>
+          <DropdownMenu>
+            <DropdownMenuTrigger className="ml-auto flex items-center gap-2 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <span className="hidden text-sm text-muted-foreground sm:block">admin@jmp</span>
+              <span className="flex size-8 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">A</span>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => router.push("/jmp-admin/settings")}>
+                <Settings /> Account settings
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem destructive onClick={logout}>
+                <LogOut /> Log out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </header>
         <main className="flex-1 p-4 md:p-6">{children}</main>
       </div>
