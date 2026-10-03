@@ -16,6 +16,7 @@ import {
 import { Button } from "@/components/admin/ui/button";
 import { Input } from "@/components/admin/ui/input";
 import { Label } from "@/components/admin/ui/label";
+import { PasswordField, isPasswordValid } from "@/components/admin/ui/password-field";
 import {
   PLAN_LABELS,
   ROLE_LABELS,
@@ -131,7 +132,7 @@ export function UserFormDialog({
     if (!name.trim()) return setError("Name is required.");
     if (!editing) {
       if (!/^\S+@\S+\.\S+$/.test(email.trim())) return setError("Enter a valid email address.");
-      if (password.length < 8) return setError("Password must be at least 8 characters.");
+      if (!isPasswordValid(password)) return setError("Password doesn't meet all the requirements below.");
     }
     onSave({
       name: name.trim(),
@@ -191,11 +192,10 @@ export function UserFormDialog({
 
           {!editing && (
             <Field label="Temporary password">
-              <Input
-                type="password"
+              <PasswordField
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="At least 8 characters"
+                onChange={setPassword}
+                placeholder="Create a strong password"
               />
             </Field>
           )}
