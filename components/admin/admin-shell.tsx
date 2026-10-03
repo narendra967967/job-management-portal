@@ -4,6 +4,7 @@
 // NOT reuse any user-dashboard component so admin styling evolves independently.
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -28,7 +29,6 @@ import {
   Receipt,
   Lock,
   ChevronDown,
-  Shield,
   LogOut,
   type LucideIcon,
 } from "lucide-react";
@@ -66,7 +66,7 @@ const GROUPS: Group[] = [
     // the marketing levers that drive it. All post-payment-integration (soon).
     label: "Sales & Revenue",
     items: [
-      { label: "Plans & Pricing", icon: Tag, soon: true },
+      { href: "/jmp-admin/plans", label: "Plans & Pricing", icon: Tag },
       { label: "Subscriptions", icon: Repeat, soon: true },
       { label: "Orders & Payments", icon: CreditCard, soon: true },
       { label: "Revenue", icon: TrendingUp, soon: true },
@@ -99,6 +99,7 @@ const GROUPS: Group[] = [
 const TITLES: Record<string, string> = {
   "/jmp-admin/dashboard": "Dashboard",
   "/jmp-admin/users": "Users",
+  "/jmp-admin/plans": "Plans & Pricing",
   "/jmp-admin/settings": "Account",
 };
 
@@ -110,9 +111,14 @@ function isActive(pathname: string, href?: string) {
 function Brand() {
   return (
     <div className="flex items-center gap-2">
-      <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-        <Shield className="size-4" aria-hidden />
-      </span>
+      <Image
+        src="/logo.png"
+        alt="JMP"
+        width={32}
+        height={32}
+        priority
+        className="size-8 shrink-0 rounded-full"
+      />
       <div className="leading-tight">
         <p className="text-sm font-semibold text-white">JMP Admin</p>
         <p className="text-[10px] text-slate-400">Control panel</p>

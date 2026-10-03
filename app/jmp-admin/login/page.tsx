@@ -4,8 +4,9 @@
 // just enters the panel; real credential auth is wired in the backend phase.
 
 import { useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Shield, Eye, EyeOff, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { Button } from "@/components/admin/ui/button";
 import { Input } from "@/components/admin/ui/input";
 import { Label } from "@/components/admin/ui/label";
@@ -28,9 +29,14 @@ export default function AdminLoginPage() {
     <div className="flex min-h-dvh items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4">
       <div className="w-full max-w-sm">
         <div className="mb-6 flex flex-col items-center gap-3 text-center">
-          <span className="flex size-12 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg">
-            <Shield className="size-6" aria-hidden />
-          </span>
+          <Image
+            src="/logo.png"
+            alt="JMP"
+            width={48}
+            height={48}
+            priority
+            className="size-12 rounded-full shadow-lg"
+          />
           <div>
             <h1 className="text-xl font-semibold text-white">JMP Admin</h1>
             <p className="text-sm text-slate-400">Sign in to the control panel</p>
