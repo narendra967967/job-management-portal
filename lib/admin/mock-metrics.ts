@@ -5,18 +5,6 @@
 import { MOCK_USERS, PLAN_LABELS, type AdminPlan } from "@/lib/admin/mock-users";
 import type { Point } from "@/components/admin/ui/charts";
 
-// Leads captured per week (last 8 weeks).
-export const LEADS_OVER_TIME: Point[] = [
-  { label: "Jul 27", value: 31 },
-  { label: "Aug 3", value: 44 },
-  { label: "Aug 10", value: 38 },
-  { label: "Aug 17", value: 59 },
-  { label: "Aug 24", value: 52 },
-  { label: "Aug 31", value: 71 },
-  { label: "Sep 7", value: 64 },
-  { label: "Sep 14", value: 83 },
-];
-
 // New users added per month (last 6 months).
 export const NEW_USERS_OVER_TIME: Point[] = [
   { label: "Apr", value: 1 },

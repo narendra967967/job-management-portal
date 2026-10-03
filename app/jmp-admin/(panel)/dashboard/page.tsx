@@ -1,6 +1,6 @@
 import {
   Users,
-  Briefcase,
+  UserCheck,
   FileText,
   Sparkles,
   TrendingUp,
@@ -20,7 +20,6 @@ import {
   VizStyle,
 } from "@/components/admin/ui/charts";
 import {
-  LEADS_OVER_TIME,
   NEW_USERS_OVER_TIME,
   AI_CALLS_OVER_TIME,
   PLAN_MIX,
@@ -29,6 +28,11 @@ import {
 
 // Admin dashboard home. Static mock data for now (UI-first); real numbers get
 // wired to the DB in the backend phase.
+//
+// Note: deliberately NO aggregate lead-volume analytics here (total leads across
+// users, leads-over-time). That's high-volume, per-user operational data — not
+// useful admin analytics — and the leads table is auto-pruned on a retention
+// schedule (see backend backlog). Admin metrics stay user/usage/system focused.
 
 const STATS: {
   label: string;
@@ -36,8 +40,8 @@ const STATS: {
   delta: string;
   icon: LucideIcon;
 }[] = [
-  { label: "Total users", value: "2", delta: "+1 this month", icon: Users },
-  { label: "Active leads", value: "548", delta: "across all users", icon: Briefcase },
+  { label: "Total users", value: "14", delta: "+6 this month", icon: Users },
+  { label: "Active users", value: "11", delta: "active this week", icon: UserCheck },
   { label: "Résumés stored", value: "3", delta: "in S3", icon: FileText },
   { label: "AI calls (30d)", value: "126", delta: "+18% vs. prev.", icon: Sparkles },
 ];
@@ -45,7 +49,7 @@ const STATS: {
 const ACTIVITY: { who: string; what: string; when: string }[] = [
   { who: "narendra", what: "connected Gmail (read-only)", when: "2h ago" },
   { who: "kunal", what: "signed in for the first time", when: "5h ago" },
-  { who: "system", what: "Gmail sync captured 4 new leads", when: "1d ago" },
+  { who: "system", what: "completed a Gmail sync", when: "1d ago" },
   { who: "narendra", what: "uploaded a résumé", when: "2d ago" },
 ];
 
@@ -76,15 +80,15 @@ export default function AdminDashboardPage() {
         })}
       </div>
 
-      {/* Leads over time + plan mix */}
+      {/* User growth + plan mix */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle>Leads captured</CardTitle>
-            <CardDescription>Per week, across all users · last 8 weeks</CardDescription>
+            <CardTitle>New users</CardTitle>
+            <CardDescription>Added per month · last 6 months</CardDescription>
           </CardHeader>
           <CardContent>
-            <AreaChart data={LEADS_OVER_TIME} unit="leads" />
+            <BarChart data={NEW_USERS_OVER_TIME} unit="users" />
           </CardContent>
         </Card>
 
@@ -99,18 +103,8 @@ export default function AdminDashboardPage() {
         </Card>
       </div>
 
-      {/* New users + AI calls + status mix */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardTitle>New users</CardTitle>
-            <CardDescription>Added per month · last 6 months</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <BarChart data={NEW_USERS_OVER_TIME} unit="users" />
-          </CardContent>
-        </Card>
-
+      {/* AI usage + status mix */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>AI calls</CardTitle>
