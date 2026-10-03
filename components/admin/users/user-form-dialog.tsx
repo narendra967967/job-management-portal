@@ -39,6 +39,21 @@ export interface UserFormValues {
 const selectCls =
   "h-9 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
 
+// Mask an Indian mobile number to "+91 ##### #####" as the user types. Strips a
+// leading 91 country code only when it's clearly a prefix (total > 10 digits), so
+// national numbers that happen to start with 91 aren't mangled. Returns "" when
+// there are no digits yet, so the placeholder still shows.
+function formatMobile(raw: string): string {
+  let digits = raw.replace(/\D/g, "");
+  if (digits.startsWith("00")) digits = digits.slice(2); // intl exit code (00 → +)
+  if (digits.length > 10 && digits.startsWith("91")) digits = digits.slice(2); // +91 country code
+  digits = digits.slice(0, 10);
+  if (!digits) return "";
+  const p1 = digits.slice(0, 5);
+  const p2 = digits.slice(5, 10);
+  return p2 ? `+91 ${p1} ${p2}` : `+91 ${p1}`;
+}
+
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
     <label className="block space-y-1.5">
@@ -76,7 +91,7 @@ export function UserFormDialog({
     if (!open) return;
     setName(user?.name ?? "");
     setEmail(user?.email ?? "");
-    setMobile(user?.mobile ?? "");
+    setMobile(formatMobile(user?.mobile ?? ""));
     setRole(user?.role ?? "user");
     setStatus(user?.status ?? "active");
     setPlan(user?.plan ?? "free");
@@ -122,7 +137,13 @@ export function UserFormDialog({
               <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Full name" />
             </Field>
             <Field label="Mobile">
-              <Input value={mobile} onChange={(e) => setMobile(e.target.value)} placeholder="+91 …" />
+              <Input
+                type="tel"
+                inputMode="tel"
+                value={mobile}
+                onChange={(e) => setMobile(formatMobile(e.target.value))}
+                placeholder="+91 ##### #####"
+              />
             </Field>
           </div>
 
