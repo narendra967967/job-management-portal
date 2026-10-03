@@ -3,7 +3,6 @@ import {
   UserCheck,
   FileText,
   Sparkles,
-  TrendingUp,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -11,7 +10,6 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
-  CardDescription,
 } from "@/components/admin/ui/card";
 import {
   AreaChart,
@@ -85,7 +83,6 @@ export default function AdminDashboardPage() {
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle>New users</CardTitle>
-            <CardDescription>Added per month · last 6 months</CardDescription>
           </CardHeader>
           <CardContent>
             <BarChart data={NEW_USERS_OVER_TIME} unit="users" />
@@ -95,7 +92,6 @@ export default function AdminDashboardPage() {
         <Card>
           <CardHeader>
             <CardTitle>Plan distribution</CardTitle>
-            <CardDescription>Users by subscription plan</CardDescription>
           </CardHeader>
           <CardContent>
             <DonutChart data={PLAN_MIX} centerLabel="Users" />
@@ -108,7 +104,6 @@ export default function AdminDashboardPage() {
         <Card>
           <CardHeader>
             <CardTitle>AI calls</CardTitle>
-            <CardDescription>Per week · last 8 weeks</CardDescription>
           </CardHeader>
           <CardContent>
             <AreaChart data={AI_CALLS_OVER_TIME} unit="calls" />
@@ -118,7 +113,6 @@ export default function AdminDashboardPage() {
         <Card>
           <CardHeader>
             <CardTitle>Users by status</CardTitle>
-            <CardDescription>Active vs. inactive</CardDescription>
           </CardHeader>
           <CardContent>
             <DonutChart data={STATUS_MIX} centerLabel="Users" />
@@ -131,7 +125,6 @@ export default function AdminDashboardPage() {
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle>Recent activity</CardTitle>
-            <CardDescription>Latest actions across the workspace</CardDescription>
           </CardHeader>
           <CardContent className="space-y-0">
             <ul className="divide-y divide-border">
@@ -157,17 +150,12 @@ export default function AdminDashboardPage() {
         <Card>
           <CardHeader>
             <CardTitle>System</CardTitle>
-            <CardDescription>Environment snapshot</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
             <Row label="Environment" value="Preprod" />
             <Row label="App version" value="v0.1.0" />
             <Row label="Database" value="Connected" ok />
             <Row label="Gmail sync" value="Every 15 min" />
-            <div className="flex items-center gap-1.5 pt-1 text-xs text-muted-foreground">
-              <TrendingUp className="size-3.5" aria-hidden />
-              Placeholder data — wired to real metrics later.
-            </div>
           </CardContent>
         </Card>
       </div>

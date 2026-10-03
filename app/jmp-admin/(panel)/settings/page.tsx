@@ -76,12 +76,7 @@ export default function AdminSettingsPage() {
 
   return (
     <div className="mx-auto max-w-5xl">
-      <p className="text-sm text-muted-foreground">
-        Your admin profile, preferences, and password — these apply to the{" "}
-        <span className="font-medium text-foreground">admin dashboard</span> only.
-      </p>
-
-      <div className="mt-5 lg:flex lg:gap-6">
+      <div className="lg:flex lg:gap-6">
         {/* Mobile / tablet: horizontal strip */}
         <nav
           aria-label="Settings sections"
@@ -159,7 +154,6 @@ function ProfileCard() {
   return (
     <section className="rounded-2xl border bg-card p-4 md:p-5">
       <h2 className="text-sm font-medium">Profile</h2>
-      <p className="mt-0.5 text-xs text-muted-foreground">Your admin account details.</p>
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <Field label="Name">
           <Input value={name} onChange={(e) => setName(e.target.value)} />
@@ -181,9 +175,6 @@ function PreferencesCard() {
   return (
     <section className="rounded-2xl border bg-card p-4 md:p-5">
       <h2 className="text-sm font-medium">Preferences</h2>
-      <p className="mt-0.5 text-xs text-muted-foreground">
-        How the admin dashboard looks and behaves for you.
-      </p>
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <Field label="Theme">
           <select className={selectCls} value={theme} onChange={(e) => setTheme(e.target.value)}>
@@ -215,9 +206,6 @@ function AiCard() {
   return (
     <section className="rounded-2xl border bg-card p-4 md:p-5">
       <h2 className="text-sm font-medium">AI integration</h2>
-      <p className="mt-0.5 text-xs text-muted-foreground">
-        AI provider used by admin tools (separate from the user app&apos;s AI settings).
-      </p>
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <Field label="Provider">
           <select className={selectCls} value={provider} onChange={(e) => setProvider(e.target.value)}>
@@ -241,13 +229,6 @@ function AiCard() {
             className="font-mono"
           />
         </Field>
-      </div>
-      <div className="mt-3 flex items-start gap-2 rounded-lg border border-ai/30 bg-ai-muted/40 p-3">
-        <ShieldCheck className="mt-0.5 size-4 shrink-0 text-ai" aria-hidden />
-        <p className="text-xs text-ai">
-          Stored encrypted and used only server-side once the backend is wired. Your key is never
-          sent to the browser or exposed in client code.
-        </p>
       </div>
       <SaveRow label="Save key" />
     </section>
@@ -282,7 +263,6 @@ function AccountCard() {
   return (
     <section className="rounded-2xl border bg-card p-4 md:p-5">
       <h2 className="text-sm font-medium">Account</h2>
-      <p className="mt-0.5 text-xs text-muted-foreground">Change your password or sign out.</p>
 
       <div className="mt-4 space-y-3">
         <Field label="Current password">

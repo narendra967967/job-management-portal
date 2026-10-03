@@ -10,7 +10,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
   DialogFooter,
 } from "@/components/admin/ui/dialog";
 import { Button } from "@/components/admin/ui/button";
@@ -152,11 +151,6 @@ export function UserFormDialog({
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{editing ? "Edit user" : "Add user"}</DialogTitle>
-          <DialogDescription>
-            {editing
-              ? "Update this user's details. Email can't be changed."
-              : "Create an admin-provisioned account with all its details."}
-          </DialogDescription>
         </DialogHeader>
 
         <div className="max-h-[65vh] space-y-4 overflow-y-auto pr-1">

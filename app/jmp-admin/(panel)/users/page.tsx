@@ -368,7 +368,7 @@ export default function AdminUsersPage() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Reset password</DialogTitle>
-            <DialogDescription>Set a new temporary password for {resetTarget?.name}. They should change it after signing in.</DialogDescription>
+            <DialogDescription>For {resetTarget?.name}</DialogDescription>
           </DialogHeader>
           <div className="space-y-1.5">
             <Label>New password</Label>
