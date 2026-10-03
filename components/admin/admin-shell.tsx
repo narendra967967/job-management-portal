@@ -9,7 +9,6 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   Users,
-  Briefcase,
   BookOpen,
   Inbox,
   ScrollText,
@@ -41,7 +40,6 @@ const GROUPS: Group[] = [
     label: "People & Content",
     items: [
       { href: "/jmp-admin/users", label: "Users", icon: Users },
-      { label: "Leads", icon: Briefcase, soon: true },
       { label: "Knowledge base", icon: BookOpen, soon: true },
     ],
   },
