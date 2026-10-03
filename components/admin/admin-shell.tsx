@@ -5,7 +5,7 @@
 // All configuration + the admin's account live on one Settings page, reached from
 // the sidebar footer.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -127,15 +127,22 @@ function ItemRow({ item, pathname }: { item: Item; pathname: string }) {
   );
 }
 
-function NavGroup({ group, pathname }: { group: Group; pathname: string }) {
-  // Static like the user dashboard: all groups open by default; the toggle still
-  // lets you collapse one manually.
-  const [open, setOpen] = useState(true);
+function NavGroup({
+  group,
+  pathname,
+  open,
+  onToggle,
+}: {
+  group: Group;
+  pathname: string;
+  open: boolean;
+  onToggle: () => void;
+}) {
   return (
     <div>
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={onToggle}
         aria-expanded={open}
         className="flex w-full items-center justify-between rounded-lg px-3 py-1.5 text-[10px] font-semibold tracking-wide text-slate-500 uppercase transition-colors hover:text-slate-300"
       >
@@ -192,6 +199,14 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const title = TITLES[pathname] ?? "Admin";
+
+  // Accordion: one group open at a time. The group holding the active page opens
+  // on load and whenever navigation moves into it; opening another closes the rest.
+  const activeGroup = GROUPS.find((g) => g.items.some((it) => isActive(pathname, it.href)))?.label ?? null;
+  const [openGroup, setOpenGroup] = useState<string | null>(activeGroup);
+  useEffect(() => {
+    setOpenGroup(activeGroup);
+  }, [activeGroup]);
   const mobileLinks: Item[] = [
     ...GROUPS.flatMap((g) => g.items).filter((i) => i.href && !i.soon),
     { href: SETTINGS_HREF, label: "Settings", icon: Settings },
@@ -210,7 +225,13 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           <Brand />
           <div className="flex flex-col gap-3">
             {GROUPS.map((g) => (
-              <NavGroup key={g.label} group={g} pathname={pathname} />
+              <NavGroup
+                key={g.label}
+                group={g}
+                pathname={pathname}
+                open={openGroup === g.label}
+                onToggle={() => setOpenGroup((cur) => (cur === g.label ? null : g.label))}
+              />
             ))}
           </div>
         </div>
