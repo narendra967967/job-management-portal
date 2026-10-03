@@ -4,7 +4,7 @@
 // once the account exists. UI-first: onSave receives the values; persistence and
 // the payment/subscription flow are wired later.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -39,19 +39,35 @@ export interface UserFormValues {
 const selectCls =
   "h-9 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
 
-// Mask an Indian mobile number to "+91 ##### #####" as the user types. Strips a
-// leading 91 country code only when it's clearly a prefix (total > 10 digits), so
-// national numbers that happen to start with 91 aren't mangled. Returns "" when
-// there are no digits yet, so the placeholder still shows.
-function formatMobile(raw: string): string {
-  let digits = raw.replace(/\D/g, "");
-  if (digits.startsWith("00")) digits = digits.slice(2); // intl exit code (00 → +)
-  if (digits.length > 10 && digits.startsWith("91")) digits = digits.slice(2); // +91 country code
-  digits = digits.slice(0, 10);
-  if (!digits) return "";
-  const p1 = digits.slice(0, 5);
-  const p2 = digits.slice(5, 10);
-  return p2 ? `+91 ${p1} ${p2}` : `+91 ${p1}`;
+// Indian mobile masking. The "+91" prefix is a fixed, non-editable adornment (see
+// the Mobile field) and the input state holds ONLY the national number. The +91 is
+// never stored in state — it's added back only at save time — so backspacing works
+// to empty and the prefix "91" can never be re-absorbed into the number.
+
+// Keep only the national (10-digit) digits. Strips a leading 00 exit code and a +91
+// country code when clearly a prefix (total > 10 digits), so a national number that
+// itself starts with 91 isn't mangled (this only triggers when a full, prefixed
+// number is pasted into the national field).
+function nationalDigits(raw: string): string {
+  let d = raw.replace(/\D/g, "");
+  if (d.startsWith("00")) d = d.slice(2);
+  if (d.length > 10 && d.startsWith("91")) d = d.slice(2);
+  return d.slice(0, 10);
+}
+
+// Group the national number as "##### #####".
+function groupNational(raw: string): string {
+  const d = nationalDigits(raw);
+  const a = d.slice(0, 5);
+  const b = d.slice(5, 10);
+  return b ? `${a} ${b}` : a;
+}
+
+// Compose the full value to store from the national number in state ("+91 ##### #####"),
+// or "" when empty so the field stays optional.
+function storedMobile(national: string): string {
+  const grouped = groupNational(national);
+  return grouped ? `+91 ${grouped}` : "";
 }
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
@@ -86,12 +102,23 @@ export function UserFormDialog({
   const [plan, setPlan] = useState<AdminPlan>("free");
   const [expiresAt, setExpiresAt] = useState("");
   const [error, setError] = useState("");
+  const mobileRef = useRef<HTMLInputElement>(null);
+
+  // The mask reformats on every keystroke, which resets the caret; keep it at the
+  // end while editing so typing and backspacing-from-the-end stay in sync.
+  useEffect(() => {
+    const el = mobileRef.current;
+    if (el && document.activeElement === el) {
+      const len = el.value.length;
+      el.setSelectionRange(len, len);
+    }
+  }, [mobile]);
 
   useEffect(() => {
     if (!open) return;
     setName(user?.name ?? "");
     setEmail(user?.email ?? "");
-    setMobile(formatMobile(user?.mobile ?? ""));
+    setMobile(groupNational(user?.mobile ?? ""));
     setRole(user?.role ?? "user");
     setStatus(user?.status ?? "active");
     setPlan(user?.plan ?? "free");
@@ -110,7 +137,7 @@ export function UserFormDialog({
       name: name.trim(),
       email: email.trim(),
       password: password || undefined,
-      mobile: mobile.trim(),
+      mobile: storedMobile(mobile),
       role,
       status,
       plan,
@@ -137,13 +164,18 @@ export function UserFormDialog({
               <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Full name" />
             </Field>
             <Field label="Mobile">
-              <Input
-                type="tel"
-                inputMode="tel"
-                value={mobile}
-                onChange={(e) => setMobile(formatMobile(e.target.value))}
-                placeholder="+91 ##### #####"
-              />
+              <div className="flex h-8 w-full min-w-0 items-center rounded-lg border border-input bg-transparent px-2.5 text-base transition-colors focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50 md:text-sm dark:bg-input/30">
+                <span className="mr-1.5 shrink-0 select-none text-muted-foreground">+91</span>
+                <input
+                  ref={mobileRef}
+                  type="tel"
+                  inputMode="numeric"
+                  value={mobile}
+                  onChange={(e) => setMobile(groupNational(e.target.value))}
+                  placeholder="----- -----"
+                  className="h-full w-full min-w-0 bg-transparent outline-none placeholder:text-muted-foreground"
+                />
+              </div>
             </Field>
           </div>
 
