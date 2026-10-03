@@ -10,14 +10,22 @@ import {
   LayoutDashboard,
   Users,
   BookOpen,
+  Tag,
+  Repeat,
+  CreditCard,
+  TrendingUp,
+  Ticket,
+  Megaphone,
+  Gift,
   Inbox,
   ScrollText,
-  Megaphone,
   Settings,
   SlidersHorizontal,
   Sparkles,
   Clock,
   Mail,
+  Wallet,
+  Receipt,
   Lock,
   ChevronDown,
   Shield,
@@ -54,11 +62,24 @@ const GROUPS: Group[] = [
     ],
   },
   {
+    // One parent for everything money-related: selling, orders, revenue, and
+    // the marketing levers that drive it. All post-payment-integration (soon).
+    label: "Sales & Revenue",
+    items: [
+      { label: "Plans & Pricing", icon: Tag, soon: true },
+      { label: "Subscriptions", icon: Repeat, soon: true },
+      { label: "Orders & Payments", icon: CreditCard, soon: true },
+      { label: "Revenue", icon: TrendingUp, soon: true },
+      { label: "Coupons & Discounts", icon: Ticket, soon: true },
+      { label: "Campaigns", icon: Megaphone, soon: true },
+      { label: "Referrals", icon: Gift, soon: true },
+    ],
+  },
+  {
     label: "Operations",
     items: [
       { label: "Gmail health", icon: Inbox, soon: true },
       { label: "Activity log", icon: ScrollText, soon: true },
-      { label: "Announcements", icon: Megaphone, soon: true },
     ],
   },
   {
@@ -66,6 +87,8 @@ const GROUPS: Group[] = [
     items: [
       { label: "General", icon: SlidersHorizontal, soon: true },
       { label: "Email / SMTP", icon: Mail, soon: true },
+      { label: "Payments", icon: Wallet, soon: true },
+      { label: "Taxes & GST", icon: Receipt, soon: true },
       { label: "AI & prompts", icon: Sparkles, soon: true },
       { label: "Cron & schedule", icon: Clock, soon: true },
       { label: "Security", icon: Lock, soon: true },
