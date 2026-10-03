@@ -196,7 +196,12 @@ export function PlanFormDialog({
           <Section title="Basics">
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="Name" required>
-                <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Pro" />
+                {/* Letters, digits and spaces only. */}
+                <Input
+                  value={name}
+                  onChange={(e) => setName(e.target.value.replace(/[^a-zA-Z0-9 ]/g, ""))}
+                  placeholder="e.g. Pro"
+                />
               </Field>
               <Field label="Code" hint="(auto)">
                 <Input value={code} disabled placeholder="auto-generated" className="font-mono" />
