@@ -27,6 +27,31 @@ export function isPasswordValid(pw: string): boolean {
   return PASSWORD_RULES.every((r) => r.test(pw));
 }
 
+// Generate a random password that satisfies every rule above. Ambiguous glyphs
+// (l/1/I, O/0) are left out so the temporary password is easy to read and relay.
+export function generatePassword(length = 14): string {
+  const lower = "abcdefghijkmnpqrstuvwxyz";
+  const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  const digit = "23456789";
+  const special = "!@#$%^&*?-_";
+  const all = lower + upper + digit + special;
+  const randInt = (max: number) => {
+    const a = new Uint32Array(1);
+    crypto.getRandomValues(a);
+    return a[0] % max;
+  };
+  const pick = (set: string) => set[randInt(set.length)];
+  // Guarantee one of each required class, then fill the rest from the full set.
+  const chars = [pick(lower), pick(upper), pick(digit), pick(special)];
+  while (chars.length < Math.max(length, 8)) chars.push(pick(all));
+  // Fisher–Yates shuffle so the guaranteed chars aren't always in front.
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = randInt(i + 1);
+    [chars[i], chars[j]] = [chars[j], chars[i]];
+  }
+  return chars.join("");
+}
+
 // Success (green) comes from the app's status-applied token so it swaps in dark mode.
 const OK = "var(--status-applied-foreground)";
 
@@ -34,17 +59,19 @@ export function PasswordField({
   value,
   onChange,
   placeholder,
+  className,
 }: {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  className?: string;
 }) {
   const [show, setShow] = useState(false);
   const touched = value.length > 0;
   const valid = isPasswordValid(value);
 
   return (
-    <div>
+    <div className={className}>
       <div
         className={cn(
           "flex h-8 w-full min-w-0 items-center rounded-lg border bg-transparent px-2.5 text-base transition-colors focus-within:ring-3 md:text-sm dark:bg-input/30",

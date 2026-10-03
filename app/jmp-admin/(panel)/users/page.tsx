@@ -40,6 +40,7 @@ import {
   DialogFooter,
 } from "@/components/admin/ui/dialog";
 import { ConfirmDialog } from "@/components/admin/ui/confirm-dialog";
+import { PasswordField, isPasswordValid, generatePassword } from "@/components/admin/ui/password-field";
 import { UserFormDialog, type UserFormValues } from "@/components/admin/users/user-form-dialog";
 import { MOCK_USERS, PLAN_LABELS, type AdminUser } from "@/lib/admin/mock-users";
 import { cn } from "@/lib/utils";
@@ -369,16 +370,21 @@ export default function AdminUsersPage() {
             <DialogTitle>Reset password</DialogTitle>
             <DialogDescription>Set a new temporary password for {resetTarget?.name}. They should change it after signing in.</DialogDescription>
           </DialogHeader>
-          <label className="block space-y-1.5">
+          <div className="space-y-1.5">
             <Label>New password</Label>
-            <div className="flex gap-2">
-              <Input type="text" value={resetPw} onChange={(e) => setResetPw(e.target.value)} placeholder="At least 8 characters" />
-              <Button variant="outline" onClick={() => setResetPw(Math.random().toString(36).slice(2, 10) + "A1")}>Generate</Button>
+            <div className="flex items-start gap-2">
+              <PasswordField
+                className="flex-1 min-w-0"
+                value={resetPw}
+                onChange={setResetPw}
+                placeholder="Create a strong password"
+              />
+              <Button variant="outline" className="shrink-0" onClick={() => setResetPw(generatePassword())}>Generate</Button>
             </div>
-          </label>
+          </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setResetTarget(null)}>Cancel</Button>
-            <Button disabled={resetPw.length < 8} onClick={() => { say(`Password reset for ${resetTarget?.name}.`); setResetTarget(null); }}>Set password</Button>
+            <Button disabled={!isPasswordValid(resetPw)} onClick={() => { say(`Password reset for ${resetTarget?.name}.`); setResetTarget(null); }}>Set password</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
