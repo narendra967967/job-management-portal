@@ -23,6 +23,43 @@ export async function getCurrentUserId(): Promise<string> {
   return id;
 }
 
+export interface SessionUser {
+  id: string;
+  name: string;
+  email: string;
+  mobile: string | null;
+  role: string;
+  status: string;
+  planExpiresAt: Date | null;
+}
+
+/** The full signed-in user (user-app session), or null. No redirect. */
+export async function getSessionUser(): Promise<SessionUser | null> {
+  const s = await auth.api.getSession({ headers: await headers() });
+  const u = s?.user as
+    | { id?: string; name?: string; email?: string; mobile?: string | null; role?: string; status?: string; planExpiresAt?: string | Date | null }
+    | undefined;
+  if (!u?.id) return null;
+  return {
+    id: u.id,
+    name: u.name ?? "",
+    email: u.email ?? "",
+    mobile: u.mobile ?? null,
+    role: u.role ?? "user",
+    status: u.status ?? "active",
+    planExpiresAt: u.planExpiresAt ? new Date(u.planExpiresAt) : null,
+  };
+}
+
+export type AccessState = "ok" | "deactivated" | "expired";
+
+/** Whether a user may use the dashboard, or is deactivated / past their plan expiry. */
+export function accessState(u: { status: string; planExpiresAt: Date | null }): AccessState {
+  if (u.status === "inactive") return "deactivated";
+  if (u.planExpiresAt && u.planExpiresAt.getTime() < Date.now()) return "expired";
+  return "ok";
+}
+
 /** The signed-in admin's id, redirecting to the admin login when the session is
  *  missing or the account isn't an admin. Use in admin loaders + Server Actions. */
 export async function requireAdmin(): Promise<string> {

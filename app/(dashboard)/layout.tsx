@@ -17,7 +17,8 @@ import {
   HeaderAddLeadButton,
   AddLeadFab,
 } from "@/components/leads/add-lead-dialog";
-import { getCurrentUserId } from "@/lib/current-user";
+import { redirect } from "next/navigation";
+import { getSessionUser, accessState } from "@/lib/current-user";
 import { loadWorkspace } from "@/lib/queries";
 import { WorkspaceProvider } from "@/lib/workspace-provider";
 
@@ -26,7 +27,14 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const workspace = await loadWorkspace(await getCurrentUserId());
+  // Gate on the admin-managed account state: deactivated / expired users can sign
+  // in but don't reach the dashboard.
+  const u = await getSessionUser();
+  if (!u) redirect("/");
+  const state = accessState(u);
+  if (state === "deactivated") redirect("/deactivated");
+  if (state === "expired") redirect("/renew");
+  const workspace = await loadWorkspace(u.id);
   return (
     // App shell: full-height flex. On mobile the header + bottom nav are
     // fixed-height flex children and only <main> scrolls, so the bottom nav is
