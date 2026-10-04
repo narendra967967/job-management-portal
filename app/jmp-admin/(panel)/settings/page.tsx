@@ -856,8 +856,6 @@ function SecurityCard() {
   const [reqSpecial, setReqSpecial] = useState(policy.requireSpecial);
   const [sessionLength, setSessionLength] = useState("7");
   const [sessionUnit, setSessionUnit] = useState("days");
-  const [allowList, setAllowList] = useState("");
-  const [twoFactor, setTwoFactor] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
 
@@ -866,12 +864,6 @@ function SecurityCard() {
     if (!Number.isFinite(n) || n < 6) return setError("Minimum password length must be at least 6.");
     const s = Number(sessionLength);
     if (!Number.isFinite(s) || s < 1) return setError("Enter a valid session length.");
-    const bad = allowList
-      .split("\n")
-      .map((l) => l.trim())
-      .filter(Boolean)
-      .filter((l) => !EMAIL_RE.test(l));
-    if (bad.length) return setError(`Not a valid email in the allow-list: ${bad[0]}`);
     // Sync the shared policy so every PasswordField (add user, reset, change
     // password) updates its live checks immediately.
     setPasswordPolicy({
@@ -911,14 +903,6 @@ function SecurityCard() {
           </select>
         </div>
       </Field>
-
-      <SubHead>Access</SubHead>
-      <Field label="Sign-in allow-list" hint="One email per line · only these can sign in (blank = no restriction)">
-        <textarea className={textareaCls} value={allowList} onChange={(e) => setAllowList(e.target.value)} placeholder={"admin@example.com\nteam@example.com"} />
-      </Field>
-      <div className="mt-3">
-        <Toggle checked={twoFactor} onChange={setTwoFactor} label="Require two-factor authentication" hint="Applies to all users at next sign-in" />
-      </div>
 
       <SaveActions error={error} saved={saved} onSave={save} />
     </section>
