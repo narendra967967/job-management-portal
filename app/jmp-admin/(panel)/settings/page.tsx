@@ -36,12 +36,12 @@ interface SettingsSection {
 const SECTION = {
   profile: { id: "profile", label: "Profile", icon: User, render: () => <ProfileCard /> },
   password: { id: "password", label: "Password", icon: Lock, render: () => <PasswordCard /> },
-  general: { id: "general", label: "General", icon: Cog, render: () => <PlaceholderCard title="General" /> },
-  billing: { id: "billing", label: "Billing", icon: CreditCard, render: () => <PlaceholderCard title="Billing" /> },
+  general: { id: "general", label: "General", icon: Cog, render: () => <GeneralCard /> },
+  billing: { id: "billing", label: "Billing", icon: CreditCard, render: () => <BillingCard /> },
   email: { id: "email", label: "Email / SMTP", icon: Mail, render: () => <EmailCard /> },
   ai: { id: "ai", label: "AI", icon: Sparkles, render: () => <AiCard /> },
-  cron: { id: "cron", label: "Cron & schedule", icon: Clock, render: () => <PlaceholderCard title="Cron & schedule" /> },
-  security: { id: "security", label: "Security", icon: ShieldCheck, render: () => <PlaceholderCard title="Security" /> },
+  cron: { id: "cron", label: "Cron & schedule", icon: Clock, render: () => <CronCard /> },
+  security: { id: "security", label: "Security", icon: ShieldCheck, render: () => <SecurityCard /> },
 } satisfies Record<string, SettingsSection>;
 
 const GROUPS: { label: string; items: SettingsSection[] }[] = [
@@ -134,16 +134,62 @@ function SaveRow({ onSave, label = "Save changes" }: { onSave?: () => void; labe
 
 const selectCls =
   "h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
+const textareaCls =
+  "min-h-20 w-full rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
 
-function PlaceholderCard({ title }: { title: string }) {
+// Checkbox + label (+ optional hint) row.
+function Toggle({
+  checked,
+  onChange,
+  label,
+  hint,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label: string;
+  hint?: string;
+}) {
   return (
-    <section className="rounded-2xl border bg-card p-4 md:p-5">
-      <div className="flex items-center gap-2">
-        <h2 className="text-sm font-medium">{title}</h2>
-        <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">soon</span>
+    <label className="flex cursor-pointer items-start gap-2 text-sm">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="mt-0.5 size-4 cursor-pointer rounded border-input accent-primary"
+      />
+      <span>
+        {label}
+        {hint && <span className="block text-[11px] text-muted-foreground">{hint}</span>}
+      </span>
+    </label>
+  );
+}
+
+// Section subtitle used to group fields within a card.
+function SubHead({ children }: { children: React.ReactNode }) {
+  return <h3 className="mt-5 mb-3 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">{children}</h3>;
+}
+
+// Error line + Save button + "Saved" flash. Each card owns its error/saved state.
+function SaveActions({
+  error,
+  saved,
+  onSave,
+  label = "Save changes",
+}: {
+  error: string;
+  saved: boolean;
+  onSave: () => void;
+  label?: string;
+}) {
+  return (
+    <>
+      {error && <p className="mt-3 text-xs text-destructive">{error}</p>}
+      <div className="mt-4 flex items-center gap-3">
+        <Button onClick={onSave}>{label}</Button>
+        {saved && <span className="text-xs text-status-applied-foreground">Saved</span>}
       </div>
-      <p className="mt-8 mb-4 text-center text-xs text-muted-foreground">Coming soon.</p>
-    </section>
+    </>
   );
 }
 
@@ -400,35 +446,396 @@ function AiCard() {
   const [provider, setProvider] = useState("openai");
   const [model, setModel] = useState("");
   const [key, setKey] = useState("");
+  const [summary, setSummary] = useState("");
+  const [draft, setDraft] = useState("");
+  const [score, setScore] = useState("");
+  const [error, setError] = useState("");
+  const [saved, setSaved] = useState(false);
+
+  function save() {
+    if (key.trim() && key.trim().length < 8) return setError("Enter a valid API key.");
+    setError("");
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1800);
+  }
+
   return (
     <section className="rounded-2xl border bg-card p-4 md:p-5">
       <h2 className="text-sm font-medium">AI</h2>
+
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <Field label="Provider">
+        <Field label="Provider" hint="Which service runs AI features">
           <select className={selectCls} value={provider} onChange={(e) => setProvider(e.target.value)}>
             <option value="openai">OpenAI</option>
             <option value="anthropic">Claude (Anthropic)</option>
             <option value="openrouter">OpenRouter</option>
           </select>
         </Field>
-        <Field label="Model">
+        <Field label="Model" hint="Leave blank to use the provider default">
           <Input value={model} onChange={(e) => setModel(e.target.value)} placeholder="e.g. gpt-4o-mini" />
         </Field>
       </div>
       <div className="mt-3">
-        <Field label="API key">
+        <Field label="API key" hint="Stored encrypted · used only server-side">
           <Input type="password" value={key} onChange={(e) => setKey(e.target.value)} placeholder="sk-…" autoComplete="off" className="font-mono" />
         </Field>
       </div>
-      <SaveRow label="Save key" />
 
-      <div className="mt-5 border-t pt-4">
-        <div className="flex items-center gap-2">
-          <h3 className="text-sm font-medium">Default user prompts</h3>
-          <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">soon</span>
-        </div>
-        <p className="mt-6 mb-2 text-center text-xs text-muted-foreground">Coming soon.</p>
+      <SubHead>Default user prompts</SubHead>
+      <div className="space-y-3">
+        <Field label="Summarize job description" hint="Fallback users can override in their own settings">
+          <textarea className={textareaCls} value={summary} onChange={(e) => setSummary(e.target.value)} placeholder="Instructions for summarizing a job description…" />
+        </Field>
+        <Field label="Draft outreach" hint="Fallback users can override">
+          <textarea className={textareaCls} value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Instructions for drafting outreach…" />
+        </Field>
+        <Field label="Fit score" hint="Fallback users can override">
+          <textarea className={textareaCls} value={score} onChange={(e) => setScore(e.target.value)} placeholder="Instructions for scoring résumé/job fit…" />
+        </Field>
       </div>
+
+      <SaveActions error={error} saved={saved} onSave={save} />
+    </section>
+  );
+}
+
+/* ---------------- Application: General ---------------- */
+
+const TIMEZONES = ["Asia/Kolkata", "UTC", "America/New_York", "America/Los_Angeles", "Europe/London", "Asia/Dubai", "Asia/Singapore"];
+
+function GeneralCard() {
+  const [appName, setAppName] = useState("Job Management Portal");
+  const [supportEmail, setSupportEmail] = useState("");
+  const [timezone, setTimezone] = useState("Asia/Kolkata");
+  const [allowSignup, setAllowSignup] = useState(false);
+  const [maintenance, setMaintenance] = useState(false);
+  const [error, setError] = useState("");
+  const [saved, setSaved] = useState(false);
+
+  function save() {
+    if (!appName.trim()) return setError("App name is required.");
+    if (supportEmail.trim() && !EMAIL_RE.test(supportEmail.trim())) return setError("Enter a valid support email.");
+    setError("");
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1800);
+  }
+
+  return (
+    <section className="rounded-2xl border bg-card p-4 md:p-5">
+      <h2 className="text-sm font-medium">General</h2>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <Field label="App name" hint="Shown in the app and in emails">
+          <Input value={appName} onChange={(e) => setAppName(e.target.value)} />
+        </Field>
+        <Field label="Support email" hint="Where user queries are directed">
+          <Input type="email" value={supportEmail} onChange={(e) => setSupportEmail(e.target.value)} placeholder="support@example.com" />
+        </Field>
+        <Field label="Default timezone" hint="Used for schedules and timestamps">
+          <select className={selectCls} value={timezone} onChange={(e) => setTimezone(e.target.value)}>
+            {TIMEZONES.map((tz) => (
+              <option key={tz} value={tz}>{tz}</option>
+            ))}
+          </select>
+        </Field>
+      </div>
+      <div className="mt-4 space-y-3">
+        <Toggle checked={allowSignup} onChange={setAllowSignup} label="Allow self sign-up" hint="Off = new users are added by an admin only" />
+        <Toggle checked={maintenance} onChange={setMaintenance} label="Maintenance mode" hint="Temporarily blocks user access to the app" />
+      </div>
+      <SaveActions error={error} saved={saved} onSave={save} />
+    </section>
+  );
+}
+
+/* ---------------- Application: Billing ---------------- */
+
+function BillingCard() {
+  const [enabled, setEnabled] = useState(false);
+  const [provider, setProvider] = useState("razorpay");
+  const [mode, setMode] = useState("test");
+  const [currency, setCurrency] = useState("INR");
+  const [keyId, setKeyId] = useState("");
+  const [keySecret, setKeySecret] = useState("");
+  const [showSecret, setShowSecret] = useState(false);
+  const [gstin, setGstin] = useState("");
+  const [taxRate, setTaxRate] = useState("18");
+  const [pricesIncludeTax, setPricesIncludeTax] = useState(false);
+  const [companyName, setCompanyName] = useState("");
+  const [companyAddress, setCompanyAddress] = useState("");
+  const [invoicePrefix, setInvoicePrefix] = useState("JMP-");
+  const [error, setError] = useState("");
+  const [saved, setSaved] = useState(false);
+
+  function save() {
+    if (enabled) {
+      if (!keyId.trim() || !keySecret.trim()) return setError("Enter the payment gateway key ID and secret.");
+    }
+    const rate = Number(taxRate);
+    if (!Number.isFinite(rate) || rate < 0 || rate > 100) return setError("Tax rate must be between 0 and 100.");
+    if (gstin.trim() && gstin.trim().length !== 15) return setError("A GSTIN is 15 characters.");
+    setError("");
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1800);
+  }
+
+  return (
+    <section className="rounded-2xl border bg-card p-4 md:p-5">
+      <h2 className="text-sm font-medium">Billing</h2>
+
+      <label className="mt-4 flex cursor-pointer items-center gap-2 text-sm">
+        <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} className="size-4 cursor-pointer rounded border-input accent-primary" />
+        Enable payments
+      </label>
+
+      <SubHead>Gateway</SubHead>
+      <div className={cn("space-y-3", !enabled && "pointer-events-none opacity-50")}>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Field label="Provider" hint="Payment gateway">
+            <select className={selectCls} value={provider} onChange={(e) => setProvider(e.target.value)}>
+              <option value="razorpay">Razorpay</option>
+              <option value="stripe">Stripe</option>
+            </select>
+          </Field>
+          <Field label="Mode" hint="Use test keys until go-live">
+            <select className={selectCls} value={mode} onChange={(e) => setMode(e.target.value)}>
+              <option value="test">Test</option>
+              <option value="live">Live</option>
+            </select>
+          </Field>
+          <Field label="Currency" hint="Charge currency">
+            <select className={selectCls} value={currency} onChange={(e) => setCurrency(e.target.value)}>
+              <option value="INR">₹ INR</option>
+              <option value="USD">$ USD</option>
+            </select>
+          </Field>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Key ID" hint="Publishable / key id from the provider">
+            <Input value={keyId} onChange={(e) => setKeyId(e.target.value)} autoComplete="off" className="font-mono" />
+          </Field>
+          <Field label="Key secret" hint="Stored encrypted · never shown to users">
+            <div className="relative">
+              <Input
+                type={showSecret ? "text" : "password"}
+                value={keySecret}
+                onChange={(e) => setKeySecret(e.target.value)}
+                autoComplete="off"
+                className="pr-9 font-mono"
+              />
+              <button
+                type="button"
+                onClick={() => setShowSecret((s) => !s)}
+                aria-label={showSecret ? "Hide secret" : "Show secret"}
+                className="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                {showSecret ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+              </button>
+            </div>
+          </Field>
+        </div>
+      </div>
+
+      <SubHead>Tax</SubHead>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="GSTIN" hint="15-character GST number (optional)">
+          <Input value={gstin} onChange={(e) => setGstin(e.target.value.toUpperCase())} placeholder="22AAAAA0000A1Z5" className="font-mono" />
+        </Field>
+        <Field label="Tax rate (%)" hint="GST percentage applied to plans">
+          <Input type="number" min={0} max={100} value={taxRate} onChange={(e) => setTaxRate(e.target.value)} />
+        </Field>
+      </div>
+      <div className="mt-3">
+        <Toggle checked={pricesIncludeTax} onChange={setPricesIncludeTax} label="Plan prices include tax" hint="Off = tax is added on top at checkout" />
+      </div>
+
+      <SubHead>Invoicing</SubHead>
+      <div className="space-y-3">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Company name" hint="Shown on invoices">
+            <Input value={companyName} onChange={(e) => setCompanyName(e.target.value)} />
+          </Field>
+          <Field label="Invoice number prefix" hint="e.g. JMP-0001">
+            <Input value={invoicePrefix} onChange={(e) => setInvoicePrefix(e.target.value)} />
+          </Field>
+        </div>
+        <Field label="Company address" hint="Appears on GST invoices">
+          <textarea className={textareaCls} value={companyAddress} onChange={(e) => setCompanyAddress(e.target.value)} />
+        </Field>
+      </div>
+
+      <SaveActions error={error} saved={saved} onSave={save} />
+    </section>
+  );
+}
+
+/* ---------------- Application: Cron & schedule ---------------- */
+
+const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+function CronCard() {
+  const [syncEvery, setSyncEvery] = useState("6");
+  const [quietEnabled, setQuietEnabled] = useState(false);
+  const [quietFrom, setQuietFrom] = useState("22:00");
+  const [quietTo, setQuietTo] = useState("07:00");
+  const [quietTz, setQuietTz] = useState("Asia/Kolkata");
+  const [quietDays, setQuietDays] = useState<string[]>([...DAYS]);
+  const [purgeEnabled, setPurgeEnabled] = useState(false);
+  const [purgeDays, setPurgeDays] = useState("90");
+  const [purgeScope, setPurgeScope] = useState("discarded");
+  const [error, setError] = useState("");
+  const [saved, setSaved] = useState(false);
+
+  function toggleDay(d: string) {
+    setQuietDays((cur) => (cur.includes(d) ? cur.filter((x) => x !== d) : [...cur, d]));
+  }
+
+  function save() {
+    if (purgeEnabled) {
+      const n = Number(purgeDays);
+      if (!Number.isFinite(n) || n < 1) return setError("Enter a valid retention window (days).");
+    }
+    setError("");
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1800);
+  }
+
+  return (
+    <section className="rounded-2xl border bg-card p-4 md:p-5">
+      <h2 className="text-sm font-medium">Cron & schedule</h2>
+
+      <div className="mt-4">
+        <Field label="Gmail sync frequency" hint="How often new LinkedIn alerts are fetched">
+          <select className={selectCls} value={syncEvery} onChange={(e) => setSyncEvery(e.target.value)}>
+            <option value="1">Every hour</option>
+            <option value="3">Every 3 hours</option>
+            <option value="6">Every 6 hours</option>
+            <option value="12">Every 12 hours</option>
+            <option value="24">Once a day</option>
+          </select>
+        </Field>
+      </div>
+
+      <SubHead>Quiet hours</SubHead>
+      <Toggle checked={quietEnabled} onChange={setQuietEnabled} label="Pause syncs during quiet hours" hint="No background syncs run in this window" />
+      <div className={cn("mt-3 space-y-3", !quietEnabled && "pointer-events-none opacity-50")}>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Field label="From">
+            <Input type="time" value={quietFrom} onChange={(e) => setQuietFrom(e.target.value)} />
+          </Field>
+          <Field label="To">
+            <Input type="time" value={quietTo} onChange={(e) => setQuietTo(e.target.value)} />
+          </Field>
+          <Field label="Timezone">
+            <select className={selectCls} value={quietTz} onChange={(e) => setQuietTz(e.target.value)}>
+              {TIMEZONES.map((tz) => (
+                <option key={tz} value={tz}>{tz}</option>
+              ))}
+            </select>
+          </Field>
+        </div>
+        <div>
+          <Label className="text-xs text-muted-foreground">Applies on</Label>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {DAYS.map((d) => (
+              <button
+                key={d}
+                type="button"
+                onClick={() => toggleDay(d)}
+                className={cn(
+                  "rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors",
+                  quietDays.includes(d) ? "border-primary bg-primary/10 text-primary" : "border-input text-muted-foreground hover:bg-muted",
+                )}
+              >
+                {d}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <SubHead>Lead retention</SubHead>
+      <Toggle checked={purgeEnabled} onChange={setPurgeEnabled} label="Auto-delete stale leads" hint="Keeps the database lean over time" />
+      <div className={cn("mt-3 grid gap-3 sm:grid-cols-2", !purgeEnabled && "pointer-events-none opacity-50")}>
+        <Field label="Delete leads older than (days)" hint="Based on last activity">
+          <Input type="number" min={1} value={purgeDays} onChange={(e) => setPurgeDays(e.target.value)} />
+        </Field>
+        <Field label="Applies to" hint="Which leads are eligible">
+          <select className={selectCls} value={purgeScope} onChange={(e) => setPurgeScope(e.target.value)}>
+            <option value="discarded">Discarded &amp; closed only</option>
+            <option value="all">Any lead untouched for the window</option>
+          </select>
+        </Field>
+      </div>
+
+      <SaveActions error={error} saved={saved} onSave={save} />
+    </section>
+  );
+}
+
+/* ---------------- Application: Security ---------------- */
+
+function SecurityCard() {
+  const [minLength, setMinLength] = useState("8");
+  const [reqUpper, setReqUpper] = useState(true);
+  const [reqNumber, setReqNumber] = useState(true);
+  const [reqSpecial, setReqSpecial] = useState(true);
+  const [sessionLength, setSessionLength] = useState("7");
+  const [sessionUnit, setSessionUnit] = useState("days");
+  const [allowList, setAllowList] = useState("");
+  const [twoFactor, setTwoFactor] = useState(false);
+  const [error, setError] = useState("");
+  const [saved, setSaved] = useState(false);
+
+  function save() {
+    const n = Number(minLength);
+    if (!Number.isFinite(n) || n < 6) return setError("Minimum password length must be at least 6.");
+    const s = Number(sessionLength);
+    if (!Number.isFinite(s) || s < 1) return setError("Enter a valid session length.");
+    const bad = allowList
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .filter((l) => !EMAIL_RE.test(l));
+    if (bad.length) return setError(`Not a valid email in the allow-list: ${bad[0]}`);
+    setError("");
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1800);
+  }
+
+  return (
+    <section className="rounded-2xl border bg-card p-4 md:p-5">
+      <h2 className="text-sm font-medium">Security</h2>
+
+      <SubHead>Password policy</SubHead>
+      <Field label="Minimum length" hint="Characters required in a password">
+        <Input type="number" min={6} value={minLength} onChange={(e) => setMinLength(e.target.value)} className="w-28" />
+      </Field>
+      <div className="mt-3 space-y-2">
+        <Toggle checked={reqUpper} onChange={setReqUpper} label="Require an uppercase letter" />
+        <Toggle checked={reqNumber} onChange={setReqNumber} label="Require a number" />
+        <Toggle checked={reqSpecial} onChange={setReqSpecial} label="Require a special character" />
+      </div>
+
+      <SubHead>Sessions</SubHead>
+      <Field label="Stay signed in for" hint="How long a login stays active">
+        <div className="flex gap-2">
+          <Input type="number" min={1} value={sessionLength} onChange={(e) => setSessionLength(e.target.value)} className="w-24" />
+          <select className={cn(selectCls, "w-28")} value={sessionUnit} onChange={(e) => setSessionUnit(e.target.value)}>
+            <option value="hours">Hours</option>
+            <option value="days">Days</option>
+          </select>
+        </div>
+      </Field>
+
+      <SubHead>Access</SubHead>
+      <Field label="Sign-in allow-list" hint="One email per line · only these can sign in (blank = no restriction)">
+        <textarea className={textareaCls} value={allowList} onChange={(e) => setAllowList(e.target.value)} placeholder={"admin@example.com\nteam@example.com"} />
+      </Field>
+      <div className="mt-3">
+        <Toggle checked={twoFactor} onChange={setTwoFactor} label="Require two-factor authentication" hint="Applies to all users at next sign-in" />
+      </div>
+
+      <SaveActions error={error} saved={saved} onSave={save} />
     </section>
   );
 }
