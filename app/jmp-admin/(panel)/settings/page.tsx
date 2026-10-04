@@ -5,7 +5,7 @@
 // section cards), built from admin-only primitives. UI-first; most Application
 // sections are placeholders until their backends are wired.
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   User,
   Lock,
@@ -18,12 +18,14 @@ import {
   Eye,
   EyeOff,
   Send,
+  ChevronDown,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/admin/ui/button";
 import { Input } from "@/components/admin/ui/input";
 import { Label } from "@/components/admin/ui/label";
 import { PasswordField, isPasswordValid } from "@/components/admin/ui/password-field";
+import { usePasswordPolicy, setPasswordPolicy } from "@/lib/admin/password-policy";
 import { cn } from "@/lib/utils";
 
 interface SettingsSection {
@@ -164,6 +166,75 @@ function Toggle({
     </label>
   );
 }
+
+// Multi-select dropdown (checkbox list in a popover). Closes on outside click.
+function MultiSelect({
+  options,
+  selected,
+  onChange,
+  placeholder = "Select…",
+}: {
+  options: { value: string; label: string }[];
+  selected: string[];
+  onChange: (next: string[]) => void;
+  placeholder?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+
+  const label = selected.length
+    ? options.filter((o) => selected.includes(o.value)).map((o) => o.label).join(", ")
+    : placeholder;
+
+  function toggle(v: string) {
+    onChange(selected.includes(v) ? selected.filter((x) => x !== v) : [...selected, v]);
+  }
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className={cn(selectCls, "flex items-center justify-between gap-2 text-left")}
+      >
+        <span className={cn("truncate", !selected.length && "text-muted-foreground")}>{label}</span>
+        <ChevronDown className="size-4 shrink-0 opacity-60" aria-hidden />
+      </button>
+      {open && (
+        <div className="absolute z-20 mt-1 w-full rounded-lg border border-border bg-popover p-1 shadow-lg">
+          {options.map((o) => (
+            <label key={o.value} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted">
+              <input
+                type="checkbox"
+                checked={selected.includes(o.value)}
+                onChange={() => toggle(o.value)}
+                className="size-4 cursor-pointer rounded border-input accent-primary"
+              />
+              {o.label}
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const LEAD_STATUSES = [
+  { value: "new", label: "New" },
+  { value: "reviewing", label: "Reviewing" },
+  { value: "applied", label: "Applied" },
+  { value: "discarded", label: "Discarded" },
+  { value: "closed", label: "Closed" },
+];
 
 // Section subtitle used to group fields within a card.
 function SubHead({ children }: { children: React.ReactNode }) {
@@ -681,7 +752,7 @@ function CronCard() {
   const [quietDays, setQuietDays] = useState<string[]>([...DAYS]);
   const [purgeEnabled, setPurgeEnabled] = useState(false);
   const [purgeDays, setPurgeDays] = useState("90");
-  const [purgeScope, setPurgeScope] = useState("discarded");
+  const [purgeStatuses, setPurgeStatuses] = useState<string[]>(["discarded", "closed"]);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
 
@@ -759,11 +830,13 @@ function CronCard() {
         <Field label="Delete leads older than (days)" hint="Based on last activity">
           <Input type="number" min={1} value={purgeDays} onChange={(e) => setPurgeDays(e.target.value)} />
         </Field>
-        <Field label="Applies to" hint="Which leads are eligible">
-          <select className={selectCls} value={purgeScope} onChange={(e) => setPurgeScope(e.target.value)}>
-            <option value="discarded">Discarded &amp; closed only</option>
-            <option value="all">Any lead untouched for the window</option>
-          </select>
+        <Field label="Applies to statuses" hint="Only leads in these statuses are purged">
+          <MultiSelect
+            options={LEAD_STATUSES}
+            selected={purgeStatuses}
+            onChange={setPurgeStatuses}
+            placeholder="Select statuses…"
+          />
         </Field>
       </div>
 
@@ -775,10 +848,12 @@ function CronCard() {
 /* ---------------- Application: Security ---------------- */
 
 function SecurityCard() {
-  const [minLength, setMinLength] = useState("8");
-  const [reqUpper, setReqUpper] = useState(true);
-  const [reqNumber, setReqNumber] = useState(true);
-  const [reqSpecial, setReqSpecial] = useState(true);
+  const policy = usePasswordPolicy();
+  const [minLength, setMinLength] = useState(String(policy.minLength));
+  const [reqUpper, setReqUpper] = useState(policy.requireUpper);
+  const [reqLower, setReqLower] = useState(policy.requireLower);
+  const [reqNumber, setReqNumber] = useState(policy.requireNumber);
+  const [reqSpecial, setReqSpecial] = useState(policy.requireSpecial);
   const [sessionLength, setSessionLength] = useState("7");
   const [sessionUnit, setSessionUnit] = useState("days");
   const [allowList, setAllowList] = useState("");
@@ -797,6 +872,15 @@ function SecurityCard() {
       .filter(Boolean)
       .filter((l) => !EMAIL_RE.test(l));
     if (bad.length) return setError(`Not a valid email in the allow-list: ${bad[0]}`);
+    // Sync the shared policy so every PasswordField (add user, reset, change
+    // password) updates its live checks immediately.
+    setPasswordPolicy({
+      minLength: Math.round(n),
+      requireUpper: reqUpper,
+      requireLower: reqLower,
+      requireNumber: reqNumber,
+      requireSpecial: reqSpecial,
+    });
     setError("");
     setSaved(true);
     setTimeout(() => setSaved(false), 1800);
@@ -807,11 +891,12 @@ function SecurityCard() {
       <h2 className="text-sm font-medium">Security</h2>
 
       <SubHead>Password policy</SubHead>
-      <Field label="Minimum length" hint="Characters required in a password">
+      <Field label="Minimum length" hint="Applies to every new password across the app">
         <Input type="number" min={6} value={minLength} onChange={(e) => setMinLength(e.target.value)} className="w-28" />
       </Field>
       <div className="mt-3 space-y-2">
         <Toggle checked={reqUpper} onChange={setReqUpper} label="Require an uppercase letter" />
+        <Toggle checked={reqLower} onChange={setReqLower} label="Require a lowercase letter" />
         <Toggle checked={reqNumber} onChange={setReqNumber} label="Require a number" />
         <Toggle checked={reqSpecial} onChange={setReqSpecial} label="Require a special character" />
       </div>
