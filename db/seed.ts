@@ -106,7 +106,7 @@ async function main() {
     email: DEV_EMAIL,
     emailVerified: true,
     mobile: "+91 9876543210",
-    role: "admin",
+    role: "user",
     status: "active",
     planId: planFree,
     planExpiresAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
