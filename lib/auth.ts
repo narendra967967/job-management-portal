@@ -15,7 +15,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { account, session, user, verification } from "@/db/schema";
+import { account, securityConfig, session, user, verification } from "@/db/schema";
 import { hashPassword, verifyPassword } from "@/lib/password";
 import { provisionUserDefaults } from "@/lib/provision";
 import { sendMail, SMTP_NOT_CONFIGURED } from "@/lib/mailer";
@@ -80,6 +80,14 @@ export const auth = betterAuth({
       allowDifferentEmails: true,
     },
   },
+  session: {
+    // The real per-session lifetime is set at create time from the admin's
+    // Security setting (see databaseHooks.session.create.before). These act as a
+    // generous ceiling and disable the sliding refresh, so the create-time
+    // expiry is what actually governs how long a login stays valid.
+    expiresIn: 60 * 60 * 24 * 365,
+    updateAge: 60 * 60 * 24 * 365,
+  },
   user: {
     additionalFields: {
       mobile: { type: "string", required: false },
@@ -101,6 +109,17 @@ export const auth = betterAuth({
     },
     session: {
       create: {
+        // Apply the admin-configured session length to this login.
+        before: async (s) => {
+          const [sec] = await db
+            .select({ value: securityConfig.sessionValue, unit: securityConfig.sessionUnit })
+            .from(securityConfig)
+            .limit(1);
+          const value = sec?.value ?? 7;
+          const unit = sec?.unit ?? "days";
+          const ms = unit === "hours" ? value * 3_600_000 : value * 86_400_000;
+          return { data: { ...s, expiresAt: new Date(Date.now() + ms) } };
+        },
         // Record the login time so "last login" survives logout/expiry.
         after: async (s) => {
           await db.update(user).set({ lastLoginAt: new Date() }).where(eq(user.id, s.userId));
