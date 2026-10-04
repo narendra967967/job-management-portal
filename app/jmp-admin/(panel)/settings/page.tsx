@@ -319,7 +319,8 @@ function EmailCard() {
               <select className={selectCls} value={encryption} onChange={(e) => setEncryption(e.target.value)}>
                 <option value="none">None</option>
                 <option value="starttls">STARTTLS</option>
-                <option value="ssl">SSL / TLS</option>
+                <option value="ssl">SSL</option>
+                <option value="tls">TLS</option>
               </select>
             </Field>
           </div>
