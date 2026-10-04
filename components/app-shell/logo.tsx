@@ -1,7 +1,8 @@
-import Image from "next/image";
 import { cn } from "@/lib/utils";
 
-/** JMP logo: the planet badge mark plus optional full name. */
+/** App logo: the admin-managed branding mark (falls back to the bundled default)
+ *  plus an optional wordmark. Uses a plain <img> so admin updates show without
+ *  Next's image-optimizer cache in the way. */
 export function Logo({
   showName = true,
   className,
@@ -11,13 +12,13 @@ export function Logo({
 }) {
   return (
     <div className={cn("flex items-center gap-2.5", className)}>
-      <Image
-        src="/logo.png"
-        alt="JMP"
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/api/branding/logo"
+        alt="Logo"
         width={32}
         height={32}
-        priority
-        className="size-8 shrink-0 rounded-full"
+        className="size-8 shrink-0 rounded-full object-cover"
       />
       {showName && (
         <span className="text-sm font-medium text-foreground">

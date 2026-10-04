@@ -15,6 +15,7 @@ import { encryptSecret } from "@/lib/crypto";
 import { validatePassword } from "@/lib/admin/password-policy-server";
 import { sendMail, SMTP_NOT_CONFIGURED } from "@/lib/mailer";
 import {
+  appAssets,
   appSettings,
   securityConfig,
   cronConfig,
@@ -105,6 +106,61 @@ export async function updateGeneralAction(input: unknown): Promise<Result> {
     maintenance: v.maintenance,
   };
   await db.insert(appSettings).values({ id: "app", ...data }).onConflictDoUpdate({ target: appSettings.id, set: data });
+  revalidate();
+  // App name drives the site-wide <title>, so refresh the whole app layout too.
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
+/* ---------------- Branding (logo + favicon) ---------------- */
+
+const BRANDING_MAX_BYTES = 512 * 1024; // 512 KB — plenty for a logo/favicon
+// Extension → served Content-Type. SVG is intentionally excluded (script-in-SVG
+// XSS vector when served from our own origin).
+const LOGO_TYPES: Record<string, string> = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  webp: "image/webp",
+};
+const FAVICON_TYPES: Record<string, string> = {
+  png: "image/png",
+  ico: "image/x-icon",
+};
+
+export async function uploadBrandingAction(formData: FormData): Promise<Result> {
+  await requireAdmin();
+  const kind = String(formData.get("kind") ?? "");
+  if (kind !== "logo" && kind !== "favicon") return { ok: false, error: "Invalid asset." };
+
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) return { ok: false, error: "Choose a file to upload." };
+  if (file.size > BRANDING_MAX_BYTES) return { ok: false, error: "File must be under 512 KB." };
+
+  const ext = (file.name.split(".").pop() ?? "").toLowerCase();
+  const allowed = kind === "logo" ? LOGO_TYPES : FAVICON_TYPES;
+  const contentType = allowed[ext];
+  if (!contentType) {
+    return {
+      ok: false,
+      error: kind === "logo" ? "Upload a PNG, JPG, or WebP image." : "Upload a PNG or ICO file.",
+    };
+  }
+
+  const data = Buffer.from(await file.arrayBuffer());
+  const row = { contentType, data, updatedAt: new Date() };
+  await db.insert(appAssets).values({ kind, ...row }).onConflictDoUpdate({ target: appAssets.kind, set: row });
+  revalidatePath("/", "layout");
+  revalidate();
+  return { ok: true };
+}
+
+export async function removeBrandingAction(kind: unknown): Promise<Result> {
+  await requireAdmin();
+  const k = z.enum(["logo", "favicon"]).safeParse(kind);
+  if (!k.success) return { ok: false, error: "Invalid asset." };
+  await db.delete(appAssets).where(eq(appAssets.kind, k.data));
+  revalidatePath("/", "layout");
   revalidate();
   return { ok: true };
 }

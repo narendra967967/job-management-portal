@@ -19,6 +19,8 @@ import {
   EyeOff,
   Send,
   ChevronDown,
+  Upload,
+  Image as ImageIcon,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/admin/ui/button";
@@ -37,6 +39,8 @@ import {
   updateAiAction,
   updateEmailAction,
   sendTestEmailAction,
+  uploadBrandingAction,
+  removeBrandingAction,
 } from "@/actions/admin-settings";
 import { cn } from "@/lib/utils";
 
@@ -50,7 +54,7 @@ interface SettingsSection {
 const SECTION = {
   profile: { id: "profile", label: "Profile", icon: User, render: (i: AdminSettings) => <ProfileCard initial={i.profile} /> },
   password: { id: "password", label: "Password", icon: Lock, render: () => <PasswordCard /> },
-  general: { id: "general", label: "General", icon: Cog, render: (i: AdminSettings) => <GeneralCard initial={i.general} /> },
+  general: { id: "general", label: "General", icon: Cog, render: (i: AdminSettings) => <GeneralCard initial={i.general} branding={i.branding} /> },
   billing: { id: "billing", label: "Billing", icon: CreditCard, render: (i: AdminSettings) => <BillingCard initial={i.billing} /> },
   email: { id: "email", label: "Email / SMTP", icon: Mail, render: (i: AdminSettings) => <EmailCard initial={i.smtp} /> },
   ai: { id: "ai", label: "AI", icon: Sparkles, render: (i: AdminSettings) => <AiCard initial={i.ai} /> },
@@ -317,7 +321,7 @@ function PasswordCard() {
 
 /* ---------------- Application: General ---------------- */
 
-function GeneralCard({ initial }: { initial: AdminSettings["general"] }) {
+function GeneralCard({ initial, branding }: { initial: AdminSettings["general"]; branding: AdminSettings["branding"] }) {
   const [appName, setAppName] = useState(initial.appName);
   const [supportEmail, setSupportEmail] = useState(initial.supportEmail);
   const [timezone, setTimezone] = useState(initial.timezone);
@@ -328,7 +332,7 @@ function GeneralCard({ initial }: { initial: AdminSettings["general"] }) {
     <section className="rounded-2xl border bg-card p-4 md:p-5">
       <h2 className="text-sm font-medium">General</h2>
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <Field label="App name" hint="Shown in the app and in emails">
+        <Field label="App name" hint="Shown in the browser tab, the app, and emails">
           <Input value={appName} onChange={(e) => setAppName(e.target.value)} />
         </Field>
         <Field label="Support email" hint="Where user queries are directed">
@@ -345,7 +349,124 @@ function GeneralCard({ initial }: { initial: AdminSettings["general"] }) {
         <Toggle checked={maintenance} onChange={setMaintenance} label="Maintenance mode" hint="Temporarily blocks user access to the app" />
       </div>
       <SaveRow busy={sv.busy} saved={sv.saved} error={sv.error} onSave={() => sv.save(() => updateGeneralAction({ appName, supportEmail, timezone, allowSignup, maintenance }))} />
+
+      <SubHead>Branding</SubHead>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <BrandingAsset
+          kind="logo"
+          label="Logo"
+          hint="PNG, JPG, or WebP · under 512 KB"
+          accept="image/png,image/jpeg,image/webp"
+          alwaysPreview
+          version={branding.logoVersion}
+          hasAsset={branding.hasLogo}
+        />
+        <BrandingAsset
+          kind="favicon"
+          label="Favicon"
+          hint="PNG or ICO · square, under 512 KB"
+          accept="image/png,image/x-icon,.ico"
+          version={branding.faviconVersion}
+          hasAsset={branding.hasFavicon}
+        />
+      </div>
+      <p className="mt-2 text-[11px] text-muted-foreground">Applies across the whole site. Favicon changes may take a moment to show in the browser tab.</p>
     </section>
+  );
+}
+
+function BrandingAsset({
+  kind,
+  label,
+  hint,
+  accept,
+  version,
+  hasAsset,
+  alwaysPreview = false,
+}: {
+  kind: "logo" | "favicon";
+  label: string;
+  hint: string;
+  accept: string;
+  version: number;
+  hasAsset: boolean;
+  alwaysPreview?: boolean;
+}) {
+  const router = useRouter();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [msg, setMsg] = useState("");
+  const showPreview = alwaysPreview || hasAsset;
+  const src = `/api/branding/${kind}?v=${version}`;
+
+  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-selecting the same file
+    if (!file) return;
+    setBusy(true);
+    setError("");
+    setMsg("");
+    const fd = new FormData();
+    fd.set("kind", kind);
+    fd.set("file", file);
+    const res = await uploadBrandingAction(fd);
+    setBusy(false);
+    if (res.ok) {
+      setMsg("Updated");
+      setTimeout(() => setMsg(""), 1800);
+      router.refresh();
+    } else {
+      setError(res.error);
+    }
+  }
+
+  async function remove() {
+    setBusy(true);
+    setError("");
+    setMsg("");
+    const res = await removeBrandingAction(kind);
+    setBusy(false);
+    if (res.ok) {
+      setMsg("Removed");
+      setTimeout(() => setMsg(""), 1800);
+      router.refresh();
+    } else {
+      setError(res.error);
+    }
+  }
+
+  return (
+    <div className="rounded-xl border p-3">
+      <div className="flex items-center gap-3">
+        <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-muted/30">
+          {showPreview ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={src} alt={label} className="size-full object-contain" />
+          ) : (
+            <ImageIcon className="size-5 text-muted-foreground" aria-hidden />
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium">{label}</p>
+          <p className="text-[11px] text-muted-foreground">{hint}</p>
+        </div>
+      </div>
+      <input ref={inputRef} type="file" accept={accept} onChange={onFile} className="hidden" />
+      <div className="mt-3 flex items-center gap-2">
+        <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => inputRef.current?.click()}>
+          <Upload /> {hasAsset ? "Replace" : "Upload"}
+        </Button>
+        {hasAsset && (
+          <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={remove}>
+            Remove
+          </Button>
+        )}
+        {busy && <span className="text-xs text-muted-foreground">Working…</span>}
+        {msg && !busy && <span className="text-xs text-status-applied-foreground">{msg}</span>}
+      </div>
+      {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
+    </div>
   );
 }
 

@@ -468,6 +468,19 @@ export const plans = pgTable("plans", {
     .$onUpdate(() => new Date()),
 });
 
+/** Branding assets (logo, favicon) the admin can change anytime. One row per
+ *  kind; bytes stored in-DB (small, few) and served via /api/branding/[kind].
+ *  When a kind has no row, the app falls back to its built-in default. */
+export const appAssets = pgTable("app_assets", {
+  kind: text("kind").primaryKey(), // "logo" | "favicon"
+  contentType: text("content_type").notNull(),
+  data: bytea("data").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date()),
+});
+
 /** Settings → General (one "app" row). */
 export const appSettings = pgTable("app_settings", {
   id: text("id").primaryKey().default("app"),

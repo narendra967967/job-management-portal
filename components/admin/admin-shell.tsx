@@ -6,7 +6,6 @@
 // the sidebar footer.
 
 import { useEffect, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -95,7 +94,8 @@ function isActive(pathname: string, href?: string) {
 function Brand() {
   return (
     <div className="flex items-center gap-2">
-      <Image src="/logo.png" alt="JMP" width={32} height={32} priority className="size-8 shrink-0 rounded-full" />
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/api/branding/logo" alt="Logo" width={32} height={32} className="size-8 shrink-0 rounded-full object-cover" />
       <div className="leading-tight">
         <p className="text-sm font-semibold text-white">JMP Admin</p>
         <p className="text-[10px] text-slate-400">Control panel</p>

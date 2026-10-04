@@ -15,10 +15,12 @@ import {
   smtpConfig,
   user,
 } from "@/db/schema";
+import { getBranding } from "@/lib/branding";
 
 export interface AdminSettings {
   profile: { name: string; email: string; mobile: string };
   general: { appName: string; supportEmail: string; timezone: string; allowSignup: boolean; maintenance: boolean };
+  branding: { hasLogo: boolean; logoVersion: number; hasFavicon: boolean; faviconVersion: number };
   security: {
     pwMinLength: number;
     pwRequireUpper: boolean;
@@ -76,7 +78,7 @@ export interface AdminSettings {
 }
 
 export async function loadAdminSettings(adminId: string): Promise<AdminSettings> {
-  const [u, gen, sec, cron, bill, ai, smtp] = await Promise.all([
+  const [u, gen, sec, cron, bill, ai, smtp, branding] = await Promise.all([
     db.select({ name: user.name, email: user.email, mobile: user.mobile }).from(user).where(eq(user.id, adminId)).limit(1),
     db.select().from(appSettings).limit(1),
     db.select().from(securityConfig).limit(1),
@@ -84,6 +86,7 @@ export async function loadAdminSettings(adminId: string): Promise<AdminSettings>
     db.select().from(billingConfig).limit(1),
     db.select().from(appAiConfig).limit(1),
     db.select().from(smtpConfig).limit(1),
+    getBranding(),
   ]);
   const g = gen[0];
   const s = sec[0];
@@ -94,6 +97,7 @@ export async function loadAdminSettings(adminId: string): Promise<AdminSettings>
 
   return {
     profile: { name: u[0]?.name ?? "", email: u[0]?.email ?? "", mobile: u[0]?.mobile ?? "" },
+    branding,
     general: {
       appName: g?.appName ?? "Job Management Portal",
       supportEmail: g?.supportEmail ?? "",

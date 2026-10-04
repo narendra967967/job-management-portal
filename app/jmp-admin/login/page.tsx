@@ -5,7 +5,6 @@
 // re-checks the session + role on every authed page.
 
 import { useState } from "react";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { Button } from "@/components/admin/ui/button";
@@ -47,13 +46,13 @@ export default function AdminLoginPage() {
     <div className="flex min-h-dvh items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4">
       <div className="w-full max-w-sm">
         <div className="mb-6 flex flex-col items-center gap-3 text-center">
-          <Image
-            src="/logo.png"
-            alt="JMP"
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/api/branding/logo"
+            alt="Logo"
             width={48}
             height={48}
-            priority
-            className="size-12 rounded-full shadow-lg"
+            className="size-12 rounded-full object-cover shadow-lg"
           />
           <div>
             <h1 className="text-xl font-semibold text-white">JMP Admin</h1>
