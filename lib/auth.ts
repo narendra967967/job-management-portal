@@ -13,6 +13,7 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
+import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { account, session, user, verification } from "@/db/schema";
 import { hashPassword, verifyPassword } from "@/lib/password";
@@ -95,6 +96,14 @@ export const auth = betterAuth({
         // Give every newly created user their default settings rows.
         after: async (u) => {
           await provisionUserDefaults(u.id);
+        },
+      },
+    },
+    session: {
+      create: {
+        // Record the login time so "last login" survives logout/expiry.
+        after: async (s) => {
+          await db.update(user).set({ lastLoginAt: new Date() }).where(eq(user.id, s.userId));
         },
       },
     },

@@ -20,6 +20,9 @@ export const user = pgTable("user", {
   status: text("status").notNull().default("active"),
   planId: text("plan_id"),
   planExpiresAt: timestamp("plan_expires_at"),
+  // Stamped on every successful login (session create) so "last login" survives
+  // logout/expiry, unlike the session table.
+  lastLoginAt: timestamp("last_login_at"),
 });
 
 export const session = pgTable(

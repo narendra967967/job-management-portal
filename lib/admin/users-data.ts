@@ -5,7 +5,7 @@ import "server-only";
 
 import { ne, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { user, plans, jobLeads, session } from "@/db/schema";
+import { user, plans, jobLeads } from "@/db/schema";
 
 export type AdminUserStatus = "active" | "inactive";
 export type AdminUserRole = "user" | "admin";
@@ -23,8 +23,8 @@ export interface AdminUserRow {
   expiresAt: string | null;
   /** ISO datetime. */
   createdAt: string;
-  /** Relative string, e.g. "2h ago" or "—". */
-  lastActive: string;
+  /** Relative last-login string, e.g. "2h ago" or "—". */
+  lastLogin: string;
   leads: number;
 }
 
@@ -60,7 +60,7 @@ export async function listPlanOptions(): Promise<PlanOption[]> {
 /** All users for the admin grid, optionally excluding one id (the logged-in admin,
  *  so they can't accidentally deactivate/delete themselves). */
 export async function listAdminUsers(excludeId?: string): Promise<AdminUserRow[]> {
-  const [users, planRows, leadCounts, lastSessions] = await Promise.all([
+  const [users, planRows, leadCounts] = await Promise.all([
     db
       .select({
         id: user.id,
@@ -72,6 +72,7 @@ export async function listAdminUsers(excludeId?: string): Promise<AdminUserRow[]
         planId: user.planId,
         planExpiresAt: user.planExpiresAt,
         createdAt: user.createdAt,
+        lastLoginAt: user.lastLoginAt,
       })
       .from(user)
       .where(excludeId ? ne(user.id, excludeId) : undefined)
@@ -81,15 +82,10 @@ export async function listAdminUsers(excludeId?: string): Promise<AdminUserRow[]
       .select({ userId: jobLeads.userId, n: sql<number>`count(*)::int` })
       .from(jobLeads)
       .groupBy(jobLeads.userId),
-    db
-      .select({ userId: session.userId, last: sql<Date>`max(${session.updatedAt})` })
-      .from(session)
-      .groupBy(session.userId),
   ]);
 
   const planName = new Map(planRows.map((p) => [p.id, p.name]));
   const leadsByUser = new Map(leadCounts.map((r) => [r.userId, r.n]));
-  const lastByUser = new Map(lastSessions.map((r) => [r.userId, r.last ? new Date(r.last) : null]));
 
   return users.map((u) => ({
     id: u.id,
@@ -102,7 +98,7 @@ export async function listAdminUsers(excludeId?: string): Promise<AdminUserRow[]
     planName: u.planId ? (planName.get(u.planId) ?? null) : null,
     expiresAt: u.planExpiresAt ? new Date(u.planExpiresAt).toISOString().slice(0, 10) : null,
     createdAt: new Date(u.createdAt).toISOString(),
-    lastActive: relativeTime(lastByUser.get(u.id) ?? null),
+    lastLogin: relativeTime(u.lastLoginAt ? new Date(u.lastLoginAt) : null),
     leads: leadsByUser.get(u.id) ?? 0,
   }));
 }

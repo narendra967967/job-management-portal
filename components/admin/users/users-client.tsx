@@ -323,7 +323,7 @@ export function UsersClient({ initialUsers, plans }: { initialUsers: AdminUserRo
               <th className="hidden px-4 py-2.5 font-medium sm:table-cell">Plan</th>
               <th className="px-4 py-2.5 font-medium">Expires</th>
               <th className="hidden px-4 py-2.5 font-medium md:table-cell">Leads</th>
-              <th className="hidden px-4 py-2.5 font-medium lg:table-cell">Last active</th>
+              <th className="hidden px-4 py-2.5 font-medium lg:table-cell">Last login</th>
               <th className="px-4 py-2.5" />
             </tr>
           </thead>
@@ -355,7 +355,7 @@ export function UsersClient({ initialUsers, plans }: { initialUsers: AdminUserRo
                 <td className="hidden px-4 py-3 sm:table-cell">{u.planName ?? <span className="text-muted-foreground">—</span>}</td>
                 <td className="px-4 py-3 text-xs"><ExpiryCell iso={u.expiresAt} /></td>
                 <td className="hidden px-4 py-3 tabular-nums md:table-cell">{u.leads}</td>
-                <td className="hidden px-4 py-3 text-muted-foreground lg:table-cell">{u.lastActive}</td>
+                <td className="hidden px-4 py-3 text-muted-foreground lg:table-cell">{u.lastLogin}</td>
                 <td className="px-4 py-3 text-right">
                   <DropdownMenu>
                     <DropdownMenuTrigger aria-label={`Actions for ${u.name}`} className="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none">

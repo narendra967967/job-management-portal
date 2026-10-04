@@ -6,6 +6,7 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
+import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { account, session, user, verification } from "@/db/schema";
 import { hashPassword, verifyPassword } from "@/lib/password";
@@ -38,6 +39,15 @@ export const authAdmin = betterAuth({
       status: { type: "string", required: false, defaultValue: "active", input: false },
       planId: { type: "string", required: false, input: false },
       planExpiresAt: { type: "date", required: false, input: false },
+    },
+  },
+  databaseHooks: {
+    session: {
+      create: {
+        after: async (s) => {
+          await db.update(user).set({ lastLoginAt: new Date() }).where(eq(user.id, s.userId));
+        },
+      },
     },
   },
   plugins: [nextCookies()],
