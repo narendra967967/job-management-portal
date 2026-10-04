@@ -238,9 +238,6 @@ function MultiSelect({ options, selected, onChange, placeholder = "Select…" }:
 
 function ProfileCard({ initial }: { initial: AdminSettings["profile"] }) {
   const [name, setName] = useState(initial.name);
-  // Theme / rows are per-admin UI prefs with no table yet — local only for now.
-  const [theme, setTheme] = useState("system");
-  const [rows, setRows] = useState("25");
   const sv = useSaver();
   return (
     <section className="rounded-2xl border bg-card p-4 md:p-5">
@@ -251,21 +248,6 @@ function ProfileCard({ initial }: { initial: AdminSettings["profile"] }) {
         </Field>
         <Field label="Email (sign-in)">
           <Input value={initial.email} disabled title="Your login email can't be changed here" />
-        </Field>
-      </div>
-      <SubHead>Preferences</SubHead>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Theme">
-          <select className={selectCls} value={theme} onChange={(e) => setTheme(e.target.value)}>
-            <option value="system">System</option>
-            <option value="light">Light</option>
-            <option value="dark">Dark</option>
-          </select>
-        </Field>
-        <Field label="Rows per page">
-          <select className={selectCls} value={rows} onChange={(e) => setRows(e.target.value)}>
-            <option>10</option><option>25</option><option>50</option><option>100</option>
-          </select>
         </Field>
       </div>
       <SaveRow busy={sv.busy} saved={sv.saved} error={sv.error} onSave={() => sv.save(() => updateAdminProfileAction({ name }))} />
