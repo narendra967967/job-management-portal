@@ -38,9 +38,14 @@ function revalidate() {
 
 export async function updateAdminProfileAction(input: unknown): Promise<Result> {
   const adminId = await requireAdmin();
-  const p = z.object({ name: z.string().trim().min(1, "Name is required.").max(120) }).safeParse(input);
+  const p = z
+    .object({
+      name: z.string().trim().min(1, "Name is required.").max(120),
+      mobile: z.string().trim().max(24, "Contact number is too long.").optional().default(""),
+    })
+    .safeParse(input);
   if (!p.success) return fail(p.error);
-  await db.update(user).set({ name: p.data.name }).where(eq(user.id, adminId));
+  await db.update(user).set({ name: p.data.name, mobile: p.data.mobile || null }).where(eq(user.id, adminId));
   revalidate();
   return { ok: true };
 }

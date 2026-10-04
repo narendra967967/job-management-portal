@@ -238,6 +238,7 @@ function MultiSelect({ options, selected, onChange, placeholder = "Select…" }:
 
 function ProfileCard({ initial }: { initial: AdminSettings["profile"] }) {
   const [name, setName] = useState(initial.name);
+  const [mobile, setMobile] = useState(initial.mobile);
   const sv = useSaver();
   return (
     <section className="rounded-2xl border bg-card p-4 md:p-5">
@@ -249,8 +250,17 @@ function ProfileCard({ initial }: { initial: AdminSettings["profile"] }) {
         <Field label="Email (sign-in)">
           <Input value={initial.email} disabled title="Your login email can't be changed here" />
         </Field>
+        <Field label="Contact number" hint="Optional — used to reach you">
+          <Input
+            type="tel"
+            value={mobile}
+            onChange={(e) => setMobile(e.target.value)}
+            placeholder="e.g. +91 98765 43210"
+            autoComplete="tel"
+          />
+        </Field>
       </div>
-      <SaveRow busy={sv.busy} saved={sv.saved} error={sv.error} onSave={() => sv.save(() => updateAdminProfileAction({ name }))} />
+      <SaveRow busy={sv.busy} saved={sv.saved} error={sv.error} onSave={() => sv.save(() => updateAdminProfileAction({ name, mobile }))} />
     </section>
   );
 }

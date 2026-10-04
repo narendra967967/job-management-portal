@@ -17,7 +17,7 @@ import {
 } from "@/db/schema";
 
 export interface AdminSettings {
-  profile: { name: string; email: string };
+  profile: { name: string; email: string; mobile: string };
   general: { appName: string; supportEmail: string; timezone: string; allowSignup: boolean; maintenance: boolean };
   security: {
     pwMinLength: number;
@@ -77,7 +77,7 @@ export interface AdminSettings {
 
 export async function loadAdminSettings(adminId: string): Promise<AdminSettings> {
   const [u, gen, sec, cron, bill, ai, smtp] = await Promise.all([
-    db.select({ name: user.name, email: user.email }).from(user).where(eq(user.id, adminId)).limit(1),
+    db.select({ name: user.name, email: user.email, mobile: user.mobile }).from(user).where(eq(user.id, adminId)).limit(1),
     db.select().from(appSettings).limit(1),
     db.select().from(securityConfig).limit(1),
     db.select().from(cronConfig).limit(1),
@@ -93,7 +93,7 @@ export async function loadAdminSettings(adminId: string): Promise<AdminSettings>
   const m = smtp[0];
 
   return {
-    profile: { name: u[0]?.name ?? "", email: u[0]?.email ?? "" },
+    profile: { name: u[0]?.name ?? "", email: u[0]?.email ?? "", mobile: u[0]?.mobile ?? "" },
     general: {
       appName: g?.appName ?? "Job Management Portal",
       supportEmail: g?.supportEmail ?? "",
