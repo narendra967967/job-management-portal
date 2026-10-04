@@ -16,14 +16,12 @@ import { Button } from "@/components/admin/ui/button";
 import { Input } from "@/components/admin/ui/input";
 import { Label } from "@/components/admin/ui/label";
 import { PasswordField, isPasswordValid } from "@/components/admin/ui/password-field";
-import {
-  PLAN_LABELS,
-  ROLE_LABELS,
-  type AdminUser,
-  type AdminUserStatus,
-  type AdminUserRole,
-  type AdminPlan,
-} from "@/lib/admin/mock-users";
+import type {
+  AdminUserRow,
+  AdminUserStatus,
+  AdminUserRole,
+  PlanOption,
+} from "@/lib/admin/users-data";
 
 export interface UserFormValues {
   name: string;
@@ -32,7 +30,7 @@ export interface UserFormValues {
   mobile: string;
   role: AdminUserRole;
   status: AdminUserStatus;
-  plan: AdminPlan;
+  planId: string | null;
   expiresAt: string | null;
 }
 
@@ -85,12 +83,14 @@ export function UserFormDialog({
   open,
   onOpenChange,
   user,
+  plans,
   onSave,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  user: AdminUser | null;
-  onSave: (values: UserFormValues) => void;
+  user: AdminUserRow | null;
+  plans: PlanOption[];
+  onSave: (values: UserFormValues) => Promise<{ ok: boolean; error?: string }>;
 }) {
   const editing = !!user;
   const [name, setName] = useState("");
@@ -99,9 +99,10 @@ export function UserFormDialog({
   const [mobile, setMobile] = useState("");
   const [role, setRole] = useState<AdminUserRole>("user");
   const [status, setStatus] = useState<AdminUserStatus>("active");
-  const [plan, setPlan] = useState<AdminPlan>("free");
+  const [planId, setPlanId] = useState<string>("");
   const [expiresAt, setExpiresAt] = useState("");
   const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
   const mobileRef = useRef<HTMLInputElement>(null);
 
   // The mask reformats on every keystroke, which resets the caret; keep it at the
@@ -121,29 +122,37 @@ export function UserFormDialog({
     setMobile(groupNational(user?.mobile ?? ""));
     setRole(user?.role ?? "user");
     setStatus(user?.status ?? "active");
-    setPlan(user?.plan ?? "free");
+    setPlanId(user?.planId ?? "");
     setExpiresAt(user?.expiresAt ?? "");
     setPassword("");
     setError("");
+    setBusy(false);
   }, [open, user]);
 
-  function save() {
+  async function save() {
     if (!name.trim()) return setError("Name is required.");
     if (!editing) {
       if (!/^\S+@\S+\.\S+$/.test(email.trim())) return setError("Enter a valid email address.");
       if (!isPasswordValid(password)) return setError("Password doesn't meet all the requirements below.");
     }
-    onSave({
-      name: name.trim(),
-      email: email.trim(),
-      password: password || undefined,
-      mobile: storedMobile(mobile),
-      role,
-      status,
-      plan,
-      expiresAt: expiresAt || null,
-    });
-    onOpenChange(false);
+    setError("");
+    setBusy(true);
+    try {
+      const res = await onSave({
+        name: name.trim(),
+        email: email.trim(),
+        password: password || undefined,
+        mobile: storedMobile(mobile),
+        role,
+        status,
+        planId: planId || null,
+        expiresAt: expiresAt || null,
+      });
+      if (!res.ok) setError(res.error ?? "Couldn't save.");
+      else onOpenChange(false);
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -197,9 +206,8 @@ export function UserFormDialog({
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Role">
               <select className={selectCls} value={role} onChange={(e) => setRole(e.target.value as AdminUserRole)}>
-                {Object.entries(ROLE_LABELS).map(([v, l]) => (
-                  <option key={v} value={v}>{l}</option>
-                ))}
+                <option value="user">User</option>
+                <option value="admin">Admin</option>
               </select>
             </Field>
             <Field label="Status">
@@ -212,9 +220,10 @@ export function UserFormDialog({
 
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Subscription plan">
-              <select className={selectCls} value={plan} onChange={(e) => setPlan(e.target.value as AdminPlan)}>
-                {Object.entries(PLAN_LABELS).map(([v, l]) => (
-                  <option key={v} value={v}>{l}</option>
+              <select className={selectCls} value={planId} onChange={(e) => setPlanId(e.target.value)}>
+                <option value="">No plan</option>
+                {plans.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
                 ))}
               </select>
             </Field>
@@ -228,7 +237,9 @@ export function UserFormDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={save}>{editing ? "Save changes" : "Add user"}</Button>
+          <Button onClick={save} disabled={busy}>
+            {busy ? "Saving…" : editing ? "Save changes" : "Add user"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

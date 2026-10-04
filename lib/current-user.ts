@@ -21,6 +21,15 @@ export async function getCurrentUserId(): Promise<string> {
   return id;
 }
 
+/** The signed-in admin's id, redirecting to the admin login when the session is
+ *  missing or the account isn't an admin. Use in admin loaders + Server Actions. */
+export async function requireAdmin(): Promise<string> {
+  const s = await auth.api.getSession({ headers: await headers() });
+  const u = s?.user as { id?: string; role?: string } | undefined;
+  if (!u?.id || u.role !== "admin") redirect("/jmp-admin/login");
+  return u.id;
+}
+
 /** Whether Google OAuth is configured, so the Settings "Connect Google" (Gmail
  *  linking) can work. Login does not depend on this. */
 export function googleConfigured(): boolean {
