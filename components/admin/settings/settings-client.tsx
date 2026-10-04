@@ -148,6 +148,9 @@ const selectCls =
 const textareaCls =
   "min-h-20 w-full rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
 
+// Keep in sync with actions/admin-settings.ts (server enforces the same limit).
+const BRANDING_MAX_BYTES = 512 * 1024;
+
 type SaveResult = { ok: boolean; error?: string };
 
 function useSaver() {
@@ -417,20 +420,40 @@ function BrandingAsset({
     const file = e.target.files?.[0];
     e.target.value = ""; // allow re-selecting the same file
     if (!file) return;
+
+    // Validate on the client first — mirrors the server rules, and (critically)
+    // stops oversized files before they hit Next's Server Action body limit,
+    // which would otherwise throw a raw "Body exceeded 1 MB limit" error.
+    const ext = (file.name.split(".").pop() ?? "").toLowerCase();
+    const okExt = kind === "logo" ? ["png", "jpg", "jpeg", "webp"] : ["png", "ico"];
+    if (!okExt.includes(ext)) {
+      setError(kind === "logo" ? "Upload a PNG, JPG, or WebP image." : "Upload a PNG or ICO file.");
+      return;
+    }
+    if (file.size > BRANDING_MAX_BYTES) {
+      setError(`File must be under 512 KB — this one is ${(file.size / 1024).toFixed(0)} KB.`);
+      return;
+    }
+
     setBusy(true);
     setError("");
     setMsg("");
-    const fd = new FormData();
-    fd.set("kind", kind);
-    fd.set("file", file);
-    const res = await uploadBrandingAction(fd);
-    setBusy(false);
-    if (res.ok) {
-      setMsg("Updated");
-      setTimeout(() => setMsg(""), 1800);
-      router.refresh();
-    } else {
-      setError(res.error);
+    try {
+      const fd = new FormData();
+      fd.set("kind", kind);
+      fd.set("file", file);
+      const res = await uploadBrandingAction(fd);
+      if (res.ok) {
+        setMsg("Updated");
+        setTimeout(() => setMsg(""), 1800);
+        router.refresh();
+      } else {
+        setError(res.error);
+      }
+    } catch {
+      setError("Upload failed — please try a smaller file.");
+    } finally {
+      setBusy(false);
     }
   }
 
