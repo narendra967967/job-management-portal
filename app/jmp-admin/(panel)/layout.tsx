@@ -1,6 +1,6 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
+import { authAdmin } from "@/lib/auth-admin";
 import { AdminShell } from "@/components/admin/admin-shell";
 
 // Authenticated admin panel. Enforced server-side on every page: a valid session
@@ -10,7 +10,7 @@ export default async function AdminPanelLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const session = await auth.api.getSession({ headers: await headers() });
+  const session = await authAdmin.api.getSession({ headers: await headers() });
   const u = session?.user as { name?: string; email?: string; role?: string } | undefined;
   if (!u || u.role !== "admin") redirect("/jmp-admin/login");
 

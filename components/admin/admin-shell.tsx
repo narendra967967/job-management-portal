@@ -28,7 +28,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { authClient } from "@/lib/auth-client";
+import { adminSignOut } from "@/lib/auth-admin-client";
 
 interface Item {
   href?: string;
@@ -223,7 +223,7 @@ export function AdminShell({
 
   async function logout() {
     try {
-      await authClient.signOut();
+      await adminSignOut();
     } finally {
       router.push("/jmp-admin/login");
     }

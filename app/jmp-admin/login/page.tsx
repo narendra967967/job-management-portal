@@ -11,7 +11,7 @@ import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { Button } from "@/components/admin/ui/button";
 import { Input } from "@/components/admin/ui/input";
 import { Label } from "@/components/admin/ui/label";
-import { authClient, signInEmail } from "@/lib/auth-client";
+import { adminAuthClient, adminSignInEmail } from "@/lib/auth-admin-client";
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -25,7 +25,7 @@ export default function AdminLoginPage() {
     e.preventDefault();
     setBusy(true);
     setError("");
-    const res = await signInEmail(email.trim(), password);
+    const res = await adminSignInEmail(email.trim(), password);
     if (res.error) {
       setError(res.error.message ?? "Invalid email or password.");
       setBusy(false);
@@ -34,7 +34,7 @@ export default function AdminLoginPage() {
     // Admin panel is admin-only — reject non-admins (and sign them back out).
     const role = (res.data?.user as { role?: string } | undefined)?.role;
     if (role !== "admin") {
-      await authClient.signOut();
+      await adminAuthClient.signOut();
       setError("This account doesn't have admin access.");
       setBusy(false);
       return;
