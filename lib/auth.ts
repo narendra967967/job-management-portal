@@ -18,7 +18,7 @@ import { db } from "@/lib/db";
 import { account, securityConfig, session, user, verification } from "@/db/schema";
 import { hashPassword, verifyPassword } from "@/lib/password";
 import { provisionUserDefaults } from "@/lib/provision";
-import { sendMail, SMTP_NOT_CONFIGURED } from "@/lib/mailer";
+import { sendAppEmail, SMTP_NOT_CONFIGURED } from "@/lib/email";
 import { getAppName } from "@/lib/branding";
 
 export const auth = betterAuth({
@@ -41,16 +41,17 @@ export const auth = betterAuth({
     // yet, log the link so the flow is testable locally without email.
     sendResetPassword: async ({ user, url }) => {
       const appName = await getAppName();
-      const subject = `Reset your ${appName} password`;
-      const html = `<p>We received a request to reset your ${appName} password.</p>
-<p><a href="${url}">Reset your password</a> — this link expires in 1 hour.</p>
-<p>If you didn't request this, you can ignore this email.</p>`;
       try {
-        await sendMail({
+        await sendAppEmail({
           to: user.email,
-          subject,
-          html,
-          text: `Reset your password: ${url}`,
+          subject: `Reset your ${appName} password`,
+          heading: "Reset your password",
+          lines: [
+            `We received a request to reset your ${appName} password.`,
+            "Click the button below to choose a new one — this link expires in 1 hour.",
+          ],
+          button: { label: "Reset your password", url },
+          footerNote: "If you didn't request this, you can safely ignore this email.",
         });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);

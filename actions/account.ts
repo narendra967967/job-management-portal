@@ -8,7 +8,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { getSessionUser, accessState } from "@/lib/current-user";
 import { appSettings, user } from "@/db/schema";
-import { sendMail, SMTP_NOT_CONFIGURED } from "@/lib/mailer";
+import { sendAppEmail, SMTP_NOT_CONFIGURED } from "@/lib/email";
 
 const schema = z.object({
   message: z.string().trim().min(1, "Write a short message.").max(5000),
@@ -41,22 +41,22 @@ export async function requestReactivationAction(input: unknown): Promise<{ ok: b
   // app. Fall back to the escaped plain text when empty.
   const bodyHtml = parsed.data.html?.trim() || `<p>${esc(parsed.data.message)}</p>`;
   const subject = `Reactivation request — ${u.name || u.email}`;
-  const html = `
-    <p><strong>${esc(u.name)}</strong> has requested their account be reactivated.</p>
-    <table cellpadding="4" style="border-collapse:collapse;font-size:14px">
+  const detailsHtml = `
+    <p style="margin:0 0 14px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;color:#374151;"><strong>${esc(u.name)}</strong> has requested their account be reactivated.</p>
+    <table cellpadding="4" style="border-collapse:collapse;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#374151">
       <tr><td><strong>Name</strong></td><td>${esc(u.name)}</td></tr>
       <tr><td><strong>Email</strong></td><td>${esc(u.email)}</td></tr>
       <tr><td><strong>Mobile</strong></td><td>${esc(u.mobile ?? "—")}</td></tr>
       <tr><td><strong>User ID</strong></td><td>${esc(u.id)}</td></tr>
-      <tr><td><strong>Requested</strong></td><td>${new Date().toISOString()}</td></tr>
+      <tr><td><strong>Requested</strong></td><td>${esc(new Date().toISOString())}</td></tr>
     </table>
-    <p style="margin-top:12px"><strong>Message</strong></p>
+    <p style="margin:16px 0 8px;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#111827"><strong>Message</strong></p>
     ${bodyHtml}
   `;
   const text = `${u.name} (${u.email}) requests account reactivation.\n\n${parsed.data.message}`;
 
   try {
-    await sendMail({ to, subject, html, text });
+    await sendAppEmail({ to, subject, heading: "Account reactivation request", bodyHtml: detailsHtml, text });
     return { ok: true };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

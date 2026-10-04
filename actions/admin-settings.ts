@@ -14,7 +14,7 @@ import { authAdmin } from "@/lib/auth-admin";
 import { encryptSecret } from "@/lib/crypto";
 import { validatePassword } from "@/lib/admin/password-policy-server";
 import { getAppName } from "@/lib/branding";
-import { sendMail, SMTP_NOT_CONFIGURED } from "@/lib/mailer";
+import { sendAppEmail, SMTP_NOT_CONFIGURED } from "@/lib/email";
 import {
   appAssets,
   appSettings,
@@ -337,11 +337,14 @@ export async function sendTestEmailAction(to: unknown): Promise<Result> {
   if (!p.success) return fail(p.error);
   const appName = await getAppName();
   try {
-    await sendMail({
+    await sendAppEmail({
       to: p.data,
       subject: `${appName} — SMTP test email`,
-      html: `<p>This is a test email from your ${appName} admin settings. If you received it, SMTP is working.</p>`,
-      text: `SMTP test email from ${appName}. If you received it, SMTP is working.`,
+      heading: "Your SMTP is working",
+      lines: [
+        "This is a test email from your admin settings.",
+        "If it landed in your inbox, outbound email is configured correctly.",
+      ],
     });
     return { ok: true };
   } catch (e) {

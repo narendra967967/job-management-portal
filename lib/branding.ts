@@ -16,6 +16,17 @@ export const getAppName = cache(async (): Promise<string> => {
   return s?.appName?.trim() || DEFAULT_APP_NAME;
 });
 
+/** The configured support email, or "" when none is set. */
+export const getSupportEmail = cache(async (): Promise<string> => {
+  const [s] = await db.select({ supportEmail: appSettings.supportEmail }).from(appSettings).limit(1);
+  return s?.supportEmail?.trim() || "";
+});
+
+/** Absolute base URL of the app (for links/assets in emails). */
+export function getAppBaseUrl(): string {
+  return (process.env.BETTER_AUTH_URL ?? "http://localhost:3000").replace(/\/+$/, "");
+}
+
 export interface BrandingState {
   hasLogo: boolean;
   logoVersion: number;
