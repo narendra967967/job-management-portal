@@ -15,15 +15,12 @@ export async function getSessionUserId(): Promise<string | null> {
 }
 
 /** The signed-in user's id, redirecting to the login page when unauthenticated.
- *  Admin-role accounts belong to the separate admin panel and are sent there, so
- *  the user dashboard and admin panel stay fully separate. Use in dashboard reads
- *  and Server Actions. */
+ *  Use in dashboard reads and Server Actions. (Admin accounts are kept out of the
+ *  user app at the login step, not here, to avoid redirect loops with "/".) */
 export async function getCurrentUserId(): Promise<string> {
-  const s = await auth.api.getSession({ headers: await headers() });
-  const u = s?.user as { id?: string; role?: string } | undefined;
-  if (!u?.id) redirect("/");
-  if (u.role === "admin") redirect("/jmp-admin");
-  return u.id;
+  const id = await getSessionUserId();
+  if (!id) redirect("/");
+  return id;
 }
 
 /** The signed-in admin's id, redirecting to the admin login when the session is

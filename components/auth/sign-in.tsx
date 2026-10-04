@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { LogIn } from "lucide-react";
-import { signInEmail } from "@/lib/auth-client";
+import { authClient, signInEmail } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
@@ -26,6 +26,14 @@ export function LoginForm() {
     const res = await signInEmail(email.trim(), password, remember);
     if (res?.error) {
       setError(res.error.message ?? "Incorrect email or password.");
+      setBusy(false);
+      return;
+    }
+    // Admin accounts belong to the admin panel, not the user dashboard.
+    const role = (res.data?.user as { role?: string } | undefined)?.role;
+    if (role === "admin") {
+      await authClient.signOut();
+      setError("This is an admin account. Please use the admin panel at /jmp-admin.");
       setBusy(false);
       return;
     }
