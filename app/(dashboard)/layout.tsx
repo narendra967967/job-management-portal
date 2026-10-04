@@ -19,6 +19,7 @@ import {
 } from "@/components/leads/add-lead-dialog";
 import { redirect } from "next/navigation";
 import { getSessionUser, accessState } from "@/lib/current-user";
+import { guardMaintenance } from "@/lib/maintenance";
 import { loadWorkspace } from "@/lib/queries";
 import { WorkspaceProvider } from "@/lib/workspace-provider";
 
@@ -27,6 +28,8 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
+  // Maintenance mode takes the whole user side offline (admin panel stays up).
+  await guardMaintenance();
   // Gate on the admin-managed account state: deactivated / expired users can sign
   // in but don't reach the dashboard.
   const u = await getSessionUser();
