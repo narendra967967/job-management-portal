@@ -3,7 +3,7 @@ import "server-only";
 // Read side of the admin Users screen — assembled from the real DB. Mutations
 // live in actions/admin-users.ts.
 
-import { sql } from "drizzle-orm";
+import { ne, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { user, plans, jobLeads, session } from "@/db/schema";
 
@@ -57,7 +57,9 @@ export async function listPlanOptions(): Promise<PlanOption[]> {
   return rows;
 }
 
-export async function listAdminUsers(): Promise<AdminUserRow[]> {
+/** All users for the admin grid, optionally excluding one id (the logged-in admin,
+ *  so they can't accidentally deactivate/delete themselves). */
+export async function listAdminUsers(excludeId?: string): Promise<AdminUserRow[]> {
   const [users, planRows, leadCounts, lastSessions] = await Promise.all([
     db
       .select({
@@ -72,6 +74,7 @@ export async function listAdminUsers(): Promise<AdminUserRow[]> {
         createdAt: user.createdAt,
       })
       .from(user)
+      .where(excludeId ? ne(user.id, excludeId) : undefined)
       .orderBy(user.createdAt),
     db.select({ id: plans.id, name: plans.name }).from(plans),
     db
