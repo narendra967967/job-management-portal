@@ -15,6 +15,9 @@ import {
   Sparkles,
   Clock,
   ShieldCheck,
+  Eye,
+  EyeOff,
+  Send,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/admin/ui/button";
@@ -35,7 +38,7 @@ const SECTION = {
   password: { id: "password", label: "Password", icon: Lock, render: () => <PasswordCard /> },
   general: { id: "general", label: "General", icon: Cog, render: () => <PlaceholderCard title="General" /> },
   billing: { id: "billing", label: "Billing", icon: CreditCard, render: () => <PlaceholderCard title="Billing" /> },
-  email: { id: "email", label: "Email / SMTP", icon: Mail, render: () => <PlaceholderCard title="Email / SMTP" /> },
+  email: { id: "email", label: "Email / SMTP", icon: Mail, render: () => <EmailCard /> },
   ai: { id: "ai", label: "AI", icon: Sparkles, render: () => <AiCard /> },
   cron: { id: "cron", label: "Cron & schedule", icon: Clock, render: () => <PlaceholderCard title="Cron & schedule" /> },
   security: { id: "security", label: "Security", icon: ShieldCheck, render: () => <PlaceholderCard title="Security" /> },
@@ -230,6 +233,159 @@ function PasswordCard() {
           <Button onClick={changePw}>Change password</Button>
           {saved && <span className="text-xs text-status-applied-foreground">Password updated</span>}
         </div>
+      </div>
+    </section>
+  );
+}
+
+/* ---------------- Application: Email / SMTP ---------------- */
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function EmailCard() {
+  const [enabled, setEnabled] = useState(true);
+  const [host, setHost] = useState("");
+  const [port, setPort] = useState("587");
+  const [encryption, setEncryption] = useState("starttls");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPw, setShowPw] = useState(false);
+  const [fromName, setFromName] = useState("JMP");
+  const [fromEmail, setFromEmail] = useState("");
+  const [replyTo, setReplyTo] = useState("");
+  const [error, setError] = useState("");
+  const [saved, setSaved] = useState(false);
+  const [testTo, setTestTo] = useState("");
+  const [testMsg, setTestMsg] = useState("");
+
+  const configured = host.trim() !== "" && EMAIL_RE.test(fromEmail.trim());
+
+  function save() {
+    if (enabled) {
+      if (!host.trim()) return setError("SMTP host is required.");
+      if (!port.trim() || !Number.isFinite(Number(port))) return setError("Enter a valid port.");
+      if (!EMAIL_RE.test(fromEmail.trim())) return setError("Enter a valid “From” email.");
+      if (replyTo.trim() && !EMAIL_RE.test(replyTo.trim())) return setError("Enter a valid reply-to email.");
+    }
+    setError("");
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1800);
+  }
+
+  function sendTest() {
+    if (!EMAIL_RE.test(testTo.trim())) {
+      setTestMsg("Enter a valid email address.");
+      return;
+    }
+    // Mock send until the backend is wired.
+    setTestMsg(`Test email sent to ${testTo.trim()}.`);
+    setTimeout(() => setTestMsg(""), 3000);
+  }
+
+  return (
+    <section className="rounded-2xl border bg-card p-4 md:p-5">
+      <div className="flex items-center gap-2">
+        <h2 className="text-sm font-medium">Email / SMTP</h2>
+        <span
+          className={cn(
+            "rounded-full px-2 py-0.5 text-[10px] font-medium",
+            configured ? "bg-status-applied text-status-applied-foreground" : "bg-muted text-muted-foreground",
+          )}
+        >
+          {configured ? "Configured" : "Not configured"}
+        </span>
+      </div>
+
+      <label className="mt-4 flex cursor-pointer items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={enabled}
+          onChange={(e) => setEnabled(e.target.checked)}
+          className="size-4 cursor-pointer rounded border-input accent-primary"
+        />
+        Send emails via SMTP
+      </label>
+
+      <div className={cn("mt-4 space-y-3", !enabled && "pointer-events-none opacity-50")}>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="SMTP host">
+            <Input value={host} onChange={(e) => setHost(e.target.value)} placeholder="smtp.example.com" autoComplete="off" />
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Port">
+              <Input type="number" value={port} onChange={(e) => setPort(e.target.value)} placeholder="587" />
+            </Field>
+            <Field label="Encryption">
+              <select className={selectCls} value={encryption} onChange={(e) => setEncryption(e.target.value)}>
+                <option value="none">None</option>
+                <option value="starttls">STARTTLS</option>
+                <option value="ssl">SSL / TLS</option>
+              </select>
+            </Field>
+          </div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Username">
+            <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="user@example.com" autoComplete="off" />
+          </Field>
+          <Field label="Password">
+            <div className="relative">
+              <Input
+                type={showPw ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                autoComplete="off"
+                className="pr-9 font-mono"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPw((s) => !s)}
+                aria-label={showPw ? "Hide password" : "Show password"}
+                className="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                {showPw ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+              </button>
+            </div>
+          </Field>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="From name">
+            <Input value={fromName} onChange={(e) => setFromName(e.target.value)} placeholder="JMP" />
+          </Field>
+          <Field label="From email">
+            <Input type="email" value={fromEmail} onChange={(e) => setFromEmail(e.target.value)} placeholder="noreply@example.com" />
+          </Field>
+        </div>
+
+        <Field label="Reply-to (optional)">
+          <Input type="email" value={replyTo} onChange={(e) => setReplyTo(e.target.value)} placeholder="support@example.com" />
+        </Field>
+      </div>
+
+      {error && <p className="mt-3 text-xs text-destructive">{error}</p>}
+      <div className="mt-4 flex items-center gap-3">
+        <Button onClick={save}>Save changes</Button>
+        {saved && <span className="text-xs text-status-applied-foreground">Saved</span>}
+      </div>
+
+      <div className="mt-5 border-t pt-4">
+        <h3 className="text-sm font-medium">Send a test email</h3>
+        <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+          <Input
+            type="email"
+            value={testTo}
+            onChange={(e) => setTestTo(e.target.value)}
+            placeholder="you@example.com"
+            className="sm:flex-1"
+          />
+          <Button variant="outline" onClick={sendTest}>
+            <Send /> Send test
+          </Button>
+        </div>
+        {testMsg && <p className="mt-2 text-xs text-muted-foreground">{testMsg}</p>}
       </div>
     </section>
   );
