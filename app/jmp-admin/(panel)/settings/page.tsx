@@ -8,14 +8,11 @@
 import { useState } from "react";
 import {
   User,
-  SlidersHorizontal,
-  Sparkles,
   Lock,
   Cog,
+  CreditCard,
   Mail,
-  Wallet,
-  Receipt,
-  Wand2,
+  Sparkles,
   Clock,
   ShieldCheck,
   type LucideIcon,
@@ -35,24 +32,18 @@ interface SettingsSection {
 
 const SECTION = {
   profile: { id: "profile", label: "Profile", icon: User, render: () => <ProfileCard /> },
-  preferences: { id: "preferences", label: "Preferences", icon: SlidersHorizontal, render: () => <PreferencesCard /> },
-  ai: { id: "ai", label: "AI integration", icon: Sparkles, render: () => <AiCard /> },
   password: { id: "password", label: "Password", icon: Lock, render: () => <PasswordCard /> },
   general: { id: "general", label: "General", icon: Cog, render: () => <PlaceholderCard title="General" /> },
+  billing: { id: "billing", label: "Billing", icon: CreditCard, render: () => <PlaceholderCard title="Billing" /> },
   email: { id: "email", label: "Email / SMTP", icon: Mail, render: () => <PlaceholderCard title="Email / SMTP" /> },
-  payments: { id: "payments", label: "Payments", icon: Wallet, render: () => <PlaceholderCard title="Payments" /> },
-  taxes: { id: "taxes", label: "Taxes & GST", icon: Receipt, render: () => <PlaceholderCard title="Taxes & GST" /> },
-  prompts: { id: "prompts", label: "AI & prompts", icon: Wand2, render: () => <PlaceholderCard title="AI & prompts" /> },
+  ai: { id: "ai", label: "AI", icon: Sparkles, render: () => <AiCard /> },
   cron: { id: "cron", label: "Cron & schedule", icon: Clock, render: () => <PlaceholderCard title="Cron & schedule" /> },
   security: { id: "security", label: "Security", icon: ShieldCheck, render: () => <PlaceholderCard title="Security" /> },
 } satisfies Record<string, SettingsSection>;
 
 const GROUPS: { label: string; items: SettingsSection[] }[] = [
-  { label: "Account", items: [SECTION.profile, SECTION.preferences, SECTION.ai, SECTION.password] },
-  {
-    label: "Application",
-    items: [SECTION.general, SECTION.email, SECTION.payments, SECTION.taxes, SECTION.prompts, SECTION.cron, SECTION.security],
-  },
+  { label: "Account", items: [SECTION.profile, SECTION.password] },
+  { label: "Application", items: [SECTION.general, SECTION.billing, SECTION.email, SECTION.ai, SECTION.cron, SECTION.security] },
 ];
 const SECTIONS: SettingsSection[] = GROUPS.flatMap((g) => g.items);
 
@@ -152,10 +143,12 @@ function PlaceholderCard({ title }: { title: string }) {
   );
 }
 
-/* ---------------- Account sections ---------------- */
+/* ---------------- Account ---------------- */
 
 function ProfileCard() {
   const [name, setName] = useState("Narendra Gupta");
+  const [theme, setTheme] = useState("system");
+  const [rows, setRows] = useState("25");
   return (
     <section className="rounded-2xl border bg-card p-4 md:p-5">
       <h2 className="text-sm font-medium">Profile</h2>
@@ -167,18 +160,9 @@ function ProfileCard() {
           <Input value="narendragpt967967@gmail.com" disabled title="Your login email can't be changed here" />
         </Field>
       </div>
-      <SaveRow />
-    </section>
-  );
-}
 
-function PreferencesCard() {
-  const [theme, setTheme] = useState("system");
-  const [rows, setRows] = useState("25");
-  return (
-    <section className="rounded-2xl border bg-card p-4 md:p-5">
-      <h2 className="text-sm font-medium">Preferences</h2>
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+      <h3 className="mt-5 mb-3 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">Preferences</h3>
+      <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Theme">
           <select className={selectCls} value={theme} onChange={(e) => setTheme(e.target.value)}>
             <option value="system">System</option>
@@ -195,36 +179,8 @@ function PreferencesCard() {
           </select>
         </Field>
       </div>
-      <SaveRow />
-    </section>
-  );
-}
 
-function AiCard() {
-  const [provider, setProvider] = useState("openai");
-  const [model, setModel] = useState("");
-  const [key, setKey] = useState("");
-  return (
-    <section className="rounded-2xl border bg-card p-4 md:p-5">
-      <h2 className="text-sm font-medium">AI integration</h2>
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <Field label="Provider">
-          <select className={selectCls} value={provider} onChange={(e) => setProvider(e.target.value)}>
-            <option value="openai">OpenAI</option>
-            <option value="anthropic">Claude (Anthropic)</option>
-            <option value="openrouter">OpenRouter</option>
-          </select>
-        </Field>
-        <Field label="Model">
-          <Input value={model} onChange={(e) => setModel(e.target.value)} placeholder="e.g. gpt-4o-mini" />
-        </Field>
-      </div>
-      <div className="mt-3">
-        <Field label="API key">
-          <Input type="password" value={key} onChange={(e) => setKey(e.target.value)} placeholder="sk-…" autoComplete="off" className="font-mono" />
-        </Field>
-      </div>
-      <SaveRow label="Save key" />
+      <SaveRow />
     </section>
   );
 }
@@ -274,6 +230,45 @@ function PasswordCard() {
           <Button onClick={changePw}>Change password</Button>
           {saved && <span className="text-xs text-status-applied-foreground">Password updated</span>}
         </div>
+      </div>
+    </section>
+  );
+}
+
+/* ---------------- Application: AI (integration + default prompts) ---------------- */
+
+function AiCard() {
+  const [provider, setProvider] = useState("openai");
+  const [model, setModel] = useState("");
+  const [key, setKey] = useState("");
+  return (
+    <section className="rounded-2xl border bg-card p-4 md:p-5">
+      <h2 className="text-sm font-medium">AI</h2>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <Field label="Provider">
+          <select className={selectCls} value={provider} onChange={(e) => setProvider(e.target.value)}>
+            <option value="openai">OpenAI</option>
+            <option value="anthropic">Claude (Anthropic)</option>
+            <option value="openrouter">OpenRouter</option>
+          </select>
+        </Field>
+        <Field label="Model">
+          <Input value={model} onChange={(e) => setModel(e.target.value)} placeholder="e.g. gpt-4o-mini" />
+        </Field>
+      </div>
+      <div className="mt-3">
+        <Field label="API key">
+          <Input type="password" value={key} onChange={(e) => setKey(e.target.value)} placeholder="sk-…" autoComplete="off" className="font-mono" />
+        </Field>
+      </div>
+      <SaveRow label="Save key" />
+
+      <div className="mt-5 border-t pt-4">
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-medium">Default user prompts</h3>
+          <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">soon</span>
+        </div>
+        <p className="mt-6 mb-2 text-center text-xs text-muted-foreground">Coming soon.</p>
       </div>
     </section>
   );
