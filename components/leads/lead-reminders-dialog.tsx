@@ -41,7 +41,7 @@ export function LeadRemindersDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-md">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <span className="flex size-7 items-center justify-center rounded-md bg-primary/10 text-primary">
@@ -54,6 +54,8 @@ export function LeadRemindersDialog({
           </DialogDescription>
         </DialogHeader>
 
+        {/* Scroll only the body so the full-bleed footer isn't clipped. */}
+        <div className="max-h-[55dvh] overflow-y-auto">
         {reminders.length === 0 ? (
           <div className="flex flex-col items-center rounded-xl border border-dashed px-6 py-8 text-center">
             <span className="flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
@@ -106,6 +108,7 @@ export function LeadRemindersDialog({
             })}
           </ul>
         )}
+        </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
