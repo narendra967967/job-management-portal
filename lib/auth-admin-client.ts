@@ -16,8 +16,3 @@ export function adminSignInEmail(email: string, password: string) {
 export function adminSignOut() {
   return adminAuthClient.signOut();
 }
-
-/** Change the signed-in admin's password (verifies the current one). */
-export function adminChangePassword(currentPassword: string, newPassword: string) {
-  return adminAuthClient.changePassword({ currentPassword, newPassword, revokeOtherSessions: true });
-}

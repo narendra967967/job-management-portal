@@ -7,9 +7,12 @@
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/current-user";
+import { authAdmin } from "@/lib/auth-admin";
 import { encryptSecret } from "@/lib/crypto";
+import { validatePassword } from "@/lib/admin/password-policy-server";
 import { sendMail, SMTP_NOT_CONFIGURED } from "@/lib/mailer";
 import {
   appSettings,
@@ -40,6 +43,38 @@ export async function updateAdminProfileAction(input: unknown): Promise<Result> 
   await db.update(user).set({ name: p.data.name }).where(eq(user.id, adminId));
   revalidate();
   return { ok: true };
+}
+
+/* ---------------- Password (admin's own) ---------------- */
+
+export async function updateAdminPasswordAction(input: unknown): Promise<Result> {
+  await requireAdmin();
+  const p = z
+    .object({
+      currentPassword: z.string().min(1, "Enter your current password."),
+      newPassword: z.string().min(1, "Enter a new password."),
+    })
+    .safeParse(input);
+  if (!p.success) return fail(p.error);
+
+  // Enforce the configured policy here (Better Auth only checks min length).
+  const pwError = await validatePassword(p.data.newPassword);
+  if (pwError) return { ok: false, error: pwError };
+
+  try {
+    await authAdmin.api.changePassword({
+      body: {
+        currentPassword: p.data.currentPassword,
+        newPassword: p.data.newPassword,
+        revokeOtherSessions: true,
+      },
+      headers: await headers(),
+    });
+    return { ok: true };
+  } catch {
+    // Wrong current password (or any auth failure) — stay generic.
+    return { ok: false, error: "Current password is incorrect." };
+  }
 }
 
 /* ---------------- General ---------------- */
@@ -103,10 +138,12 @@ export async function updateCronAction(input: unknown): Promise<Result> {
       quietFrom: z.string().regex(/^\d{2}:\d{2}$/),
       quietTo: z.string().regex(/^\d{2}:\d{2}$/),
       quietTz: z.string().min(1),
-      quietDays: z.array(z.string()).max(7),
+      quietDays: z.array(z.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"])).max(7),
       purgeEnabled: z.boolean(),
       purgeDays: z.number().int().min(1).max(3650),
-      purgeStatuses: z.array(z.string()).max(10),
+      purgeStatuses: z
+        .array(z.enum(["new", "reviewing", "applied", "discarded", "closed"]))
+        .max(10),
     })
     .safeParse(input);
   if (!p.success) return fail(p.error);
@@ -123,9 +160,9 @@ export async function updateBillingAction(input: unknown): Promise<Result> {
   const p = z
     .object({
       enabled: z.boolean(),
-      provider: z.string().min(1),
-      mode: z.string().min(1),
-      currency: z.string().min(1),
+      provider: z.enum(["razorpay", "stripe"]),
+      mode: z.enum(["test", "live"]),
+      currency: z.enum(["INR", "USD"]),
       keyId: z.string().optional().default(""),
       keySecret: z.string().optional().default(""),
       gstin: z.string().optional().default(""),

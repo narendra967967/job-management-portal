@@ -26,10 +26,10 @@ import { Input } from "@/components/admin/ui/input";
 import { Label } from "@/components/admin/ui/label";
 import { PasswordField, isPasswordValid } from "@/components/admin/ui/password-field";
 import { setPasswordPolicy } from "@/lib/admin/password-policy";
-import { adminChangePassword } from "@/lib/auth-admin-client";
 import type { AdminSettings } from "@/lib/admin/settings-data";
 import {
   updateAdminProfileAction,
+  updateAdminPasswordAction,
   updateGeneralAction,
   updateSecurityAction,
   updateCronAction,
@@ -290,9 +290,9 @@ function PasswordCard() {
     if (next !== confirmPw) return setError("New passwords don't match.");
     setError("");
     setBusy(true);
-    const res = await adminChangePassword(current, next);
+    const res = await updateAdminPasswordAction({ currentPassword: current, newPassword: next });
     setBusy(false);
-    if (res?.error) return setError(res.error.message ?? "Couldn't change password.");
+    if (!res.ok) return setError(res.error);
     setCurrent("");
     setNext("");
     setConfirmPw("");

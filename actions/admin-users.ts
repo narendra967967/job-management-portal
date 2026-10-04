@@ -11,6 +11,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/current-user";
 import { hashPassword } from "@/lib/password";
+import { validatePassword } from "@/lib/admin/password-policy-server";
 import { provisionUserDefaults } from "@/lib/provision";
 import { account, plans, user } from "@/db/schema";
 
@@ -67,6 +68,10 @@ export async function createAdminUserAction(input: unknown): Promise<ActionResul
   const parsed = createSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: firstError(parsed.error) };
   const v = parsed.data;
+
+  // Enforce the admin-configured password policy server-side (not just min length).
+  const pwError = await validatePassword(v.password);
+  if (pwError) return { ok: false, error: pwError };
 
   const existing = await db.select({ id: user.id }).from(user).where(eq(user.email, v.email));
   if (existing.length) return { ok: false, error: "A user with that email already exists." };
@@ -142,6 +147,8 @@ export async function resetAdminUserPasswordAction(id: string, password: unknown
   const adminId = await requireAdmin();
   const p = passwordSchema.safeParse(password);
   if (!p.success) return { ok: false, error: firstError(p.error) };
+  const pwError = await validatePassword(p.data);
+  if (pwError) return { ok: false, error: pwError };
   void adminId;
   await db
     .update(account)
