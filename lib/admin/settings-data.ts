@@ -19,7 +19,7 @@ import { getBranding } from "@/lib/branding";
 
 export interface AdminSettings {
   profile: { name: string; email: string; mobile: string };
-  general: { appName: string; supportEmail: string; timezone: string; allowSignup: boolean; maintenance: boolean };
+  general: { appName: string; supportEmail: string; allowSignup: boolean; maintenance: boolean };
   branding: { hasLogo: boolean; logoVersion: number; hasFavicon: boolean; faviconVersion: number };
   security: {
     pwMinLength: number;
@@ -101,7 +101,6 @@ export async function loadAdminSettings(adminId: string): Promise<AdminSettings>
     general: {
       appName: g?.appName ?? "Job Management Portal",
       supportEmail: g?.supportEmail ?? "",
-      timezone: g?.timezone ?? "Asia/Kolkata",
       allowSignup: g?.allowSignup ?? false,
       maintenance: g?.maintenance ?? false,
     },

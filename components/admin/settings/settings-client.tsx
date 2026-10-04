@@ -340,7 +340,6 @@ function PasswordCard() {
 function GeneralCard({ initial, branding }: { initial: AdminSettings["general"]; branding: AdminSettings["branding"] }) {
   const [appName, setAppName] = useState(initial.appName);
   const [supportEmail, setSupportEmail] = useState(initial.supportEmail);
-  const [timezone, setTimezone] = useState(initial.timezone);
   const [allowSignup, setAllowSignup] = useState(initial.allowSignup);
   const [maintenance, setMaintenance] = useState(initial.maintenance);
   const sv = useSaver();
@@ -354,17 +353,12 @@ function GeneralCard({ initial, branding }: { initial: AdminSettings["general"];
         <Field label="Support email" hint="Where user queries are directed">
           <Input type="email" value={supportEmail} onChange={(e) => setSupportEmail(e.target.value)} placeholder="support@example.com" />
         </Field>
-        <Field label="Default timezone" hint="Used for schedules and timestamps">
-          <select className={selectCls} value={timezone} onChange={(e) => setTimezone(e.target.value)}>
-            {TIMEZONES.map((tz) => <option key={tz} value={tz}>{tz}</option>)}
-          </select>
-        </Field>
       </div>
       <div className="mt-4 space-y-3">
         <Toggle checked={allowSignup} onChange={setAllowSignup} label="Allow self sign-up" hint="Off = new users are added by an admin only" />
         <Toggle checked={maintenance} onChange={setMaintenance} label="Maintenance mode" hint="Temporarily blocks user access to the app" />
       </div>
-      <SaveRow busy={sv.busy} saved={sv.saved} error={sv.error} onSave={() => sv.save(() => updateGeneralAction({ appName, supportEmail, timezone, allowSignup, maintenance }))} />
+      <SaveRow busy={sv.busy} saved={sv.saved} error={sv.error} onSave={() => sv.save(() => updateGeneralAction({ appName, supportEmail, allowSignup, maintenance }))} />
 
       <SubHead>Branding</SubHead>
       <div className="grid gap-3 sm:grid-cols-2">

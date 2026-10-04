@@ -486,7 +486,6 @@ export const appSettings = pgTable("app_settings", {
   id: text("id").primaryKey().default("app"),
   appName: text("app_name").notNull().default("Job Management Portal"),
   supportEmail: text("support_email"),
-  timezone: text("timezone").notNull().default("Asia/Kolkata"),
   allowSignup: boolean("allow_signup").notNull().default(false),
   maintenance: boolean("maintenance").notNull().default(false),
   updatedAt: timestamp("updated_at", { withTimezone: true })

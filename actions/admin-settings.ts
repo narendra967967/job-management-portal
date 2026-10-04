@@ -92,7 +92,6 @@ export async function updateGeneralAction(input: unknown): Promise<Result> {
     .object({
       appName: z.string().trim().min(1, "App name is required.").max(120),
       supportEmail: z.string().trim().refine((v) => v === "" || EMAIL_RE.test(v), "Enter a valid support email."),
-      timezone: z.string().min(1),
       allowSignup: z.boolean(),
       maintenance: z.boolean(),
     })
@@ -102,7 +101,6 @@ export async function updateGeneralAction(input: unknown): Promise<Result> {
   const data = {
     appName: v.appName,
     supportEmail: v.supportEmail || null,
-    timezone: v.timezone,
     allowSignup: v.allowSignup,
     maintenance: v.maintenance,
   };
