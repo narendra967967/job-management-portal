@@ -13,6 +13,7 @@ import { requireAdmin } from "@/lib/current-user";
 import { authAdmin } from "@/lib/auth-admin";
 import { encryptSecret } from "@/lib/crypto";
 import { validatePassword } from "@/lib/admin/password-policy-server";
+import { getAppName } from "@/lib/branding";
 import { sendMail, SMTP_NOT_CONFIGURED } from "@/lib/mailer";
 import {
   appAssets,
@@ -336,12 +337,13 @@ export async function sendTestEmailAction(to: unknown): Promise<Result> {
   await requireAdmin();
   const p = z.string().trim().refine((v) => EMAIL_RE.test(v), "Enter a valid email address.").safeParse(to);
   if (!p.success) return fail(p.error);
+  const appName = await getAppName();
   try {
     await sendMail({
       to: p.data,
-      subject: "JMP — SMTP test email",
-      html: "<p>This is a test email from your Job Management Portal admin settings. If you received it, SMTP is working.</p>",
-      text: "SMTP test email from Job Management Portal. If you received it, SMTP is working.",
+      subject: `${appName} — SMTP test email`,
+      html: `<p>This is a test email from your ${appName} admin settings. If you received it, SMTP is working.</p>`,
+      text: `SMTP test email from ${appName}. If you received it, SMTP is working.`,
     });
     return { ok: true };
   } catch (e) {

@@ -19,6 +19,7 @@ import { account, securityConfig, session, user, verification } from "@/db/schem
 import { hashPassword, verifyPassword } from "@/lib/password";
 import { provisionUserDefaults } from "@/lib/provision";
 import { sendMail, SMTP_NOT_CONFIGURED } from "@/lib/mailer";
+import { getAppName } from "@/lib/branding";
 
 export const auth = betterAuth({
   secret: process.env.BETTER_AUTH_SECRET,
@@ -39,8 +40,9 @@ export const auth = betterAuth({
     // Reset link is emailed via SMTP (config in DB). When SMTP isn't set up
     // yet, log the link so the flow is testable locally without email.
     sendResetPassword: async ({ user, url }) => {
-      const subject = "Reset your Job Management Portal password";
-      const html = `<p>We received a request to reset your password.</p>
+      const appName = await getAppName();
+      const subject = `Reset your ${appName} password`;
+      const html = `<p>We received a request to reset your ${appName} password.</p>
 <p><a href="${url}">Reset your password</a> — this link expires in 1 hour.</p>
 <p>If you didn't request this, you can ignore this email.</p>`;
       try {

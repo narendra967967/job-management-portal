@@ -20,6 +20,7 @@ import {
 import { redirect } from "next/navigation";
 import { getSessionUser, accessState } from "@/lib/current-user";
 import { guardMaintenance } from "@/lib/maintenance";
+import { getAppName } from "@/lib/branding";
 import { loadWorkspace } from "@/lib/queries";
 import { WorkspaceProvider } from "@/lib/workspace-provider";
 
@@ -37,7 +38,7 @@ export default async function DashboardLayout({
   const state = accessState(u);
   if (state === "deactivated") redirect("/deactivated");
   if (state === "expired") redirect("/renew");
-  const workspace = await loadWorkspace(u.id);
+  const [workspace, appName] = await Promise.all([loadWorkspace(u.id), getAppName()]);
   return (
     // App shell: full-height flex. On mobile the header + bottom nav are
     // fixed-height flex children and only <main> scrolls, so the bottom nav is
@@ -49,7 +50,7 @@ export default async function DashboardLayout({
       {/* Desktop sidebar */}
       <aside className="hidden w-60 shrink-0 flex-col overflow-y-auto border-r border-sidebar-border bg-sidebar md:flex">
         <div className="border-b border-sidebar-border p-4">
-          <Logo />
+          <Logo name={appName} />
         </div>
         <SidebarNav />
         <SidebarFooter />
@@ -59,9 +60,9 @@ export default async function DashboardLayout({
         {/* Top app bar */}
         <header className="shrink-0 border-b bg-card/70 shadow-[0_1px_2px_-1px_oklch(0.51_0.24_277_/_0.12)] backdrop-blur-md">
           <div className="flex items-center gap-2 px-4 py-2.5 md:gap-3 md:px-6">
-            <MobileNav />
+            <MobileNav name={appName} />
             <div className="md:hidden">
-              <Logo showName={false} />
+              <Logo showName={false} name={appName} />
             </div>
             <TopBarSearch />
             <div className="ml-auto flex items-center gap-1.5 sm:gap-2.5">

@@ -1,6 +1,7 @@
 import { Sparkles, Gauge, Send } from "lucide-react";
 import { Logo } from "@/components/app-shell/logo";
 import { BrandDoodles } from "@/components/auth/brand-doodles";
+import { getAppName } from "@/lib/branding";
 
 const HIGHLIGHTS = [
   {
@@ -21,7 +22,7 @@ const HIGHLIGHTS = [
 ];
 
 /** Shared two-panel auth layout: branded gradient panel + a form card. */
-export function AuthShell({
+export async function AuthShell({
   title,
   subtitle,
   children,
@@ -30,6 +31,7 @@ export function AuthShell({
   subtitle: string;
   children: React.ReactNode;
 }) {
+  const appName = await getAppName();
   return (
     <main className="min-h-dvh lg:grid lg:grid-cols-2">
       {/* Brand panel — desktop only */}
@@ -45,10 +47,8 @@ export function AuthShell({
         />
 
         <div className="relative flex items-center gap-2">
-          <Logo showName={false} />
-          <span className="text-sm font-semibold tracking-tight">
-            Job Management Portal
-          </span>
+          <Logo showName={false} name={appName} />
+          <span className="text-sm font-semibold tracking-tight">{appName}</span>
         </div>
 
         <div className="relative">
@@ -79,7 +79,7 @@ export function AuthShell({
       <div className="flex min-h-dvh flex-col items-center justify-center px-6 py-12">
         <div className="w-full max-w-sm">
           <div className="flex flex-col items-center text-center lg:hidden">
-            <Logo showName={false} className="scale-110" />
+            <Logo showName={false} name={appName} className="scale-110" />
           </div>
           <div className="mt-6 lg:mt-0">
             <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>

@@ -241,7 +241,7 @@ export function AccountMenu() {
 }
 
 /** Hamburger + slide-in sidebar drawer — mobile only (below md). */
-export function MobileNav() {
+export function MobileNav({ name }: { name?: string }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
 
@@ -292,7 +292,7 @@ export function MobileNav() {
             />
             <aside className="absolute inset-y-0 left-0 flex w-72 max-w-[85%] flex-col border-r border-sidebar-border bg-sidebar shadow-xl">
               <div className="flex items-center justify-between border-b border-sidebar-border p-4">
-                <Logo />
+                <Logo name={name} />
                 <button
                   type="button"
                   aria-label="Close menu"
