@@ -83,6 +83,7 @@ export const aiProvider = pgEnum("ai_provider", [
   "openrouter",
 ]);
 export const resumeFileType = pgEnum("resume_file_type", ["pdf", "doc", "docx"]);
+export const planStatus = pgEnum("plan_status", ["active", "inactive"]);
 
 /* ------------------------------------------------------------------ */
 /* Application tables                                                   */
@@ -417,12 +418,135 @@ export const smtpConfig = pgTable("smtp_config", {
   id: text("id").primaryKey().default("app"),
   host: text("host").notNull(),
   port: integer("port").notNull().default(587),
+  // Legacy boolean kept for the current mailer; `encryption` is the richer choice
+  // the admin UI writes (none/starttls/ssl/tls). Mailer reads encryption when set.
   secure: boolean("secure").notNull().default(false),
+  encryption: text("encryption").notNull().default("starttls"),
   username: text("username"),
   passwordCiphertext: text("password_ciphertext"),
   fromEmail: text("from_email").notNull(),
   fromName: text("from_name"),
+  replyTo: text("reply_to"),
   enabled: boolean("enabled").notNull().default(false),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date()),
+});
+
+/* ------------------------------------------------------------------ */
+/* Admin: Plans & Pricing + app-level config (single "app" row each)    */
+/* ------------------------------------------------------------------ */
+
+/** Subscription plans shown on the admin Plans & Pricing screen. */
+export const plans = pgTable("plans", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  code: text("code").notNull().unique(),
+  // Rich-text HTML from the admin editor (sanitize on write when wired).
+  description: text("description").notNull().default(""),
+  accent: text("accent").notNull().default("indigo"),
+  isFree: boolean("is_free").notNull().default(false),
+  // Free plan only — days of access before renewal (0 = never expires).
+  freeDurationDays: integer("free_duration_days").notNull().default(0),
+  // 0 disables that interval.
+  monthlyPrice: integer("monthly_price").notNull().default(0),
+  yearlyPrice: integer("yearly_price").notNull().default(0),
+  currency: text("currency").notNull().default("INR"),
+  // null = unlimited.
+  limitResumes: integer("limit_resumes"),
+  allowCustomPrompts: boolean("allow_custom_prompts").notNull().default(false),
+  features: text("features").array().notNull().default(sql`'{}'::text[]`),
+  popular: boolean("popular").notNull().default(false),
+  status: planStatus("status").notNull().default("active"),
+  // Running count of users who have ever been on this plan — gates deletion.
+  everSubscribed: integer("ever_subscribed").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date()),
+});
+
+/** Settings → General (one "app" row). */
+export const appSettings = pgTable("app_settings", {
+  id: text("id").primaryKey().default("app"),
+  appName: text("app_name").notNull().default("Job Management Portal"),
+  supportEmail: text("support_email"),
+  timezone: text("timezone").notNull().default("Asia/Kolkata"),
+  allowSignup: boolean("allow_signup").notNull().default(false),
+  maintenance: boolean("maintenance").notNull().default(false),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date()),
+});
+
+/** Settings → Security (one "app" row). Password policy + session length. */
+export const securityConfig = pgTable("security_config", {
+  id: text("id").primaryKey().default("app"),
+  pwMinLength: integer("pw_min_length").notNull().default(8),
+  pwRequireUpper: boolean("pw_require_upper").notNull().default(true),
+  pwRequireLower: boolean("pw_require_lower").notNull().default(true),
+  pwRequireNumber: boolean("pw_require_number").notNull().default(true),
+  pwRequireSpecial: boolean("pw_require_special").notNull().default(true),
+  sessionValue: integer("session_value").notNull().default(7),
+  sessionUnit: text("session_unit").notNull().default("days"),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date()),
+});
+
+/** Settings → Cron & schedule (one "app" row). */
+export const cronConfig = pgTable("cron_config", {
+  id: text("id").primaryKey().default("app"),
+  syncIntervalHours: integer("sync_interval_hours").notNull().default(6),
+  quietEnabled: boolean("quiet_enabled").notNull().default(false),
+  quietFrom: text("quiet_from").notNull().default("22:00"),
+  quietTo: text("quiet_to").notNull().default("07:00"),
+  quietTz: text("quiet_tz").notNull().default("Asia/Kolkata"),
+  quietDays: text("quiet_days").array().notNull().default(sql`'{}'::text[]`),
+  purgeEnabled: boolean("purge_enabled").notNull().default(false),
+  purgeDays: integer("purge_days").notNull().default(90),
+  purgeStatuses: text("purge_statuses").array().notNull().default(sql`'{}'::text[]`),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date()),
+});
+
+/** Settings → Billing (one "app" row). Gateway secret encrypted at rest. */
+export const billingConfig = pgTable("billing_config", {
+  id: text("id").primaryKey().default("app"),
+  enabled: boolean("enabled").notNull().default(false),
+  provider: text("provider").notNull().default("razorpay"),
+  mode: text("mode").notNull().default("test"),
+  currency: text("currency").notNull().default("INR"),
+  keyId: text("key_id"),
+  keySecretCiphertext: text("key_secret_ciphertext"),
+  gstin: text("gstin"),
+  taxRate: integer("tax_rate").notNull().default(18),
+  pricesIncludeTax: boolean("prices_include_tax").notNull().default(false),
+  companyName: text("company_name"),
+  companyAddress: text("company_address"),
+  invoicePrefix: text("invoice_prefix").notNull().default("JMP-"),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date()),
+});
+
+/** Settings → AI (one "app" row). Admin tools AI key + default user prompts. */
+export const appAiConfig = pgTable("app_ai_config", {
+  id: text("id").primaryKey().default("app"),
+  adminProvider: aiProvider("admin_provider").notNull().default("openai"),
+  adminModel: text("admin_model"),
+  adminKeyCiphertext: text("admin_key_ciphertext"),
+  adminKeyLast4: text("admin_key_last4"),
+  defaultPromptSummary: text("default_prompt_summary"),
+  defaultPromptDraft: text("default_prompt_draft"),
+  defaultPromptScore: text("default_prompt_score"),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .defaultNow()

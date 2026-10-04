@@ -13,6 +13,13 @@ export const user = pgTable("user", {
     .$onUpdate(() => /* @__PURE__ */ new Date())
     .notNull(),
   mobile: text("mobile"),
+  // Admin-managed fields (Better Auth additionalFields in lib/auth.ts). Added by
+  // hand because the better-auth CLI can't resolve the "@/" alias in this repo's
+  // config; keep in sync with lib/auth.ts additionalFields.
+  role: text("role").notNull().default("user"),
+  status: text("status").notNull().default("active"),
+  planId: text("plan_id"),
+  planExpiresAt: timestamp("plan_expires_at"),
 });
 
 export const session = pgTable(

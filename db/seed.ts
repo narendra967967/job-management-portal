@@ -65,8 +65,32 @@ async function main() {
   await db.delete(schema.userSettings);
   await db.delete(schema.gmailConfig);
   await db.delete(schema.resumes);
+  // Admin plans + app-level config (no FK to user; safe to clear anytime).
+  await db.delete(schema.plans);
+  await db.delete(schema.appSettings);
+  await db.delete(schema.securityConfig);
+  await db.delete(schema.cronConfig);
+  await db.delete(schema.billingConfig);
+  await db.delete(schema.appAiConfig);
   // Better Auth tables — remove the dev user last.
   await db.delete(schema.user).where(eq(schema.user.id, DEV_USER_ID));
+
+  console.log("Seeding plans + app config…");
+  const planFree = randomUUID();
+  const planStarter = randomUUID();
+  const planPro = randomUUID();
+  const planBusiness = randomUUID();
+  await db.insert(schema.plans).values([
+    { id: planFree, name: "Free", code: "free", description: "<p>The default plan every user starts on when they're onboarded.</p>", accent: "indigo", isFree: true, freeDurationDays: 14, monthlyPrice: 0, yearlyPrice: 0, currency: "INR", limitResumes: 1, allowCustomPrompts: false, features: ["Up to 20 leads", "Manual Gmail sync", "Community support"], popular: false, status: "active", everSubscribed: 1 },
+    { id: planStarter, name: "Starter", code: "starter", description: "<p>For active job seekers who want <b>automation</b>.</p>", accent: "emerald", isFree: false, monthlyPrice: 299, yearlyPrice: 2499, currency: "INR", limitResumes: 3, allowCustomPrompts: false, features: ["Unlimited leads", "300 AI calls / month", "Auto Gmail sync", "Email support"], popular: false, status: "active", everSubscribed: 0 },
+    { id: planPro, name: "Pro", code: "pro", description: "<p>Everything you need to run outreach at scale.</p>", accent: "violet", isFree: false, monthlyPrice: 599, yearlyPrice: 4999, currency: "INR", limitResumes: 10, allowCustomPrompts: true, features: ["Everything in Starter", "1,000 AI calls / month", "Priority email support"], popular: true, status: "active", everSubscribed: 0 },
+    { id: planBusiness, name: "Business", code: "business", description: "<p>Highest limits and priority support.</p>", accent: "rose", isFree: false, monthlyPrice: 1299, yearlyPrice: 10999, currency: "INR", limitResumes: null, allowCustomPrompts: true, features: ["Everything in Pro", "5,000 AI calls / month", "Priority support"], popular: false, status: "active", everSubscribed: 0 },
+  ]);
+  await db.insert(schema.appSettings).values({ id: "app", supportEmail: DEV_EMAIL });
+  await db.insert(schema.securityConfig).values({ id: "app" });
+  await db.insert(schema.cronConfig).values({ id: "app", quietDays: ["Sat", "Sun"], purgeStatuses: ["discarded", "closed"] });
+  await db.insert(schema.billingConfig).values({ id: "app" });
+  await db.insert(schema.appAiConfig).values({ id: "app" });
 
   console.log(`Seeding dev user ${DEV_USER_ID} (${DEV_EMAIL})…`);
   await db.insert(schema.user).values({
@@ -75,6 +99,10 @@ async function main() {
     email: DEV_EMAIL,
     emailVerified: true,
     mobile: "+91 9876543210",
+    role: "admin",
+    status: "active",
+    planId: planFree,
+    planExpiresAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
     createdAt: new Date(),
     updatedAt: new Date(),
   });

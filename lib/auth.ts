@@ -82,6 +82,11 @@ export const auth = betterAuth({
   user: {
     additionalFields: {
       mobile: { type: "string", required: false },
+      // Admin-managed fields (not settable via the auth API — input: false).
+      role: { type: "string", required: false, defaultValue: "user", input: false },
+      status: { type: "string", required: false, defaultValue: "active", input: false },
+      planId: { type: "string", required: false, input: false },
+      planExpiresAt: { type: "date", required: false, input: false },
     },
   },
   databaseHooks: {
