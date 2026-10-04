@@ -104,11 +104,12 @@ export default function AdminSettingsPage() {
 
 /* ---------------- shared ---------------- */
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
     <label className="block space-y-1.5">
       <Label className="text-xs text-muted-foreground">{label}</Label>
       {children}
+      {hint && <span className="block text-[11px] text-muted-foreground">{hint}</span>}
     </label>
   );
 }
@@ -308,14 +309,14 @@ function EmailCard() {
 
       <div className={cn("mt-4 space-y-3", !enabled && "pointer-events-none opacity-50")}>
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="SMTP host">
+          <Field label="SMTP host" hint="Your provider's mail server, e.g. smtp.gmail.com">
             <Input value={host} onChange={(e) => setHost(e.target.value)} placeholder="smtp.example.com" autoComplete="off" />
           </Field>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Port">
+            <Field label="Port" hint="587 STARTTLS · 465 SSL · 25 none">
               <Input type="number" value={port} onChange={(e) => setPort(e.target.value)} placeholder="587" />
             </Field>
-            <Field label="Encryption">
+            <Field label="Encryption" hint="Match your provider">
               <select className={selectCls} value={encryption} onChange={(e) => setEncryption(e.target.value)}>
                 <option value="none">None</option>
                 <option value="starttls">STARTTLS</option>
@@ -327,10 +328,10 @@ function EmailCard() {
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Username">
+          <Field label="Username" hint="Usually your full email address">
             <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="user@example.com" autoComplete="off" />
           </Field>
-          <Field label="Password">
+          <Field label="Password" hint="Use an app password if required · stored encrypted">
             <div className="relative">
               <Input
                 type={showPw ? "text" : "password"}
@@ -353,15 +354,15 @@ function EmailCard() {
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="From name">
+          <Field label="From name" hint="Sender name recipients see">
             <Input value={fromName} onChange={(e) => setFromName(e.target.value)} placeholder="JMP" />
           </Field>
-          <Field label="From email">
+          <Field label="From email" hint="Address emails are sent from">
             <Input type="email" value={fromEmail} onChange={(e) => setFromEmail(e.target.value)} placeholder="noreply@example.com" />
           </Field>
         </div>
 
-        <Field label="Reply-to (optional)">
+        <Field label="Reply-to (optional)" hint="Where replies go, if different from the From address">
           <Input type="email" value={replyTo} onChange={(e) => setReplyTo(e.target.value)} placeholder="support@example.com" />
         </Field>
       </div>
@@ -386,6 +387,7 @@ function EmailCard() {
             <Send /> Send test
           </Button>
         </div>
+        <p className="mt-1.5 text-[11px] text-muted-foreground">Sends a sample email using the settings above.</p>
         {testMsg && <p className="mt-2 text-xs text-muted-foreground">{testMsg}</p>}
       </div>
     </section>
