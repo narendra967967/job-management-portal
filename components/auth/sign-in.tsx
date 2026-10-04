@@ -29,11 +29,12 @@ export function LoginForm() {
       setBusy(false);
       return;
     }
-    // Admin accounts belong to the admin panel, not the user dashboard.
+    // Admin accounts belong to the admin panel, not the user dashboard. Use the
+    // generic message (don't reveal that the account exists / is an admin).
     const role = (res.data?.user as { role?: string } | undefined)?.role;
     if (role === "admin") {
       await authClient.signOut();
-      setError("This is an admin account. Please use the admin panel at /jmp-admin.");
+      setError("Incorrect email or password.");
       setBusy(false);
       return;
     }

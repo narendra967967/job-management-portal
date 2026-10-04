@@ -34,8 +34,9 @@ export default function AdminLoginPage() {
     // Admin panel is admin-only — reject non-admins (and sign them back out).
     const role = (res.data?.user as { role?: string } | undefined)?.role;
     if (role !== "admin") {
+      // Generic message — don't reveal that the credentials are valid.
       await adminAuthClient.signOut();
-      setError("This account doesn't have admin access.");
+      setError("Invalid email or password.");
       setBusy(false);
       return;
     }
