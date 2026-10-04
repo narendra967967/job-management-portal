@@ -5,7 +5,7 @@
 // when the admin types a new value.
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   User,
   Lock,
@@ -89,8 +89,21 @@ function TabButton({ section, active, onSelect }: { section: SettingsSection; ac
 }
 
 export function SettingsClient({ initial }: { initial: AdminSettings }) {
-  const [active, setActive] = useState(SECTIONS[0].id);
+  // Keep the open section in the URL (?section=) so a reload stays put. Read it
+  // from searchParams (SSR-consistent — no flash) and update it in place via
+  // history so switching tabs doesn't re-hit the server.
+  const searchParams = useSearchParams();
+  const fromUrl = searchParams.get("section");
+  const initialActive = SECTIONS.some((s) => s.id === fromUrl) ? (fromUrl as string) : SECTIONS[0].id;
+  const [active, setActive] = useState(initialActive);
   const current = SECTIONS.find((s) => s.id === active) ?? SECTIONS[0];
+
+  function selectSection(id: string) {
+    setActive(id);
+    const url = new URL(window.location.href);
+    url.searchParams.set("section", id);
+    window.history.replaceState(null, "", url.toString());
+  }
 
   // Hydrate the client password-policy store from the saved Security config so
   // every PasswordField (here, add user, reset) reflects the real policy.
@@ -109,7 +122,7 @@ export function SettingsClient({ initial }: { initial: AdminSettings }) {
       <div className="lg:flex lg:gap-6">
         <nav aria-label="Settings sections" className="-mx-4 flex gap-1 overflow-x-auto px-4 pb-1 lg:hidden">
           {SECTIONS.map((s) => (
-            <TabButton key={s.id} section={s} active={s.id === active} onSelect={setActive} />
+            <TabButton key={s.id} section={s} active={s.id === active} onSelect={selectSection} />
           ))}
         </nav>
         <nav aria-label="Settings sections" className="hidden lg:block lg:w-56 lg:shrink-0 lg:space-y-5">
@@ -117,7 +130,7 @@ export function SettingsClient({ initial }: { initial: AdminSettings }) {
             <div key={g.label} className="space-y-1">
               <p className="px-3 text-[11px] font-semibold tracking-wider text-muted-foreground/60 uppercase">{g.label}</p>
               {g.items.map((s) => (
-                <TabButton key={s.id} section={s} active={s.id === active} onSelect={setActive} />
+                <TabButton key={s.id} section={s} active={s.id === active} onSelect={selectSection} />
               ))}
             </div>
           ))}
