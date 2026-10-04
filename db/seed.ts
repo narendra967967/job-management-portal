@@ -25,6 +25,11 @@ const DEV_EMAIL = process.env.ALLOWED_EMAIL ?? "narendragpt967967@gmail.com";
 // Initial admin-provisioned login (change later via an admin dashboard).
 const DEV_PASSWORD = process.env.DEV_PASSWORD ?? "admin1234";
 
+// Dedicated admin-panel login (role = admin).
+const ADMIN_ID = "admin-user";
+const ADMIN_EMAIL = "adminjmp@gmail.com";
+const ADMIN_PASSWORD = "Admin@JMP";
+
 async function main() {
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error("DATABASE_URL is not set (.env.local).");
@@ -72,8 +77,10 @@ async function main() {
   await db.delete(schema.cronConfig);
   await db.delete(schema.billingConfig);
   await db.delete(schema.appAiConfig);
-  // Better Auth tables — remove the dev user last.
+  // Better Auth tables — remove the dev user last (by email too, to clear any
+  // admin created out-of-band via db:add-user).
   await db.delete(schema.user).where(eq(schema.user.id, DEV_USER_ID));
+  await db.delete(schema.user).where(eq(schema.user.email, ADMIN_EMAIL));
 
   console.log("Seeding plans + app config…");
   const planFree = randomUUID();
@@ -117,6 +124,33 @@ async function main() {
     createdAt: new Date(),
     updatedAt: new Date(),
   });
+
+  // Dedicated admin-panel account (role = admin).
+  console.log(`Seeding admin ${ADMIN_ID} (${ADMIN_EMAIL})…`);
+  await db.insert(schema.user).values({
+    id: ADMIN_ID,
+    name: "JMP Admin",
+    email: ADMIN_EMAIL,
+    emailVerified: true,
+    role: "admin",
+    status: "active",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+  await db.insert(schema.account).values({
+    id: randomUUID(),
+    accountId: ADMIN_ID,
+    providerId: "credential",
+    userId: ADMIN_ID,
+    password: await hashPassword(ADMIN_PASSWORD),
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+  await db.insert(schema.userSettings).values({ userId: ADMIN_ID }).onConflictDoNothing();
+  await db
+    .insert(schema.gmailConfig)
+    .values({ userId: ADMIN_ID, senders: ["jobalerts-noreply@linkedin.com"] })
+    .onConflictDoNothing();
 
   // Resumes (one default).
   const resumePm = randomUUID();

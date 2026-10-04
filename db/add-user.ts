@@ -28,6 +28,7 @@ async function main() {
   const password = process.env.ADD_USER_PASSWORD ?? "";
   const name = (process.env.ADD_USER_NAME ?? "").trim() || email.split("@")[0];
   const mobile = (process.env.ADD_USER_MOBILE ?? "").trim();
+  const role = (process.env.ADD_USER_ROLE ?? "user").trim() || "user";
   const id = (process.env.ADD_USER_ID ?? "").trim() || randomUUID();
 
   if (!email || !email.includes("@")) {
@@ -52,12 +53,14 @@ async function main() {
     process.exit(1);
   }
 
-  console.log(`Creating user ${email} (id ${id})…`);
+  console.log(`Creating user ${email} (id ${id}, role ${role})…`);
   await db.insert(schema.user).values({
     id,
     name,
     email,
     emailVerified: true,
+    role,
+    status: "active",
     ...(mobile ? { mobile } : {}),
     createdAt: new Date(),
     updatedAt: new Date(),

@@ -1,15 +1,10 @@
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { auth } from "@/lib/auth";
 
-// Admin entry point. Routes to the dashboard when there's a session, otherwise
-// to login. Session wiring is deferred (backend phase) — until then there's no
-// admin session, so this lands on /jmp-admin/login. When auth is added, replace
-// the stub below with the real session lookup; the redirect logic stays.
+// Admin entry point: an admin session goes to the dashboard, everyone else to login.
 export default async function AdminIndexPage() {
-  const hasSession = await getAdminSession();
-  redirect(hasSession ? "/jmp-admin/dashboard" : "/jmp-admin/login");
-}
-
-// TODO(auth): real admin session check (cookie/DB) in the backend phase.
-async function getAdminSession(): Promise<boolean> {
-  return false;
+  const session = await auth.api.getSession({ headers: await headers() });
+  const role = (session?.user as { role?: string } | undefined)?.role;
+  redirect(role === "admin" ? "/jmp-admin/dashboard" : "/jmp-admin/login");
 }

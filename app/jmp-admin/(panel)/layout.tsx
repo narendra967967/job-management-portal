@@ -1,11 +1,22 @@
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+import { auth } from "@/lib/auth";
 import { AdminShell } from "@/components/admin/admin-shell";
 
-// Layout for the authenticated admin panel. (Auth enforcement is a backend
-// TODO — this module is UI-first; today the pages are reachable directly.)
-export default function AdminPanelLayout({
+// Authenticated admin panel. Enforced server-side on every page: a valid session
+// AND role = admin, else back to the admin login.
+export default async function AdminPanelLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return <AdminShell>{children}</AdminShell>;
+  const session = await auth.api.getSession({ headers: await headers() });
+  const u = session?.user as { name?: string; email?: string; role?: string } | undefined;
+  if (!u || u.role !== "admin") redirect("/jmp-admin/login");
+
+  return (
+    <AdminShell admin={{ name: u.name ?? "Admin", email: u.email ?? "" }}>
+      {children}
+    </AdminShell>
+  );
 }

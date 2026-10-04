@@ -1,7 +1,8 @@
 "use client";
 
-// Admin login — standalone (no admin shell). UI-first: submitting currently
-// just enters the panel; real credential auth is wired in the backend phase.
+// Admin login — standalone (no admin shell). Authenticates via Better Auth
+// (email + password) and requires an admin-role account; the (panel) layout
+// re-checks the session + role on every authed page.
 
 import { useState } from "react";
 import Image from "next/image";
@@ -10,6 +11,7 @@ import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { Button } from "@/components/admin/ui/button";
 import { Input } from "@/components/admin/ui/input";
 import { Label } from "@/components/admin/ui/label";
+import { authClient, signInEmail } from "@/lib/auth-client";
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -17,12 +19,27 @@ export default function AdminLoginPage() {
   const [password, setPassword] = useState("");
   const [show, setShow] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
-    // TODO: replace with real admin auth. UI-only for now.
-    setTimeout(() => router.push("/jmp-admin/dashboard"), 400);
+    setError("");
+    const res = await signInEmail(email.trim(), password);
+    if (res.error) {
+      setError(res.error.message ?? "Invalid email or password.");
+      setBusy(false);
+      return;
+    }
+    // Admin panel is admin-only — reject non-admins (and sign them back out).
+    const role = (res.data?.user as { role?: string } | undefined)?.role;
+    if (role !== "admin") {
+      await authClient.signOut();
+      setError("This account doesn't have admin access.");
+      setBusy(false);
+      return;
+    }
+    router.push("/jmp-admin/dashboard");
   }
 
   return (
@@ -79,6 +96,10 @@ export default function AdminLoginPage() {
               </button>
             </div>
           </div>
+
+          {error && (
+            <p className="rounded-lg bg-destructive/15 px-3 py-2 text-xs text-destructive">{error}</p>
+          )}
 
           <Button type="submit" disabled={busy} className="w-full justify-center gap-2">
             {busy && <Loader2 className="size-4 animate-spin" aria-hidden />}

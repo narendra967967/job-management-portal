@@ -28,6 +28,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { authClient } from "@/lib/auth-client";
 
 interface Item {
   href?: string;
@@ -42,8 +43,10 @@ interface Group {
 
 const SETTINGS_HREF = "/jmp-admin/settings";
 
-// Mock admin identity (from the session once auth is wired).
-const ADMIN = { name: "Narendra Gupta", email: "narendragpt967967@gmail.com" };
+interface Admin {
+  name: string;
+  email: string;
+}
 
 const GROUPS: Group[] = [
   { label: "Overview", items: [{ href: "/jmp-admin/dashboard", label: "Dashboard", icon: LayoutDashboard }] },
@@ -160,7 +163,7 @@ function NavGroup({
   );
 }
 
-function UserFooter({ pathname, onLogout }: { pathname: string; onLogout: () => void }) {
+function UserFooter({ pathname, admin, onLogout }: { pathname: string; admin: Admin; onLogout: () => void }) {
   const settingsActive = isActive(pathname, SETTINGS_HREF);
   return (
     <div className="mt-4 space-y-1 border-t border-slate-800 pt-3">
@@ -176,11 +179,11 @@ function UserFooter({ pathname, onLogout }: { pathname: string; onLogout: () => 
       </Link>
       <div className="flex items-center gap-2 rounded-lg px-2 py-2">
         <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
-          {ADMIN.name.charAt(0)}
+          {(admin.name || "A").charAt(0).toUpperCase()}
         </span>
         <div className="min-w-0 flex-1 leading-tight">
-          <p className="truncate text-xs font-medium text-white">{ADMIN.name}</p>
-          <p className="truncate text-[10px] text-slate-400">{ADMIN.email}</p>
+          <p className="truncate text-xs font-medium text-white">{admin.name}</p>
+          <p className="truncate text-[10px] text-slate-400">{admin.email}</p>
         </div>
         <button
           type="button"
@@ -195,7 +198,13 @@ function UserFooter({ pathname, onLogout }: { pathname: string; onLogout: () => 
   );
 }
 
-export function AdminShell({ children }: { children: React.ReactNode }) {
+export function AdminShell({
+  children,
+  admin = { name: "Admin", email: "" },
+}: {
+  children: React.ReactNode;
+  admin?: Admin;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const title = TITLES[pathname] ?? "Admin";
@@ -212,9 +221,12 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     { href: SETTINGS_HREF, label: "Settings", icon: Settings },
   ];
 
-  function logout() {
-    // TODO: clear the admin session when auth is wired; UI-only for now.
-    router.push("/jmp-admin/login");
+  async function logout() {
+    try {
+      await authClient.signOut();
+    } finally {
+      router.push("/jmp-admin/login");
+    }
   }
 
   return (
@@ -235,7 +247,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             ))}
           </div>
         </div>
-        <UserFooter pathname={pathname} onLogout={logout} />
+        <UserFooter pathname={pathname} admin={admin} onLogout={logout} />
       </aside>
 
       {/* Mobile top bar + nav row */}
