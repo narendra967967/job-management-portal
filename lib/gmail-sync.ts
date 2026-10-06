@@ -31,6 +31,7 @@ import {
   GOOGLE_NOT_CONNECTED,
 } from "@/lib/gmail";
 import { parseLinkedInAlert } from "@/lib/linkedin-parser";
+import { isWithinQuietHours } from "@/lib/quiet-hours";
 
 export interface SyncResult {
   connected: boolean;
@@ -206,6 +207,15 @@ export async function runSyncForAllUsers(): Promise<
     .selectDistinct({ userId: accountT.userId })
     .from(accountT)
     .where(eq(accountT.providerId, "google"));
+
+  // Global quiet hours pause all background syncs (manual "Sync now" is exempt).
+  if (await isWithinQuietHours()) {
+    return users.map(({ userId }) => ({
+      userId,
+      skipped: true,
+      result: { connected: true, fetched: 0, inserted: 0, renewed: 0, errors: 0, message: "Quiet hours — paused." },
+    }));
+  }
 
   const out: { userId: string; result: SyncResult; skipped?: boolean }[] = [];
   for (const { userId } of users) {
