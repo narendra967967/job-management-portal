@@ -10,6 +10,10 @@ import { DEFAULT_APP_NAME } from "@/lib/branding";
 
 export const metadata: Metadata = { title: "We’ll be right back" };
 
+// Must render per-request: the redirect + content depend on the live maintenance
+// flag, and a static prerender would bake the build-time decision.
+export const dynamic = "force-dynamic";
+
 export default async function MaintenancePage() {
   const [s] = await db.select().from(appSettings).limit(1);
   if (!s?.maintenance) redirect("/");
