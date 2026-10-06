@@ -15,11 +15,17 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { account, securityConfig, session, user, verification } from "@/db/schema";
+import { account, session, user, verification } from "@/db/schema";
 import { hashPassword, verifyPassword } from "@/lib/password";
 import { provisionUserDefaults } from "@/lib/provision";
 import { sendAppEmail, SMTP_NOT_CONFIGURED } from "@/lib/email";
 import { getAppName } from "@/lib/branding";
+import { getSessionLengthSeconds } from "@/lib/session-length";
+
+// Read once at init: drives BOTH the DB session expiry and the cookie max-age so
+// they always match. Changing Settings → Security applies on new logins after a
+// server restart.
+const SESSION_SECONDS = await getSessionLengthSeconds();
 
 export const auth = betterAuth({
   secret: process.env.BETTER_AUTH_SECRET,
@@ -84,12 +90,11 @@ export const auth = betterAuth({
     },
   },
   session: {
-    // The real per-session lifetime is set at create time from the admin's
-    // Security setting (see databaseHooks.session.create.before). These act as a
-    // generous ceiling and disable the sliding refresh, so the create-time
-    // expiry is what actually governs how long a login stays valid.
-    expiresIn: 60 * 60 * 24 * 365,
-    updateAge: 60 * 60 * 24 * 365,
+    // Both the DB session and the cookie max-age come from this one value, so a
+    // login's lifetime and its cookie expire together. updateAge == expiresIn
+    // disables the sliding refresh (fixed window from login).
+    expiresIn: SESSION_SECONDS,
+    updateAge: SESSION_SECONDS,
   },
   user: {
     additionalFields: {
@@ -112,17 +117,6 @@ export const auth = betterAuth({
     },
     session: {
       create: {
-        // Apply the admin-configured session length to this login.
-        before: async (s) => {
-          const [sec] = await db
-            .select({ value: securityConfig.sessionValue, unit: securityConfig.sessionUnit })
-            .from(securityConfig)
-            .limit(1);
-          const value = sec?.value ?? 7;
-          const unit = sec?.unit ?? "days";
-          const ms = unit === "hours" ? value * 3_600_000 : value * 86_400_000;
-          return { data: { ...s, expiresAt: new Date(Date.now() + ms) } };
-        },
         // Record the login time so "last login" survives logout/expiry.
         after: async (s) => {
           await db.update(user).set({ lastLoginAt: new Date() }).where(eq(user.id, s.userId));
