@@ -778,7 +778,6 @@ function AiCard({ initial }: { initial: AdminSettings["ai"] }) {
 /* ---------------- Application: Cron & schedule ---------------- */
 
 function CronCard({ initial }: { initial: AdminSettings["cron"] }) {
-  const [syncEvery, setSyncEvery] = useState(String(initial.syncIntervalHours));
   const [quietEnabled, setQuietEnabled] = useState(initial.quietEnabled);
   const [quietFrom, setQuietFrom] = useState(initial.quietFrom);
   const [quietTo, setQuietTo] = useState(initial.quietTo);
@@ -796,17 +795,7 @@ function CronCard({ initial }: { initial: AdminSettings["cron"] }) {
   return (
     <section className="rounded-2xl border bg-card p-4 md:p-5">
       <h2 className="text-sm font-medium">Cron & schedule</h2>
-      <div className="mt-4">
-        <Field label="Gmail sync frequency" hint="How often new LinkedIn alerts are fetched">
-          <select className={selectCls} value={syncEvery} onChange={(e) => setSyncEvery(e.target.value)}>
-            <option value="1">Every hour</option>
-            <option value="3">Every 3 hours</option>
-            <option value="6">Every 6 hours</option>
-            <option value="12">Every 12 hours</option>
-            <option value="24">Once a day</option>
-          </select>
-        </Field>
-      </div>
+      <p className="mt-2 text-xs text-muted-foreground">Each user sets their own sync frequency; the scheduler just honors it. These controls are global overrides.</p>
 
       <SubHead>Quiet hours</SubHead>
       <Toggle checked={quietEnabled} onChange={setQuietEnabled} label="Pause syncs during quiet hours" hint="No background syncs run in this window" />
@@ -850,7 +839,7 @@ function CronCard({ initial }: { initial: AdminSettings["cron"] }) {
         onSave={() =>
           sv.save(() =>
             updateCronAction({
-              syncIntervalHours: Number(syncEvery), quietEnabled, quietFrom, quietTo, quietTz, quietDays,
+              quietEnabled, quietFrom, quietTo, quietTz, quietDays,
               purgeEnabled, purgeDays: Number(purgeDays), purgeStatuses,
             }),
           )

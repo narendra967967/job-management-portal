@@ -31,7 +31,6 @@ export interface AdminSettings {
     sessionUnit: string;
   };
   cron: {
-    syncIntervalHours: number;
     quietEnabled: boolean;
     quietFrom: string;
     quietTo: string;
@@ -114,7 +113,6 @@ export async function loadAdminSettings(adminId: string): Promise<AdminSettings>
       sessionUnit: s?.sessionUnit ?? "days",
     },
     cron: {
-      syncIntervalHours: c?.syncIntervalHours ?? 6,
       quietEnabled: c?.quietEnabled ?? false,
       quietFrom: c?.quietFrom ?? "22:00",
       quietTo: c?.quietTo ?? "07:00",

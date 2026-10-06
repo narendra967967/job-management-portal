@@ -22,6 +22,7 @@ import {
   uuid,
   date,
   timestamp,
+  jsonb,
   uniqueIndex,
   index,
   customType,
@@ -513,7 +514,6 @@ export const securityConfig = pgTable("security_config", {
 /** Settings → Cron & schedule (one "app" row). */
 export const cronConfig = pgTable("cron_config", {
   id: text("id").primaryKey().default("app"),
-  syncIntervalHours: integer("sync_interval_hours").notNull().default(6),
   quietEnabled: boolean("quiet_enabled").notNull().default(false),
   quietFrom: text("quiet_from").notNull().default("22:00"),
   quietTo: text("quiet_to").notNull().default("07:00"),
@@ -527,6 +527,27 @@ export const cronConfig = pgTable("cron_config", {
     .defaultNow()
     .$onUpdate(() => new Date()),
 });
+
+/** Audit log of automatic stale-lead purges, per user per run. Records the policy
+ *  in force (days + statuses) and how many leads were deleted per status, so each
+ *  deletion is accountable and the user can be notified. */
+export const leadPurgeLog = pgTable(
+  "lead_purge_log",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    runAt: timestamp("run_at", { withTimezone: true }).notNull().defaultNow(),
+    policyDays: integer("policy_days").notNull(),
+    statuses: text("statuses").array().notNull().default(sql`'{}'::text[]`),
+    // { [status]: count } of leads deleted in this run.
+    counts: jsonb("counts").$type<Record<string, number>>().notNull(),
+    totalDeleted: integer("total_deleted").notNull(),
+    notified: boolean("notified").notNull().default(false),
+  },
+  (t) => [index("lead_purge_log_user_idx").on(t.userId, t.runAt.desc())],
+);
 
 /** Settings → Billing (one "app" row). Gateway secret encrypted at rest. */
 export const billingConfig = pgTable("billing_config", {

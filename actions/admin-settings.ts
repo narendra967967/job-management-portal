@@ -193,7 +193,6 @@ export async function updateCronAction(input: unknown): Promise<Result> {
   await requireAdmin();
   const p = z
     .object({
-      syncIntervalHours: z.number().int().min(1).max(24),
       quietEnabled: z.boolean(),
       quietFrom: z.string().regex(/^\d{2}:\d{2}$/),
       quietTo: z.string().regex(/^\d{2}:\d{2}$/),
