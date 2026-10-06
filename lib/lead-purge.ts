@@ -11,6 +11,7 @@ import { db } from "@/lib/db";
 import { cronConfig, jobLeads as leadsT, leadPurgeLog, user as userT } from "@/db/schema";
 import { LEAD_STATUS_LABELS, type LeadStatus } from "@/lib/types";
 import { sendAppEmail, SMTP_NOT_CONFIGURED } from "@/lib/email";
+import { createNotification } from "@/lib/notifications";
 
 export interface PurgeUserResult {
   userId: string;
@@ -118,6 +119,18 @@ export async function runLeadPurge(): Promise<PurgeRunResult> {
       .insert(leadPurgeLog)
       .values({ userId, policyDays: days, statuses, counts, totalDeleted: total, notified: false })
       .returning({ id: leadPurgeLog.id });
+
+    // Persistent in-app notification (same message as the email).
+    const breakdown = Object.entries(counts)
+      .filter(([, n]) => n > 0)
+      .map(([s, n]) => `${n} ${labelFor(s)}`)
+      .join(", ");
+    const policyStatuses = statuses.map(labelFor).join(", ");
+    await createNotification(userId, {
+      type: "lead-purge",
+      title: "Old leads cleared",
+      body: `${total} old lead${total === 1 ? "" : "s"} removed (${breakdown}) as part of routine database cleanup. Preset policy: leads marked ${policyStatuses} with no activity for ${days}+ days are removed automatically — no action needed.`,
+    });
 
     const notified = await emailUser(userId, counts, total, days, statuses);
     if (notified && log) {

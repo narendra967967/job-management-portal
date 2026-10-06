@@ -26,6 +26,7 @@ import {
   userSettings as settingsT,
 } from "@/db/schema";
 import { OUTREACH_KIND_LABELS, fitScoreKey } from "@/lib/types";
+import { listNotifications, type NotificationRow } from "@/lib/notifications";
 import type {
   AiSettings,
   Contact,
@@ -90,6 +91,8 @@ export interface WorkspaceData {
   aiPrompts: { summary: string; draft: string; score: string };
   /** Cached fit scores keyed by fitScoreKey(leadId, resumeId). */
   fitScores: Record<string, FitScore>;
+  /** Persistent notifications (newest first) for the dashboard bell. */
+  notifications: NotificationRow[];
 }
 
 /** Everything the dashboard needs for one user, in UI-ready shapes. */
@@ -109,6 +112,7 @@ export async function loadWorkspace(userId: string): Promise<WorkspaceData> {
     syncStateRows,
     errorRows,
     fitScoreRows,
+    notificationRows,
   ] = await Promise.all([
     db.select().from(leadsT).where(eq(leadsT.userId, userId)),
     db.select().from(detailsT).where(eq(detailsT.userId, userId)),
@@ -145,6 +149,7 @@ export async function loadWorkspace(userId: string): Promise<WorkspaceData> {
       .orderBy(desc(errorsT.createdAt))
       .limit(20),
     db.select().from(fitScoresT).where(eq(fitScoresT.userId, userId)),
+    listNotifications(userId),
   ]);
 
   // Per-lead derived fields (contactCount, hasDueReminder) — computed in JS
@@ -350,5 +355,6 @@ export async function loadWorkspace(userId: string): Promise<WorkspaceData> {
       score: settings?.promptScore ?? "",
     },
     fitScores,
+    notifications: notificationRows,
   };
 }

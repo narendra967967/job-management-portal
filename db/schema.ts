@@ -549,6 +549,26 @@ export const leadPurgeLog = pgTable(
   (t) => [index("lead_purge_log_user_idx").on(t.userId, t.runAt.desc())],
 );
 
+/** Persistent user notifications shown on the dashboard bell (in addition to the
+ *  derived reminder/new-lead items). Created by system events like the lead
+ *  purge; mirrors the email the user also receives. */
+export const notifications = pgTable(
+  "notifications",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    type: text("type").notNull(), // e.g. "lead-purge", "system"
+    title: text("title").notNull(),
+    body: text("body").notNull(),
+    href: text("href"), // optional click-through target
+    readAt: timestamp("read_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("notifications_user_idx").on(t.userId, t.createdAt.desc())],
+);
+
 /** Settings → Billing (one "app" row). Gateway secret encrypted at rest. */
 export const billingConfig = pgTable("billing_config", {
   id: text("id").primaryKey().default("app"),

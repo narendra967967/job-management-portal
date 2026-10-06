@@ -48,6 +48,7 @@ import {
 } from "@/actions/settings";
 import { syncMyGmailAction } from "@/actions/gmail-sync";
 import { saveJdAction, summarizeJdAction, scoreFitAction } from "@/actions/ai";
+import { markNotificationsReadAction } from "@/actions/notifications";
 import { toast } from "@/components/ui/toast";
 import type { SyncResult } from "@/lib/gmail-sync";
 import type { GmailSyncStatus, IngestError } from "@/lib/queries";
@@ -115,6 +116,7 @@ let gmailSync: GmailSyncStatus = { lastSyncedAt: null, lastRunAt: null, lastErro
 let ingestErrors: IngestError[] = [];
 let aiPrompts = { summary: "", draft: "", score: "" };
 let fitScores: Record<string, FitScore> = {};
+let storedNotifications: WorkspaceData["notifications"] = [];
 let hydrated = false;
 
 const listeners = new Set<() => void>();
@@ -149,6 +151,7 @@ function apply(data: WorkspaceData) {
   ingestErrors = data.ingestErrors;
   aiPrompts = data.aiPrompts;
   fitScores = data.fitScores;
+  storedNotifications = data.notifications;
 }
 
 /** Called by WorkspaceProvider during render so the first snapshot has data.
@@ -180,9 +183,13 @@ const getContacts = () => contacts;
 const getOutreach = () => outreach;
 const getReminders = () => reminders;
 const getTasks = () => tasks;
+const getStoredNotifications = () => storedNotifications;
 
 export function useLeads(): JobLead[] {
   return useSyncExternalStore(subscribe, getLeads, getLeads);
+}
+function useStoredNotifications(): WorkspaceData["notifications"] {
+  return useSyncExternalStore(subscribe, getStoredNotifications, getStoredNotifications);
 }
 export function useLead(id: string): JobLead | undefined {
   return useLeads().find((l) => l.id === id);
@@ -932,16 +939,42 @@ export function useTodos(): TodoGroups {
 
 export interface StoreNotification {
   id: string;
-  kind: "new-lead" | "reminder-due";
+  kind: "new-lead" | "reminder-due" | "system";
   title: string;
   detail: string;
-  leadId: string;
+  /** Lead-linked (derived) items click through to the lead. */
+  leadId?: string;
+  /** Persistent items may click through to this path instead. */
+  href?: string;
+  /** Persistent items carry a read state; derived items are always shown. */
+  read?: boolean;
+}
+
+/** Mark all persistent notifications read (called when the bell opens). */
+export function markNotificationsRead() {
+  if (!storedNotifications.some((n) => !n.read)) return;
+  storedNotifications = storedNotifications.map((n) => (n.read ? n : { ...n, read: true }));
+  emit();
+  void markNotificationsReadAction().catch(() => {});
 }
 
 export function useNotifications(): StoreNotification[] {
   const allLeads = useLeads();
   const allReminders = useReminders();
+  const dbNotifications = useStoredNotifications();
   const items: StoreNotification[] = [];
+
+  // Persistent (DB) notifications first — newest first already.
+  for (const n of dbNotifications) {
+    items.push({
+      id: n.id,
+      kind: "system",
+      title: n.title,
+      detail: n.body,
+      href: n.href ?? undefined,
+      read: n.read,
+    });
+  }
 
   for (const r of allReminders) {
     if (r.outcome !== "pending") continue;

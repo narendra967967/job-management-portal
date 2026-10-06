@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { Bell, Clock, Sparkles, Search } from "lucide-react";
-import { useLeads, useReminders, useNotifications } from "@/lib/mock-store";
+import { useLeads, useReminders, useNotifications, markNotificationsRead } from "@/lib/mock-store";
 import { useSearchQuery, setSearchQuery } from "@/lib/search-store";
 import { Input } from "@/components/ui/input";
 import {
@@ -78,12 +78,17 @@ const MAX_NOTIFICATIONS = 5;
 export function NotificationsMenu() {
   const router = useRouter();
   const notifications = useNotifications();
-  const unread = notifications.length;
+  const unread = notifications.filter((n) => !n.read).length;
   // Only ever show the five most recent; the rest live on their pages.
   const top = notifications.slice(0, MAX_NOTIFICATIONS);
 
+  function open(n: (typeof notifications)[number]) {
+    if (n.leadId) router.push(`/leads/${n.leadId}`);
+    else if (n.href) router.push(n.href);
+  }
+
   return (
-    <DropdownMenu>
+    <DropdownMenu onOpenChange={(o) => o && markNotificationsRead()}>
       <DropdownMenuTrigger
         aria-label={`Notifications${unread ? `, ${unread} unread` : ""}`}
         className="relative flex size-10 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
@@ -110,25 +115,29 @@ export function NotificationsMenu() {
               <DropdownMenuItem
                 key={n.id}
                 className="items-start gap-2.5 py-2"
-                onClick={() => router.push(`/leads/${n.leadId}`)}
+                onClick={() => open(n)}
               >
                 <span
                   className={cn(
                     "mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md",
                     n.kind === "reminder-due"
                       ? "bg-status-reviewing text-status-reviewing-foreground"
-                      : "bg-ai-muted text-ai",
+                      : n.kind === "system"
+                        ? "bg-primary/10 text-primary"
+                        : "bg-ai-muted text-ai",
                   )}
                 >
                   {n.kind === "reminder-due" ? (
                     <Clock className="size-3.5" aria-hidden />
+                  ) : n.kind === "system" ? (
+                    <Bell className="size-3.5" aria-hidden />
                   ) : (
                     <Sparkles className="size-3.5" aria-hidden />
                   )}
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="text-sm font-medium">{n.title}</span>
-                  <span className="block truncate text-xs text-muted-foreground">
+                  <span className="block line-clamp-2 text-xs text-muted-foreground">
                     {n.detail}
                   </span>
                 </span>
