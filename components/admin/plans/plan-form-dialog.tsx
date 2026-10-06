@@ -24,7 +24,7 @@ import {
   type PlanStatus,
   type Currency,
   type AccentKey,
-} from "@/lib/admin/mock-plans";
+} from "@/lib/admin/plans-model";
 import { cn } from "@/lib/utils";
 
 export interface PlanFormValues {
@@ -90,7 +90,7 @@ export function PlanFormDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   plan: Plan | null;
-  onSave: (values: PlanFormValues) => void;
+  onSave: (values: PlanFormValues) => Promise<{ ok: boolean; error?: string }>;
 }) {
   const editing = !!plan;
   const [name, setName] = useState("");
@@ -106,6 +106,7 @@ export function PlanFormDialog({
   const [allowCustomPrompts, setAllowCustomPrompts] = useState(false);
   const [features, setFeatures] = useState<string[]>([""]);
   const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
 
   // Code is auto: tracks the name on add, frozen to the plan's code on edit.
   const code = editing ? (plan?.code ?? "") : slugify(name);
@@ -137,7 +138,7 @@ export function PlanFormDialog({
     setFeatures((f) => (f.length === 1 ? [""] : f.filter((_, idx) => idx !== i)));
   }
 
-  function submit(status: PlanStatus) {
+  async function submit(status: PlanStatus) {
     // Name (required) + a valid auto-code derived from it.
     if (!name.trim()) return setError("Name is required.");
     if (!code) return setError("Name must include at least one letter or number.");
@@ -166,7 +167,9 @@ export function PlanFormDialog({
       resumesLimit = Math.round(n);
     }
 
-    onSave({
+    setError("");
+    setBusy(true);
+    const res = await onSave({
       name: name.trim(),
       code,
       description,
@@ -181,7 +184,9 @@ export function PlanFormDialog({
       features: features.map((f) => f.trim()).filter(Boolean),
       status,
     });
-    onOpenChange(false);
+    setBusy(false);
+    if (res.ok) onOpenChange(false);
+    else setError(res.error ?? "Couldn't save the plan.");
   }
 
   return (
@@ -343,9 +348,13 @@ export function PlanFormDialog({
         )}
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button variant="outline" onClick={() => submit("inactive")}>Save as draft</Button>
-          <Button onClick={() => submit("active")}>Save &amp; activate</Button>
+          <Button variant="outline" disabled={busy} onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button variant="outline" disabled={busy} onClick={() => submit("inactive")}>
+            {isFree ? "Save" : "Save as draft"}
+          </Button>
+          {!isFree && (
+            <Button disabled={busy} onClick={() => submit("active")}>Save &amp; activate</Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
