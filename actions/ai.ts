@@ -29,6 +29,7 @@ import {
   scoreFitSchema,
 } from "@/lib/schemas";
 import {
+  appAiConfig,
   contacts as contactsT,
   fitScores as fitScoresT,
   jobLeadDetails as detailsT,
@@ -50,6 +51,44 @@ function friendly(err: unknown): string {
   const msg = err instanceof Error ? err.message : String(err);
   if (msg === AI_NOT_CONFIGURED) return NO_KEY_MSG;
   return msg || "AI request failed.";
+}
+
+type PromptKind = "summary" | "draft" | "score";
+
+/**
+ * Resolve the system prompt for an AI operation: the user's own prompt wins; if
+ * they haven't set one, fall back to the admin-configured default (Settings → AI,
+ * app_ai_config); finally the built-in default. Lets the admin set org-wide
+ * defaults that users can still override.
+ */
+async function effectivePrompt(userId: string, kind: PromptKind): Promise<string> {
+  const [own] = await db
+    .select({
+      summary: settingsT.promptSummary,
+      draft: settingsT.promptDraft,
+      score: settingsT.promptScore,
+    })
+    .from(settingsT)
+    .where(eq(settingsT.userId, userId));
+  const ownPrompt = (kind === "summary" ? own?.summary : kind === "draft" ? own?.draft : own?.score)?.trim();
+  if (ownPrompt) return ownPrompt;
+
+  const [admin] = await db
+    .select({
+      summary: appAiConfig.defaultPromptSummary,
+      draft: appAiConfig.defaultPromptDraft,
+      score: appAiConfig.defaultPromptScore,
+    })
+    .from(appAiConfig)
+    .limit(1);
+  const adminPrompt = (kind === "summary" ? admin?.summary : kind === "draft" ? admin?.draft : admin?.score)?.trim();
+  if (adminPrompt) return adminPrompt;
+
+  return kind === "summary"
+    ? DEFAULT_SUMMARY_PROMPT
+    : kind === "draft"
+      ? DEFAULT_DRAFT_PROMPT
+      : DEFAULT_SCORE_PROMPT;
 }
 
 /* ---------------- Save JD only (FR-3.1) — no AI ---------------- */
@@ -107,11 +146,7 @@ export async function summarizeJdAction(
     .onConflictDoUpdate({ target: detailsT.leadId, set: { jdText: text } });
 
   try {
-    const [s] = await db
-      .select({ p: settingsT.promptSummary })
-      .from(settingsT)
-      .where(eq(settingsT.userId, userId));
-    const system = s?.p?.trim() || DEFAULT_SUMMARY_PROMPT;
+    const system = await effectivePrompt(userId, "summary");
     const summary = await aiComplete(userId, system, text, 300);
     await db
       .update(detailsT)
@@ -226,11 +261,7 @@ export async function draftOutreachAction(input: {
   ].join("\n");
 
   try {
-    const [s] = await db
-      .select({ p: settingsT.promptDraft })
-      .from(settingsT)
-      .where(eq(settingsT.userId, userId));
-    const system = s?.p?.trim() || DEFAULT_DRAFT_PROMPT;
+    const system = await effectivePrompt(userId, "draft");
     const draft = await aiComplete(userId, system, context, 500);
     return { ok: true, draft };
   } catch (err) {
@@ -286,11 +317,7 @@ export async function scoreFitAction(
   }
 
   try {
-    const [s] = await db
-      .select({ p: settingsT.promptScore })
-      .from(settingsT)
-      .where(eq(settingsT.userId, userId));
-    const base = s?.p?.trim() || DEFAULT_SCORE_PROMPT;
+    const base = await effectivePrompt(userId, "score");
     // Enforce a parseable output regardless of the (possibly custom) prompt.
     const system = `${base}\n\nReply with ONLY minified JSON: {"score": <integer 0-100>, "rationale": "<one sentence>"}. No other text.`;
     const context = [

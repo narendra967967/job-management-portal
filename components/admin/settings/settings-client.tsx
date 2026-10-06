@@ -728,7 +728,7 @@ function AiCard({ initial }: { initial: AdminSettings["ai"] }) {
     <section className="rounded-2xl border bg-card p-4 md:p-5">
       <h2 className="text-sm font-medium">AI</h2>
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <Field label="Provider" hint="Which service runs AI features">
+        <Field label="Provider" hint="Powers admin-side AI (e.g. the knowledge base)">
           <select className={selectCls} value={provider} onChange={(e) => setProvider(e.target.value)}>
             <option value="openai">OpenAI</option>
             <option value="anthropic">Claude (Anthropic)</option>
@@ -740,7 +740,7 @@ function AiCard({ initial }: { initial: AdminSettings["ai"] }) {
         </Field>
       </div>
       <div className="mt-3">
-        <Field label="API key" hint={initial.hasKey ? `Saved (…${initial.keyLast4}) · type to replace` : "Stored encrypted · used only server-side"}>
+        <Field label="Admin API key" hint={initial.hasKey ? `Saved (…${initial.keyLast4}) · type to replace` : "For admin-side AI only · stored encrypted, server-side"}>
           <Input type="password" value={key} onChange={(e) => setKey(e.target.value)} placeholder={initial.hasKey ? "••••••••" : "sk-…"} autoComplete="off" className="font-mono" />
         </Field>
       </div>
