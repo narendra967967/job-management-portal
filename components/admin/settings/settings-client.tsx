@@ -818,6 +818,7 @@ function CronCard({ initial }: { initial: AdminSettings["cron"] }) {
               </button>
             ))}
           </div>
+          <p className="mt-1.5 text-[11px] text-muted-foreground">For an overnight window, pick the start day — it carries through past midnight (e.g. Sat covers Sat night to the next morning). No days = every day.</p>
         </div>
       </div>
 
