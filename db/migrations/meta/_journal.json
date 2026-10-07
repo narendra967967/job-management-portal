@@ -113,6 +113,13 @@
       "when": 1791394118222,
       "tag": "0015_special_king_cobra",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1791395093671,
+      "tag": "0016_new_magneto",
+      "breakpoints": true
     }
   ]
 }

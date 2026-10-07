@@ -9,6 +9,18 @@ export const TICKET_STATUS_LABELS: Record<TicketStatus, string> = {
   resolved: "Resolved",
 };
 
+export type TicketCategory = "question" | "bug" | "billing" | "account" | "other";
+
+export const TICKET_CATEGORIES: TicketCategory[] = ["question", "bug", "billing", "account", "other"];
+
+export const TICKET_CATEGORY_LABELS: Record<TicketCategory, string> = {
+  question: "Question",
+  bug: "Bug / problem",
+  billing: "Billing",
+  account: "Account",
+  other: "Other",
+};
+
 export interface TicketReply {
   id: string;
   body: string;
@@ -22,6 +34,7 @@ export interface Ticket {
   email: string;
   subject: string;
   message: string;
+  category: string;
   source: string;
   status: TicketStatus;
   createdAt: string;

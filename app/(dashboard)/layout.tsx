@@ -17,6 +17,7 @@ import {
   HeaderAddLeadButton,
   AddLeadFab,
 } from "@/components/leads/add-lead-dialog";
+import { ContactSupportProvider, SupportIconButton } from "@/components/support/contact-support";
 import { redirect } from "next/navigation";
 import { getSessionUser, accessState } from "@/lib/current-user";
 import { guardMaintenance } from "@/lib/maintenance";
@@ -45,6 +46,7 @@ export default async function DashboardLayout({
     // always pinned to the visible bottom (no reliance on position:fixed).
     <WorkspaceProvider initial={workspace}>
     <AutoSync />
+    <ContactSupportProvider>
     <AddLeadProvider>
     <div className="flex h-dvh flex-col overflow-hidden bg-background md:flex-row">
       {/* Desktop sidebar */}
@@ -68,6 +70,7 @@ export default async function DashboardLayout({
             <div className="ml-auto flex items-center gap-1.5 sm:gap-2.5">
               <TopBarStats className="hidden sm:flex" />
               <HeaderAddLeadButton />
+              <SupportIconButton />
               <NotificationsMenu />
             </div>
           </div>
@@ -86,6 +89,7 @@ export default async function DashboardLayout({
       </div>
       <Toaster />
     </AddLeadProvider>
+    </ContactSupportProvider>
     </WorkspaceProvider>
   );
 }

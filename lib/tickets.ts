@@ -18,6 +18,7 @@ export async function createSupportTicket(input: {
   email: string;
   subject: string;
   message: string;
+  category?: string;
   source: string;
 }): Promise<string> {
   const [row] = await db
@@ -28,6 +29,7 @@ export async function createSupportTicket(input: {
       email: input.email,
       subject: input.subject,
       message: input.message,
+      category: input.category ?? "other",
       source: input.source,
     })
     .returning({ id: supportTickets.id });
@@ -53,6 +55,7 @@ export async function listTickets(): Promise<Ticket[]> {
     email: t.email,
     subject: t.subject,
     message: t.message,
+    category: t.category,
     source: t.source,
     status: t.status,
     createdAt: t.createdAt.toISOString(),

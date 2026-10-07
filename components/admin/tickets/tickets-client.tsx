@@ -14,7 +14,7 @@ import {
 } from "@/components/admin/ui/dialog";
 import { Button } from "@/components/admin/ui/button";
 import { setTicketStatusAction, replyTicketAction } from "@/actions/admin-tickets";
-import { TICKET_STATUS_LABELS, type Ticket, type TicketStatus } from "@/lib/tickets-model";
+import { TICKET_STATUS_LABELS, TICKET_CATEGORY_LABELS, type Ticket, type TicketCategory, type TicketStatus } from "@/lib/tickets-model";
 import { cn } from "@/lib/utils";
 
 const STATUS_FILTERS: ("all" | TicketStatus)[] = ["all", "open", "in_progress", "resolved"];
@@ -135,7 +135,7 @@ export function TicketsClient({ initial }: { initial: Ticket[] }) {
                   )}
                 </span>
                 <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-                  {t.name || t.email || "Unknown"} · {t.source} · {fmt(t.createdAt)}
+                  {t.name || t.email || "Unknown"} · {TICKET_CATEGORY_LABELS[t.category as TicketCategory] ?? t.category} · {t.source} · {fmt(t.createdAt)}
                 </span>
               </span>
             </button>
@@ -154,6 +154,7 @@ export function TicketsClient({ initial }: { initial: Ticket[] }) {
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                   <span className="flex items-center gap-1"><Mail className="size-3.5" aria-hidden /> {active.email || "—"}</span>
                   <span>{active.name || "Unknown"}</span>
+                  <span>· {TICKET_CATEGORY_LABELS[active.category as TicketCategory] ?? active.category}</span>
                   <span>· {active.source}</span>
                   <span className="flex items-center gap-1"><Clock className="size-3.5" aria-hidden /> {fmt(active.createdAt)}</span>
                 </div>

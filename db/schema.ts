@@ -583,6 +583,8 @@ export const supportTickets = pgTable(
     subject: text("subject").notNull(),
     // Plain text or admin-safe HTML (the user's own message).
     message: text("message").notNull(),
+    // Triage bucket: question | bug | billing | account | other.
+    category: text("category").notNull().default("other"),
     // Where it came from: "reactivation", "contact", or a page path.
     source: text("source").notNull().default("contact"),
     status: ticketStatus("status").notNull().default("open"),

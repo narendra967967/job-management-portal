@@ -17,6 +17,7 @@ import {
   Mail,
   RefreshCw,
   AlertTriangle,
+  LifeBuoy,
   Sparkles,
   Wand2,
   Bell,
@@ -85,6 +86,7 @@ import {
   type Resume,
 } from "@/lib/types";
 import { Button } from "@/components/ui/button";
+import { useContactSupport } from "@/components/support/contact-support";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -119,6 +121,7 @@ const SECTION = {
   prompts: { id: "prompts", label: "AI prompts", icon: Wand2, render: () => <AiPromptsCard /> },
   followups: { id: "followups", label: "Follow-ups", icon: Bell, render: () => <FollowUpsCard /> },
   resumes: { id: "resumes", label: "Resumes", icon: FileText, render: () => <ResumesCard /> },
+  help: { id: "help", label: "Help & support", icon: LifeBuoy, render: () => <HelpSupportCard /> },
   account: { id: "account", label: "Account", icon: ShieldCheck, render: () => <AccountCard /> },
 } satisfies Record<string, SettingsSection>;
 
@@ -131,7 +134,7 @@ const GROUPS: { label: string; items: SettingsSection[] }[] = [
   { label: "AI", items: [SECTION.ai, SECTION.prompts] },
   { label: "Outreach", items: [SECTION.followups, SECTION.resumes] },
 ];
-const FOOTER: SettingsSection[] = [SECTION.account];
+const FOOTER: SettingsSection[] = [SECTION.help, SECTION.account];
 const SECTIONS: SettingsSection[] = [...GROUPS.flatMap((g) => g.items), ...FOOTER];
 
 function TabButton({
@@ -1702,6 +1705,21 @@ function ResumesCard() {
 }
 
 /* ---------------- Account ---------------- */
+
+function HelpSupportCard() {
+  const { open } = useContactSupport();
+  return (
+    <section className="rounded-2xl border bg-card p-4 md:p-5">
+      <h2 className="text-sm font-medium">Help &amp; support</h2>
+      <p className="mt-0.5 text-xs text-muted-foreground">
+        Have a question or hit a problem? Send us a message and we&apos;ll reply to your account email.
+      </p>
+      <Button className="mt-4" onClick={() => open({ source: "settings" })}>
+        <LifeBuoy className="size-4" aria-hidden /> Contact support
+      </Button>
+    </section>
+  );
+}
 
 function AccountCard() {
   const [current, setCurrent] = useState("");

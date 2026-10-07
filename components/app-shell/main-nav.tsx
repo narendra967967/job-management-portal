@@ -20,8 +20,10 @@ import {
   ChevronDown,
   type LucideIcon,
 } from "lucide-react";
+import { LifeBuoy } from "lucide-react";
 import { Logo } from "@/components/app-shell/logo";
 import { SidebarAddLeadButton } from "@/components/leads/add-lead-dialog";
+import { SupportNavButton, useContactSupport } from "@/components/support/contact-support";
 import { useProfile } from "@/lib/mock-store";
 import { signOutToHome } from "@/lib/auth-client";
 import {
@@ -173,6 +175,7 @@ export function SidebarFooter() {
   const active = isActive(pathname, "/settings");
   return (
     <div className="mt-auto border-t p-3">
+      <SupportNavButton className="mb-1" />
       <Link
         href="/settings"
         className={cn(
@@ -212,6 +215,7 @@ export function SidebarFooter() {
 export function AccountMenu() {
   const router = useRouter();
   const profile = useProfile();
+  const { open: openSupport } = useContactSupport();
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -230,6 +234,10 @@ export function AccountMenu() {
         <DropdownMenuItem onClick={() => router.push("/settings")}>
           <Settings className="size-4" aria-hidden />
           Settings
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => openSupport()}>
+          <LifeBuoy className="size-4" aria-hidden />
+          Contact support
         </DropdownMenuItem>
         <DropdownMenuItem onClick={signOutToHome}>
           <LogOut className="size-4" aria-hidden />
