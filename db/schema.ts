@@ -85,6 +85,7 @@ export const aiProvider = pgEnum("ai_provider", [
 ]);
 export const resumeFileType = pgEnum("resume_file_type", ["pdf", "doc", "docx"]);
 export const planStatus = pgEnum("plan_status", ["active", "inactive"]);
+export const ticketStatus = pgEnum("ticket_status", ["open", "in_progress", "resolved"]);
 
 /* ------------------------------------------------------------------ */
 /* Application tables                                                   */
@@ -567,6 +568,45 @@ export const notifications = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("notifications_user_idx").on(t.userId, t.createdAt.desc())],
+);
+
+/** Support tickets — messages users send from the app (e.g. the deactivated-account
+ *  "write to admin" flow). Collected for the admin Tickets inbox. User name/email are
+ *  snapshotted so a ticket survives user deletion. */
+export const supportTickets = pgTable(
+  "support_tickets",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id").references(() => user.id, { onDelete: "set null" }),
+    name: text("name").notNull().default(""),
+    email: text("email").notNull().default(""),
+    subject: text("subject").notNull(),
+    // Plain text or admin-safe HTML (the user's own message).
+    message: text("message").notNull(),
+    // Where it came from: "reactivation", "contact", or a page path.
+    source: text("source").notNull().default("contact"),
+    status: ticketStatus("status").notNull().default("open"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [index("support_tickets_status_idx").on(t.status, t.createdAt.desc())],
+);
+
+/** Admin replies on a ticket (emailed to the user; users have no in-app view). */
+export const ticketReplies = pgTable(
+  "ticket_replies",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ticketId: uuid("ticket_id")
+      .notNull()
+      .references(() => supportTickets.id, { onDelete: "cascade" }),
+    body: text("body").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("ticket_replies_ticket_idx").on(t.ticketId, t.createdAt)],
 );
 
 /** Settings → Billing (one "app" row). Gateway secret encrypted at rest. */

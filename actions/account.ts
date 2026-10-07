@@ -9,6 +9,7 @@ import { db } from "@/lib/db";
 import { getSessionUser, accessState } from "@/lib/current-user";
 import { appSettings, user } from "@/db/schema";
 import { sendAppEmail, SMTP_NOT_CONFIGURED } from "@/lib/email";
+import { createSupportTicket } from "@/lib/tickets";
 
 const schema = z.object({
   message: z.string().trim().min(1, "Write a short message.").max(5000),
@@ -54,6 +55,21 @@ export async function requestReactivationAction(input: unknown): Promise<{ ok: b
     ${bodyHtml}
   `;
   const text = `${u.name} (${u.email}) requests account reactivation.\n\n${parsed.data.message}`;
+
+  // Record it as a support ticket for the admin Tickets inbox (best-effort — the
+  // email below is the primary notification).
+  try {
+    await createSupportTicket({
+      userId: u.id,
+      name: u.name,
+      email: u.email,
+      subject,
+      message: parsed.data.message,
+      source: "reactivation",
+    });
+  } catch (e) {
+    console.error("[account] ticket create failed:", e instanceof Error ? e.message : String(e));
+  }
 
   try {
     await sendAppEmail({ to, subject, heading: "Account reactivation request", bodyHtml: detailsHtml, text });

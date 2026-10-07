@@ -22,6 +22,7 @@ import {
   Inbox,
   ScrollText,
   Settings,
+  LifeBuoy,
   ChevronDown,
   LogOut,
   type LucideIcon,
@@ -50,10 +51,10 @@ interface Admin {
 const GROUPS: Group[] = [
   { label: "Overview", items: [{ href: "/jmp-admin/dashboard", label: "Dashboard", icon: LayoutDashboard }] },
   {
-    label: "People & Content",
+    label: "People and Tickets",
     items: [
       { href: "/jmp-admin/users", label: "Users", icon: Users },
-      { label: "Knowledge base", icon: BookOpen, soon: true },
+      { href: "/jmp-admin/tickets", label: "Tickets", icon: LifeBuoy },
     ],
   },
   {
@@ -82,6 +83,7 @@ const GROUPS: Group[] = [
 const TITLES: Record<string, string> = {
   "/jmp-admin/dashboard": "Dashboard",
   "/jmp-admin/users": "Users",
+  "/jmp-admin/tickets": "Tickets",
   "/jmp-admin/plans": "Plans & Pricing",
   "/jmp-admin/settings": "Settings",
 };
@@ -167,6 +169,11 @@ function UserFooter({ pathname, admin, onLogout }: { pathname: string; admin: Ad
   const settingsActive = isActive(pathname, SETTINGS_HREF);
   return (
     <div className="mt-4 space-y-1 border-t border-slate-800 pt-3">
+      <span className="flex cursor-default items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-500">
+        <BookOpen className="size-4 shrink-0" aria-hidden />
+        Knowledge base
+        <span className="ml-auto rounded-full bg-slate-800 px-1.5 py-0.5 text-[9px] text-slate-400">soon</span>
+      </span>
       <Link
         href={SETTINGS_HREF}
         className={cn(
