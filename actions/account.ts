@@ -64,7 +64,8 @@ export async function requestReactivationAction(input: unknown): Promise<{ ok: b
       name: u.name,
       email: u.email,
       subject,
-      message: parsed.data.message,
+      // Prefer the rich-text HTML (sanitized on write); fall back to the plain text.
+      message: parsed.data.html?.trim() || parsed.data.message,
       source: "reactivation",
     });
   } catch (e) {

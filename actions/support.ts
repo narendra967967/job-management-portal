@@ -11,6 +11,7 @@ import { getSessionUser } from "@/lib/current-user";
 import { supportTickets } from "@/db/schema";
 import { createSupportTicket } from "@/lib/tickets";
 import { TICKET_CATEGORIES } from "@/lib/tickets-model";
+import { sanitizeRichText, richTextToPlain } from "@/lib/sanitize";
 import { sendAppEmail } from "@/lib/email";
 
 type Result = { ok: true } | { ok: false; error: string };
@@ -20,7 +21,8 @@ const MAX_OPEN_PER_USER = 8;
 const schema = z.object({
   category: z.string().refine((v) => (TICKET_CATEGORIES as string[]).includes(v), "Pick a category."),
   subject: z.string().trim().min(3, "Add a short subject.").max(120),
-  message: z.string().trim().min(5, "Tell us a bit more about the issue.").max(5000),
+  // Rich-text HTML; sanitized on write. Validate on the stripped-text length.
+  message: z.string().max(20000).refine((v) => richTextToPlain(v).length >= 5, "Tell us a bit more about the issue."),
   source: z.string().trim().max(200).optional().default("contact"),
 });
 
@@ -53,11 +55,15 @@ export async function submitSupportTicketAction(input: unknown): Promise<Result>
 
   // Confirmation email (best-effort — the ticket is already filed).
   try {
+    const safeHtml = sanitizeRichText(v.message);
     await sendAppEmail({
       to: u.email,
       subject: `We got your request: ${v.subject}`,
       heading: "Thanks — we've received your request",
-      lines: ["Our team will review it and reply to you by email.", `Your message:\n\n${v.message}`],
+      bodyHtml: `<p style="margin:0 0 14px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;color:#374151;">Our team will review it and reply to you by email.</p>
+        <p style="margin:0 0 6px;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#111827;"><strong>Your message</strong></p>
+        <div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;color:#374151;">${safeHtml}</div>`,
+      text: `Thanks — we've received your request. We'll reply to you by email.\n\nYour message:\n${richTextToPlain(v.message)}`,
       footerNote: "You're receiving this because you contacted support from your account.",
     });
   } catch {

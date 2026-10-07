@@ -7,6 +7,7 @@ import "server-only";
 import { asc, desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { supportTickets, ticketReplies } from "@/db/schema";
+import { sanitizeRichText } from "@/lib/sanitize";
 import type { Ticket, TicketReply, TicketStatus } from "@/lib/tickets-model";
 
 export type { Ticket, TicketReply, TicketStatus } from "@/lib/tickets-model";
@@ -28,7 +29,8 @@ export async function createSupportTicket(input: {
       name: input.name,
       email: input.email,
       subject: input.subject,
-      message: input.message,
+      // Message is rich-text HTML — sanitize on write so it's safe to render.
+      message: sanitizeRichText(input.message),
       category: input.category ?? "other",
       source: input.source,
     })

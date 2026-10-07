@@ -18,7 +18,9 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { RichText } from "@/components/ui/rich-text";
 import { toast } from "@/components/ui/toast";
+import { richTextToPlain } from "@/lib/sanitize";
 import { submitSupportTicketAction } from "@/actions/support";
 import { TICKET_CATEGORIES, TICKET_CATEGORY_LABELS, type TicketCategory } from "@/lib/tickets-model";
 import { cn } from "@/lib/utils";
@@ -55,8 +57,6 @@ export function ContactSupportProvider({ children }: { children: React.ReactNode
 
 const selectCls =
   "h-9 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
-const textareaCls =
-  "min-h-28 w-full rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
 
 function ContactSupportDialog({
   open,
@@ -70,7 +70,7 @@ function ContactSupportDialog({
   const pathname = usePathname();
   const [category, setCategory] = useState<TicketCategory>("question");
   const [subject, setSubject] = useState("");
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState(""); // rich-text HTML
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -83,12 +83,12 @@ function ContactSupportDialog({
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (subject.trim().length < 3) return toast.error("Add a short subject");
-    if (message.trim().length < 5) return toast.error("Tell us a bit more about the issue");
+    if (richTextToPlain(message).length < 5) return toast.error("Tell us a bit more about the issue");
     setBusy(true);
     const res = await submitSupportTicketAction({
       category,
       subject: subject.trim(),
-      message: message.trim(),
+      message,
       source: prefill.source ?? pathname,
     });
     setBusy(false);
@@ -126,16 +126,10 @@ function ContactSupportDialog({
             <span className="text-xs font-medium text-muted-foreground">Subject</span>
             <Input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Briefly, what's this about?" maxLength={120} />
           </label>
-          <label className="block space-y-1.5">
+          <div className="space-y-1.5">
             <span className="text-xs font-medium text-muted-foreground">Message</span>
-            <textarea
-              className={textareaCls}
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              placeholder="Share the details — what happened, what you expected…"
-              maxLength={5000}
-            />
-          </label>
+            <RichText value={message} onChange={setMessage} placeholder="Share the details — what happened, what you expected…" />
+          </div>
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>

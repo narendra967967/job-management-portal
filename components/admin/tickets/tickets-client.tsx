@@ -173,7 +173,11 @@ export function TicketsClient({ initial }: { initial: Ticket[] }) {
                 </label>
 
                 <div className="rounded-xl border bg-muted/30 p-3">
-                  <p className="text-sm whitespace-pre-wrap">{active.message}</p>
+                  {/* Message is sanitized on write (lib/sanitize), so rendering is safe. */}
+                  <div
+                    className="text-sm [&_li]:ml-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:mb-2 [&_p:last-child]:mb-0 [&_ul]:list-disc [&_ul]:pl-5"
+                    dangerouslySetInnerHTML={{ __html: active.message }}
+                  />
                 </div>
 
                 {active.replies.length > 0 && (
