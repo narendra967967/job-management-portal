@@ -4,7 +4,7 @@
 // ticket (admin Tickets inbox) and emails the user a confirmation. One-way — admin
 // replies come back by email.
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, gt } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/current-user";
@@ -17,6 +17,7 @@ import { sendAppEmail } from "@/lib/email";
 type Result = { ok: true } | { ok: false; error: string };
 
 const MAX_OPEN_PER_USER = 8;
+const MAX_PER_HOUR = 5;
 
 const schema = z.object({
   category: z.string().refine((v) => (TICKET_CATEGORIES as string[]).includes(v), "Pick a category."),
@@ -34,11 +35,21 @@ export async function submitSupportTicketAction(input: unknown): Promise<Result>
   if (!p.success) return { ok: false, error: p.error.issues[0]?.message ?? "Invalid input." };
   const v = p.data;
 
-  // Light anti-spam: cap how many open requests one user can stack up.
-  const open = await db
-    .select({ id: supportTickets.id })
-    .from(supportTickets)
-    .where(and(eq(supportTickets.userId, u.id), eq(supportTickets.status, "open")));
+  // Light anti-spam: cap open requests and recent submissions per user.
+  const hourAgo = new Date(Date.now() - 60 * 60 * 1000);
+  const [open, recent] = await Promise.all([
+    db
+      .select({ id: supportTickets.id })
+      .from(supportTickets)
+      .where(and(eq(supportTickets.userId, u.id), eq(supportTickets.status, "open"))),
+    db
+      .select({ id: supportTickets.id })
+      .from(supportTickets)
+      .where(and(eq(supportTickets.userId, u.id), gt(supportTickets.createdAt, hourAgo))),
+  ]);
+  if (recent.length >= MAX_PER_HOUR) {
+    return { ok: false, error: "You've sent several requests recently — please wait a bit before sending more." };
+  }
   if (open.length >= MAX_OPEN_PER_USER) {
     return { ok: false, error: "You already have several open requests — we'll get back to you soon." };
   }

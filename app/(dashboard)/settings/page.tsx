@@ -709,6 +709,19 @@ function SyncScheduleCard() {
 function IngestionIssuesCard() {
   const errors = useIngestErrors();
   const { confirm, dialog: confirmDialog } = useConfirm();
+  const { open: openSupport } = useContactSupport();
+
+  function reportToSupport() {
+    const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const list = errors.slice(0, 8).map((e) => `<li>${esc(e.reason)}</li>`).join("");
+    openSupport({
+      category: "bug",
+      subject: "Problem with Gmail sync / ingestion",
+      source: "ingestion-issues",
+      message: `<p>I'm seeing ingestion issues when my LinkedIn alerts are synced:</p><ul>${list}</ul><p>&nbsp;</p>`,
+    });
+  }
+
   return (
     <section className="rounded-2xl border bg-card p-4 md:p-5">
       <div className="flex items-start justify-between gap-3">
@@ -719,23 +732,28 @@ function IngestionIssuesCard() {
           </p>
         </div>
         {errors.length > 0 && (
-          <Button
-            variant="outline"
-            onClick={async () => {
-              if (
-                await confirm({
-                  title: "Clear ingestion issues?",
-                  description: `All ${errors.length} logged parse issue${errors.length === 1 ? "" : "s"} will be removed. This can't be undone.`,
-                  confirmLabel: "Clear",
-                  destructive: true,
-                })
-              ) {
-                clearIngestErrors();
-              }
-            }}
-          >
-            Clear
-          </Button>
+          <div className="flex shrink-0 gap-2">
+            <Button variant="outline" onClick={reportToSupport}>
+              <LifeBuoy className="size-4" aria-hidden /> Report to support
+            </Button>
+            <Button
+              variant="outline"
+              onClick={async () => {
+                if (
+                  await confirm({
+                    title: "Clear ingestion issues?",
+                    description: `All ${errors.length} logged parse issue${errors.length === 1 ? "" : "s"} will be removed. This can't be undone.`,
+                    confirmLabel: "Clear",
+                    destructive: true,
+                  })
+                ) {
+                  clearIngestErrors();
+                }
+              }}
+            >
+              Clear
+            </Button>
+          </div>
         )}
       </div>
       {confirmDialog}
@@ -770,6 +788,7 @@ function IngestionIssuesCard() {
 function AiProviderCard() {
   const ai = useAiSettings();
   const { confirm, dialog: confirmDialog } = useConfirm();
+  const { open: openSupport } = useContactSupport();
   const [provider, setProvider] = useState<AiProvider>(ai.provider);
   const [model, setModel] = useState(ai.model);
   const [keyInput, setKeyInput] = useState("");
@@ -934,6 +953,17 @@ function AiProviderCard() {
           never sent to the browser or exposed in client code.
         </p>
       </div>
+      <p className="mt-3 text-xs text-muted-foreground">
+        Trouble with AI features?{" "}
+        <button
+          type="button"
+          onClick={() => openSupport({ category: "bug", subject: "AI isn't working", source: "ai-settings" })}
+          className="font-medium text-primary underline-offset-4 hover:underline"
+        >
+          Contact support
+        </button>
+        .
+      </p>
       {confirmDialog}
     </section>
   );

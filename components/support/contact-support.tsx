@@ -28,6 +28,8 @@ import { cn } from "@/lib/utils";
 export interface SupportPrefill {
   category?: TicketCategory;
   subject?: string;
+  /** Rich-text HTML to pre-fill the message with (e.g. an error summary). */
+  message?: string;
   /** Where this was opened from (defaults to the current page path). */
   source?: string;
 }
@@ -77,7 +79,7 @@ function ContactSupportDialog({
     if (!open) return;
     setCategory(prefill.category ?? "question");
     setSubject(prefill.subject ?? "");
-    setMessage("");
+    setMessage(prefill.message ?? "");
   }, [open, prefill]);
 
   async function submit(e: React.FormEvent) {
