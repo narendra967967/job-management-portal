@@ -14,6 +14,7 @@ import {
   type Ticket,
 } from "@/lib/tickets";
 import { sendAppEmail, SMTP_NOT_CONFIGURED } from "@/lib/email";
+import { sanitizeRichText, richTextToPlain } from "@/lib/sanitize";
 
 type Result = { ok: true } | { ok: false; error: string };
 
@@ -32,13 +33,14 @@ async function sendResolvedEmail(ticket: Ticket): Promise<void> {
       <p style="margin:0 0 4px;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#6b7280;">${esc(label)} · ${esc(when)}</p>
       <div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;color:#374151;border-left:3px solid #e5e7eb;padding-left:10px;">${bodyHtml}</div>
     </div>`;
+  // ticket.message and reply bodies are already sanitized HTML (stored safe).
   let convo = block("You wrote", ticket.message, fmt(ticket.createdAt));
   for (const r of ticket.replies) {
-    convo += block("Support replied", `<p style="margin:0;">${esc(r.body).replace(/\n/g, "<br>")}</p>`, fmt(r.createdAt));
+    convo += block("Support replied", r.body, fmt(r.createdAt));
   }
 
-  const textParts = [`You wrote (${fmt(ticket.createdAt)}):`, ticket.message.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim()];
-  for (const r of ticket.replies) textParts.push(`Support replied (${fmt(r.createdAt)}):`, r.body);
+  const textParts = [`You wrote (${fmt(ticket.createdAt)}):`, richTextToPlain(ticket.message)];
+  for (const r of ticket.replies) textParts.push(`Support replied (${fmt(r.createdAt)}):`, richTextToPlain(r.body));
 
   try {
     await sendAppEmail({
@@ -106,7 +108,7 @@ export async function deleteTicketsAction(ids: unknown): Promise<Result> {
 export async function replyTicketAction(id: unknown, body: unknown): Promise<Result> {
   await requireAdmin();
   const p = z
-    .object({ id: z.string().uuid(), body: z.string().trim().min(1, "Write a reply.").max(10000) })
+    .object({ id: z.string().uuid(), body: z.string().max(10000).refine((v) => richTextToPlain(v).length >= 1, "Write a reply.") })
     .safeParse({ id, body });
   if (!p.success) return { ok: false, error: p.error.issues[0]?.message ?? "Invalid reply." };
 
@@ -120,7 +122,8 @@ export async function replyTicketAction(id: unknown, body: unknown): Promise<Res
         to: ticket.email,
         subject: `Re: ${ticket.subject}`,
         heading: "Reply from support",
-        lines: [body as string],
+        bodyHtml: sanitizeRichText(p.data.body),
+        text: richTextToPlain(p.data.body),
       });
     } catch (e) {
       emailed = false;

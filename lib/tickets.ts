@@ -110,7 +110,8 @@ export async function addTicketReply(
     .from(supportTickets)
     .where(eq(supportTickets.id, id));
   if (!ticket) return null;
-  await db.insert(ticketReplies).values({ ticketId: id, body });
+  // Reply is rich-text HTML — sanitize on write so it's safe to render.
+  await db.insert(ticketReplies).values({ ticketId: id, body: sanitizeRichText(body) });
   await db.update(supportTickets).set({ updatedAt: new Date() }).where(eq(supportTickets.id, id));
   return ticket;
 }

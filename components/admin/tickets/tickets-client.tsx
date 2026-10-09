@@ -26,6 +26,8 @@ import { Input } from "@/components/admin/ui/input";
 import { Badge } from "@/components/admin/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/admin/ui/dialog";
 import { ConfirmDialog } from "@/components/admin/ui/confirm-dialog";
+import { RichText } from "@/components/admin/ui/rich-text";
+import { richTextToPlain } from "@/lib/sanitize";
 import {
   setTicketStatusAction,
   bulkSetTicketStatusAction,
@@ -59,6 +61,12 @@ function fmt(iso: string): string {
 function catLabel(c: string): string {
   return TICKET_CATEGORY_LABELS[c as TicketCategory] ?? c;
 }
+function initials(name: string): string {
+  return (name || "?").split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase();
+}
+
+const proseCls =
+  "text-sm [&_li]:ml-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:mb-2 [&_p:last-child]:mb-0 [&_ul]:list-disc [&_ul]:pl-5";
 
 export function TicketsClient({ initial }: { initial: Ticket[] }) {
   const router = useRouter();
@@ -165,7 +173,7 @@ export function TicketsClient({ initial }: { initial: Ticket[] }) {
   }
 
   async function sendReply(id: string) {
-    if (!reply.trim()) return;
+    if (!richTextToPlain(reply).trim()) return;
     setBusy(true);
     const res = await replyTicketAction(id, reply);
     setBusy(false);
@@ -319,61 +327,82 @@ export function TicketsClient({ initial }: { initial: Ticket[] }) {
 
       {/* Detail modal */}
       <Dialog open={active !== null} onOpenChange={(o) => !o && setActiveId(null)}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-xl">
           {active && (
             <>
               <DialogHeader>
-                <DialogTitle className="pr-6">{active.subject}</DialogTitle>
+                <DialogTitle className="flex items-center gap-2 pr-6">
+                  <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                    <LifeBuoy className="size-4" aria-hidden />
+                  </span>
+                  <span className="min-w-0 truncate">{active.subject}</span>
+                </DialogTitle>
               </DialogHeader>
-              <div className="max-h-[70vh] space-y-4 overflow-y-auto">
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                  <span className="flex items-center gap-1"><Mail className="size-3.5" aria-hidden /> {active.email || "—"}</span>
-                  <span>{active.name || "Unknown"}</span>
-                  <span>· {catLabel(active.category)}</span>
-                  <span>· {active.source}</span>
-                  <span className="flex items-center gap-1"><Clock className="size-3.5" aria-hidden /> {fmt(active.createdAt)}</span>
+
+              {/* Fixed-height body: meta/status/reply stay put, only the thread scrolls. */}
+              <div className="flex h-[70vh] flex-col gap-4 px-0.5">
+                {/* Requester + meta */}
+                <div className="shrink-0 rounded-xl border bg-muted/20 p-3">
+                  <div className="flex items-center gap-3">
+                    <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+                      {initials(active.name)}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">{active.name || "Unknown"}</p>
+                      <p className="flex items-center gap-1 truncate text-xs text-muted-foreground">
+                        <Mail className="size-3.5 shrink-0" aria-hidden /> {active.email || "—"}
+                      </p>
+                    </div>
+                    <Badge variant={STATUS_BADGE[active.status]}>{TICKET_STATUS_LABELS[active.status]}</Badge>
+                  </div>
+                  <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+                    <span className="rounded-full border bg-background px-2 py-0.5 font-medium text-foreground">{catLabel(active.category)}</span>
+                    <span className="rounded-full border bg-background px-2 py-0.5">{active.source}</span>
+                    <span className="flex items-center gap-1"><Clock className="size-3 shrink-0" aria-hidden /> {fmt(active.createdAt)}</span>
+                  </div>
                 </div>
 
-                <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                  Status
+                {/* Status control */}
+                <div className="flex shrink-0 flex-wrap items-center gap-2 rounded-xl border p-3">
+                  <span className="text-xs font-medium">Status</span>
                   <select className={selectCls} value={active.status} onChange={(e) => changeStatus(active.id, e.target.value as TicketStatus)}>
                     {(["open", "in_progress", "resolved"] as TicketStatus[]).map((s) => (
                       <option key={s} value={s}>{TICKET_STATUS_LABELS[s]}</option>
                     ))}
                   </select>
-                  <span className="text-[11px]">Resolving emails the user the full conversation.</span>
-                </label>
-
-                <div className="rounded-xl border bg-muted/30 p-3">
-                  {/* Sanitized on write (lib/sanitize) — safe to render. */}
-                  <div
-                    className="text-sm [&_li]:ml-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:mb-2 [&_p:last-child]:mb-0 [&_ul]:list-disc [&_ul]:pl-5"
-                    dangerouslySetInnerHTML={{ __html: active.message }}
-                  />
+                  <span className="text-[11px] text-muted-foreground">Resolving emails the user the full conversation.</span>
                 </div>
 
-                {active.replies.length > 0 && (
-                  <div className="space-y-2">
-                    <p className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">Replies</p>
+                {/* Conversation thread — the only scrolling region */}
+                <div className="flex min-h-0 flex-1 flex-col">
+                  <p className="mb-2 shrink-0 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">Conversation</p>
+                  <div className="min-h-0 flex-1 space-y-2.5 overflow-y-auto rounded-xl border bg-muted/10 p-2.5">
+                    <div className="rounded-xl border bg-card p-3">
+                      <div className="mb-1.5 flex items-center justify-between gap-2">
+                        <span className="text-xs font-medium">{active.name || "User"}</span>
+                        <span className="text-[10px] text-muted-foreground">{fmt(active.createdAt)}</span>
+                      </div>
+                      {/* Sanitized on write (lib/sanitize) — safe to render. */}
+                      <div className={proseCls} dangerouslySetInnerHTML={{ __html: active.message }} />
+                    </div>
                     {active.replies.map((r) => (
                       <div key={r.id} className="rounded-xl border border-primary/20 bg-primary/5 p-3">
-                        <p className="text-sm whitespace-pre-wrap">{r.body}</p>
-                        <p className="mt-1 text-[10px] text-muted-foreground">Sent {fmt(r.createdAt)}</p>
+                        <div className="mb-1.5 flex items-center justify-between gap-2">
+                          <span className="text-xs font-medium text-primary">Support</span>
+                          <span className="text-[10px] text-muted-foreground">{fmt(r.createdAt)}</span>
+                        </div>
+                        <div className={proseCls} dangerouslySetInnerHTML={{ __html: r.body }} />
                       </div>
                     ))}
                   </div>
-                )}
+                </div>
 
-                <div className="space-y-2">
+                {/* Reply composer */}
+                <div className="shrink-0 space-y-2">
                   <p className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">Reply</p>
-                  <textarea
-                    className="min-h-24 w-full rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-                    value={reply}
-                    onChange={(e) => setReply(e.target.value)}
-                    placeholder="Write a reply — it's emailed to the user…"
-                  />
+                  <RichText value={reply} onChange={setReply} placeholder="Write a reply — it's emailed to the user…" />
                   <div className="flex items-center justify-end">
-                    <Button onClick={() => sendReply(active.id)} disabled={busy || !reply.trim()}>
+                    <Button onClick={() => sendReply(active.id)} disabled={busy || !richTextToPlain(reply).trim()}>
                       <Send /> {busy ? "Sending…" : "Send reply"}
                     </Button>
                   </div>
