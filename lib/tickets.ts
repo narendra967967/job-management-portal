@@ -4,7 +4,7 @@ import "server-only";
 // account "write to admin" flow) and the admin Tickets inbox. createSupportTicket
 // is the single entry point any user-side page can call to raise a ticket.
 
-import { asc, desc, eq } from "drizzle-orm";
+import { asc, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { supportTickets, ticketReplies } from "@/db/schema";
 import { sanitizeRichText } from "@/lib/sanitize";
@@ -66,8 +66,38 @@ export async function listTickets(): Promise<Ticket[]> {
   }));
 }
 
+/** One ticket with its replies (for the detail view and the resolved email). */
+export async function getTicket(id: string): Promise<Ticket | null> {
+  const [t] = await db.select().from(supportTickets).where(eq(supportTickets.id, id));
+  if (!t) return null;
+  const replies = await db
+    .select()
+    .from(ticketReplies)
+    .where(eq(ticketReplies.ticketId, id))
+    .orderBy(asc(ticketReplies.createdAt));
+  return {
+    id: t.id,
+    userId: t.userId,
+    name: t.name,
+    email: t.email,
+    subject: t.subject,
+    message: t.message,
+    category: t.category,
+    source: t.source,
+    status: t.status,
+    createdAt: t.createdAt.toISOString(),
+    updatedAt: t.updatedAt.toISOString(),
+    replies: replies.map((r) => ({ id: r.id, body: r.body, createdAt: r.createdAt.toISOString() })),
+  };
+}
+
 export async function setTicketStatus(id: string, status: TicketStatus): Promise<void> {
   await db.update(supportTickets).set({ status }).where(eq(supportTickets.id, id));
+}
+
+export async function deleteTickets(ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  await db.delete(supportTickets).where(inArray(supportTickets.id, ids));
 }
 
 /** Record an admin reply and return the ticket (for emailing the user). */
