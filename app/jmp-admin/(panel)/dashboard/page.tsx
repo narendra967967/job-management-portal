@@ -17,51 +17,38 @@ import {
   DonutChart,
   VizStyle,
 } from "@/components/admin/ui/charts";
-import {
-  NEW_USERS_OVER_TIME,
-  AI_CALLS_OVER_TIME,
-  PLAN_MIX,
-  STATUS_MIX,
-} from "@/lib/admin/mock-metrics";
+import { requireAdmin } from "@/lib/current-user";
+import { loadDashboardMetrics, type SystemRow } from "@/lib/admin/dashboard-data";
 
-// Admin dashboard home. Static mock data for now (UI-first); real numbers get
-// wired to the DB in the backend phase.
+// Admin dashboard home — real aggregates from the DB (see lib/admin/dashboard-data).
 //
 // Note: deliberately NO aggregate lead-volume analytics here (total leads across
 // users, leads-over-time). That's high-volume, per-user operational data — not
 // useful admin analytics — and the leads table is auto-pruned on a retention
 // schedule (see backend backlog). Admin metrics stay user/usage/system focused.
 
-const STATS: {
-  label: string;
-  value: string;
-  delta: string;
-  icon: LucideIcon;
-}[] = [
-  { label: "Total users", value: "14", delta: "+6 this month", icon: Users },
-  { label: "Active users", value: "11", delta: "active this week", icon: UserCheck },
-  { label: "Résumés stored", value: "3", delta: "in S3", icon: FileText },
-  { label: "AI calls (30d)", value: "126", delta: "+18% vs. prev.", icon: Sparkles },
-];
+const STAT_ICONS: Record<string, LucideIcon> = {
+  users: Users,
+  active: UserCheck,
+  resumes: FileText,
+  ai: Sparkles,
+};
 
-const ACTIVITY: { who: string; what: string; when: string }[] = [
-  { who: "narendra", what: "connected Gmail (read-only)", when: "2h ago" },
-  { who: "kunal", what: "signed in for the first time", when: "5h ago" },
-  { who: "system", what: "completed a Gmail sync", when: "1d ago" },
-  { who: "narendra", what: "uploaded a résumé", when: "2d ago" },
-];
+export default async function AdminDashboardPage() {
+  await requireAdmin();
+  const { stats, newUsers, aiCalls, planMix, statusMix, activity, system } =
+    await loadDashboardMetrics();
 
-export default function AdminDashboardPage() {
   return (
     <div className="space-y-6">
       <VizStyle />
 
       {/* Stat cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {STATS.map((s) => {
-          const Icon = s.icon;
+        {stats.map((s) => {
+          const Icon = STAT_ICONS[s.key] ?? Sparkles;
           return (
-            <Card key={s.label}>
+            <Card key={s.key}>
               <CardContent className="flex items-center gap-4 p-4">
                 <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                   <Icon className="size-5" aria-hidden />
@@ -85,7 +72,7 @@ export default function AdminDashboardPage() {
             <CardTitle>New users</CardTitle>
           </CardHeader>
           <CardContent>
-            <BarChart data={NEW_USERS_OVER_TIME} unit="users" />
+            <BarChart data={newUsers} unit="users" />
           </CardContent>
         </Card>
 
@@ -94,7 +81,11 @@ export default function AdminDashboardPage() {
             <CardTitle>Plan distribution</CardTitle>
           </CardHeader>
           <CardContent>
-            <DonutChart data={PLAN_MIX} centerLabel="Users" />
+            {planMix.length > 0 ? (
+              <DonutChart data={planMix} centerLabel="Users" />
+            ) : (
+              <Empty>No users yet</Empty>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -106,7 +97,7 @@ export default function AdminDashboardPage() {
             <CardTitle>AI calls</CardTitle>
           </CardHeader>
           <CardContent>
-            <AreaChart data={AI_CALLS_OVER_TIME} unit="calls" />
+            <AreaChart data={aiCalls} unit="calls" />
           </CardContent>
         </Card>
 
@@ -115,7 +106,11 @@ export default function AdminDashboardPage() {
             <CardTitle>Users by status</CardTitle>
           </CardHeader>
           <CardContent>
-            <DonutChart data={STATUS_MIX} centerLabel="Users" />
+            {statusMix.length > 0 ? (
+              <DonutChart data={statusMix} centerLabel="Users" />
+            ) : (
+              <Empty>No users yet</Empty>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -127,22 +122,26 @@ export default function AdminDashboardPage() {
             <CardTitle>Recent activity</CardTitle>
           </CardHeader>
           <CardContent className="space-y-0">
-            <ul className="divide-y divide-border">
-              {ACTIVITY.map((a, i) => (
-                <li key={i} className="flex items-center gap-3 py-2.5">
-                  <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold uppercase">
-                    {a.who.slice(0, 2)}
-                  </span>
-                  <p className="min-w-0 flex-1 text-sm">
-                    <span className="font-medium">{a.who}</span>{" "}
-                    <span className="text-muted-foreground">{a.what}</span>
-                  </p>
-                  <span className="shrink-0 text-xs text-muted-foreground">
-                    {a.when}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            {activity.length > 0 ? (
+              <ul className="divide-y divide-border">
+                {activity.map((a, i) => (
+                  <li key={i} className="flex items-center gap-3 py-2.5">
+                    <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold uppercase">
+                      {a.who.slice(0, 2)}
+                    </span>
+                    <p className="min-w-0 flex-1 text-sm">
+                      <span className="font-medium">{a.who}</span>{" "}
+                      <span className="text-muted-foreground">{a.what}</span>
+                    </p>
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {a.when}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <Empty>No activity yet</Empty>
+            )}
           </CardContent>
         </Card>
 
@@ -152,10 +151,9 @@ export default function AdminDashboardPage() {
             <CardTitle>System</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
-            <Row label="Environment" value="Preprod" />
-            <Row label="App version" value="v0.1.0" />
-            <Row label="Database" value="Connected" ok />
-            <Row label="Gmail sync" value="Every 15 min" />
+            {system.map((r) => (
+              <Row key={r.label} row={r} />
+            ))}
           </CardContent>
         </Card>
       </div>
@@ -163,18 +161,26 @@ export default function AdminDashboardPage() {
   );
 }
 
-function Row({ label, value, ok }: { label: string; value: string; ok?: boolean }) {
+function Empty({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">
+      {children}
+    </div>
+  );
+}
+
+function Row({ row }: { row: SystemRow }) {
   return (
     <div className="flex items-center justify-between">
-      <span className="text-muted-foreground">{label}</span>
+      <span className="text-muted-foreground">{row.label}</span>
       <span
         className={
-          ok
+          row.ok
             ? "font-medium text-status-applied-foreground"
             : "font-medium text-foreground"
         }
       >
-        {value}
+        {row.value}
       </span>
     </div>
   );
