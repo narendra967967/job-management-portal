@@ -340,7 +340,7 @@ export function TicketsClient({ initial }: { initial: Ticket[] }) {
               </DialogHeader>
 
               {/* Fixed-height body: meta/status/reply stay put, only the thread scrolls. */}
-              <div className="flex h-[70vh] flex-col gap-4 px-0.5">
+              <div className="flex h-[70vh] w-full min-w-0 flex-col gap-4 px-0.5">
                 {/* Requester + meta */}
                 <div className="shrink-0 rounded-xl border bg-muted/20 p-3">
                   <div className="flex items-center gap-3">
