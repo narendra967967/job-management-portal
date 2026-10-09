@@ -68,6 +68,19 @@ function initials(name: string): string {
 const proseCls =
   "text-sm [&_li]:ml-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:mb-2 [&_p:last-child]:mb-0 [&_ul]:list-disc [&_ul]:pl-5";
 
+// Timestamps are formatted in the viewer's locale/timezone, which the server can't
+// know — so render them client-only (empty on first paint) to avoid a hydration
+// mismatch. The icon/label around it stays server-rendered.
+function ClientTime({ iso, className }: { iso: string; className?: string }) {
+  const [text, setText] = useState("");
+  useEffect(() => setText(fmt(iso)), [iso]);
+  return (
+    <span className={className} suppressHydrationWarning>
+      {text}
+    </span>
+  );
+}
+
 export function TicketsClient({ initial }: { initial: Ticket[] }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
@@ -317,7 +330,7 @@ export function TicketsClient({ initial }: { initial: Ticket[] }) {
                   <td className="px-4 py-3">
                     <Badge variant={STATUS_BADGE[t.status]}>{TICKET_STATUS_LABELS[t.status]}</Badge>
                   </td>
-                  <td className="hidden px-4 py-3 text-xs text-muted-foreground lg:table-cell">{fmt(t.createdAt)}</td>
+                  <td className="hidden px-4 py-3 text-xs text-muted-foreground lg:table-cell"><ClientTime iso={t.createdAt} /></td>
                 </tr>
               ))}
             </tbody>
@@ -358,7 +371,7 @@ export function TicketsClient({ initial }: { initial: Ticket[] }) {
                   <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
                     <span className="rounded-full border bg-background px-2 py-0.5 font-medium text-foreground">{catLabel(active.category)}</span>
                     <span className="rounded-full border bg-background px-2 py-0.5">{active.source}</span>
-                    <span className="flex items-center gap-1"><Clock className="size-3 shrink-0" aria-hidden /> {fmt(active.createdAt)}</span>
+                    <span className="flex items-center gap-1"><Clock className="size-3 shrink-0" aria-hidden /> <ClientTime iso={active.createdAt} /></span>
                   </div>
                 </div>
 
@@ -380,7 +393,7 @@ export function TicketsClient({ initial }: { initial: Ticket[] }) {
                     <div className="rounded-xl border bg-card p-3">
                       <div className="mb-1.5 flex items-center justify-between gap-2">
                         <span className="text-xs font-medium">{active.name || "User"}</span>
-                        <span className="text-[10px] text-muted-foreground">{fmt(active.createdAt)}</span>
+                        <ClientTime iso={active.createdAt} className="text-[10px] text-muted-foreground" />
                       </div>
                       {/* Sanitized on write (lib/sanitize) — safe to render. */}
                       <div className={proseCls} dangerouslySetInnerHTML={{ __html: active.message }} />
@@ -389,7 +402,7 @@ export function TicketsClient({ initial }: { initial: Ticket[] }) {
                       <div key={r.id} className="rounded-xl border border-primary/20 bg-primary/5 p-3">
                         <div className="mb-1.5 flex items-center justify-between gap-2">
                           <span className="text-xs font-medium text-primary">Support</span>
-                          <span className="text-[10px] text-muted-foreground">{fmt(r.createdAt)}</span>
+                          <ClientTime iso={r.createdAt} className="text-[10px] text-muted-foreground" />
                         </div>
                         <div className={proseCls} dangerouslySetInnerHTML={{ __html: r.body }} />
                       </div>
