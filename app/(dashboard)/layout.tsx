@@ -9,6 +9,7 @@ import {
   NotificationsMenu,
   TopBarStats,
   TopBarSearch,
+  PlanChip,
 } from "@/components/app-shell/top-bar";
 import { AutoSync } from "@/components/app-shell/auto-sync";
 import { Toaster } from "@/components/ui/toast";
@@ -71,6 +72,7 @@ export default async function DashboardLayout({
             </div>
             <TopBarSearch />
             <div className="ml-auto flex items-center gap-1.5 sm:gap-2.5">
+              <PlanChip className="hidden sm:inline-flex" />
               <TopBarStats className="hidden sm:flex" />
               <HeaderAddLeadButton />
               <SupportIconButton />

@@ -24,6 +24,7 @@ import { LifeBuoy } from "lucide-react";
 import { Logo } from "@/components/app-shell/logo";
 import { SidebarAddLeadButton } from "@/components/leads/add-lead-dialog";
 import { SupportNavButton, useContactSupport } from "@/components/support/contact-support";
+import { PlanBadge } from "@/components/ui/plan-badge";
 import { useProfile } from "@/lib/mock-store";
 import { signOutToHome } from "@/lib/auth-client";
 import {
@@ -197,6 +198,9 @@ export function SidebarFooter() {
           <p className="truncate text-[11px] text-muted-foreground">
             {profile.email}
           </p>
+          {profile.plan && (
+            <PlanBadge name={profile.plan.name} accent={profile.plan.accent} className="mt-1" />
+          )}
         </div>
         <button
           type="button"

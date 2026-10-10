@@ -72,6 +72,7 @@ import { signOutToHome, connectGoogle, changePassword } from "@/lib/auth-client"
 import { previewPromptAction } from "@/actions/ai";
 import { PasswordInput } from "@/components/ui/password-input";
 import { PasswordStrength } from "@/components/ui/password-strength";
+import { PlanBadge } from "@/components/ui/plan-badge";
 import { toast } from "@/components/ui/toast";
 import { MarkdownLite, looksLikeMarkdown } from "@/components/ui/markdown-lite";
 import { Textarea } from "@/components/ui/textarea";
@@ -290,10 +291,17 @@ function ProfileCard() {
 
   return (
     <section className="rounded-2xl border bg-card p-4 md:p-5">
-      <h2 className="text-sm font-medium">Profile</h2>
-      <p className="mt-0.5 text-xs text-muted-foreground">
-        Used to identify you and sign in.
-      </p>
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <h2 className="text-sm font-medium">Profile</h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Used to identify you and sign in.
+          </p>
+        </div>
+        {profile.plan && (
+          <PlanBadge name={profile.plan.name} accent={profile.plan.accent} className="shrink-0" />
+        )}
+      </div>
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <Field label="Name">
           <Input

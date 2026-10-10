@@ -19,6 +19,7 @@ import {
   jobLeadDetails as detailsT,
   jobLeads as leadsT,
   outreachMessages as outreachT,
+  plans as plansT,
   reminders as remindersT,
   resumes as resumesT,
   tasks as tasksT,
@@ -284,10 +285,22 @@ export async function loadWorkspace(userId: string): Promise<WorkspaceData> {
   const gmail = gmailRow[0];
   const u = userRow[0];
 
+  // The user's current plan (name + accent) for the plan badge.
+  let plan: Profile["plan"] = null;
+  if (u?.planId) {
+    const [p] = await db
+      .select({ name: plansT.name, accent: plansT.accent })
+      .from(plansT)
+      .where(eq(plansT.id, u.planId))
+      .limit(1);
+    if (p) plan = { name: p.name, accent: p.accent };
+  }
+
   const profile: Profile = {
     name: u?.name ?? "",
     email: u?.email ?? "",
     mobile: u?.mobile ?? "",
+    plan,
   };
 
   // "Connected" means a Google account is linked for this user (its refresh

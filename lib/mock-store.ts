@@ -96,7 +96,7 @@ let tasks: Task[] = [];
 let resumes: Resume[] = [];
 let defaultResumeId = "";
 let appSettings: AppSettings = { reminderIntervalDays: 3, staleLeadDays: 14 };
-let profile: Profile = { name: "", email: "", mobile: "" };
+let profile: Profile = { name: "", email: "", mobile: "", plan: null };
 let google: GoogleConnection = {
   connected: false,
   email: null,

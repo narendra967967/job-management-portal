@@ -233,10 +233,18 @@ export const RESUME_ACCEPT = ".pdf,.docx";
 export const RESUME_ALLOWED_EXT = ["pdf", "docx"] as const;
 export const RESUME_MAX_BYTES = 5 * 1024 * 1024; // 5 MB
 
+/** The user's current plan, for the plan badge (name + accent colour key). */
+export interface PlanSummary {
+  name: string;
+  accent: string;
+}
+
 export interface Profile {
   name: string;
   email: string;
   mobile: string;
+  /** The user's assigned plan, or null when none. */
+  plan: PlanSummary | null;
 }
 
 export type NotificationKind = "new-lead" | "reminder-due";

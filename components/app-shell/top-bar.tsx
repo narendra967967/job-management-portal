@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { Bell, Clock, Sparkles, Search } from "lucide-react";
-import { useLeads, useReminders, useNotifications, markNotificationsRead } from "@/lib/mock-store";
+import { useLeads, useReminders, useNotifications, useProfile, markNotificationsRead } from "@/lib/mock-store";
 import { useSearchQuery, setSearchQuery } from "@/lib/search-store";
 import { Input } from "@/components/ui/input";
+import { PlanBadge } from "@/components/ui/plan-badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -40,6 +41,17 @@ export function TopBarSearch() {
         className="h-9 pl-9"
       />
     </div>
+  );
+}
+
+/** The user's current plan as a tinted pill; links to Settings. Hidden when no plan. */
+export function PlanChip({ className }: { className?: string }) {
+  const plan = useProfile().plan;
+  if (!plan) return null;
+  return (
+    <Link href="/settings" aria-label={`Your plan: ${plan.name}`} className={cn("shrink-0", className)}>
+      <PlanBadge name={plan.name} accent={plan.accent} />
+    </Link>
   );
 }
 
