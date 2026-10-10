@@ -207,7 +207,9 @@ export function UsersClient({ initialUsers, plans }: { initialUsers: AdminUserRo
           expiresAt: v.expiresAt,
         });
     if (res.ok) {
-      say(editing ? `Updated ${v.name}.` : `Added ${v.name}.`);
+      if (editing) say(`Updated ${v.name}.`);
+      else if ("emailed" in res && !res.emailed) sayErr(`Added ${v.name}, but the invite email couldn't be sent.`);
+      else say(`Added ${v.name} — set-password invite emailed.`);
       router.refresh();
     }
     return res;

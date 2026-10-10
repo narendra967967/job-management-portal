@@ -15,7 +15,6 @@ import {
 import { Button } from "@/components/admin/ui/button";
 import { Input } from "@/components/admin/ui/input";
 import { Label } from "@/components/admin/ui/label";
-import { PasswordField, isPasswordValid } from "@/components/admin/ui/password-field";
 import type {
   AdminUserRow,
   AdminUserStatus,
@@ -95,7 +94,6 @@ export function UserFormDialog({
   const editing = !!user;
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [mobile, setMobile] = useState("");
   const [role, setRole] = useState<AdminUserRole>("user");
   const [status, setStatus] = useState<AdminUserStatus>("active");
@@ -124,16 +122,14 @@ export function UserFormDialog({
     setStatus(user?.status ?? "active");
     setPlanId(user?.planId ?? "");
     setExpiresAt(user?.expiresAt ?? "");
-    setPassword("");
     setError("");
     setBusy(false);
   }, [open, user]);
 
   async function save() {
     if (!name.trim()) return setError("Name is required.");
-    if (!editing) {
-      if (!/^\S+@\S+\.\S+$/.test(email.trim())) return setError("Enter a valid email address.");
-      if (!isPasswordValid(password)) return setError("Password doesn't meet all the requirements below.");
+    if (!editing && !/^\S+@\S+\.\S+$/.test(email.trim())) {
+      return setError("Enter a valid email address.");
     }
     setError("");
     setBusy(true);
@@ -141,7 +137,6 @@ export function UserFormDialog({
       const res = await onSave({
         name: name.trim(),
         email: email.trim(),
-        password: password || undefined,
         mobile: storedMobile(mobile),
         role,
         status,
@@ -194,13 +189,11 @@ export function UserFormDialog({
           </Field>
 
           {!editing && (
-            <Field label="Temporary password">
-              <PasswordField
-                value={password}
-                onChange={setPassword}
-                placeholder="Create a strong password"
-              />
-            </Field>
+            <div className="rounded-lg border bg-muted/30 p-3 text-xs text-muted-foreground">
+              We&rsquo;ll email{" "}
+              <span className="font-medium text-foreground">{email.trim() || "the user"}</span>{" "}
+              a secure link to set their own password and sign in — no password is sent in the email.
+            </div>
           )}
 
           <div className="grid gap-4 sm:grid-cols-2">

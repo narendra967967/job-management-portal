@@ -4,11 +4,12 @@
 // Every action requires an admin session. Client-side validation is mirrored here
 // with Zod; passwords are scrypt-hashed (never stored plaintext).
 
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
+import { auth } from "@/lib/auth";
 import { requireAdmin } from "@/lib/current-user";
 import { hashPassword } from "@/lib/password";
 import { validatePassword } from "@/lib/admin/password-policy-server";
@@ -16,6 +17,7 @@ import { provisionUserDefaults } from "@/lib/provision";
 import { account, plans, user } from "@/db/schema";
 
 type ActionResult = { ok: true } | { ok: false; error: string };
+type CreateResult = { ok: true; emailed: boolean } | { ok: false; error: string };
 
 const roleSchema = z.enum(["user", "admin"]);
 const statusSchema = z.enum(["active", "inactive"]);
@@ -33,7 +35,9 @@ const passwordSchema = z.string().min(8, "Password must be at least 8 characters
 const createSchema = z.object({
   name: nameSchema,
   email: emailSchema,
-  password: passwordSchema,
+  // Optional: admins don't set a password — the user sets their own via the
+  // emailed set-password link. When given, it's still policy-checked.
+  password: passwordSchema.optional(),
   mobile: mobileSchema,
   role: roleSchema,
   status: statusSchema,
@@ -63,15 +67,20 @@ async function bumpEverSubscribed(planId: string | null | undefined) {
     .where(eq(plans.id, planId));
 }
 
-export async function createAdminUserAction(input: unknown): Promise<ActionResult> {
+export async function createAdminUserAction(input: unknown): Promise<CreateResult> {
   await requireAdmin();
   const parsed = createSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: firstError(parsed.error) };
   const v = parsed.data;
 
-  // Enforce the admin-configured password policy server-side (not just min length).
-  const pwError = await validatePassword(v.password);
-  if (pwError) return { ok: false, error: pwError };
+  // When an admin supplies a password, enforce the configured policy. When they
+  // don't (the default), mint an unguessable one — the user replaces it via the
+  // emailed set-password link and never sees this value.
+  if (v.password) {
+    const pwError = await validatePassword(v.password);
+    if (pwError) return { ok: false, error: pwError };
+  }
+  const initialPassword = v.password ?? randomBytes(24).toString("base64url");
 
   const existing = await db.select({ id: user.id }).from(user).where(eq(user.email, v.email));
   if (existing.length) return { ok: false, error: "A user with that email already exists." };
@@ -95,15 +104,25 @@ export async function createAdminUserAction(input: unknown): Promise<ActionResul
     accountId: id,
     providerId: "credential",
     userId: id,
-    password: await hashPassword(v.password),
+    password: await hashPassword(initialPassword),
     createdAt: new Date(),
     updatedAt: new Date(),
   });
   await provisionUserDefaults(id);
   await bumpEverSubscribed(v.planId ?? null);
 
+  // Email a welcome + set-password link (best-effort — the account exists either
+  // way). The user has never logged in, so sendResetPassword sends the welcome copy.
+  let emailed = true;
+  try {
+    await auth.api.requestPasswordReset({ body: { email: v.email, redirectTo: "/reset-password" } });
+  } catch (e) {
+    emailed = false;
+    console.error("[admin-users] welcome email failed:", e instanceof Error ? e.message : e);
+  }
+
   revalidatePath("/jmp-admin/users");
-  return { ok: true };
+  return { ok: true, emailed };
 }
 
 export async function updateAdminUserAction(input: unknown): Promise<ActionResult> {

@@ -45,29 +45,54 @@ export const auth = betterAuth({
     },
     // Reset link is emailed via SMTP (config in DB). When SMTP isn't set up
     // yet, log the link so the flow is testable locally without email.
-    sendResetPassword: async ({ user, url }) => {
+    // Admin-provisioned accounts that have never logged in get a WELCOME email
+    // (with the same set-password link); existing users get the reset copy.
+    sendResetPassword: async ({ user: recipient, url }) => {
       const appName = await getAppName();
+      let isNew = false;
       try {
-        await sendAppEmail({
-          to: user.email,
-          subject: `Reset your ${appName} password`,
-          heading: "Reset your password",
-          lines: [
-            `We received a request to reset your ${appName} password.`,
-            "Click the button below to choose a new one — this link expires in 1 hour.",
-          ],
-          button: { label: "Reset your password", url },
-          footerNote: "If you didn't request this, you can safely ignore this email.",
-        });
+        const [row] = await db
+          .select({ lastLoginAt: user.lastLoginAt })
+          .from(user)
+          .where(eq(user.id, recipient.id));
+        isNew = !row?.lastLoginAt;
+      } catch {
+        isNew = false;
+      }
+      const content = isNew
+        ? {
+            subject: `Welcome to ${appName} — set your password`,
+            heading: `Welcome to ${appName}`,
+            lines: [
+              `Hi ${recipient.name || "there"}, an administrator created an account for you on ${appName}.`,
+              `Your login ID is ${recipient.email}.`,
+              "Click below to set your password and sign in. This link expires in 1 hour — if it does, use “Forgot password” on the sign-in page to get a new one.",
+            ],
+            button: { label: "Set your password", url },
+            footerNote:
+              "Once you're signed in, you can change your password anytime from Settings → Account.",
+          }
+        : {
+            subject: `Reset your ${appName} password`,
+            heading: "Reset your password",
+            lines: [
+              `We received a request to reset your ${appName} password.`,
+              "Click the button below to choose a new one — this link expires in 1 hour.",
+            ],
+            button: { label: "Reset your password", url },
+            footerNote: "If you didn't request this, you can safely ignore this email.",
+          };
+      try {
+        await sendAppEmail({ to: recipient.email, ...content });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         if (msg === SMTP_NOT_CONFIGURED) {
           console.log(
-            `\n[password-reset] SMTP not configured — reset link for ${user.email}:\n${url}\n`,
+            `\n[password-reset] SMTP not configured — link for ${recipient.email}:\n${url}\n`,
           );
         } else {
           console.error("[password-reset] email send failed:", msg);
-          console.log(`[password-reset] link for ${user.email}: ${url}`);
+          console.log(`[password-reset] link for ${recipient.email}: ${url}`);
         }
       }
     },
