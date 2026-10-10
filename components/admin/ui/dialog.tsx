@@ -22,7 +22,11 @@ function DialogContent({
       <D.Backdrop className="fixed inset-0 z-50 bg-black/40 backdrop-blur-[1px] data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0" />
       <D.Popup
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl border border-border bg-card p-5 text-card-foreground shadow-xl outline-none sm:max-w-lg data-open:animate-in data-open:zoom-in-95 data-closed:animate-out data-closed:zoom-out-95",
+          // Mobile-first: cap width to the viewport and scroll only vertically.
+          // `min-w-0` + `[&>*]:min-w-0` stop grid min-content from overriding the
+          // max-width cap (which would make the modal wider than the screen and
+          // overflow on the x-axis). Content wraps; overflow-x is clipped as a net.
+          "fixed top-1/2 left-1/2 z-50 grid max-h-[calc(100dvh-2rem)] w-full min-w-0 max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 overflow-x-hidden overflow-y-auto rounded-xl border border-border bg-card p-5 text-card-foreground shadow-xl outline-none [&>*]:min-w-0 sm:max-w-lg data-open:animate-in data-open:zoom-in-95 data-closed:animate-out data-closed:zoom-out-95",
           className,
         )}
         {...props}
