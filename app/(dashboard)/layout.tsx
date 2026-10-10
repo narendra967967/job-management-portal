@@ -19,6 +19,7 @@ import {
   AddLeadFab,
 } from "@/components/leads/add-lead-dialog";
 import { ContactSupportProvider, SupportIconButton } from "@/components/support/contact-support";
+import { SupportWidget } from "@/components/support/support-widget";
 import { redirect } from "next/navigation";
 import { getSessionUser, accessState } from "@/lib/current-user";
 import { guardMaintenance } from "@/lib/maintenance";
@@ -92,6 +93,8 @@ export default async function DashboardLayout({
       {/* Mobile-only floating "Add lead" button (above the bottom nav). */}
       <AddLeadFab />
       </div>
+      {/* Floating help launcher + panel (bottom-right, all dashboard pages). */}
+      <SupportWidget />
       <Toaster />
     </AddLeadProvider>
     </ContactSupportProvider>

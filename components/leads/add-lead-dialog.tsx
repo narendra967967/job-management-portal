@@ -123,12 +123,13 @@ export function AddLeadFab() {
   // The support conversation has its own pinned composer at the bottom — the
   // floating FAB would overlap its Send button, and "add lead" isn't relevant here.
   if (pathname?.startsWith("/support/")) return null;
+  // Positioned to stack above the floating help launcher (which sits at ~4.75rem).
   return (
     <button
       type="button"
       onClick={open}
       aria-label="Add lead"
-      className="fixed right-4 bottom-[calc(env(safe-area-inset-bottom)+4.75rem)] z-40 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform active:scale-95 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none md:hidden"
+      className="fixed right-4 bottom-[calc(env(safe-area-inset-bottom)+9rem)] z-40 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform active:scale-95 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none md:hidden"
     >
       <Plus className="size-6" aria-hidden />
     </button>
