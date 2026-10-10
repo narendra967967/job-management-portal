@@ -96,7 +96,7 @@ export function TicketConversation({ ticket }: { ticket: Ticket }) {
   return (
     <div className="mx-auto flex h-full max-w-2xl flex-col gap-3">
       <Link
-        href="/settings"
+        href="/settings?tab=help"
         className="inline-flex shrink-0 items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="size-4" aria-hidden />

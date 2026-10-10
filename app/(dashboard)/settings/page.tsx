@@ -26,6 +26,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { cn, formatDateTime } from "@/lib/utils";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import {
@@ -182,8 +183,20 @@ function TabButton({
 }
 
 export default function SettingsPage() {
-  const [active, setActive] = useState(SECTIONS[0].id);
+  // The active tab lives in the URL (?tab=…) so it survives a refresh and
+  // back-navigation (e.g. back from a ticket returns to Help & support).
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get("tab");
+  const active = SECTIONS.some((s) => s.id === tabParam) ? (tabParam as string) : SECTIONS[0].id;
   const current = SECTIONS.find((s) => s.id === active) ?? SECTIONS[0];
+
+  function setActive(id: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", id);
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  }
 
   return (
     <div className="mx-auto max-w-5xl">
