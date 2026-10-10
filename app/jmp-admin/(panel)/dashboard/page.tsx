@@ -5,6 +5,7 @@ import {
   FileText,
   Sparkles,
   LifeBuoy,
+  Mail,
   ArrowRight,
   type LucideIcon,
 } from "lucide-react";
@@ -62,6 +63,7 @@ export default async function AdminDashboardPage() {
     planMix,
     statusMix,
     funnel,
+    gmail,
     ticketStats,
     recentTickets,
     sla,
@@ -205,7 +207,7 @@ export default async function AdminDashboardPage() {
         </Card>
       </div>
 
-      {/* Recent activity + system */}
+      {/* Recent activity + (Gmail health over System) */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <SectionHeader title="Recent activity" />
@@ -233,14 +235,40 @@ export default async function AdminDashboardPage() {
           </CardContent>
         </Card>
 
-        <Card>
-          <SectionHeader title="System" />
-          <CardContent className="space-y-3 text-sm">
-            {system.map((r) => (
-              <StatRow key={r.label} label={r.label} value={r.value} ok={r.ok} />
-            ))}
-          </CardContent>
-        </Card>
+        <div className="space-y-4">
+          <Card>
+            <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
+              <CardTitle className="flex items-center gap-2">
+                <Mail className="size-4 text-primary" aria-hidden /> Gmail health
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              <StatRow label="Connected accounts" value={`${gmail.connected} / ${gmail.totalUsers}`} ok={gmail.connected > 0} />
+              <StatRow label="Last sync" value={gmail.lastSync} />
+              <StatRow
+                label="Ingest errors (30d)"
+                value={String(gmail.ingestErrors)}
+                ok={gmail.ingestErrors === 0}
+                warn={gmail.ingestErrors > 0}
+              />
+              <StatRow
+                label="Failing syncs"
+                value={String(gmail.failingSyncs)}
+                ok={gmail.failingSyncs === 0}
+                warn={gmail.failingSyncs > 0}
+              />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <SectionHeader title="System" />
+            <CardContent className="space-y-3 text-sm">
+              {system.map((r) => (
+                <StatRow key={r.label} label={r.label} value={r.value} ok={r.ok} />
+              ))}
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );
@@ -278,15 +306,27 @@ function Empty({ children }: { children: React.ReactNode }) {
   );
 }
 
-function StatRow({ label, value, ok }: { label: string; value: string; ok?: boolean }) {
+function StatRow({
+  label,
+  value,
+  ok,
+  warn,
+}: {
+  label: string;
+  value: string;
+  ok?: boolean;
+  warn?: boolean;
+}) {
   return (
     <div className="flex items-center justify-between">
       <span className="text-muted-foreground">{label}</span>
       <span
         className={
-          ok
-            ? "font-medium text-status-applied-foreground"
-            : "font-medium text-foreground"
+          warn
+            ? "font-medium text-destructive"
+            : ok
+              ? "font-medium text-status-applied-foreground"
+              : "font-medium text-foreground"
         }
       >
         {value}

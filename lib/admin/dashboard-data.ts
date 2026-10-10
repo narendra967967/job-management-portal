@@ -22,6 +22,7 @@ import {
   plans,
   gmailConfig,
   gmailSyncState,
+  gmailIngestErrors,
   supportTickets,
   ticketReplies,
 } from "@/db/schema";
@@ -84,6 +85,14 @@ export interface FunnelStage {
   pct: number;
 }
 
+export interface GmailHealth {
+  connected: number;
+  totalUsers: number;
+  lastSync: string;
+  ingestErrors: number;
+  failingSyncs: number;
+}
+
 export interface DashboardMetrics {
   stats: StatCard[];
   newUsers: TimeSeries;
@@ -92,6 +101,7 @@ export interface DashboardMetrics {
   planMix: Point[];
   statusMix: Point[];
   funnel: FunnelStage[];
+  gmail: GmailHealth;
   ticketStats: TicketStats;
   recentTickets: RecentTicket[];
   sla: SlaStats;
@@ -210,6 +220,8 @@ export async function loadDashboardMetrics(): Promise<DashboardMetrics> {
     recentTicketRows,
     ticketRows,
     firstReplyRows,
+    ingestErrorRows,
+    failingSyncRows,
   ] = await Promise.all([
     db.select({ n: count }).from(user).where(onlyUsers),
     db.select({ n: count }).from(user).where(and(onlyUsers, sql`${user.createdAt} >= ${monthAgo}`)),
@@ -288,6 +300,16 @@ export async function loadDashboardMetrics(): Promise<DashboardMetrics> {
       .select({ ticketId: ticketReplies.ticketId, first: sql<string>`min(${ticketReplies.createdAt})` })
       .from(ticketReplies)
       .groupBy(ticketReplies.ticketId),
+    db
+      .select({ n: count })
+      .from(gmailIngestErrors)
+      .innerJoin(user, eq(gmailIngestErrors.userId, user.id))
+      .where(and(onlyUsers, sql`${gmailIngestErrors.createdAt} >= ${monthAgo}`)),
+    db
+      .select({ n: countDistinctUser })
+      .from(gmailSyncState)
+      .innerJoin(user, eq(gmailSyncState.userId, user.id))
+      .where(and(onlyUsers, isNotNull(gmailSyncState.lastError))),
   ]);
 
   const totalUsers = totalUsersRows[0]?.n ?? 0;
@@ -417,6 +439,15 @@ export async function loadDashboardMetrics(): Promise<DashboardMetrics> {
   // --- System snapshot ---
   const appEnv = process.env.APP_ENV ?? (process.env.NODE_ENV === "production" ? "Production" : "Development");
   const lastSync = lastSyncRow[0]?.syncedAt ? relativeTime(new Date(lastSyncRow[0].syncedAt as Date)) : "Never";
+
+  // --- Gmail health (users only; read-only Gmail integration) ---
+  const gmail: GmailHealth = {
+    connected: gmailConnected,
+    totalUsers,
+    lastSync,
+    ingestErrors: ingestErrorRows[0]?.n ?? 0,
+    failingSyncs: failingSyncRows[0]?.n ?? 0,
+  };
   const system: SystemRow[] = [
     { label: "Environment", value: appEnv },
     { label: "App version", value: `v${pkg.version}` },
@@ -432,6 +463,7 @@ export async function loadDashboardMetrics(): Promise<DashboardMetrics> {
     planMix,
     statusMix,
     funnel,
+    gmail,
     ticketStats,
     recentTickets,
     sla,
