@@ -23,7 +23,7 @@ import {
   useState,
   type KeyboardEvent,
 } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import {
   Plus,
   ClipboardList,
@@ -119,6 +119,10 @@ export function HeaderAddLeadButton() {
 /** Floating action button — mobile only (the 5-slot bottom nav is full). */
 export function AddLeadFab() {
   const { open } = useAddLead();
+  const pathname = usePathname();
+  // The support conversation has its own pinned composer at the bottom — the
+  // floating FAB would overlap its Send button, and "add lead" isn't relevant here.
+  if (pathname?.startsWith("/support/")) return null;
   return (
     <button
       type="button"
