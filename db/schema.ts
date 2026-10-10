@@ -591,6 +591,12 @@ export const supportTickets = pgTable(
     // Where it came from: "reactivation", "contact", or a page path.
     source: text("source").notNull().default("contact"),
     status: ticketStatus("status").notNull().default("open"),
+    // Read/delivery receipts (chat ticks + unread counts). "last_*_at >= a message's
+    // created_at" means that party has delivered/read that message.
+    lastReadByUserAt: timestamp("last_read_by_user_at", { withTimezone: true }),
+    lastReadByAdminAt: timestamp("last_read_by_admin_at", { withTimezone: true }),
+    lastDeliveredToUserAt: timestamp("last_delivered_to_user_at", { withTimezone: true }),
+    lastDeliveredToAdminAt: timestamp("last_delivered_to_admin_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()

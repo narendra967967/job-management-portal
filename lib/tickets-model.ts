@@ -36,6 +36,33 @@ export interface TicketReply {
   createdAt: string;
 }
 
+/** Read/delivery receipts for a ticket (drives chat ticks + unread counts). */
+export interface TicketReceipts {
+  lastReadByUserAt: string | null;
+  lastReadByAdminAt: string | null;
+  lastDeliveredToUserAt: string | null;
+  lastDeliveredToAdminAt: string | null;
+}
+
+export type TickState = "sent" | "delivered" | "read";
+
+/** Tick state for one message, derived from the ticket's receipts. The recipient is
+ *  the OTHER party, so a message is read/delivered once that party's receipt time
+ *  reaches the message. Only the sender shows ticks on their own messages. */
+export function messageTick(
+  author: TicketAuthor,
+  messageAt: string,
+  r: TicketReceipts,
+): TickState {
+  const recipientIsUser = author === "admin";
+  const readAt = recipientIsUser ? r.lastReadByUserAt : r.lastReadByAdminAt;
+  const deliveredAt = recipientIsUser ? r.lastDeliveredToUserAt : r.lastDeliveredToAdminAt;
+  const at = new Date(messageAt).getTime();
+  if (readAt && new Date(readAt).getTime() >= at) return "read";
+  if (deliveredAt && new Date(deliveredAt).getTime() >= at) return "delivered";
+  return "sent";
+}
+
 /** Lightweight row for the user's own ticket list (Settings → Help & support). */
 export interface UserTicketSummary {
   id: string;
@@ -46,9 +73,11 @@ export interface UserTicketSummary {
   createdAt: string;
   updatedAt: string;
   replyCount: number;
+  /** Admin replies the user hasn't read yet. */
+  unreadCount: number;
 }
 
-export interface Ticket {
+export interface Ticket extends TicketReceipts {
   id: string;
   number: number;
   userId: string | null;
