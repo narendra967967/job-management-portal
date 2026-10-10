@@ -77,7 +77,10 @@ export function AreaChart({
   const padL = 40;
   const padR = 16;
   const padT = 16;
-  const padB = 28;
+  // Rotate x labels 45° when too many to fit horizontally (e.g. the daily view),
+  // and give the axis extra room below so the slanted text doesn't clip.
+  const dense = data.length > 12;
+  const padB = dense ? 48 : 28;
   const plotW = W - padL - padR;
   const plotH = H - padT - padB;
 
@@ -138,19 +141,23 @@ export function AreaChart({
           strokeLinecap="round"
         />
 
-        {/* x labels */}
-        {data.map((d, i) => (
-          <text
-            key={i}
-            x={x(i)}
-            y={H - 8}
-            textAnchor="middle"
-            className="fill-muted-foreground"
-            style={{ fontSize: 10 }}
-          >
-            {d.label}
-          </text>
-        ))}
+        {/* x labels (rotated 45° when dense) */}
+        {data.map((d, i) => {
+          const ly = dense ? H - padB + 6 : H - 8;
+          return (
+            <text
+              key={i}
+              x={x(i)}
+              y={ly}
+              textAnchor={dense ? "end" : "middle"}
+              transform={dense ? `rotate(-45 ${x(i)} ${ly})` : undefined}
+              className="fill-muted-foreground"
+              style={{ fontSize: 10 }}
+            >
+              {d.label}
+            </text>
+          );
+        })}
 
         {/* Hover crosshair + active dot */}
         {active !== null && (
@@ -231,7 +238,10 @@ export function BarChart({
   const padL = 40;
   const padR = 16;
   const padT = 16;
-  const padB = 28;
+  // Rotate x labels 45° when too many to fit horizontally (e.g. the daily view),
+  // and give the axis extra room below so the slanted text doesn't clip.
+  const dense = data.length > 12;
+  const padB = dense ? 48 : 28;
   const plotW = W - padL - padR;
   const plotH = H - padT - padB;
 
@@ -298,8 +308,9 @@ export function BarChart({
               />
               <text
                 x={cx}
-                y={H - 8}
-                textAnchor="middle"
+                y={dense ? H - padB + 6 : H - 8}
+                textAnchor={dense ? "end" : "middle"}
+                transform={dense ? `rotate(-45 ${cx} ${H - padB + 6})` : undefined}
                 className="fill-muted-foreground"
                 style={{ fontSize: 10 }}
               >
