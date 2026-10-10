@@ -61,6 +61,7 @@ export interface SystemRow {
 
 export interface RecentTicket {
   id: string;
+  number: number;
   subject: string;
   who: string;
   status: "open" | "in_progress" | "resolved";
@@ -323,6 +324,7 @@ export async function loadDashboardMetrics(): Promise<DashboardMetrics> {
     db
       .select({
         id: supportTickets.id,
+        number: supportTickets.number,
         subject: supportTickets.subject,
         name: supportTickets.name,
         status: supportTickets.status,
@@ -439,6 +441,7 @@ export async function loadDashboardMetrics(): Promise<DashboardMetrics> {
   const ticketStats: TicketStats = { total: ticketTotal, open: ticketOpen, statusMix: ticketStatusMix };
   const recentTickets: RecentTicket[] = recentTicketRows.map((t) => ({
     id: t.id,
+    number: t.number,
     subject: t.subject,
     who: t.name || "Unknown",
     status: t.status as RecentTicket["status"],

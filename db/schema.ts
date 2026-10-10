@@ -577,6 +577,9 @@ export const supportTickets = pgTable(
   "support_tickets",
   {
     id: uuid("id").primaryKey().defaultRandom(),
+    // Human-readable, sequential reference (shown to users/admins as e.g. TKT-0042).
+    // The uuid id stays the internal/system key. Existing rows backfill via the sequence.
+    number: integer("number").notNull().generatedByDefaultAsIdentity(),
     userId: text("user_id").references(() => user.id, { onDelete: "set null" }),
     name: text("name").notNull().default(""),
     email: text("email").notNull().default(""),

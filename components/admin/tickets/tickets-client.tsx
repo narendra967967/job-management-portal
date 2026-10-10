@@ -37,6 +37,7 @@ import {
 import {
   TICKET_STATUS_LABELS,
   TICKET_CATEGORY_LABELS,
+  ticketRef,
   type Ticket,
   type TicketCategory,
   type TicketStatus,
@@ -318,6 +319,7 @@ export function TicketsClient({ initial }: { initial: Ticket[] }) {
                     <input type="checkbox" className={checkboxCls} checked={selected.has(t.id)} onChange={() => toggleOne(t.id)} aria-label={`Select ${t.subject}`} />
                   </td>
                   <td className="px-4 py-3">
+                    <p className="font-mono text-[11px] text-muted-foreground">{ticketRef(t.number)}</p>
                     <p className="font-medium">{t.subject}</p>
                     <p className="text-xs text-muted-foreground sm:hidden">{t.name || t.email}</p>
                     {t.replies.length > 0 && <span className="text-[11px] text-muted-foreground">{t.replies.length} repl{t.replies.length === 1 ? "y" : "ies"}</span>}
@@ -350,6 +352,7 @@ export function TicketsClient({ initial }: { initial: Ticket[] }) {
                   </span>
                   <span className="min-w-0 truncate">{active.subject}</span>
                 </DialogTitle>
+                <p className="pl-9 font-mono text-[11px] text-muted-foreground">{ticketRef(active.number)}</p>
               </DialogHeader>
 
               {/* Fixed-height body: meta/status/reply stay put, only the thread scrolls. */}

@@ -93,6 +93,7 @@ import { TicketStatusPill } from "@/components/support/ticket-status-pill";
 import { listMyTicketsAction } from "@/actions/support";
 import {
   TICKET_CATEGORY_LABELS,
+  ticketRef,
   type UserTicketSummary,
   type TicketStatus,
   type TicketCategory,
@@ -1826,7 +1827,7 @@ function HelpSupportCard() {
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium">{t.subject}</p>
                         <p className="truncate text-xs text-muted-foreground">
-                          {cat} · updated {formatDateTime(t.updatedAt)}
+                          <span className="font-mono">{ticketRef(t.number)}</span> · {cat} · updated {formatDateTime(t.updatedAt)}
                           {t.replyCount > 0 && ` · ${t.replyCount} ${t.replyCount === 1 ? "reply" : "replies"}`}
                         </p>
                       </div>

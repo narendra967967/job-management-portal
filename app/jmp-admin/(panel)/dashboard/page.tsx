@@ -21,6 +21,7 @@ import { Badge } from "@/components/admin/ui/badge";
 import { DonutChart, VizStyle } from "@/components/admin/ui/charts";
 import { TimeSeriesCard } from "@/components/admin/dashboard/time-series-card";
 import { requireAdmin } from "@/lib/current-user";
+import { ticketRef } from "@/lib/tickets-model";
 import {
   loadDashboardMetrics,
   type RecentTicket,
@@ -197,7 +198,9 @@ export default async function AdminDashboardPage() {
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium">{t.subject}</p>
-                      <p className="truncate text-xs text-muted-foreground">{t.who}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        <span className="font-mono">{ticketRef(t.number)}</span> · {t.who}
+                      </p>
                     </div>
                     <Badge variant={TICKET_BADGE[t.status]}>{TICKET_LABEL[t.status]}</Badge>
                     <span className="shrink-0 text-xs text-muted-foreground">{t.when}</span>

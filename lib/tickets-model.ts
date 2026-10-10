@@ -23,6 +23,11 @@ export const TICKET_CATEGORY_LABELS: Record<TicketCategory, string> = {
 
 export type TicketAuthor = "user" | "admin";
 
+/** Human-readable ticket reference from the sequential number, e.g. TKT-0042. */
+export function ticketRef(n: number): string {
+  return `TKT-${String(n).padStart(4, "0")}`;
+}
+
 export interface TicketReply {
   id: string;
   /** Who wrote it: "user" (the ticket owner) or "admin" (support). */
@@ -34,6 +39,7 @@ export interface TicketReply {
 /** Lightweight row for the user's own ticket list (Settings → Help & support). */
 export interface UserTicketSummary {
   id: string;
+  number: number;
   subject: string;
   category: string;
   status: TicketStatus;
@@ -44,6 +50,7 @@ export interface UserTicketSummary {
 
 export interface Ticket {
   id: string;
+  number: number;
   userId: string | null;
   name: string;
   email: string;

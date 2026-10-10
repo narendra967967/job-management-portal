@@ -73,6 +73,7 @@ export async function listTickets(): Promise<Ticket[]> {
   }
   return tickets.map((t) => ({
     id: t.id,
+    number: t.number,
     userId: t.userId,
     name: t.name,
     email: t.email,
@@ -98,6 +99,7 @@ export async function getTicket(id: string): Promise<Ticket | null> {
     .orderBy(asc(ticketReplies.createdAt));
   return {
     id: t.id,
+    number: t.number,
     userId: t.userId,
     name: t.name,
     email: t.email,
@@ -135,6 +137,7 @@ export async function listUserTickets(userId: string): Promise<UserTicketSummary
   const replyCount = new Map(counts.map((c) => [c.ticketId, c.n]));
   return tickets.map((t) => ({
     id: t.id,
+    number: t.number,
     subject: t.subject,
     category: t.category,
     status: t.status,

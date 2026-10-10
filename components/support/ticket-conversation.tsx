@@ -17,6 +17,7 @@ import { richTextToPlain } from "@/lib/sanitize";
 import { replyToMyTicketAction } from "@/actions/support";
 import {
   TICKET_CATEGORY_LABELS,
+  ticketRef,
   type Ticket,
   type TicketAuthor,
   type TicketCategory,
@@ -52,6 +53,7 @@ function ClientTime({ iso, mode, className }: { iso: string; mode: "time" | "day
   );
 }
 
+// One message in the thread (the original ticket message, then each reply).
 type Msg = { id: string; author: TicketAuthor; body: string; at: string };
 
 export function TicketConversation({ ticket }: { ticket: Ticket }) {
@@ -111,7 +113,8 @@ export function TicketConversation({ ticket }: { ticket: Ticket }) {
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold">{ticket.subject}</p>
             <p className="truncate text-xs text-muted-foreground">
-              {category} · opened <ClientTime iso={ticket.createdAt} mode="day" />
+              <span className="font-mono">{ticketRef(ticket.number)}</span> · {category} · opened{" "}
+              <ClientTime iso={ticket.createdAt} mode="day" />
             </p>
           </div>
           <TicketStatusPill status={ticket.status} />
