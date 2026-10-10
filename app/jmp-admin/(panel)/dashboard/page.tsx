@@ -6,6 +6,7 @@ import {
   Sparkles,
   LifeBuoy,
   Mail,
+  HardDrive,
   ArrowRight,
   type LucideIcon,
 } from "lucide-react";
@@ -64,6 +65,7 @@ export default async function AdminDashboardPage() {
     statusMix,
     funnel,
     gmail,
+    storage,
     ticketStats,
     recentTickets,
     sla,
@@ -257,6 +259,20 @@ export default async function AdminDashboardPage() {
                 ok={gmail.failingSyncs === 0}
                 warn={gmail.failingSyncs > 0}
               />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
+              <CardTitle className="flex items-center gap-2">
+                <HardDrive className="size-4 text-primary" aria-hidden /> Storage used
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              <StatRow label="Résumé files" value={`${storage.resumeFiles}`} />
+              <StatRow label="Résumé data" value={storage.resumeSize} />
+              <StatRow label="App assets" value={storage.assetSize} />
+              <StatRow label="Total in DB" value={storage.total} />
             </CardContent>
           </Card>
 

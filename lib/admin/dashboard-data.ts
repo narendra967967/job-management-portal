@@ -18,6 +18,8 @@ import {
   user,
   session,
   resumes,
+  resumeFiles,
+  appAssets,
   fitScores,
   plans,
   gmailConfig,
@@ -93,6 +95,13 @@ export interface GmailHealth {
   failingSyncs: number;
 }
 
+export interface StorageStats {
+  resumeFiles: number;
+  resumeSize: string;
+  assetSize: string;
+  total: string;
+}
+
 export interface DashboardMetrics {
   stats: StatCard[];
   newUsers: TimeSeries;
@@ -102,6 +111,7 @@ export interface DashboardMetrics {
   statusMix: Point[];
   funnel: FunnelStage[];
   gmail: GmailHealth;
+  storage: StorageStats;
   ticketStats: TicketStats;
   recentTickets: RecentTicket[];
   sla: SlaStats;
@@ -121,6 +131,15 @@ function relativeTime(dt: Date): string {
   const months = Math.floor(days / 30);
   if (months < 12) return `${months}mo ago`;
   return `${Math.floor(months / 12)}y ago`;
+}
+
+function humanBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  const kb = n / 1024;
+  if (kb < 1024) return `${kb.toFixed(kb < 10 ? 1 : 0)} KB`;
+  const mb = kb / 1024;
+  if (mb < 1024) return `${mb.toFixed(mb < 10 ? 1 : 0)} MB`;
+  return `${(mb / 1024).toFixed(1)} GB`;
 }
 
 function humanDuration(ms: number): string {
@@ -222,6 +241,8 @@ export async function loadDashboardMetrics(): Promise<DashboardMetrics> {
     firstReplyRows,
     ingestErrorRows,
     failingSyncRows,
+    resumeStorageRows,
+    assetStorageRows,
   ] = await Promise.all([
     db.select({ n: count }).from(user).where(onlyUsers),
     db.select({ n: count }).from(user).where(and(onlyUsers, sql`${user.createdAt} >= ${monthAgo}`)),
@@ -310,6 +331,12 @@ export async function loadDashboardMetrics(): Promise<DashboardMetrics> {
       .from(gmailSyncState)
       .innerJoin(user, eq(gmailSyncState.userId, user.id))
       .where(and(onlyUsers, isNotNull(gmailSyncState.lastError))),
+    db
+      .select({ n: count, bytes: sql<string>`coalesce(sum(octet_length(${resumeFiles.data})), 0)::bigint` })
+      .from(resumeFiles),
+    db
+      .select({ bytes: sql<string>`coalesce(sum(octet_length(${appAssets.data})), 0)::bigint` })
+      .from(appAssets),
   ]);
 
   const totalUsers = totalUsersRows[0]?.n ?? 0;
@@ -448,6 +475,17 @@ export async function loadDashboardMetrics(): Promise<DashboardMetrics> {
     ingestErrors: ingestErrorRows[0]?.n ?? 0,
     failingSyncs: failingSyncRows[0]?.n ?? 0,
   };
+
+  // --- Storage (bytes stored in Postgres; résumé files + app assets).
+  // Résumé bytes are the go-live candidate for moving to S3/R2 (see backlog). ---
+  const resumeBytes = Number(resumeStorageRows[0]?.bytes ?? 0);
+  const assetBytes = Number(assetStorageRows[0]?.bytes ?? 0);
+  const storage: StorageStats = {
+    resumeFiles: resumeStorageRows[0]?.n ?? 0,
+    resumeSize: humanBytes(resumeBytes),
+    assetSize: humanBytes(assetBytes),
+    total: humanBytes(resumeBytes + assetBytes),
+  };
   const system: SystemRow[] = [
     { label: "Environment", value: appEnv },
     { label: "App version", value: `v${pkg.version}` },
@@ -464,6 +502,7 @@ export async function loadDashboardMetrics(): Promise<DashboardMetrics> {
     statusMix,
     funnel,
     gmail,
+    storage,
     ticketStats,
     recentTickets,
     sla,
