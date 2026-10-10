@@ -110,7 +110,13 @@ export function TicketsClient({ initial }: { initial: Ticket[] }) {
     return initial.filter((t) => {
       if (fStatus !== "all" && t.status !== fStatus) return false;
       if (fCategory !== "all" && t.category !== fCategory) return false;
-      if (q && ![t.subject, t.name, t.email].some((v) => v.toLowerCase().includes(q))) return false;
+      if (
+        q &&
+        ![t.subject, t.name, t.email, ticketRef(t.number), String(t.number)].some((v) =>
+          v.toLowerCase().includes(q),
+        )
+      )
+        return false;
       return true;
     });
   }, [initial, query, fStatus, fCategory]);
@@ -232,7 +238,7 @@ export function TicketsClient({ initial }: { initial: Ticket[] }) {
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-0 flex-1 sm:max-w-xs">
           <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
-          <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search subject, name, email…" className="h-9 pl-8" />
+          <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search #, subject, name, email…" className="h-9 pl-8" />
         </div>
         <select className={selectCls} value={fStatus} onChange={(e) => setFStatus(e.target.value as "all" | TicketStatus)} aria-label="Filter status">
           {STATUS_FILTERS.map((s) => (
