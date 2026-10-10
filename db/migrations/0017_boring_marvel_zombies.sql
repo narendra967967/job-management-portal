@@ -1,0 +1,1 @@
+ALTER TABLE "ticket_replies" ADD COLUMN "author" text DEFAULT 'admin' NOT NULL;

@@ -21,10 +21,25 @@ export const TICKET_CATEGORY_LABELS: Record<TicketCategory, string> = {
   other: "Other",
 };
 
+export type TicketAuthor = "user" | "admin";
+
 export interface TicketReply {
   id: string;
+  /** Who wrote it: "user" (the ticket owner) or "admin" (support). */
+  author: TicketAuthor;
   body: string;
   createdAt: string;
+}
+
+/** Lightweight row for the user's own ticket list (Settings → Help & support). */
+export interface UserTicketSummary {
+  id: string;
+  subject: string;
+  category: string;
+  status: TicketStatus;
+  createdAt: string;
+  updatedAt: string;
+  replyCount: number;
 }
 
 export interface Ticket {

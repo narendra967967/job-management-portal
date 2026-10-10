@@ -398,22 +398,34 @@ export function TicketsClient({ initial }: { initial: Ticket[] }) {
                       {/* Sanitized on write (lib/sanitize) — safe to render. */}
                       <div className={proseCls} dangerouslySetInnerHTML={{ __html: active.message }} />
                     </div>
-                    {active.replies.map((r) => (
-                      <div key={r.id} className="rounded-xl border border-primary/20 bg-primary/5 p-3">
-                        <div className="mb-1.5 flex items-center justify-between gap-2">
-                          <span className="text-xs font-medium text-primary">Support</span>
-                          <ClientTime iso={r.createdAt} className="text-[10px] text-muted-foreground" />
+                    {active.replies.map((r) => {
+                      const fromUser = r.author === "user";
+                      return (
+                        <div
+                          key={r.id}
+                          className={
+                            fromUser
+                              ? "rounded-xl border bg-card p-3"
+                              : "rounded-xl border border-primary/20 bg-primary/5 p-3"
+                          }
+                        >
+                          <div className="mb-1.5 flex items-center justify-between gap-2">
+                            <span className={fromUser ? "text-xs font-medium" : "text-xs font-medium text-primary"}>
+                              {fromUser ? active.name || "User" : "Support"}
+                            </span>
+                            <ClientTime iso={r.createdAt} className="text-[10px] text-muted-foreground" />
+                          </div>
+                          <div className={proseCls} dangerouslySetInnerHTML={{ __html: r.body }} />
                         </div>
-                        <div className={proseCls} dangerouslySetInnerHTML={{ __html: r.body }} />
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
 
                 {/* Reply composer */}
                 <div className="shrink-0 space-y-2">
                   <p className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">Reply</p>
-                  <RichText value={reply} onChange={setReply} placeholder="Write a reply — it's emailed to the user…" />
+                  <RichText value={reply} onChange={setReply} placeholder="Write a reply — the user is notified in-app…" />
                   <div className="flex items-center justify-end">
                     <Button onClick={() => sendReply(active.id)} disabled={busy || !richTextToPlain(reply).trim()}>
                       <Send /> {busy ? "Sending…" : "Send reply"}

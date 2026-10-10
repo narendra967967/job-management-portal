@@ -597,7 +597,8 @@ export const supportTickets = pgTable(
   (t) => [index("support_tickets_status_idx").on(t.status, t.createdAt.desc())],
 );
 
-/** Admin replies on a ticket (emailed to the user; users have no in-app view). */
+/** Replies on a ticket — two-way: "admin" (support) or "user". Shown in the admin
+ *  inbox and the user's in-app conversation view. */
 export const ticketReplies = pgTable(
   "ticket_replies",
   {
@@ -605,6 +606,8 @@ export const ticketReplies = pgTable(
     ticketId: uuid("ticket_id")
       .notNull()
       .references(() => supportTickets.id, { onDelete: "cascade" }),
+    // Who wrote it: "admin" (support) or "user". Existing rows backfill to admin.
+    author: text("author").notNull().default("admin"),
     body: text("body").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },

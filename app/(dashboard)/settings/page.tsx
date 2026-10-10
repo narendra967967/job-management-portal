@@ -25,7 +25,8 @@ import {
   Download,
   type LucideIcon,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import Link from "next/link";
+import { cn, formatDateTime } from "@/lib/utils";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import {
   useProfile,
@@ -88,6 +89,14 @@ import {
 } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { useContactSupport } from "@/components/support/contact-support";
+import { TicketStatusPill } from "@/components/support/ticket-status-pill";
+import { listMyTicketsAction } from "@/actions/support";
+import {
+  TICKET_CATEGORY_LABELS,
+  type UserTicketSummary,
+  type TicketStatus,
+  type TicketCategory,
+} from "@/lib/tickets-model";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -1746,15 +1755,90 @@ function ResumesCard() {
 
 function HelpSupportCard() {
   const { open } = useContactSupport();
+  const [tickets, setTickets] = useState<UserTicketSummary[] | null>(null);
+  const [filter, setFilter] = useState<"all" | TicketStatus>("all");
+
+  useEffect(() => {
+    let alive = true;
+    void listMyTicketsAction().then((res) => {
+      if (!alive) return;
+      setTickets(res.ok ? res.tickets : []);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const filtered = (tickets ?? []).filter((t) => filter === "all" || t.status === filter);
+
   return (
     <section className="rounded-2xl border bg-card p-4 md:p-5">
-      <h2 className="text-sm font-medium">Help &amp; support</h2>
-      <p className="mt-0.5 text-xs text-muted-foreground">
-        Have a question or hit a problem? Send us a message and we&apos;ll reply to your account email.
-      </p>
-      <Button className="mt-4" onClick={() => open({ source: "settings" })}>
-        <LifeBuoy className="size-4" aria-hidden /> Contact support
-      </Button>
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <h2 className="text-sm font-medium">Help &amp; support</h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Have a question or hit a problem? Send us a message — replies show up right here.
+          </p>
+        </div>
+        <Button onClick={() => open({ source: "settings" })}>
+          <LifeBuoy className="size-4" aria-hidden /> Contact support
+        </Button>
+      </div>
+
+      {/* The user's own requests */}
+      <div className="mt-5">
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+            Your requests
+          </h3>
+          <select
+            className="h-8 rounded-lg border border-input bg-transparent px-2 text-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value as "all" | TicketStatus)}
+            aria-label="Filter requests by status"
+          >
+            <option value="all">All</option>
+            <option value="open">Open</option>
+            <option value="in_progress">In progress</option>
+            <option value="resolved">Resolved</option>
+          </select>
+        </div>
+
+        <div className="mt-2">
+          {tickets === null ? (
+            <p className="py-6 text-center text-xs text-muted-foreground">Loading…</p>
+          ) : filtered.length === 0 ? (
+            <p className="py-6 text-center text-xs text-muted-foreground">
+              {tickets.length === 0
+                ? "You haven't raised any requests yet."
+                : "No requests match this filter."}
+            </p>
+          ) : (
+            <ul className="divide-y divide-border overflow-hidden rounded-xl border">
+              {filtered.map((t) => {
+                const cat = TICKET_CATEGORY_LABELS[t.category as TicketCategory] ?? t.category;
+                return (
+                  <li key={t.id}>
+                    <Link
+                      href={`/support/${t.id}`}
+                      className="flex items-center gap-3 p-3 transition-colors hover:bg-muted/40"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">{t.subject}</p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {cat} · updated {formatDateTime(t.updatedAt)}
+                          {t.replyCount > 0 && ` · ${t.replyCount} ${t.replyCount === 1 ? "reply" : "replies"}`}
+                        </p>
+                      </div>
+                      <TicketStatusPill status={t.status} />
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      </div>
     </section>
   );
 }

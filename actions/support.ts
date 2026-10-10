@@ -6,11 +6,12 @@
 
 import { and, eq, gt } from "drizzle-orm";
 import { z } from "zod";
+import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/current-user";
 import { supportTickets } from "@/db/schema";
-import { createSupportTicket } from "@/lib/tickets";
-import { TICKET_CATEGORIES } from "@/lib/tickets-model";
+import { addTicketReply, createSupportTicket, getUserTicket, listUserTickets } from "@/lib/tickets";
+import { TICKET_CATEGORIES, type UserTicketSummary } from "@/lib/tickets-model";
 import { sanitizeRichText, richTextToPlain } from "@/lib/sanitize";
 import { sendAppEmail } from "@/lib/email";
 
@@ -71,15 +72,51 @@ export async function submitSupportTicketAction(input: unknown): Promise<Result>
       to: u.email,
       subject: `We got your request: ${v.subject}`,
       heading: "Thanks — we've received your request",
-      bodyHtml: `<p style="margin:0 0 14px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;color:#374151;">Our team will review it and reply to you by email.</p>
+      bodyHtml: `<p style="margin:0 0 14px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;color:#374151;">Our team will review it and reply from your account. You can follow the conversation anytime under <strong>Settings &rarr; Help &amp; support</strong>.</p>
         <p style="margin:0 0 6px;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#111827;"><strong>Your message</strong></p>
         <div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;color:#374151;">${safeHtml}</div>`,
-      text: `Thanks — we've received your request. We'll reply to you by email.\n\nYour message:\n${richTextToPlain(v.message)}`,
+      text: `Thanks — we've received your request. Follow the conversation under Settings → Help & support.\n\nYour message:\n${richTextToPlain(v.message)}`,
       footerNote: "You're receiving this because you contacted support from your account.",
     });
   } catch {
     // Non-fatal: the ticket is filed regardless.
   }
 
+  return { ok: true };
+}
+
+/** The signed-in user's own tickets (for Settings → Help & support). */
+export async function listMyTicketsAction(): Promise<
+  { ok: true; tickets: UserTicketSummary[] } | { ok: false; error: string }
+> {
+  const u = await getSessionUser();
+  if (!u) return { ok: false, error: "You're not signed in." };
+  const tickets = await listUserTickets(u.id);
+  return { ok: true, tickets };
+}
+
+const replySchema = z.object({
+  ticketId: z.string().uuid(),
+  body: z.string().max(20000).refine((v) => richTextToPlain(v).length >= 1, "Write a reply."),
+});
+
+/** Reply to one of the user's own tickets. Blocked once the ticket is resolved. */
+export async function replyToMyTicketAction(input: unknown): Promise<Result> {
+  const u = await getSessionUser();
+  if (!u) return { ok: false, error: "You're not signed in." };
+
+  const p = replySchema.safeParse(input);
+  if (!p.success) return { ok: false, error: p.error.issues[0]?.message ?? "Invalid reply." };
+
+  // Must be the user's own ticket, and not already resolved.
+  const ticket = await getUserTicket(u.id, p.data.ticketId);
+  if (!ticket) return { ok: false, error: "Ticket not found." };
+  if (ticket.status === "resolved") {
+    return { ok: false, error: "This request is resolved. Please raise a new one to continue." };
+  }
+
+  await addTicketReply(p.data.ticketId, p.data.body, "user");
+  // Admin works from the inbox (the reply bumps updatedAt) — no email to support.
+  revalidatePath(`/support/${p.data.ticketId}`);
   return { ok: true };
 }

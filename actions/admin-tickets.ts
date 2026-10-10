@@ -14,9 +14,21 @@ import {
   type Ticket,
 } from "@/lib/tickets";
 import { sendAppEmail, SMTP_NOT_CONFIGURED } from "@/lib/email";
-import { sanitizeRichText, richTextToPlain } from "@/lib/sanitize";
+import { richTextToPlain } from "@/lib/sanitize";
+import { createNotification } from "@/lib/notifications";
 
 type Result = { ok: true } | { ok: false; error: string };
+
+/** In-app notification when a ticket is resolved (the transcript also goes by email). */
+async function notifyResolved(userId: string | null, ticketId: string, subject: string) {
+  if (!userId) return;
+  await createNotification(userId, {
+    type: "ticket-resolved",
+    title: "Your request was resolved",
+    body: subject,
+    href: `/support/${ticketId}`,
+  });
+}
 
 function revalidate() {
   revalidatePath("/jmp-admin/tickets");
@@ -34,13 +46,14 @@ async function sendResolvedEmail(ticket: Ticket): Promise<void> {
       <div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;color:#374151;border-left:3px solid #e5e7eb;padding-left:10px;">${bodyHtml}</div>
     </div>`;
   // ticket.message and reply bodies are already sanitized HTML (stored safe).
+  const label = (author: "user" | "admin") => (author === "user" ? "You wrote" : "Support replied");
   let convo = block("You wrote", ticket.message, fmt(ticket.createdAt));
   for (const r of ticket.replies) {
-    convo += block("Support replied", r.body, fmt(r.createdAt));
+    convo += block(label(r.author), r.body, fmt(r.createdAt));
   }
 
   const textParts = [`You wrote (${fmt(ticket.createdAt)}):`, richTextToPlain(ticket.message)];
-  for (const r of ticket.replies) textParts.push(`Support replied (${fmt(r.createdAt)}):`, richTextToPlain(r.body));
+  for (const r of ticket.replies) textParts.push(`${label(r.author)} (${fmt(r.createdAt)}):`, richTextToPlain(r.body));
 
   try {
     await sendAppEmail({
@@ -69,7 +82,10 @@ export async function setTicketStatusAction(id: unknown, status: unknown): Promi
   const becameResolved = p.data.status === "resolved" && ticket.status !== "resolved";
 
   await setTicketStatus(p.data.id, p.data.status);
-  if (becameResolved) await sendResolvedEmail({ ...ticket, status: "resolved" });
+  if (becameResolved) {
+    await sendResolvedEmail({ ...ticket, status: "resolved" });
+    await notifyResolved(ticket.userId, p.data.id, ticket.subject);
+  }
   revalidate();
   return { ok: true };
 }
@@ -89,7 +105,10 @@ export async function bulkSetTicketStatusAction(ids: unknown, status: unknown): 
     if (!ticket) continue;
     const becameResolved = p.data.status === "resolved" && ticket.status !== "resolved";
     await setTicketStatus(id, p.data.status);
-    if (becameResolved) toEmail.push({ ...ticket, status: "resolved" });
+    if (becameResolved) {
+      toEmail.push({ ...ticket, status: "resolved" });
+      await notifyResolved(ticket.userId, id, ticket.subject);
+    }
   }
   await Promise.allSettled(toEmail.map((t) => sendResolvedEmail(t)));
   revalidate();
@@ -112,27 +131,20 @@ export async function replyTicketAction(id: unknown, body: unknown): Promise<Res
     .safeParse({ id, body });
   if (!p.success) return { ok: false, error: p.error.issues[0]?.message ?? "Invalid reply." };
 
-  const ticket = await addTicketReply(p.data.id, p.data.body);
+  const ticket = await addTicketReply(p.data.id, p.data.body, "admin");
   if (!ticket) return { ok: false, error: "Ticket not found." };
 
-  let emailed = true;
-  if (ticket.email) {
-    try {
-      await sendAppEmail({
-        to: ticket.email,
-        subject: `Re: ${ticket.subject}`,
-        heading: "Reply from support",
-        bodyHtml: sanitizeRichText(p.data.body),
-        text: richTextToPlain(p.data.body),
-      });
-    } catch (e) {
-      emailed = false;
-      const msg = e instanceof Error ? e.message : String(e);
-      if (msg !== SMTP_NOT_CONFIGURED) console.error("[tickets] reply email failed:", msg);
-    }
-  } else {
-    emailed = false;
+  // No per-reply email now (owner decision) — the user reads the thread in
+  // Settings → Help & support, so notify them in-app instead. The full transcript
+  // is emailed only when the ticket is resolved.
+  if (ticket.userId) {
+    await createNotification(ticket.userId, {
+      type: "support-reply",
+      title: "Support replied to your request",
+      body: ticket.subject,
+      href: `/support/${p.data.id}`,
+    });
   }
   revalidate();
-  return emailed ? { ok: true } : { ok: false, error: "Reply saved, but the email couldn't be sent." };
+  return { ok: true };
 }
