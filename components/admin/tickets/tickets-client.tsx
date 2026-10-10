@@ -71,10 +71,35 @@ const proseCls =
 
 // Timestamps are formatted in the viewer's locale/timezone, which the server can't
 // know — so render them client-only (empty on first paint) to avoid a hydration
-// mismatch. The icon/label around it stays server-rendered.
-function ClientTime({ iso, className }: { iso: string; className?: string }) {
+// mismatch. `mode`: full date+time (default), short time (chat bubbles), or a day
+// label (chat dividers).
+function ClientTime({
+  iso,
+  mode = "full",
+  className,
+}: {
+  iso: string;
+  mode?: "full" | "time" | "day";
+  className?: string;
+}) {
   const [text, setText] = useState("");
-  useEffect(() => setText(fmt(iso)), [iso]);
+  useEffect(() => {
+    const d = new Date(iso);
+    if (mode === "time") {
+      setText(d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }));
+      return;
+    }
+    if (mode === "day") {
+      const now = new Date();
+      const yesterday = new Date(now);
+      yesterday.setDate(now.getDate() - 1);
+      if (d.toDateString() === now.toDateString()) setText("Today");
+      else if (d.toDateString() === yesterday.toDateString()) setText("Yesterday");
+      else setText(d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }));
+      return;
+    }
+    setText(fmt(iso));
+  }, [iso, mode]);
   return (
     <span className={className} suppressHydrationWarning>
       {text}
@@ -94,6 +119,7 @@ export function TicketsClient({ initial }: { initial: Ticket[] }) {
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [flash, setFlash] = useState("");
   const [flashErr, setFlashErr] = useState(false);
+  const chatScrollRef = useRef<HTMLDivElement>(null);
 
   const counts = useMemo(
     () => ({
@@ -122,6 +148,13 @@ export function TicketsClient({ initial }: { initial: Ticket[] }) {
   }, [initial, query, fStatus, fCategory]);
 
   const active = activeId ? (initial.find((t) => t.id === activeId) ?? null) : null;
+
+  // Keep the chat scrolled to the latest message when a ticket opens or a reply lands.
+  const activeReplyCount = active?.replies.length ?? 0;
+  useEffect(() => {
+    const el = chatScrollRef.current;
+    if (el) requestAnimationFrame(() => (el.scrollTop = el.scrollHeight));
+  }, [activeId, activeReplyCount]);
 
   // Keep selection to still-present rows.
   const presentIds = useMemo(() => new Set(initial.map((t) => t.id)), [initial]);
@@ -395,50 +428,92 @@ export function TicketsClient({ initial }: { initial: Ticket[] }) {
                   <span className="text-[11px] text-muted-foreground">Resolving emails the user the full conversation.</span>
                 </div>
 
-                {/* Conversation thread — the only scrolling region */}
-                <div className="flex min-h-0 flex-1 flex-col">
-                  <p className="mb-2 shrink-0 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">Conversation</p>
-                  <div className="min-h-0 flex-1 space-y-2.5 overflow-y-auto rounded-xl border bg-muted/10 p-2.5">
-                    <div className="rounded-xl border bg-card p-3">
-                      <div className="mb-1.5 flex items-center justify-between gap-2">
-                        <span className="text-xs font-medium">{active.name || "User"}</span>
-                        <ClientTime iso={active.createdAt} className="text-[10px] text-muted-foreground" />
-                      </div>
-                      {/* Sanitized on write (lib/sanitize) — safe to render. */}
-                      <div className={proseCls} dangerouslySetInnerHTML={{ __html: active.message }} />
-                    </div>
-                    {active.replies.map((r) => {
-                      const fromUser = r.author === "user";
+                {/* Conversation + reply, merged as a chat panel (support on the right). */}
+                <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border">
+                  <div ref={chatScrollRef} className="min-h-0 flex-1 space-y-0 overflow-y-auto bg-muted/20 p-3">
+                    {([
+                      { id: "message", author: "user" as const, body: active.message, at: active.createdAt },
+                      ...active.replies.map((r) => ({ id: r.id, author: r.author, body: r.body, at: r.createdAt })),
+                    ]).map((m, i, msgs) => {
+                      const day = (s: string) => s.slice(0, 10);
+                      const prev = msgs[i - 1];
+                      const next = msgs[i + 1];
+                      const newDay = !prev || day(prev.at) !== day(m.at);
+                      const firstOfGroup = newDay || !prev || prev.author !== m.author;
+                      const lastOfGroup = !next || next.author !== m.author || day(next.at) !== day(m.at);
+                      const mine = m.author === "admin"; // admin = support = right side
                       return (
-                        <div
-                          key={r.id}
-                          className={
-                            fromUser
-                              ? "rounded-xl border bg-card p-3"
-                              : "rounded-xl border border-primary/20 bg-primary/5 p-3"
-                          }
-                        >
-                          <div className="mb-1.5 flex items-center justify-between gap-2">
-                            <span className={fromUser ? "text-xs font-medium" : "text-xs font-medium text-primary"}>
-                              {fromUser ? active.name || "User" : "Support"}
-                            </span>
-                            <ClientTime iso={r.createdAt} className="text-[10px] text-muted-foreground" />
+                        <div key={m.id}>
+                          {newDay && (
+                            <div className="my-3 flex justify-center">
+                              <ClientTime
+                                iso={m.at}
+                                mode="day"
+                                className="rounded-full bg-background/70 px-2.5 py-0.5 text-[10px] font-medium text-muted-foreground ring-1 ring-border"
+                              />
+                            </div>
+                          )}
+                          <div
+                            className={cn(
+                              "flex items-end gap-2",
+                              mine ? "justify-end" : "justify-start",
+                              !newDay && (firstOfGroup ? "mt-3" : "mt-1"),
+                            )}
+                          >
+                            {!mine && (
+                              <div className="w-7 shrink-0 self-end">
+                                {lastOfGroup && (
+                                  <span className="flex size-7 items-center justify-center rounded-full bg-muted text-[10px] font-semibold uppercase text-muted-foreground">
+                                    {initials(active.name)}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                            <div className={cn("flex max-w-[82%] flex-col", mine ? "items-end" : "items-start")}>
+                              {firstOfGroup && (
+                                <span
+                                  className={cn(
+                                    "mb-1 text-[11px] font-medium",
+                                    mine ? "mr-1 text-primary" : "ml-1 text-muted-foreground",
+                                  )}
+                                >
+                                  {mine ? "Support" : active.name || "User"}
+                                </span>
+                              )}
+                              <div
+                                className={cn(
+                                  "px-3 py-2",
+                                  mine ? "rounded-2xl bg-primary text-primary-foreground" : "rounded-2xl border bg-card",
+                                  mine ? (lastOfGroup ? "rounded-br-md" : "") : lastOfGroup ? "rounded-bl-md" : "",
+                                  !firstOfGroup && (mine ? "rounded-tr-md" : "rounded-tl-md"),
+                                )}
+                              >
+                                {/* Sanitized on write (lib/sanitize) — safe to render. */}
+                                <div className={proseCls} dangerouslySetInnerHTML={{ __html: m.body }} />
+                                <ClientTime
+                                  iso={m.at}
+                                  mode="time"
+                                  className={cn(
+                                    "mt-0.5 block text-right text-[10px]",
+                                    mine ? "text-primary-foreground/70" : "text-muted-foreground",
+                                  )}
+                                />
+                              </div>
+                            </div>
                           </div>
-                          <div className={proseCls} dangerouslySetInnerHTML={{ __html: r.body }} />
                         </div>
                       );
                     })}
                   </div>
-                </div>
 
-                {/* Reply composer */}
-                <div className="shrink-0 space-y-2">
-                  <p className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">Reply</p>
-                  <RichText value={reply} onChange={setReply} placeholder="Write a reply — the user is notified in-app…" />
-                  <div className="flex items-center justify-end">
-                    <Button onClick={() => sendReply(active.id)} disabled={busy || !richTextToPlain(reply).trim()}>
-                      <Send /> {busy ? "Sending…" : "Send reply"}
-                    </Button>
+                  {/* Composer (merged into the chat panel) */}
+                  <div className="shrink-0 border-t bg-card p-2.5">
+                    <RichText value={reply} onChange={setReply} placeholder="Write a reply — the user is notified in-app…" />
+                    <div className="mt-2 flex items-center justify-end">
+                      <Button onClick={() => sendReply(active.id)} disabled={busy || !richTextToPlain(reply).trim()}>
+                        <Send /> {busy ? "Sending…" : "Send reply"}
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>
