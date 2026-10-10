@@ -19,6 +19,8 @@ export interface AdminUserRow {
   status: AdminUserStatus;
   planId: string | null;
   planName: string | null;
+  /** Plan accent colour key (plans.accent), for the badge. */
+  planAccent: string | null;
   /** ISO date or null. */
   expiresAt: string | null;
   /** ISO datetime. */
@@ -77,14 +79,14 @@ export async function listAdminUsers(excludeId?: string): Promise<AdminUserRow[]
       .from(user)
       .where(excludeId ? ne(user.id, excludeId) : undefined)
       .orderBy(user.createdAt),
-    db.select({ id: plans.id, name: plans.name }).from(plans),
+    db.select({ id: plans.id, name: plans.name, accent: plans.accent }).from(plans),
     db
       .select({ userId: jobLeads.userId, n: sql<number>`count(*)::int` })
       .from(jobLeads)
       .groupBy(jobLeads.userId),
   ]);
 
-  const planName = new Map(planRows.map((p) => [p.id, p.name]));
+  const planById = new Map(planRows.map((p) => [p.id, p]));
   const leadsByUser = new Map(leadCounts.map((r) => [r.userId, r.n]));
 
   return users.map((u) => ({
@@ -95,7 +97,8 @@ export async function listAdminUsers(excludeId?: string): Promise<AdminUserRow[]
     role: (u.role as AdminUserRole) ?? "user",
     status: (u.status as AdminUserStatus) ?? "active",
     planId: u.planId,
-    planName: u.planId ? (planName.get(u.planId) ?? null) : null,
+    planName: u.planId ? (planById.get(u.planId)?.name ?? null) : null,
+    planAccent: u.planId ? (planById.get(u.planId)?.accent ?? null) : null,
     expiresAt: u.planExpiresAt ? new Date(u.planExpiresAt).toISOString().slice(0, 10) : null,
     createdAt: new Date(u.createdAt).toISOString(),
     lastLogin: relativeTime(u.lastLoginAt ? new Date(u.lastLoginAt) : null),

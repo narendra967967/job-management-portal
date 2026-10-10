@@ -24,6 +24,7 @@ import {
 import { Button } from "@/components/admin/ui/button";
 import { Input } from "@/components/admin/ui/input";
 import { Label } from "@/components/admin/ui/label";
+import { PlanBadge } from "@/components/admin/ui/plan-badge";
 import { Badge } from "@/components/admin/ui/badge";
 import {
   DropdownMenu,
@@ -354,7 +355,13 @@ export function UsersClient({ initialUsers, plans }: { initialUsers: AdminUserRo
                     </Badge>
                   </button>
                 </td>
-                <td className="hidden px-4 py-3 sm:table-cell">{u.planName ?? <span className="text-muted-foreground">—</span>}</td>
+                <td className="hidden px-4 py-3 sm:table-cell">
+                  {u.planName ? (
+                    <PlanBadge name={u.planName} accent={u.planAccent} />
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </td>
                 <td className="px-4 py-3 text-xs"><ExpiryCell iso={u.expiresAt} /></td>
                 <td className="hidden px-4 py-3 tabular-nums md:table-cell">{u.leads}</td>
                 <td className="hidden px-4 py-3 text-muted-foreground lg:table-cell">{u.lastLogin}</td>
