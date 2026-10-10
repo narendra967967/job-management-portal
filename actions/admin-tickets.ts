@@ -10,12 +10,16 @@ import {
   addTicketReply,
   deleteTickets,
   getTicket,
+  getTicketOwner,
+  markTicketReceipt,
   setTicketStatus,
   type Ticket,
+  type TicketReply,
 } from "@/lib/tickets";
 import { sendAppEmail, SMTP_NOT_CONFIGURED } from "@/lib/email";
 import { richTextToPlain } from "@/lib/sanitize";
 import { createNotification } from "@/lib/notifications";
+import { publish } from "@/lib/support-events";
 
 type Result = { ok: true } | { ok: false; error: string };
 
@@ -82,6 +86,7 @@ export async function setTicketStatusAction(id: unknown, status: unknown): Promi
   const becameResolved = p.data.status === "resolved" && ticket.status !== "resolved";
 
   await setTicketStatus(p.data.id, p.data.status);
+  publish({ type: "status", ticketId: p.data.id, ownerUserId: ticket.userId, status: p.data.status });
   if (becameResolved) {
     await sendResolvedEmail({ ...ticket, status: "resolved" });
     await notifyResolved(ticket.userId, p.data.id, ticket.subject);
@@ -105,6 +110,7 @@ export async function bulkSetTicketStatusAction(ids: unknown, status: unknown): 
     if (!ticket) continue;
     const becameResolved = p.data.status === "resolved" && ticket.status !== "resolved";
     await setTicketStatus(id, p.data.status);
+    publish({ type: "status", ticketId: id, ownerUserId: ticket.userId, status: p.data.status });
     if (becameResolved) {
       toEmail.push({ ...ticket, status: "resolved" });
       await notifyResolved(ticket.userId, id, ticket.subject);
@@ -124,7 +130,9 @@ export async function deleteTicketsAction(ids: unknown): Promise<Result> {
   return { ok: true };
 }
 
-export async function replyTicketAction(id: unknown, body: unknown): Promise<Result> {
+type ReplyResult = { ok: true; reply: TicketReply } | { ok: false; error: string };
+
+export async function replyTicketAction(id: unknown, body: unknown): Promise<ReplyResult> {
   await requireAdmin();
   const p = z
     .object({ id: z.string().uuid(), body: z.string().max(10000).refine((v) => richTextToPlain(v).length >= 1, "Write a reply.") })
@@ -133,6 +141,9 @@ export async function replyTicketAction(id: unknown, body: unknown): Promise<Res
 
   const ticket = await addTicketReply(p.data.id, p.data.body, "admin");
   if (!ticket) return { ok: false, error: "Ticket not found." };
+
+  // Live: push the reply to the user's open chat/widget.
+  publish({ type: "reply", ticketId: p.data.id, ownerUserId: ticket.userId, reply: ticket.reply, status: ticket.status });
 
   // No per-reply email now (owner decision) — the user reads the thread in
   // Settings → Help & support, so notify them in-app instead. The full transcript
@@ -146,5 +157,24 @@ export async function replyTicketAction(id: unknown, body: unknown): Promise<Res
     });
   }
   revalidate();
+  return { ok: true, reply: ticket.reply };
+}
+
+/** Mark a ticket's user messages read / delivered for the admin. */
+async function adminReceipt(ticketId: unknown, kind: "read" | "delivered"): Promise<Result> {
+  await requireAdmin();
+  const p = z.string().uuid().safeParse(ticketId);
+  if (!p.success) return { ok: false, error: "Invalid request." };
+  if ((await getTicketOwner(p.data)) === undefined) return { ok: false, error: "Ticket not found." };
+  const r = await markTicketReceipt(p.data, "admin", kind);
+  if (r) publish({ type: "receipt", ticketId: p.data, ownerUserId: r.ownerUserId, party: "admin", kind, at: r.at });
   return { ok: true };
+}
+
+export async function markAdminTicketReadAction(ticketId: unknown): Promise<Result> {
+  return adminReceipt(ticketId, "read");
+}
+
+export async function markAdminTicketDeliveredAction(ticketId: unknown): Promise<Result> {
+  return adminReceipt(ticketId, "delivered");
 }

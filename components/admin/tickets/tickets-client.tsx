@@ -18,6 +18,7 @@ import {
   Trash2,
   X,
   Check,
+  CheckCheck,
   AlertCircle,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/admin/ui/card";
@@ -33,14 +34,20 @@ import {
   bulkSetTicketStatusAction,
   deleteTicketsAction,
   replyTicketAction,
+  markAdminTicketReadAction,
+  markAdminTicketDeliveredAction,
 } from "@/actions/admin-tickets";
+import { useSupportStream } from "@/lib/use-support-stream";
 import {
   TICKET_STATUS_LABELS,
   TICKET_CATEGORY_LABELS,
+  messageTick,
   ticketRef,
   type Ticket,
   type TicketCategory,
+  type TicketReply,
   type TicketStatus,
+  type TickState,
 } from "@/lib/tickets-model";
 import { cn } from "@/lib/utils";
 
@@ -107,8 +114,30 @@ function ClientTime({
   );
 }
 
+/** Delivery/read ticks for the admin's own (outgoing) messages, WhatsApp-style. */
+function Ticks({ state }: { state: TickState }) {
+  if (state === "sent") return <Check className="inline size-3" aria-label="Sent" />;
+  return (
+    <CheckCheck
+      className={cn("inline size-3", state === "read" ? "text-sky-300" : "")}
+      aria-label={state === "read" ? "Read" : "Delivered"}
+    />
+  );
+}
+
+/** True when the ticket has user replies the admin hasn't seen yet. */
+function hasUnseenUserReply(t: Ticket): boolean {
+  const read = t.lastReadByAdminAt ? new Date(t.lastReadByAdminAt).getTime() : 0;
+  return t.replies.some((r) => r.author === "user" && new Date(r.createdAt).getTime() > read);
+}
+
 export function TicketsClient({ initial }: { initial: Ticket[] }) {
   const router = useRouter();
+  // Live mirror of the server data: SSE events patch it in place so the inbox and
+  // open thread update without a refresh. Re-seeded whenever the server sends new
+  // props (e.g. after a status change or delete triggers router.refresh()).
+  const [tickets, setTickets] = useState<Ticket[]>(initial);
+  useEffect(() => setTickets(initial), [initial]);
   const [query, setQuery] = useState("");
   const [fStatus, setFStatus] = useState<"all" | TicketStatus>("all");
   const [fCategory, setFCategory] = useState("all");
@@ -123,17 +152,17 @@ export function TicketsClient({ initial }: { initial: Ticket[] }) {
 
   const counts = useMemo(
     () => ({
-      total: initial.length,
-      open: initial.filter((t) => t.status === "open").length,
-      in_progress: initial.filter((t) => t.status === "in_progress").length,
-      resolved: initial.filter((t) => t.status === "resolved").length,
+      total: tickets.length,
+      open: tickets.filter((t) => t.status === "open").length,
+      in_progress: tickets.filter((t) => t.status === "in_progress").length,
+      resolved: tickets.filter((t) => t.status === "resolved").length,
     }),
-    [initial],
+    [tickets],
   );
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return initial.filter((t) => {
+    return tickets.filter((t) => {
       if (fStatus !== "all" && t.status !== fStatus) return false;
       if (fCategory !== "all" && t.category !== fCategory) return false;
       if (
@@ -145,9 +174,59 @@ export function TicketsClient({ initial }: { initial: Ticket[] }) {
         return false;
       return true;
     });
-  }, [initial, query, fStatus, fCategory]);
+  }, [tickets, query, fStatus, fCategory]);
 
-  const active = activeId ? (initial.find((t) => t.id === activeId) ?? null) : null;
+  const active = activeId ? (tickets.find((t) => t.id === activeId) ?? null) : null;
+
+  // Live updates across all tickets (admin sees every ticket). Patches the local
+  // mirror in place; `activeId` is read via closure (the hook always calls the
+  // latest callback), so a reply to the open ticket is auto-marked read.
+  useSupportStream("/api/support/admin-stream", (e) => {
+    if (e.type === "ticket") {
+      // A brand-new ticket we don't have yet — pull it in from the server.
+      router.refresh();
+      return;
+    }
+    const ticketId = e.ticketId as string;
+    if (e.type === "reply") {
+      const r = e.reply as TicketReply;
+      setTickets((prev) =>
+        prev.map((t) => {
+          if (t.id !== ticketId) return t;
+          const replies = t.replies.some((x) => x.id === r.id) ? t.replies : [...t.replies, r];
+          return { ...t, replies, status: (e.status as TicketStatus) ?? t.status, updatedAt: r.createdAt };
+        }),
+      );
+      if (r.author === "user" && activeId === ticketId) {
+        // The open ticket got a customer reply → it's delivered and read.
+        void markAdminTicketDeliveredAction(ticketId);
+        void markAdminTicketReadAction(ticketId);
+      }
+    } else if (e.type === "receipt" && e.party === "user") {
+      // The customer read/received the admin's messages → advance our tick state.
+      const at = String(e.at);
+      setTickets((prev) =>
+        prev.map((t) =>
+          t.id === ticketId
+            ? { ...t, lastDeliveredToUserAt: at, ...(e.kind === "read" ? { lastReadByUserAt: at } : {}) }
+            : t,
+        ),
+      );
+    } else if (e.type === "status") {
+      setTickets((prev) => prev.map((t) => (t.id === ticketId ? { ...t, status: e.status as TicketStatus } : t)));
+    }
+  });
+
+  // Open a ticket's detail modal, marking its customer messages read for the admin.
+  function openTicket(id: string) {
+    setActiveId(id);
+    setReply("");
+    void markAdminTicketReadAction(id);
+    const now = new Date().toISOString();
+    setTickets((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, lastReadByAdminAt: now, lastDeliveredToAdminAt: now } : t)),
+    );
+  }
 
   // Keep the chat scrolled to the latest message when a ticket opens or a reply lands.
   const activeReplyCount = active?.replies.length ?? 0;
@@ -157,7 +236,7 @@ export function TicketsClient({ initial }: { initial: Ticket[] }) {
   }, [activeId, activeReplyCount]);
 
   // Keep selection to still-present rows.
-  const presentIds = useMemo(() => new Set(initial.map((t) => t.id)), [initial]);
+  const presentIds = useMemo(() => new Set(tickets.map((t) => t.id)), [tickets]);
   useEffect(() => {
     setSelected((prev) => {
       const next = new Set([...prev].filter((id) => presentIds.has(id)));
@@ -230,10 +309,19 @@ export function TicketsClient({ initial }: { initial: Ticket[] }) {
     setBusy(true);
     const res = await replyTicketAction(id, reply);
     setBusy(false);
-    if (res.ok || res.error.startsWith("Reply saved")) {
+    if (res.ok) {
+      // Optimistic: drop the new reply straight into the open thread.
+      setTickets((prev) =>
+        prev.map((t) =>
+          t.id === id
+            ? t.replies.some((x) => x.id === res.reply.id)
+              ? t
+              : { ...t, replies: [...t.replies, res.reply], updatedAt: res.reply.createdAt }
+            : t,
+        ),
+      );
       setReply("");
-      say(res.ok ? "Reply sent." : res.error, !res.ok);
-      router.refresh();
+      say("Reply sent.");
     } else say(res.error, true);
   }
 
@@ -285,7 +373,7 @@ export function TicketsClient({ initial }: { initial: Ticket[] }) {
           ))}
         </select>
         <span className="ml-auto text-sm text-muted-foreground">
-          {filtered.length} of {initial.length}
+          {filtered.length} of {tickets.length}
         </span>
       </div>
 
@@ -351,7 +439,7 @@ export function TicketsClient({ initial }: { initial: Ticket[] }) {
               {filtered.map((t) => (
                 <tr
                   key={t.id}
-                  onClick={() => { setActiveId(t.id); setReply(""); }}
+                  onClick={() => openTicket(t.id)}
                   className={cn("cursor-pointer border-b border-border last:border-0 hover:bg-muted/40", selected.has(t.id) && "bg-primary/5")}
                 >
                   <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
@@ -359,9 +447,24 @@ export function TicketsClient({ initial }: { initial: Ticket[] }) {
                   </td>
                   <td className="px-4 py-3">
                     <p className="font-mono text-[11px] text-muted-foreground">{ticketRef(t.number)}</p>
-                    <p className="font-medium">{t.subject}</p>
+                    <p className="flex items-center gap-1.5 font-medium">
+                      {hasUnseenUserReply(t) && (
+                        <span
+                          className="inline-block size-2 shrink-0 rounded-full bg-primary"
+                          aria-label="New reply from the customer"
+                          title="New reply from the customer"
+                        />
+                      )}
+                      <span className="min-w-0 truncate">{t.subject}</span>
+                    </p>
                     <p className="text-xs text-muted-foreground sm:hidden">{t.name || t.email}</p>
-                    {t.replies.length > 0 && <span className="text-[11px] text-muted-foreground">{t.replies.length} repl{t.replies.length === 1 ? "y" : "ies"}</span>}
+                    {hasUnseenUserReply(t) ? (
+                      <span className="text-[11px] font-medium text-primary">New reply</span>
+                    ) : (
+                      t.replies.length > 0 && (
+                        <span className="text-[11px] text-muted-foreground">{t.replies.length} repl{t.replies.length === 1 ? "y" : "ies"}</span>
+                      )
+                    )}
                   </td>
                   <td className="hidden px-4 py-3 sm:table-cell">
                     <p className="truncate">{t.name || "Unknown"}</p>
@@ -490,14 +593,15 @@ export function TicketsClient({ initial }: { initial: Ticket[] }) {
                               >
                                 {/* Sanitized on write (lib/sanitize) — safe to render. */}
                                 <div className={proseCls} dangerouslySetInnerHTML={{ __html: m.body }} />
-                                <ClientTime
-                                  iso={m.at}
-                                  mode="time"
+                                <span
                                   className={cn(
-                                    "mt-0.5 block text-right text-[10px]",
+                                    "mt-0.5 flex items-center justify-end gap-1 text-[10px]",
                                     mine ? "text-primary-foreground/70" : "text-muted-foreground",
                                   )}
-                                />
+                                >
+                                  <ClientTime iso={m.at} mode="time" />
+                                  {mine && <Ticks state={messageTick("admin", m.at, active)} />}
+                                </span>
                               </div>
                             </div>
                           </div>
