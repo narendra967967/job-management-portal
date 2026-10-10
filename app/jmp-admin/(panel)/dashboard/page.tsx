@@ -15,17 +15,12 @@ import {
   CardTitle,
 } from "@/components/admin/ui/card";
 import { Badge } from "@/components/admin/ui/badge";
-import {
-  AreaChart,
-  BarChart,
-  DonutChart,
-  VizStyle,
-} from "@/components/admin/ui/charts";
+import { DonutChart, VizStyle } from "@/components/admin/ui/charts";
+import { TimeSeriesCard } from "@/components/admin/dashboard/time-series-card";
 import { requireAdmin } from "@/lib/current-user";
 import {
   loadDashboardMetrics,
   type RecentTicket,
-  type SystemRow,
 } from "@/lib/admin/dashboard-data";
 
 // Admin dashboard home — real aggregates from the DB (see lib/admin/dashboard-data).
@@ -35,6 +30,9 @@ import {
 // users, leads-over-time). That's high-volume, per-user operational data — not
 // useful admin analytics — and the leads table is auto-pruned on a retention
 // schedule (see backend backlog). Admin metrics stay user/usage/system focused.
+//
+// Revenue / plan-over-time charts are intentionally absent: they need the billing
+// integration (payments table + plan-change event log), which is deferred.
 
 const STAT_ICONS: Record<string, LucideIcon> = {
   users: Users,
@@ -59,11 +57,14 @@ export default async function AdminDashboardPage() {
   const {
     stats,
     newUsers,
-    aiCalls,
+    aiScores,
+    activeUsers,
     planMix,
     statusMix,
+    funnel,
     ticketStats,
     recentTickets,
+    sla,
     activity,
     system,
   } = await loadDashboardMetrics();
@@ -96,13 +97,9 @@ export default async function AdminDashboardPage() {
 
       {/* User growth + plan mix */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <SectionHeader title="New users" href="/jmp-admin/users" />
-          <CardContent>
-            <BarChart data={newUsers} unit="users" />
-          </CardContent>
-        </Card>
-
+        <div className="lg:col-span-2">
+          <TimeSeriesCard title="New users" series={newUsers} unit="users" kind="bar" href="/jmp-admin/users" />
+        </div>
         <Card>
           <SectionHeader title="Plan distribution" href="/jmp-admin/users" />
           <CardContent>
@@ -115,15 +112,14 @@ export default async function AdminDashboardPage() {
         </Card>
       </div>
 
-      {/* AI usage + status mix */}
+      {/* AI usage + active users (both time-based) */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card>
-          <SectionHeader title="AI scores" />
-          <CardContent>
-            <AreaChart data={aiCalls} unit="scores" />
-          </CardContent>
-        </Card>
+        <TimeSeriesCard title="AI scores" series={aiScores} unit="scores" kind="area" />
+        <TimeSeriesCard title="Active users" series={activeUsers} unit="users" kind="area" href="/jmp-admin/users" />
+      </div>
 
+      {/* User status + onboarding funnel + support SLA */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card>
           <SectionHeader title="Users by status" href="/jmp-admin/users" />
           <CardContent>
@@ -132,6 +128,36 @@ export default async function AdminDashboardPage() {
             ) : (
               <Empty>No users yet</Empty>
             )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <SectionHeader title="Onboarding funnel" />
+          <CardContent className="space-y-3">
+            {funnel.map((f) => (
+              <div key={f.label}>
+                <div className="mb-1 flex items-center justify-between text-xs">
+                  <span className="font-medium">{f.label}</span>
+                  <span className="text-muted-foreground tabular-nums">
+                    {f.value} · {f.pct}%
+                  </span>
+                </div>
+                <div className="h-2 overflow-hidden rounded-full bg-muted">
+                  <div className="h-full rounded-full bg-primary" style={{ width: `${f.pct}%` }} />
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <SectionHeader title="Support SLA" href="/jmp-admin/tickets" />
+          <CardContent className="space-y-3 text-sm">
+            <StatRow label="Avg first response" value={sla.firstResponse} />
+            <StatRow label="Avg resolution" value={sla.resolution} />
+            <StatRow label="Open (unresolved)" value={String(sla.openCount)} />
+            <StatRow label="Oldest open" value={sla.oldestOpen} />
+            <StatRow label="Resolution rate" value={`${sla.resolutionRate}%`} ok={sla.resolutionRate >= 50} />
           </CardContent>
         </Card>
       </div>
@@ -150,7 +176,7 @@ export default async function AdminDashboardPage() {
         </Card>
 
         <Card className="lg:col-span-2">
-          <SectionHeader title="Recent tickets" href="/jmp-admin/tickets" cta="View all" />
+          <SectionHeader title="Recent tickets" href="/jmp-admin/tickets" />
           <CardContent>
             <div className="mb-3 flex flex-wrap gap-2">
               <Badge variant="neutral">{ticketStats.total} total</Badge>
@@ -211,7 +237,7 @@ export default async function AdminDashboardPage() {
           <SectionHeader title="System" />
           <CardContent className="space-y-3 text-sm">
             {system.map((r) => (
-              <Row key={r.label} row={r} />
+              <StatRow key={r.label} label={r.label} value={r.value} ok={r.ok} />
             ))}
           </CardContent>
         </Card>
@@ -252,18 +278,18 @@ function Empty({ children }: { children: React.ReactNode }) {
   );
 }
 
-function Row({ row }: { row: SystemRow }) {
+function StatRow({ label, value, ok }: { label: string; value: string; ok?: boolean }) {
   return (
     <div className="flex items-center justify-between">
-      <span className="text-muted-foreground">{row.label}</span>
+      <span className="text-muted-foreground">{label}</span>
       <span
         className={
-          row.ok
+          ok
             ? "font-medium text-status-applied-foreground"
             : "font-medium text-foreground"
         }
       >
-        {row.value}
+        {value}
       </span>
     </div>
   );

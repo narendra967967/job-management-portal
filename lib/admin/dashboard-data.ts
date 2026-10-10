@@ -6,7 +6,7 @@ import "server-only";
 // with DB date functions — clearer and driver-agnostic.
 //
 // User-base metrics count ONLY role='user' accounts — admins are operators, not
-// customers, so they're excluded from totals, plan/status mixes, and the activity feed.
+// customers, so they're excluded from totals, plan/status mixes, funnel, and the feed.
 //
 // Deliberately NO aggregate lead-volume analytics (total leads over time): that's
 // high-volume, per-user operational data, auto-pruned on a retention schedule.
@@ -14,11 +14,28 @@ import "server-only";
 
 import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { user, resumes, fitScores, plans, gmailSyncState, supportTickets } from "@/db/schema";
+import {
+  user,
+  session,
+  resumes,
+  fitScores,
+  plans,
+  gmailConfig,
+  gmailSyncState,
+  supportTickets,
+  ticketReplies,
+} from "@/db/schema";
 import type { Point } from "@/components/admin/ui/charts";
 import pkg from "@/package.json";
 
 const DAY = 86_400_000;
+
+export type Granularity = "daily" | "monthly" | "yearly";
+export interface TimeSeries {
+  daily: Point[];
+  monthly: Point[];
+  yearly: Point[];
+}
 
 export interface StatCard {
   key: string;
@@ -53,14 +70,31 @@ export interface TicketStats {
   statusMix: Point[];
 }
 
+export interface SlaStats {
+  firstResponse: string;
+  resolution: string;
+  openCount: number;
+  oldestOpen: string;
+  resolutionRate: number;
+}
+
+export interface FunnelStage {
+  label: string;
+  value: number;
+  pct: number;
+}
+
 export interface DashboardMetrics {
   stats: StatCard[];
-  newUsers: Point[];
-  aiCalls: Point[];
+  newUsers: TimeSeries;
+  aiScores: TimeSeries;
+  activeUsers: TimeSeries;
   planMix: Point[];
   statusMix: Point[];
+  funnel: FunnelStage[];
   ticketStats: TicketStats;
   recentTickets: RecentTicket[];
+  sla: SlaStats;
   activity: ActivityItem[];
   system: SystemRow[];
 }
@@ -79,6 +113,61 @@ function relativeTime(dt: Date): string {
   return `${Math.floor(months / 12)}y ago`;
 }
 
+function humanDuration(ms: number): string {
+  if (ms <= 0) return "0m";
+  const mins = Math.round(ms / 60_000);
+  if (mins < 60) return `${mins}m`;
+  const hrs = Math.round(mins / 60);
+  if (hrs < 48) return `${hrs}h`;
+  return `${Math.round(hrs / 24)}d`;
+}
+
+// Fixed bucket windows for the three granularities (last 30 days / 12 months / 5 years).
+function buildBuckets(g: Granularity, now: Date): { label: string; start: number; end: number }[] {
+  const out: { label: string; start: number; end: number }[] = [];
+  if (g === "daily") {
+    const base = new Date(now);
+    base.setHours(0, 0, 0, 0);
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(base);
+      d.setDate(base.getDate() - i);
+      const s = d.getTime();
+      out.push({ label: d.toLocaleString("en-US", { month: "short", day: "numeric" }), start: s, end: s + DAY });
+    }
+  } else if (g === "monthly") {
+    for (let i = 11; i >= 0; i--) {
+      const start = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const end = new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
+      out.push({ label: start.toLocaleString("en-US", { month: "short" }), start: start.getTime(), end: end.getTime() });
+    }
+  } else {
+    for (let i = 4; i >= 0; i--) {
+      const y = now.getFullYear() - i;
+      out.push({ label: String(y), start: new Date(y, 0, 1).getTime(), end: new Date(y + 1, 0, 1).getTime() });
+    }
+  }
+  return out;
+}
+
+// Bucket timestamps into daily/monthly/yearly series. `dedupe` counts distinct uids
+// per bucket (for active-users), otherwise counts rows (signups, scores).
+function makeSeries(rows: { at: number; uid?: string }[], dedupe = false): TimeSeries {
+  const now = new Date();
+  const build = (g: Granularity): Point[] => {
+    const buckets = buildBuckets(g, now);
+    const sets = dedupe ? buckets.map(() => new Set<string>()) : null;
+    const counts = buckets.map(() => 0);
+    for (const r of rows) {
+      const idx = buckets.findIndex((b) => r.at >= b.start && r.at < b.end);
+      if (idx < 0) continue;
+      if (sets) sets[idx].add(r.uid ?? "");
+      else counts[idx] += 1;
+    }
+    return buckets.map((b, i) => ({ label: b.label, value: sets ? sets[i].size : counts[i] }));
+  };
+  return { daily: build("daily"), monthly: build("monthly"), yearly: build("yearly") };
+}
+
 const TICKET_STATUS_LABEL: Record<RecentTicket["status"], string> = {
   open: "Open",
   in_progress: "In progress",
@@ -86,6 +175,7 @@ const TICKET_STATUS_LABEL: Record<RecentTicket["status"], string> = {
 };
 
 const count = sql<number>`count(*)::int`;
+const countDistinctUser = sql<number>`count(distinct ${user.id})::int`;
 // User-base metrics count customers only, never admin/operator accounts.
 const onlyUsers = eq(user.role, "user");
 
@@ -93,12 +183,7 @@ export async function loadDashboardMetrics(): Promise<DashboardMetrics> {
   const now = Date.now();
   const monthAgo = new Date(now - 30 * DAY);
   const weekAgo = new Date(now - 7 * DAY);
-
-  // 8-week window for the AI-calls series (bounded fetch, bucketed in JS below).
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-  const todayEnd = todayStart.getTime() + DAY;
-  const aiWindowStart = new Date(todayEnd - 8 * 7 * DAY);
+  const fiveYearsAgo = new Date(now - 5 * 366 * DAY);
 
   const [
     totalUsersRows,
@@ -113,14 +198,18 @@ export async function loadDashboardMetrics(): Promise<DashboardMetrics> {
     statusMixRows,
     userCreatedAt,
     aiCreatedAt,
+    sessionRows,
+    gmailConnectedRows,
+    scoredUsersRows,
     recentSignups,
     recentResumes,
     recentScores,
     recentSyncs,
     lastSyncRow,
-    ticketTotalRows,
     ticketStatusRows,
     recentTicketRows,
+    ticketRows,
+    firstReplyRows,
   ] = await Promise.all([
     db.select({ n: count }).from(user).where(onlyUsers),
     db.select({ n: count }).from(user).where(and(onlyUsers, sql`${user.createdAt} >= ${monthAgo}`)),
@@ -133,10 +222,22 @@ export async function loadDashboardMetrics(): Promise<DashboardMetrics> {
     db.select({ planId: user.planId, n: count }).from(user).where(onlyUsers).groupBy(user.planId),
     db.select({ status: user.status, n: count }).from(user).where(onlyUsers).groupBy(user.status),
     db.select({ createdAt: user.createdAt }).from(user).where(onlyUsers),
+    db.select({ createdAt: fitScores.createdAt }).from(fitScores),
     db
-      .select({ createdAt: fitScores.createdAt })
+      .select({ createdAt: session.createdAt, uid: session.userId })
+      .from(session)
+      .innerJoin(user, eq(session.userId, user.id))
+      .where(and(onlyUsers, sql`${session.createdAt} >= ${fiveYearsAgo}`)),
+    db
+      .select({ n: countDistinctUser })
+      .from(gmailConfig)
+      .innerJoin(user, eq(gmailConfig.userId, user.id))
+      .where(and(onlyUsers, eq(gmailConfig.connected, true))),
+    db
+      .select({ n: countDistinctUser })
       .from(fitScores)
-      .where(sql`${fitScores.createdAt} >= ${aiWindowStart}`),
+      .innerJoin(user, eq(fitScores.userId, user.id))
+      .where(onlyUsers),
     db
       .select({ name: user.name, createdAt: user.createdAt })
       .from(user)
@@ -169,7 +270,6 @@ export async function loadDashboardMetrics(): Promise<DashboardMetrics> {
       .orderBy(desc(gmailSyncState.lastSyncedAt))
       .limit(1),
     db.select({ status: supportTickets.status, n: count }).from(supportTickets).groupBy(supportTickets.status),
-    db.select({ status: supportTickets.status, n: count }).from(supportTickets).groupBy(supportTickets.status),
     db
       .select({
         id: supportTickets.id,
@@ -181,6 +281,13 @@ export async function loadDashboardMetrics(): Promise<DashboardMetrics> {
       .from(supportTickets)
       .orderBy(desc(supportTickets.createdAt))
       .limit(5),
+    db
+      .select({ id: supportTickets.id, status: supportTickets.status, createdAt: supportTickets.createdAt, updatedAt: supportTickets.updatedAt })
+      .from(supportTickets),
+    db
+      .select({ ticketId: ticketReplies.ticketId, first: sql<string>`min(${ticketReplies.createdAt})` })
+      .from(ticketReplies)
+      .groupBy(ticketReplies.ticketId),
   ]);
 
   const totalUsers = totalUsersRows[0]?.n ?? 0;
@@ -221,34 +328,13 @@ export async function loadDashboardMetrics(): Promise<DashboardMetrics> {
     },
   ];
 
-  // --- New users per month (last 6 months) ---
-  const months: { label: string; key: string; value: number }[] = [];
-  const base = new Date(todayStart);
-  for (let i = 5; i >= 0; i--) {
-    const d = new Date(base.getFullYear(), base.getMonth() - i, 1);
-    months.push({ label: d.toLocaleString("en-US", { month: "short" }), key: `${d.getFullYear()}-${d.getMonth()}`, value: 0 });
-  }
-  const monthIndex = new Map(months.map((m, i) => [m.key, i]));
-  for (const row of userCreatedAt) {
-    const d = new Date(row.createdAt);
-    const idx = monthIndex.get(`${d.getFullYear()}-${d.getMonth()}`);
-    if (idx !== undefined) months[idx].value += 1;
-  }
-  const newUsers: Point[] = months.map((m) => ({ label: m.label, value: m.value }));
-
-  // --- AI scores per week (last 8 weeks, bucketed by week-ending) ---
-  const weeks: { label: string; start: number; end: number; value: number }[] = [];
-  for (let i = 7; i >= 0; i--) {
-    const end = todayEnd - i * 7 * DAY;
-    const start = end - 7 * DAY;
-    weeks.push({ label: new Date(start).toLocaleString("en-US", { month: "short", day: "numeric" }), start, end, value: 0 });
-  }
-  for (const row of aiCreatedAt) {
-    const t = new Date(row.createdAt).getTime();
-    const w = weeks.find((wk) => t >= wk.start && t < wk.end);
-    if (w) w.value += 1;
-  }
-  const aiCalls: Point[] = weeks.map((w) => ({ label: w.label, value: w.value }));
+  // --- Time series (daily / monthly / yearly) ---
+  const newUsersSeries = makeSeries(userCreatedAt.map((r) => ({ at: new Date(r.createdAt).getTime() })));
+  const aiScoresSeries = makeSeries(aiCreatedAt.map((r) => ({ at: new Date(r.createdAt).getTime() })));
+  const activeUsersSeries = makeSeries(
+    sessionRows.map((r) => ({ at: new Date(r.createdAt).getTime(), uid: r.uid })),
+    true,
+  );
 
   // --- Plan distribution (users only) ---
   const planNames = new Map((await db.select({ id: plans.id, name: plans.name }).from(plans)).map((p) => [p.id, p.name]));
@@ -262,9 +348,20 @@ export async function loadDashboardMetrics(): Promise<DashboardMetrics> {
     .map((r) => ({ label: r.status === "active" ? "Active" : r.status === "inactive" ? "Inactive" : r.status, value: r.n }))
     .filter((p) => p.value > 0);
 
+  // --- Onboarding funnel (users only) ---
+  const gmailConnected = gmailConnectedRows[0]?.n ?? 0;
+  const scoredUsers = scoredUsersRows[0]?.n ?? 0;
+  const pct = (n: number) => (totalUsers > 0 ? Math.round((n / totalUsers) * 100) : 0);
+  const funnel: FunnelStage[] = [
+    { label: "Signed up", value: totalUsers, pct: 100 },
+    { label: "Gmail connected", value: gmailConnected, pct: pct(gmailConnected) },
+    { label: "Résumé added", value: resumeUsers, pct: pct(resumeUsers) },
+    { label: "Scored a lead", value: scoredUsers, pct: pct(scoredUsers) },
+  ];
+
   // --- Tickets ---
-  const ticketTotal = ticketTotalRows.reduce((s, r) => s + r.n, 0);
-  const ticketOpen = ticketTotalRows.find((r) => r.status === "open")?.n ?? 0;
+  const ticketTotal = ticketStatusRows.reduce((s, r) => s + r.n, 0);
+  const ticketOpen = ticketStatusRows.find((r) => r.status === "open")?.n ?? 0;
   const ticketStatusMix: Point[] = (["open", "in_progress", "resolved"] as const)
     .map((s) => ({ label: TICKET_STATUS_LABEL[s], value: ticketStatusRows.find((r) => r.status === s)?.n ?? 0 }))
     .filter((p) => p.value > 0);
@@ -276,6 +373,33 @@ export async function loadDashboardMetrics(): Promise<DashboardMetrics> {
     status: t.status as RecentTicket["status"],
     when: relativeTime(new Date(t.createdAt)),
   }));
+
+  // --- Support SLA ---
+  const firstReplyAt = new Map(firstReplyRows.map((r) => [r.ticketId, new Date(r.first).getTime()]));
+  const firstResponseDurations: number[] = [];
+  const resolutionDurations: number[] = [];
+  const openAges: number[] = [];
+  let resolvedCount = 0;
+  for (const t of ticketRows) {
+    const created = new Date(t.createdAt).getTime();
+    const first = firstReplyAt.get(t.id);
+    if (first) firstResponseDurations.push(first - created);
+    if (t.status === "resolved") {
+      resolvedCount += 1;
+      // Approx: updatedAt is last activity; without later replies ≈ resolve time.
+      resolutionDurations.push(new Date(t.updatedAt).getTime() - created);
+    } else {
+      openAges.push(now - created);
+    }
+  }
+  const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
+  const sla: SlaStats = {
+    firstResponse: firstResponseDurations.length ? humanDuration(avg(firstResponseDurations)) : "—",
+    resolution: resolutionDurations.length ? humanDuration(avg(resolutionDurations)) : "—",
+    openCount: openAges.length,
+    oldestOpen: openAges.length ? humanDuration(Math.max(...openAges)) : "—",
+    resolutionRate: ticketTotal > 0 ? Math.round((resolvedCount / ticketTotal) * 100) : 0,
+  };
 
   // --- Recent activity (merge of real timestamps, newest first) ---
   type Ev = { who: string; what: string; at: number };
@@ -300,5 +424,18 @@ export async function loadDashboardMetrics(): Promise<DashboardMetrics> {
     { label: "Last Gmail sync", value: lastSync },
   ];
 
-  return { stats, newUsers, aiCalls, planMix, statusMix, ticketStats, recentTickets, activity, system };
+  return {
+    stats,
+    newUsers: newUsersSeries,
+    aiScores: aiScoresSeries,
+    activeUsers: activeUsersSeries,
+    planMix,
+    statusMix,
+    funnel,
+    ticketStats,
+    recentTickets,
+    sla,
+    activity,
+    system,
+  };
 }
