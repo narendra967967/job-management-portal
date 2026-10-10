@@ -5,6 +5,9 @@ import { AdminShell } from "@/components/admin/admin-shell";
 
 // Authenticated admin panel. Enforced server-side on every page: a valid session
 // AND role = admin, else back to the admin login.
+// Session-gated routes — never statically prerendered (no DB at build).
+export const dynamic = "force-dynamic";
+
 export default async function AdminPanelLayout({
   children,
 }: {

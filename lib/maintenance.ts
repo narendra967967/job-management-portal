@@ -11,8 +11,16 @@ import { db } from "@/lib/db";
 import { appSettings } from "@/db/schema";
 
 export const isMaintenanceOn = cache(async (): Promise<boolean> => {
-  const [s] = await db.select({ maintenance: appSettings.maintenance }).from(appSettings).limit(1);
-  return !!s?.maintenance;
+  try {
+    const [s] = await db.select({ maintenance: appSettings.maintenance }).from(appSettings).limit(1);
+    return !!s?.maintenance;
+  } catch {
+    // DB unavailable (e.g. `next build` runs with no DATABASE_URL, or a runtime
+    // outage) — don't force the maintenance redirect; degrade open. This also lets
+    // `next build` reach the dynamic `headers()` call so these routes resolve as
+    // dynamic instead of failing to prerender.
+    return false;
+  }
 });
 
 /** Call at the top of every user-facing page/layout: bounces to /maintenance

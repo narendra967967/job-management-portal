@@ -25,6 +25,9 @@ import { getAppName } from "@/lib/branding";
 import { loadWorkspace } from "@/lib/queries";
 import { WorkspaceProvider } from "@/lib/workspace-provider";
 
+// Per-user, session-gated routes — never statically prerendered (no DB at build).
+export const dynamic = "force-dynamic";
+
 export default async function DashboardLayout({
   children,
 }: {
