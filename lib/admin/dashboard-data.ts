@@ -102,6 +102,21 @@ export interface StorageStats {
   total: string;
 }
 
+export interface PlanExpiryAlert {
+  name: string;
+  plan: string;
+  when: string;
+  expired: boolean;
+  soon: boolean;
+}
+
+export interface PlanExpiry {
+  expired: number;
+  soon7: number;
+  soon30: number;
+  alerts: PlanExpiryAlert[];
+}
+
 export interface DashboardMetrics {
   stats: StatCard[];
   newUsers: TimeSeries;
@@ -112,6 +127,7 @@ export interface DashboardMetrics {
   funnel: FunnelStage[];
   gmail: GmailHealth;
   storage: StorageStats;
+  planExpiry: PlanExpiry;
   ticketStats: TicketStats;
   recentTickets: RecentTicket[];
   sla: SlaStats;
@@ -243,6 +259,7 @@ export async function loadDashboardMetrics(): Promise<DashboardMetrics> {
     failingSyncRows,
     resumeStorageRows,
     assetStorageRows,
+    planExpiryRows,
   ] = await Promise.all([
     db.select({ n: count }).from(user).where(onlyUsers),
     db.select({ n: count }).from(user).where(and(onlyUsers, sql`${user.createdAt} >= ${monthAgo}`)),
@@ -337,6 +354,11 @@ export async function loadDashboardMetrics(): Promise<DashboardMetrics> {
     db
       .select({ bytes: sql<string>`coalesce(sum(octet_length(${appAssets.data})), 0)::bigint` })
       .from(appAssets),
+    db
+      .select({ name: user.name, planId: user.planId, expiresAt: user.planExpiresAt })
+      .from(user)
+      .where(and(onlyUsers, isNotNull(user.planExpiresAt)))
+      .orderBy(user.planExpiresAt),
   ]);
 
   const totalUsers = totalUsersRows[0]?.n ?? 0;
@@ -486,6 +508,31 @@ export async function loadDashboardMetrics(): Promise<DashboardMetrics> {
     assetSize: humanBytes(assetBytes),
     total: humanBytes(resumeBytes + assetBytes),
   };
+
+  // --- Plan expiry (users only; from user.planExpiresAt) ---
+  const d7 = now + 7 * DAY;
+  const d30 = now + 30 * DAY;
+  let expiredCount = 0;
+  let soon7 = 0;
+  let soon30 = 0;
+  const expiryAlerts: PlanExpiryAlert[] = [];
+  for (const r of planExpiryRows) {
+    const t = new Date(r.expiresAt as Date).getTime();
+    const isExpired = t < now;
+    if (isExpired) expiredCount += 1;
+    else {
+      if (t < d30) soon30 += 1;
+      if (t < d7) soon7 += 1;
+    }
+    expiryAlerts.push({
+      name: r.name,
+      plan: r.planId ? (planNames.get(r.planId) ?? "—") : "—",
+      when: isExpired ? `${humanDuration(now - t)} ago` : `in ${humanDuration(t - now)}`,
+      expired: isExpired,
+      soon: !isExpired && t < d7,
+    });
+  }
+  const planExpiry: PlanExpiry = { expired: expiredCount, soon7, soon30, alerts: expiryAlerts.slice(0, 5) };
   const system: SystemRow[] = [
     { label: "Environment", value: appEnv },
     { label: "App version", value: `v${pkg.version}` },
@@ -503,6 +550,7 @@ export async function loadDashboardMetrics(): Promise<DashboardMetrics> {
     funnel,
     gmail,
     storage,
+    planExpiry,
     ticketStats,
     recentTickets,
     sla,

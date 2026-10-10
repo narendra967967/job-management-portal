@@ -7,6 +7,7 @@ import {
   LifeBuoy,
   Mail,
   HardDrive,
+  CalendarClock,
   ArrowRight,
   type LucideIcon,
 } from "lucide-react";
@@ -66,6 +67,7 @@ export default async function AdminDashboardPage() {
     funnel,
     gmail,
     storage,
+    planExpiry,
     ticketStats,
     recentTickets,
     sla,
@@ -209,7 +211,7 @@ export default async function AdminDashboardPage() {
         </Card>
       </div>
 
-      {/* Recent activity + (Gmail health over System) */}
+      {/* Recent activity + plan expiry */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <SectionHeader title="Recent activity" />
@@ -237,54 +239,98 @@ export default async function AdminDashboardPage() {
           </CardContent>
         </Card>
 
-        <div className="space-y-4">
-          <Card>
-            <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
-              <CardTitle className="flex items-center gap-2">
-                <Mail className="size-4 text-primary" aria-hidden /> Gmail health
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm">
-              <StatRow label="Connected accounts" value={`${gmail.connected} / ${gmail.totalUsers}`} ok={gmail.connected > 0} />
-              <StatRow label="Last sync" value={gmail.lastSync} />
-              <StatRow
-                label="Ingest errors (30d)"
-                value={String(gmail.ingestErrors)}
-                ok={gmail.ingestErrors === 0}
-                warn={gmail.ingestErrors > 0}
-              />
-              <StatRow
-                label="Failing syncs"
-                value={String(gmail.failingSyncs)}
-                ok={gmail.failingSyncs === 0}
-                warn={gmail.failingSyncs > 0}
-              />
-            </CardContent>
-          </Card>
+        <Card>
+          <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
+            <CardTitle className="flex items-center gap-2">
+              <CalendarClock className="size-4 text-primary" aria-hidden /> Plan expiry
+            </CardTitle>
+            <Link
+              href="/jmp-admin/users"
+              className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-primary hover:underline"
+            >
+              View all <ArrowRight className="size-3.5" aria-hidden />
+            </Link>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            <StatRow label="Expired" value={String(planExpiry.expired)} ok={planExpiry.expired === 0} warn={planExpiry.expired > 0} />
+            <StatRow label="Expiring ≤7 days" value={String(planExpiry.soon7)} ok={planExpiry.soon7 === 0} warn={planExpiry.soon7 > 0} />
+            <StatRow label="Expiring ≤30 days" value={String(planExpiry.soon30)} />
+            {planExpiry.alerts.length > 0 ? (
+              <ul className="space-y-2 border-t border-border pt-3">
+                {planExpiry.alerts.map((a, i) => (
+                  <li key={i} className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate font-medium">{a.name}</p>
+                      <p className="truncate text-xs text-muted-foreground">{a.plan}</p>
+                    </div>
+                    <span
+                      className={
+                        "shrink-0 text-xs " +
+                        (a.expired || a.soon ? "text-destructive" : "text-muted-foreground")
+                      }
+                    >
+                      {a.when}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="border-t border-border pt-3 text-xs text-muted-foreground">
+                No upcoming expiries.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
-          <Card>
-            <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
-              <CardTitle className="flex items-center gap-2">
-                <HardDrive className="size-4 text-primary" aria-hidden /> Storage used
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm">
-              <StatRow label="Résumé files" value={`${storage.resumeFiles}`} />
-              <StatRow label="Résumé data" value={storage.resumeSize} />
-              <StatRow label="App assets" value={storage.assetSize} />
-              <StatRow label="Total in DB" value={storage.total} />
-            </CardContent>
-          </Card>
+      {/* Operations: Gmail health + storage + system */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <Card>
+          <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
+            <CardTitle className="flex items-center gap-2">
+              <Mail className="size-4 text-primary" aria-hidden /> Gmail health
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            <StatRow label="Connected accounts" value={`${gmail.connected} / ${gmail.totalUsers}`} ok={gmail.connected > 0} />
+            <StatRow label="Last sync" value={gmail.lastSync} />
+            <StatRow
+              label="Ingest errors (30d)"
+              value={String(gmail.ingestErrors)}
+              ok={gmail.ingestErrors === 0}
+              warn={gmail.ingestErrors > 0}
+            />
+            <StatRow
+              label="Failing syncs"
+              value={String(gmail.failingSyncs)}
+              ok={gmail.failingSyncs === 0}
+              warn={gmail.failingSyncs > 0}
+            />
+          </CardContent>
+        </Card>
 
-          <Card>
-            <SectionHeader title="System" />
-            <CardContent className="space-y-3 text-sm">
-              {system.map((r) => (
-                <StatRow key={r.label} label={r.label} value={r.value} ok={r.ok} />
-              ))}
-            </CardContent>
-          </Card>
-        </div>
+        <Card>
+          <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
+            <CardTitle className="flex items-center gap-2">
+              <HardDrive className="size-4 text-primary" aria-hidden /> Storage used
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            <StatRow label="Résumé files" value={`${storage.resumeFiles}`} />
+            <StatRow label="Résumé data" value={storage.resumeSize} />
+            <StatRow label="App assets" value={storage.assetSize} />
+            <StatRow label="Total in DB" value={storage.total} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <SectionHeader title="System" />
+          <CardContent className="space-y-3 text-sm">
+            {system.map((r) => (
+              <StatRow key={r.label} label={r.label} value={r.value} ok={r.ok} />
+            ))}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
