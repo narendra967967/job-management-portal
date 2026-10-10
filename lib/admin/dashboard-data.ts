@@ -5,13 +5,16 @@ import "server-only";
 // fit scores), so time series are bucketed in JS from bounded queries rather than
 // with DB date functions — clearer and driver-agnostic.
 //
+// User-base metrics count ONLY role='user' accounts — admins are operators, not
+// customers, so they're excluded from totals, plan/status mixes, and the activity feed.
+//
 // Deliberately NO aggregate lead-volume analytics (total leads over time): that's
 // high-volume, per-user operational data, auto-pruned on a retention schedule.
 // Metrics stay user/usage/system focused.
 
-import { desc, eq, isNotNull, sql } from "drizzle-orm";
+import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { user, resumes, fitScores, plans, gmailSyncState } from "@/db/schema";
+import { user, resumes, fitScores, plans, gmailSyncState, supportTickets } from "@/db/schema";
 import type { Point } from "@/components/admin/ui/charts";
 import pkg from "@/package.json";
 
@@ -36,12 +39,28 @@ export interface SystemRow {
   ok?: boolean;
 }
 
+export interface RecentTicket {
+  id: string;
+  subject: string;
+  who: string;
+  status: "open" | "in_progress" | "resolved";
+  when: string;
+}
+
+export interface TicketStats {
+  total: number;
+  open: number;
+  statusMix: Point[];
+}
+
 export interface DashboardMetrics {
   stats: StatCard[];
   newUsers: Point[];
   aiCalls: Point[];
   planMix: Point[];
   statusMix: Point[];
+  ticketStats: TicketStats;
+  recentTickets: RecentTicket[];
   activity: ActivityItem[];
   system: SystemRow[];
 }
@@ -60,7 +79,15 @@ function relativeTime(dt: Date): string {
   return `${Math.floor(months / 12)}y ago`;
 }
 
+const TICKET_STATUS_LABEL: Record<RecentTicket["status"], string> = {
+  open: "Open",
+  in_progress: "In progress",
+  resolved: "Resolved",
+};
+
 const count = sql<number>`count(*)::int`;
+// User-base metrics count customers only, never admin/operator accounts.
+const onlyUsers = eq(user.role, "user");
 
 export async function loadDashboardMetrics(): Promise<DashboardMetrics> {
   const now = Date.now();
@@ -91,24 +118,21 @@ export async function loadDashboardMetrics(): Promise<DashboardMetrics> {
     recentScores,
     recentSyncs,
     lastSyncRow,
+    ticketTotalRows,
+    ticketStatusRows,
+    recentTicketRows,
   ] = await Promise.all([
-    db.select({ n: count }).from(user),
-    db.select({ n: count }).from(user).where(sql`${user.createdAt} >= ${monthAgo}`),
-    db.select({ n: count }).from(user).where(eq(user.status, "active")),
-    db.select({ n: count }).from(user).where(sql`${user.lastLoginAt} >= ${weekAgo}`),
+    db.select({ n: count }).from(user).where(onlyUsers),
+    db.select({ n: count }).from(user).where(and(onlyUsers, sql`${user.createdAt} >= ${monthAgo}`)),
+    db.select({ n: count }).from(user).where(and(onlyUsers, eq(user.status, "active"))),
+    db.select({ n: count }).from(user).where(and(onlyUsers, sql`${user.lastLoginAt} >= ${weekAgo}`)),
     db.select({ n: count }).from(resumes),
     db.select({ n: sql<number>`count(distinct ${resumes.userId})::int` }).from(resumes),
     db.select({ n: count }).from(fitScores),
     db.select({ n: count }).from(fitScores).where(sql`${fitScores.createdAt} >= ${monthAgo}`),
-    db
-      .select({ planId: user.planId, n: count })
-      .from(user)
-      .groupBy(user.planId),
-    db
-      .select({ status: user.status, n: count })
-      .from(user)
-      .groupBy(user.status),
-    db.select({ createdAt: user.createdAt }).from(user),
+    db.select({ planId: user.planId, n: count }).from(user).where(onlyUsers).groupBy(user.planId),
+    db.select({ status: user.status, n: count }).from(user).where(onlyUsers).groupBy(user.status),
+    db.select({ createdAt: user.createdAt }).from(user).where(onlyUsers),
     db
       .select({ createdAt: fitScores.createdAt })
       .from(fitScores)
@@ -116,6 +140,7 @@ export async function loadDashboardMetrics(): Promise<DashboardMetrics> {
     db
       .select({ name: user.name, createdAt: user.createdAt })
       .from(user)
+      .where(onlyUsers)
       .orderBy(desc(user.createdAt))
       .limit(5),
     db
@@ -143,6 +168,19 @@ export async function loadDashboardMetrics(): Promise<DashboardMetrics> {
       .where(isNotNull(gmailSyncState.lastSyncedAt))
       .orderBy(desc(gmailSyncState.lastSyncedAt))
       .limit(1),
+    db.select({ status: supportTickets.status, n: count }).from(supportTickets).groupBy(supportTickets.status),
+    db.select({ status: supportTickets.status, n: count }).from(supportTickets).groupBy(supportTickets.status),
+    db
+      .select({
+        id: supportTickets.id,
+        subject: supportTickets.subject,
+        name: supportTickets.name,
+        status: supportTickets.status,
+        createdAt: supportTickets.createdAt,
+      })
+      .from(supportTickets)
+      .orderBy(desc(supportTickets.createdAt))
+      .limit(5),
   ]);
 
   const totalUsers = totalUsersRows[0]?.n ?? 0;
@@ -174,8 +212,10 @@ export async function loadDashboardMetrics(): Promise<DashboardMetrics> {
       delta: resumeCount > 0 ? `across ${resumeUsers} user${resumeUsers === 1 ? "" : "s"}` : "none yet",
     },
     {
+      // fit_scores rows — one per (user, lead, resume); rescores overwrite, so this
+      // counts leads scored, the only AI signal we persist today.
       key: "ai",
-      label: "AI calls (30d)",
+      label: "AI scores (30d)",
       value: String(aiRecent),
       delta: `${aiTotal} all-time`,
     },
@@ -196,7 +236,7 @@ export async function loadDashboardMetrics(): Promise<DashboardMetrics> {
   }
   const newUsers: Point[] = months.map((m) => ({ label: m.label, value: m.value }));
 
-  // --- AI calls per week (last 8 weeks, bucketed by week-ending) ---
+  // --- AI scores per week (last 8 weeks, bucketed by week-ending) ---
   const weeks: { label: string; start: number; end: number; value: number }[] = [];
   for (let i = 7; i >= 0; i--) {
     const end = todayEnd - i * 7 * DAY;
@@ -210,17 +250,32 @@ export async function loadDashboardMetrics(): Promise<DashboardMetrics> {
   }
   const aiCalls: Point[] = weeks.map((w) => ({ label: w.label, value: w.value }));
 
-  // --- Plan distribution ---
+  // --- Plan distribution (users only) ---
   const planNames = new Map((await db.select({ id: plans.id, name: plans.name }).from(plans)).map((p) => [p.id, p.name]));
   const planMix: Point[] = planMixRows
     .map((r) => ({ label: r.planId ? (planNames.get(r.planId) ?? "Unknown plan") : "No plan", value: r.n }))
     .filter((p) => p.value > 0)
     .sort((a, b) => b.value - a.value);
 
-  // --- Status mix ---
+  // --- Status mix (users only) ---
   const statusMix: Point[] = statusMixRows
     .map((r) => ({ label: r.status === "active" ? "Active" : r.status === "inactive" ? "Inactive" : r.status, value: r.n }))
     .filter((p) => p.value > 0);
+
+  // --- Tickets ---
+  const ticketTotal = ticketTotalRows.reduce((s, r) => s + r.n, 0);
+  const ticketOpen = ticketTotalRows.find((r) => r.status === "open")?.n ?? 0;
+  const ticketStatusMix: Point[] = (["open", "in_progress", "resolved"] as const)
+    .map((s) => ({ label: TICKET_STATUS_LABEL[s], value: ticketStatusRows.find((r) => r.status === s)?.n ?? 0 }))
+    .filter((p) => p.value > 0);
+  const ticketStats: TicketStats = { total: ticketTotal, open: ticketOpen, statusMix: ticketStatusMix };
+  const recentTickets: RecentTicket[] = recentTicketRows.map((t) => ({
+    id: t.id,
+    subject: t.subject,
+    who: t.name || "Unknown",
+    status: t.status as RecentTicket["status"],
+    when: relativeTime(new Date(t.createdAt)),
+  }));
 
   // --- Recent activity (merge of real timestamps, newest first) ---
   type Ev = { who: string; what: string; at: number };
@@ -245,5 +300,5 @@ export async function loadDashboardMetrics(): Promise<DashboardMetrics> {
     { label: "Last Gmail sync", value: lastSync },
   ];
 
-  return { stats, newUsers, aiCalls, planMix, statusMix, activity, system };
+  return { stats, newUsers, aiCalls, planMix, statusMix, ticketStats, recentTickets, activity, system };
 }
