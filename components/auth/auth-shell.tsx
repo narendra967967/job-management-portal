@@ -6,18 +6,18 @@ import { getAppName, getTagline } from "@/lib/branding";
 const HIGHLIGHTS = [
   {
     icon: Sparkles,
-    title: "Capture leads from your inbox",
-    body: "LinkedIn job alerts become tracked leads automatically.",
+    title: "Every opportunity in one place",
+    body: "Job alerts from your inbox become tracked leads automatically.",
   },
   {
     icon: Gauge,
     title: "AI summaries & fit scoring",
-    body: "Score each role against your résumé with one click.",
+    body: "Score each role against your résumé and focus on the right ones.",
   },
   {
     icon: Send,
-    title: "Outreach & follow-ups",
-    body: "Draft messages and never miss a follow-up.",
+    title: "Apply well, on your terms",
+    body: "Draft with AI, send it yourself, and never miss a follow-up.",
   },
 ];
 
@@ -72,7 +72,7 @@ export async function AuthShell({
 
         <p className="relative flex items-center gap-2 text-xs text-primary-foreground/65">
           <ShieldCheck className="size-4 shrink-0" aria-hidden />
-          Read-only Gmail access · your data stays yours.
+          Private by design · your data stays yours.
         </p>
       </aside>
 
