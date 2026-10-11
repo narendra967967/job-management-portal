@@ -1,6 +1,6 @@
 "use client";
 
-// FAQ accordion for the landing page. Independent toggles (any number open),
+// FAQ accordion for the landing page — single-open (opening one closes the rest),
 // smooth height animation via the grid-rows 1fr↔0fr trick (honored by the
 // reduced-motion guard).
 
@@ -9,20 +9,14 @@ import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function Faq({ items }: { items: { q: string; a: string }[] }) {
-  const [open, setOpen] = useState<Set<number>>(new Set([0]));
+  const [openIdx, setOpenIdx] = useState<number | null>(0);
 
-  const toggle = (i: number) =>
-    setOpen((s) => {
-      const n = new Set(s);
-      if (n.has(i)) n.delete(i);
-      else n.add(i);
-      return n;
-    });
+  const toggle = (i: number) => setOpenIdx((cur) => (cur === i ? null : i));
 
   return (
     <div className="mx-auto mt-12 max-w-3xl divide-y overflow-hidden rounded-2xl border bg-card">
       {items.map((it, i) => {
-        const isOpen = open.has(i);
+        const isOpen = openIdx === i;
         return (
           <div key={it.q}>
             <button
