@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 
-export function LoginForm() {
+export function LoginForm({ signupAllowed = false }: { signupAllowed?: boolean }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(true);
@@ -90,6 +90,15 @@ export function LoginForm() {
         <LogIn className="size-4" aria-hidden />
         {busy ? "Signing in…" : "Sign in"}
       </Button>
+
+      {signupAllowed && (
+        <p className="text-center text-xs text-muted-foreground">
+          New here?{" "}
+          <Link href="/signup" className="font-medium text-primary hover:underline">
+            Create an account
+          </Link>
+        </p>
+      )}
     </form>
   );
 }

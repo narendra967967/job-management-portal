@@ -36,8 +36,12 @@ export const auth = betterAuth({
   }),
   emailAndPassword: {
     enabled: true,
-    // Admin-provisioned only — no public registration.
+    // The public sign-up endpoint stays disabled; self-registration goes through
+    // actions/signup.ts, which gates on the admin's allowSignup flag + password
+    // policy and creates the user UNVERIFIED. requireEmailVerification then blocks
+    // sign-in until the email is confirmed.
     disableSignUp: true,
+    requireEmailVerification: true,
     minPasswordLength: 8,
     password: {
       hash: hashPassword,
@@ -105,6 +109,35 @@ export const auth = betterAuth({
       scope: ["https://www.googleapis.com/auth/gmail.readonly"],
       accessType: "offline",
       prompt: "consent",
+    },
+  },
+  emailVerification: {
+    // Clicking the link verifies the email AND signs the user in, landing them on
+    // the dashboard. actions/signup.ts triggers the send after creating the account.
+    autoSignInAfterVerification: true,
+    sendVerificationEmail: async ({ user: recipient, url }) => {
+      const appName = await getAppName();
+      try {
+        await sendAppEmail({
+          to: recipient.email,
+          subject: `Verify your email for ${appName}`,
+          heading: "Confirm your email",
+          lines: [
+            `Hi ${recipient.name || "there"}, welcome to ${appName}!`,
+            "Confirm your email address to activate your account. This link expires in 1 hour.",
+          ],
+          button: { label: "Verify email", url },
+          footerNote: "If you didn't create this account, you can safely ignore this email.",
+        });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg === SMTP_NOT_CONFIGURED) {
+          console.log(`\n[verify-email] SMTP not configured — link for ${recipient.email}:\n${url}\n`);
+        } else {
+          console.error("[verify-email] email send failed:", msg);
+          console.log(`[verify-email] link for ${recipient.email}: ${url}`);
+        }
+      }
     },
   },
   account: {
