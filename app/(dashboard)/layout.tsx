@@ -40,7 +40,7 @@ export default async function DashboardLayout({
   // Gate on the admin-managed account state: deactivated / expired users can sign
   // in but don't reach the dashboard.
   const u = await getSessionUser();
-  if (!u) redirect("/");
+  if (!u) redirect("/login");
   const state = accessState(u);
   if (state === "deactivated") redirect("/deactivated");
   if (state === "expired") redirect("/renew");

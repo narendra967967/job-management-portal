@@ -6,7 +6,7 @@ import { DeactivatedNotice } from "@/components/auth/account-blocked";
 export default async function DeactivatedPage() {
   await guardMaintenance();
   const u = await getSessionUser();
-  if (!u) redirect("/");
+  if (!u) redirect("/login");
   const state = accessState(u);
   if (state === "ok") redirect("/leads");
   if (state === "expired") redirect("/renew");

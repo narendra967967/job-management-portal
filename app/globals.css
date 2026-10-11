@@ -178,6 +178,8 @@
     @apply font-sans;
     /* Nudge everything up ~6% so text reads a touch larger and more comfortable. */
     font-size: 106.25%;
+    /* Smooth anchor scrolling on the marketing page (disabled under reduce-motion). */
+    scroll-behavior: smooth;
   }
 }
 

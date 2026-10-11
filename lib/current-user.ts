@@ -19,7 +19,7 @@ export async function getSessionUserId(): Promise<string | null> {
  *  user app at the login step, not here, to avoid redirect loops with "/".) */
 export async function getCurrentUserId(): Promise<string> {
   const id = await getSessionUserId();
-  if (!id) redirect("/");
+  if (!id) redirect("/login");
   return id;
 }
 

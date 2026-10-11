@@ -36,7 +36,7 @@ export function ForgotPasswordForm() {
           </p>
         </div>
         <Link
-          href="/"
+          href="/login"
           className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="size-4" aria-hidden />
@@ -63,7 +63,7 @@ export function ForgotPasswordForm() {
         {busy ? "Sending…" : "Send reset link"}
       </Button>
       <Link
-        href="/"
+        href="/login"
         className="flex items-center justify-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="size-4" aria-hidden />

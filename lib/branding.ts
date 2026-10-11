@@ -53,6 +53,17 @@ export const getSupportEmail = cache(async (): Promise<string> => {
   }
 });
 
+/** Whether public self-registration is enabled (admin Settings → General). */
+export const getSignupAllowed = cache(async (): Promise<boolean> => {
+  try {
+    const [s] = await db.select({ allowSignup: appSettings.allowSignup }).from(appSettings).limit(1);
+    return !!s?.allowSignup;
+  } catch {
+    // DB unavailable (e.g. during `next build`) — default closed.
+    return false;
+  }
+});
+
 /** Absolute base URL of the app (for links/assets in emails). */
 export function getAppBaseUrl(): string {
   return (process.env.BETTER_AUTH_URL ?? "http://localhost:3000").replace(/\/+$/, "");
