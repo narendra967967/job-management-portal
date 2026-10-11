@@ -41,6 +41,8 @@ export interface Plan {
   isFree: boolean;
   /** Free plan only — days of access before renewal (0 = never expires). */
   freeDurationDays: number;
+  /** The single plan new sign-ups land on (free plans only; exactly one). */
+  isDefault: boolean;
   /** 0 disables this interval. */
   monthlyPrice: number;
   yearlyPrice: number;

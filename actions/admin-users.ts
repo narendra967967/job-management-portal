@@ -14,6 +14,7 @@ import { requireAdmin } from "@/lib/current-user";
 import { hashPassword } from "@/lib/password";
 import { validatePassword } from "@/lib/admin/password-policy-server";
 import { provisionUserDefaults } from "@/lib/provision";
+import { getDefaultPlan, expiryFromAccessDays } from "@/lib/plans";
 import { account, plans, user } from "@/db/schema";
 
 type ActionResult = { ok: true } | { ok: false; error: string };
@@ -73,6 +74,12 @@ export async function createAdminUserAction(input: unknown): Promise<CreateResul
   if (!parsed.success) return { ok: false, error: firstError(parsed.error) };
   const v = parsed.data;
 
+  // Registration requires a default sign-up plan to exist (even admin-created).
+  const def = await getDefaultPlan();
+  if (!def) {
+    return { ok: false, error: "Default plan not available — set a default sign-up plan in Plans & Pricing first." };
+  }
+
   // When an admin supplies a password, enforce the configured policy. When they
   // don't (the default), mint an unguessable one — the user replaces it via the
   // emailed set-password link and never sees this value.
@@ -85,6 +92,19 @@ export async function createAdminUserAction(input: unknown): Promise<CreateResul
   const existing = await db.select({ id: user.id }).from(user).where(eq(user.email, v.email));
   if (existing.length) return { ok: false, error: "A user with that email already exists." };
 
+  // Default to the sign-up plan; expiry from the plan's access days when not set.
+  const planId = v.planId ?? def.id;
+  let planExpiresAt: Date | null;
+  if (v.expiresAt) {
+    planExpiresAt = new Date(v.expiresAt);
+  } else {
+    const days =
+      planId === def.id
+        ? def.freeDurationDays
+        : (await db.select({ d: plans.freeDurationDays }).from(plans).where(eq(plans.id, planId)))[0]?.d ?? 0;
+    planExpiresAt = expiryFromAccessDays(days);
+  }
+
   const id = randomUUID();
   await db.insert(user).values({
     id,
@@ -94,8 +114,8 @@ export async function createAdminUserAction(input: unknown): Promise<CreateResul
     mobile: v.mobile || null,
     role: v.role,
     status: v.status,
-    planId: v.planId ?? null,
-    planExpiresAt: v.expiresAt ? new Date(v.expiresAt) : null,
+    planId,
+    planExpiresAt,
     createdAt: new Date(),
     updatedAt: new Date(),
   });
@@ -109,7 +129,7 @@ export async function createAdminUserAction(input: unknown): Promise<CreateResul
     updatedAt: new Date(),
   });
   await provisionUserDefaults(id);
-  await bumpEverSubscribed(v.planId ?? null);
+  await bumpEverSubscribed(planId);
 
   // Email a welcome + set-password link (best-effort — the account exists either
   // way). The user has never logged in, so sendResetPassword sends the welcome copy.

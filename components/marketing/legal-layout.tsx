@@ -1,7 +1,8 @@
 // Shared wrapper for the public legal pages (Privacy, Terms): marketing header +
 // a readable prose column + footer. Content is passed as children.
 
-import { getAppName, getTagline, getSignupAllowed } from "@/lib/branding";
+import { getAppName, getTagline } from "@/lib/branding";
+import { isRegistrationOpen } from "@/lib/plans";
 import { getSessionUserId } from "@/lib/current-user";
 import { SiteHeader } from "@/components/marketing/site-header";
 import { SiteFooter } from "@/components/marketing/site-footer";
@@ -25,7 +26,7 @@ export async function LegalLayout({
   const [appName, tagline, signupAllowed, sessionId] = await Promise.all([
     getAppName(),
     getTagline(),
-    getSignupAllowed(),
+    isRegistrationOpen(),
     getSessionUserId(),
   ]);
   return (

@@ -30,6 +30,7 @@ export async function loadPlans(): Promise<Plan[]> {
     accent: ((ACCENT_KEYS as string[]).includes(r.accent) ? r.accent : "indigo") as AccentKey,
     isFree: r.isFree,
     freeDurationDays: r.freeDurationDays,
+    isDefault: r.isDefault,
     monthlyPrice: r.monthlyPrice,
     yearlyPrice: r.yearlyPrice,
     currency: (r.currency === "USD" ? "USD" : "INR") as Currency,

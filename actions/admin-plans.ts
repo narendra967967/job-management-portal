@@ -5,12 +5,12 @@
 // plan is active at a time; "recommended" is single-winner; the active free plan
 // and any ever-used plan can't be deleted.
 
-import { eq, ne } from "drizzle-orm";
+import { eq, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/current-user";
-import { plans } from "@/db/schema";
+import { plans, user } from "@/db/schema";
 import { ACCENT_KEYS } from "@/lib/admin/plans-model";
 
 type Result = { ok: true } | { ok: false; error: string };
@@ -33,6 +33,7 @@ const planSchema = z.object({
   description: z.string().max(5000).optional().default(""),
   accent: z.string().refine((v) => (ACCENT_KEYS as string[]).includes(v), "Invalid accent."),
   isFree: z.boolean(),
+  isDefault: z.boolean().optional().default(false),
   freeDurationDays: z.coerce.number().int().min(0).max(3650),
   monthlyPrice: z.coerce.number().int().min(0).max(10_000_000),
   yearlyPrice: z.coerce.number().int().min(0).max(100_000_000),
@@ -64,14 +65,20 @@ function clean(v: PlanData) {
   };
 }
 
-/** Keep exactly one free plan active. `preferId` is the plan just saved/activated. */
+/** Keep exactly one free plan active. The default sign-up plan always wins;
+ *  otherwise prefer the just-saved plan, then the current active, then the first. */
 async function reconcileFreePlans(preferId?: string): Promise<void> {
-  const frees = await db.select({ id: plans.id, status: plans.status }).from(plans).where(eq(plans.isFree, true));
+  const frees = await db
+    .select({ id: plans.id, status: plans.status, isDefault: plans.isDefault })
+    .from(plans)
+    .where(eq(plans.isFree, true));
   if (frees.length === 0) return;
+  const def = frees.find((f) => f.isDefault);
   const prefer = preferId ? frees.find((f) => f.id === preferId) : undefined;
   const currentActive = frees.find((f) => f.status === "active");
-  const activeId =
-    prefer && prefer.status === "active"
+  const activeId = def
+    ? def.id
+    : prefer && prefer.status === "active"
       ? prefer.id
       : currentActive
         ? currentActive.id
@@ -82,6 +89,24 @@ async function reconcileFreePlans(preferId?: string): Promise<void> {
     await tx.update(plans).set({ status: "inactive" }).where(eq(plans.isFree, true));
     await tx.update(plans).set({ status: "active" }).where(eq(plans.id, activeId));
   });
+}
+
+/** Set (or clear) the single default sign-up plan. Setting it also activates it. */
+async function setDefaultPlan(id: string, want: boolean): Promise<void> {
+  if (want) {
+    await db.transaction(async (tx) => {
+      await tx.update(plans).set({ isDefault: false }).where(ne(plans.id, id));
+      await tx.update(plans).set({ isDefault: true, status: "active" }).where(eq(plans.id, id));
+    });
+  } else {
+    await db.update(plans).set({ isDefault: false }).where(eq(plans.id, id));
+  }
+}
+
+/** Number of users currently assigned to a plan. */
+async function usersOnPlan(id: string): Promise<number> {
+  const [row] = await db.select({ n: sql<number>`count(*)::int` }).from(user).where(eq(user.planId, id));
+  return row?.n ?? 0;
 }
 
 export async function createPlanAction(input: unknown): Promise<Result> {
@@ -97,6 +122,7 @@ export async function createPlanAction(input: unknown): Promise<Result> {
   if (existing) return { ok: false, error: "A plan with that code already exists." };
 
   const [row] = await db.insert(plans).values(v).returning({ id: plans.id });
+  await setDefaultPlan(row.id, p.data.isFree && p.data.isDefault);
   if (v.isFree) await reconcileFreePlans(row.id);
   revalidate();
   return { ok: true };
@@ -120,6 +146,7 @@ export async function updatePlanAction(id: unknown, input: unknown): Promise<Res
   const { code: _code, ...set } = v;
   void _code;
   await db.update(plans).set(set).where(eq(plans.id, planId.data));
+  await setDefaultPlan(planId.data, p.data.isFree && p.data.isDefault);
   if (v.isFree) await reconcileFreePlans(planId.data);
   revalidate();
   return { ok: true };
@@ -133,6 +160,15 @@ export async function setPlanStatusAction(id: unknown, status: unknown): Promise
 
   const [plan] = await db.select().from(plans).where(eq(plans.id, planId.data));
   if (!plan) return { ok: false, error: "Plan not found." };
+
+  if (s.data === "inactive") {
+    if (plan.isDefault) {
+      return { ok: false, error: "Can't deactivate the default sign-up plan — set another plan as the default first." };
+    }
+    if ((await usersOnPlan(plan.id)) > 0) {
+      return { ok: false, error: "Can't deactivate a plan that users are on — move them to another plan first." };
+    }
+  }
 
   if (plan.isFree) {
     // Free plans are a radio: you can only activate one (it deactivates the rest);
@@ -177,6 +213,9 @@ export async function deletePlanAction(id: unknown): Promise<Result> {
   if (!plan) return { ok: false, error: "Plan not found." };
   if (plan.everSubscribed > 0) {
     return { ok: false, error: "Can't delete a plan that's been used — deactivate it instead." };
+  }
+  if (plan.isDefault) {
+    return { ok: false, error: "Can't delete the default sign-up plan. Set another plan as the default first." };
   }
   if (plan.isFree && plan.status === "active") {
     return { ok: false, error: "Can't delete the active free plan. Activate another free plan first." };

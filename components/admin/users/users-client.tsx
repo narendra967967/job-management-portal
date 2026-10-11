@@ -59,8 +59,9 @@ const initials = (n: string) => n.split(" ").map((p) => p[0]).slice(0, 2).join("
 function daysUntil(iso: string) {
   return Math.ceil((new Date(iso + "T00:00:00").getTime() - Date.now()) / 86400000);
 }
-function ExpiryCell({ iso }: { iso: string | null }) {
-  if (!iso) return <span className="text-muted-foreground">—</span>;
+function ExpiryCell({ iso, onPlan }: { iso: string | null; onPlan?: boolean }) {
+  // On a plan with no expiry = never expires; no plan at all = nothing to show.
+  if (!iso) return <span className="text-muted-foreground">{onPlan ? "Never" : "—"}</span>;
   const d = daysUntil(iso);
   let tone = "text-foreground";
   let note = "";
@@ -362,7 +363,7 @@ export function UsersClient({ initialUsers, plans }: { initialUsers: AdminUserRo
                     <span className="text-muted-foreground">—</span>
                   )}
                 </td>
-                <td className="px-4 py-3 text-xs"><ExpiryCell iso={u.expiresAt} /></td>
+                <td className="px-4 py-3 text-xs"><ExpiryCell iso={u.expiresAt} onPlan={!!u.planName} /></td>
                 <td className="hidden px-4 py-3 tabular-nums md:table-cell">{u.leads}</td>
                 <td className="hidden px-4 py-3 text-muted-foreground lg:table-cell">{u.lastLogin}</td>
                 <td className="px-4 py-3 text-right">

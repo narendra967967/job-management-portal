@@ -451,6 +451,9 @@ export const plans = pgTable("plans", {
   isFree: boolean("is_free").notNull().default(false),
   // Free plan only — days of access before renewal (0 = never expires).
   freeDurationDays: integer("free_duration_days").notNull().default(0),
+  // The single plan new sign-ups land on (free plans only; exactly one, enforced
+  // by the partial unique index below). Registration is blocked with no default.
+  isDefault: boolean("is_default").notNull().default(false),
   // 0 disables that interval.
   monthlyPrice: integer("monthly_price").notNull().default(0),
   yearlyPrice: integer("yearly_price").notNull().default(0),
@@ -468,7 +471,10 @@ export const plans = pgTable("plans", {
     .notNull()
     .defaultNow()
     .$onUpdate(() => new Date()),
-});
+}, (t) => [
+  // At most one default sign-up plan across all plans.
+  uniqueIndex("plans_one_default_uq").on(t.isDefault).where(sql`${t.isDefault}`),
+]);
 
 /** Branding assets (logo, favicon) the admin can change anytime. One row per
  *  kind; bytes stored in-DB (small, few) and served via /api/branding/[kind].

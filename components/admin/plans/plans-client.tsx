@@ -202,12 +202,24 @@ function PlanCard({
   const active = plan.status === "active";
   const usedLock = plan.everSubscribed > 0;
   const freeActiveLock = plan.isFree && active; // the active free plan must stay
-  const deleteDisabled = freeActiveLock || usedLock;
-  const deleteTitle = freeActiveLock
-    ? "Can't delete the active free plan. Activate another free plan first."
-    : usedLock
-      ? `Can't delete — ${plan.everSubscribed} user${plan.everSubscribed === 1 ? " has" : "s have"} used this plan. Deactivate instead.`
-      : "Delete plan";
+  const deleteDisabled = freeActiveLock || usedLock || plan.isDefault;
+  const deleteTitle = plan.isDefault
+    ? "Can't delete the default sign-up plan. Set another plan as the default first."
+    : freeActiveLock
+      ? "Can't delete the active free plan. Activate another free plan first."
+      : usedLock
+        ? `Can't delete — ${plan.everSubscribed} user${plan.everSubscribed === 1 ? " has" : "s have"} used this plan. Deactivate instead.`
+        : "Delete plan";
+  // Deactivation is blocked for the default plan, the active free plan, and any
+  // plan users are currently on. Activation is always allowed.
+  const cantDeactivate = plan.isDefault
+    ? "Can't deactivate the default sign-up plan — set another plan as the default first."
+    : plan.isFree && active
+      ? "A free plan must stay active — activate another free plan to switch."
+      : plan.subscribers > 0
+        ? "Can't deactivate a plan that users are on — move them to another plan first."
+        : null;
+  const toggleDisabled = active && !!cantDeactivate;
 
   return (
     <Card className={cn("flex h-full flex-col overflow-hidden p-0", plan.popular && `ring-2 ${accent.ring}`)}>
@@ -217,7 +229,8 @@ function PlanCard({
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="text-lg font-semibold">{plan.name}</h3>
-              {plan.isFree && <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-medium">Default</span>}
+              {plan.isDefault && <span className="rounded-full bg-white/25 px-2 py-0.5 text-[10px] font-semibold">Default</span>}
+              {plan.isFree && !plan.isDefault && <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-medium">Free</span>}
               {plan.popular && <span className="rounded-full bg-white/25 px-2 py-0.5 text-[10px] font-semibold">★ Recommended</span>}
             </div>
             <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-white/80">
@@ -296,8 +309,8 @@ function PlanCard({
             variant="outline"
             size="sm"
             onClick={onToggle}
-            disabled={freeActiveLock}
-            title={freeActiveLock ? "A free plan must stay active — activate another free plan to switch." : undefined}
+            disabled={toggleDisabled}
+            title={toggleDisabled ? (cantDeactivate ?? undefined) : undefined}
           >
             {active ? "Deactivate" : "Activate"}
           </Button>

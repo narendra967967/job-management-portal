@@ -9,11 +9,12 @@ import { headers } from "next/headers";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { account, plans, user } from "@/db/schema";
+import { account, user } from "@/db/schema";
 import { auth } from "@/lib/auth";
 import { hashPassword } from "@/lib/password";
 import { provisionUserDefaults } from "@/lib/provision";
 import { getSignupAllowed } from "@/lib/branding";
+import { getDefaultPlan, expiryFromAccessDays } from "@/lib/plans";
 import { validatePassword } from "@/lib/admin/password-policy-server";
 
 type Result = { ok: true } | { ok: false; error: string };
@@ -44,8 +45,9 @@ const schema = z.object({
 });
 
 export async function signUpAction(input: unknown): Promise<Result> {
-  // Gate: self-registration must be enabled by the admin.
-  if (!(await getSignupAllowed())) {
+  // Gate: self-registration must be enabled AND a default sign-up plan must exist.
+  const def = await getDefaultPlan();
+  if (!(await getSignupAllowed()) || !def) {
     return { ok: false, error: "Registration is currently closed." };
   }
 
@@ -70,9 +72,6 @@ export async function signUpAction(input: unknown): Promise<Result> {
     return { ok: false, error: "An account with this email already exists. Try logging in." };
   }
 
-  // New users start on the Free (default) plan when one exists.
-  const [free] = await db.select({ id: plans.id }).from(plans).where(eq(plans.isFree, true)).limit(1);
-
   const id = randomUUID();
   const now = new Date();
   await db.insert(user).values({
@@ -82,7 +81,8 @@ export async function signUpAction(input: unknown): Promise<Result> {
     emailVerified: false,
     role: "user",
     status: "active",
-    planId: free?.id ?? null,
+    planId: def.id,
+    planExpiresAt: expiryFromAccessDays(def.freeDurationDays),
     createdAt: now,
     updatedAt: now,
   });

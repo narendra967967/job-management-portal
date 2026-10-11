@@ -33,6 +33,7 @@ export interface PlanFormValues {
   description: string;
   accent: AccentKey;
   isFree: boolean;
+  isDefault: boolean;
   freeDurationDays: number;
   monthlyPrice: number;
   yearlyPrice: number;
@@ -97,6 +98,7 @@ export function PlanFormDialog({
   const [description, setDescription] = useState("");
   const [accent, setAccent] = useState<AccentKey>("indigo");
   const [isFree, setIsFree] = useState(false);
+  const [isDefault, setIsDefault] = useState(false);
   const [freeDurationDays, setFreeDurationDays] = useState("14");
   const [monthlyPrice, setMonthlyPrice] = useState("0");
   const [yearlyPrice, setYearlyPrice] = useState("0");
@@ -117,6 +119,7 @@ export function PlanFormDialog({
     setDescription(plan?.description ?? "");
     setAccent(plan?.accent ?? "indigo");
     setIsFree(plan?.isFree ?? false);
+    setIsDefault(plan?.isDefault ?? false);
     setFreeDurationDays(String(plan?.freeDurationDays ?? 14));
     setMonthlyPrice(String(plan?.monthlyPrice ?? 0));
     setYearlyPrice(String(plan?.yearlyPrice ?? 0));
@@ -175,6 +178,7 @@ export function PlanFormDialog({
       description,
       accent,
       isFree,
+      isDefault: isFree ? isDefault : false,
       freeDurationDays: isFree ? freeDays : 0,
       monthlyPrice: monthly,
       yearlyPrice: yearly,
@@ -242,7 +246,10 @@ export function PlanFormDialog({
             <input
               type="checkbox"
               checked={isFree}
-              onChange={(e) => setIsFree(e.target.checked)}
+              onChange={(e) => {
+                setIsFree(e.target.checked);
+                if (!e.target.checked) setIsDefault(false);
+              }}
               className="mt-0.5 size-4 cursor-pointer rounded border-input accent-primary"
             />
             <span>
@@ -266,6 +273,22 @@ export function PlanFormDialog({
                   className="w-40"
                 />
               </Field>
+              <label className="flex items-start gap-2 rounded-lg border border-input bg-muted/20 p-3 text-sm">
+                <input
+                  type="checkbox"
+                  checked={isDefault}
+                  onChange={(e) => setIsDefault(e.target.checked)}
+                  className="mt-0.5 size-4 cursor-pointer rounded border-input accent-primary"
+                />
+                <span>
+                  Default plan for new sign-ups
+                  <span className="block text-xs text-muted-foreground">
+                    New users (self sign-up and admin-created) land on this plan. Only one plan can be
+                    the default — setting this unsets any other. Registration is disabled when no default
+                    plan exists.
+                  </span>
+                </span>
+              </label>
             </Section>
           ) : (
             <Section title="Pricing">
