@@ -21,7 +21,7 @@ export function Logo({
         alt={name}
         width={32}
         height={32}
-        className="size-8 shrink-0 rounded-full object-cover"
+        className="size-8 shrink-0 rounded-full object-contain"
       />
       {showName && (
         <span className="truncate text-sm font-medium text-foreground">{name}</span>

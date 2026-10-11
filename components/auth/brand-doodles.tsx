@@ -5,7 +5,7 @@ export function BrandDoodles() {
   return (
     <svg
       aria-hidden
-      className="pointer-events-none absolute inset-0 size-full text-white/[0.14]"
+      className="pointer-events-none absolute inset-0 size-full text-white/[0.09]"
       viewBox="0 0 500 720"
       fill="none"
       preserveAspectRatio="xMidYMid slice"
