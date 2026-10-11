@@ -139,17 +139,25 @@ function NavGroup({
       >
         <span>{label}</span>
         <ChevronDown
-          className={cn("size-3.5 transition-transform", !open && "-rotate-90")}
+          className={cn("size-3.5 transition-transform duration-200", !open && "-rotate-90")}
           aria-hidden
         />
       </button>
-      {open && (
-        <div className="mt-0.5 space-y-1">
-          {items.map((item) => (
-            <NavLink key={item.href} {...item} pathname={pathname} />
-          ))}
+      {/* Smooth height collapse via grid-rows 1fr↔0fr (animates both directions). */}
+      <div
+        className={cn(
+          "grid transition-[grid-template-rows] duration-200 ease-out",
+          open ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
+        )}
+      >
+        <div className="overflow-hidden">
+          <div className="mt-0.5 space-y-1" aria-hidden={!open}>
+            {items.map((item) => (
+              <NavLink key={item.href} {...item} pathname={pathname} />
+            ))}
+          </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }

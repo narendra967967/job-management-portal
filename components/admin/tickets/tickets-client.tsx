@@ -546,7 +546,7 @@ export function TicketsClient({ initial }: { initial: Ticket[] }) {
                       const lastOfGroup = !next || next.author !== m.author || day(next.at) !== day(m.at);
                       const mine = m.author === "admin"; // admin = support = right side
                       return (
-                        <div key={m.id}>
+                        <div key={m.id} className="animate-in fade-in slide-in-from-bottom-2 duration-300 ease-out">
                           {newDay && (
                             <div className="my-3 flex justify-center">
                               <ClientTime

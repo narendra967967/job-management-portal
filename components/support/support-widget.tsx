@@ -182,7 +182,7 @@ export function SupportWidget() {
         aria-label={open ? "Close help" : "Help & support"}
         aria-expanded={open}
         className={cn(
-          "fixed right-4 bottom-[calc(env(safe-area-inset-bottom)+4.75rem)] z-50 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform active:scale-95 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none sm:right-6 sm:bottom-6",
+          "fixed right-4 bottom-[calc(env(safe-area-inset-bottom)+4.75rem)] z-50 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform duration-200 hover:scale-105 active:scale-95 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none sm:right-6 sm:bottom-6",
           open && "scale-95",
         )}
       >
@@ -199,7 +199,7 @@ export function SupportWidget() {
         <div
           role="dialog"
           aria-label="Help & support"
-          className="fixed inset-0 z-50 flex flex-col overflow-hidden border-0 bg-card sm:inset-auto sm:right-6 sm:bottom-24 sm:h-[600px] sm:max-h-[calc(100dvh-7rem)] sm:w-[380px] sm:rounded-2xl sm:border sm:shadow-2xl"
+          className="fixed inset-0 z-50 flex flex-col overflow-hidden border-0 bg-card animate-in fade-in slide-in-from-bottom-4 duration-200 ease-out sm:inset-auto sm:right-6 sm:bottom-24 sm:h-[600px] sm:max-h-[calc(100dvh-7rem)] sm:w-[380px] sm:origin-bottom-right sm:rounded-2xl sm:border sm:shadow-2xl sm:slide-in-from-bottom-2 sm:zoom-in-95"
         >
           {/* Panel header */}
           <div className="flex shrink-0 items-center gap-2 border-b bg-primary px-4 py-3 text-primary-foreground">
@@ -234,7 +234,7 @@ export function SupportWidget() {
           {/* Panel body */}
           <div className="min-h-0 flex-1 overflow-hidden">
             {view === "list" && (
-              <div className="flex h-full flex-col">
+              <div className="flex h-full flex-col animate-in fade-in duration-200">
                 <div className="min-h-0 flex-1 overflow-y-auto p-3">
                   {tickets === null ? (
                     <p className="py-10 text-center text-sm text-muted-foreground">Loading…</p>
@@ -285,7 +285,7 @@ export function SupportWidget() {
             )}
 
             {view === "conversation" && (
-              <div className="h-full">
+              <div className="h-full animate-in fade-in slide-in-from-right-2 duration-200">
                 {loadingConvo || !active ? (
                   <p className="py-10 text-center text-sm text-muted-foreground">Loading…</p>
                 ) : (
@@ -295,7 +295,7 @@ export function SupportWidget() {
             )}
 
             {view === "new" && (
-              <form onSubmit={submitNew} className="flex h-full flex-col">
+              <form onSubmit={submitNew} className="flex h-full flex-col animate-in fade-in slide-in-from-right-2 duration-200">
                 <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
                   <label className="block space-y-1.5">
                     <span className="text-xs font-medium text-muted-foreground">Category</span>
