@@ -115,22 +115,25 @@ function NavLink({
   );
 }
 
-/** A collapsible group of nav links. Auto-expands if it holds the active route. */
+/** A collapsible group of nav links (controlled — the parent runs the accordion). */
 function NavGroup({
   label,
   items,
   pathname,
+  open,
+  onToggle,
 }: {
   label: string;
   items: NavItem[];
   pathname: string;
+  open: boolean;
+  onToggle: () => void;
 }) {
-  const [open, setOpen] = useState(true);
   return (
     <div>
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={onToggle}
         aria-expanded={open}
         className="flex w-full items-center justify-between rounded-lg px-3 py-1.5 text-[11px] font-semibold tracking-wide text-muted-foreground/70 uppercase transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
       >
@@ -151,18 +154,34 @@ function NavGroup({
   );
 }
 
-/** Persistent left sidebar — desktop only (md+). */
+/** Index of the group that holds the active route, or -1. */
+function activeGroupIndex(pathname: string): number {
+  return NAV_GROUPS.findIndex((g) => g.items.some((it) => isActive(pathname, it.href)));
+}
+
+/** Persistent left sidebar — desktop only (md+). Groups behave like an accordion:
+ *  only one is open at a time, and the one holding the current page opens itself. */
 export function SidebarNav() {
   const pathname = usePathname();
+  const activeIdx = activeGroupIndex(pathname);
+  const [openIdx, setOpenIdx] = useState<number | null>(activeIdx >= 0 ? activeIdx : 0);
+
+  // Follow navigation: when the active page moves to another group, open it.
+  useEffect(() => {
+    if (activeIdx >= 0) setOpenIdx(activeIdx);
+  }, [activeIdx]);
+
   return (
     <nav className="flex flex-col gap-3 p-3">
       <SidebarAddLeadButton />
-      {NAV_GROUPS.map((g) => (
+      {NAV_GROUPS.map((g, i) => (
         <NavGroup
           key={g.label}
           label={g.label}
           items={g.items}
           pathname={pathname}
+          open={openIdx === i}
+          onToggle={() => setOpenIdx((cur) => (cur === i ? null : i))}
         />
       ))}
     </nav>

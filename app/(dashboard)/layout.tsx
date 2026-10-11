@@ -56,7 +56,7 @@ export default async function DashboardLayout({
     <div className="flex h-dvh flex-col overflow-hidden bg-background md:flex-row">
       {/* Desktop sidebar */}
       <aside className="hidden w-60 shrink-0 flex-col overflow-y-auto border-r border-sidebar-border bg-sidebar md:flex">
-        <div className="border-b border-sidebar-border p-4">
+        <div className="flex h-16 shrink-0 items-center border-b border-sidebar-border px-4">
           <Logo name={appName} />
         </div>
         <SidebarNav />
@@ -66,7 +66,7 @@ export default async function DashboardLayout({
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {/* Top app bar */}
         <header className="shrink-0 border-b bg-card/70 shadow-[0_1px_2px_-1px_oklch(0.51_0.24_277_/_0.12)] backdrop-blur-md">
-          <div className="flex items-center gap-2 px-4 py-2.5 md:gap-3 md:px-6">
+          <div className="flex h-16 items-center gap-2 px-4 md:gap-3 md:px-6">
             <MobileNav name={appName} />
             <div className="md:hidden">
               <Logo showName={false} name={appName} />

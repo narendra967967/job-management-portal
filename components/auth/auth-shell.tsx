@@ -47,19 +47,14 @@ export async function AuthShell({
           className="pointer-events-none absolute -bottom-28 -left-10 size-96 rounded-full bg-black/10 blur-3xl"
         />
 
-        <div className="relative flex items-center gap-2.5">
+        <div className="relative flex items-center gap-2">
           <Logo showName={false} name={appName} />
-          <div className="min-w-0">
-            <p className="text-sm font-semibold tracking-tight">{appName}</p>
-            {showTagline && (
-              <p className="text-xs text-primary-foreground/70">{tagline.text}</p>
-            )}
-          </div>
+          <span className="text-sm font-semibold tracking-tight">{appName}</span>
         </div>
 
         <div className="relative">
           <h2 className="max-w-sm text-3xl leading-tight font-semibold tracking-tight">
-            Your job search, organized end to end.
+            {showTagline ? tagline.text : "Your job search, organized end to end."}
           </h2>
           <ul className="mt-8 space-y-5">
             {HIGHLIGHTS.map(({ icon: Icon, title: t, body }) => (
