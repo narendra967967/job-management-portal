@@ -41,9 +41,11 @@ config/infra only: DNS → TLS → `BETTER_AUTH_URL` → Nginx → Google OAuth 
 3. **Changing `BETTER_AUTH_URL` logs everyone out** — cookies are host-scoped, so a new host
    invalidates existing sessions. Expected; users just sign in again.
 
-4. **Update env in BOTH places.** The box `/home/ubuntu/job-management-portal/.env` *and* the
-   SSM / GitHub preprod env. The box `.env` is what runs now; SSM/GitHub is what the next CI
-   deploy uses — miss it and the deploy reverts your change.
+4. **App env lives only in the box `.env`.** The CI deploy (`deploy/preprod-remote.sh`) runs the
+   app with `--env-file "$APP_DIR/.env"` and does **not** regenerate `.env` from SSM/GitHub — so
+   your edits persist and the next `push to preprod` picks them up automatically (it re-runs the
+   container from this same file). GitHub/SSM in this pipeline are only for AWS OIDC auth, running
+   the remote deploy via `aws ssm send-command`, and ECR — not app env.
 
 5. **Google `gmail.readonly` is a restricted scope.** Keep the OAuth consent screen in
    **Testing** and add each connecting account as a **test user** (≤100) — no Google
@@ -73,7 +75,8 @@ For a host `<H>` (e.g. `preprod.jobtiva.in`, or `jobtiva.in` for prod):
 1. **DNS** — at the registrar, add `A  <H> → <EC2 Elastic IP>` (TTL 300). Verify:
    `nslookup <H>` returns the IP (or watch dnschecker.org). Wait until it resolves before step 2.
 2. **TLS** — on the box: `sudo certbot certonly --nginx -d <H>` → cert at `/etc/letsencrypt/live/<H>/`.
-3. **Env** — on the box, set `BETTER_AUTH_URL=https://<H>` (UNQUOTED) in `.env`; also set it in SSM/GitHub.
+3. **Env** — on the box, set `BETTER_AUTH_URL=https://<H>` (UNQUOTED) in `.env`. That's the only
+   place app env lives; CI reuses this file, so there's nothing else to update.
 4. **Nginx** — app server block on `<H>` + a 301 from the old host (template below); `sudo nginx -t && sudo systemctl reload nginx`.
 5. **Recreate the container** (see gotcha #2) and confirm `printenv BETTER_AUTH_URL`.
 6. **Google OAuth** — on the client in `.env`, add JS origin `https://<H>` and redirect URI `https://<H>/api/auth/callback/google`; consent-screen authorized domain `jobtiva.in`; add test users.
