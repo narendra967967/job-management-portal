@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { SiteHeader } from "@/components/marketing/site-header";
 import { SiteFooter } from "@/components/marketing/site-footer";
+import { Faq } from "@/components/marketing/faq";
 import { getAppName, getTagline, getSignupAllowed, getSupportEmail } from "@/lib/branding";
 import { getSessionUserId } from "@/lib/current-user";
 
@@ -57,6 +58,33 @@ export default async function LandingPage() {
     getSessionUserId(),
   ]);
   const loggedIn = !!sessionId;
+
+  const FAQ_ITEMS = [
+    {
+      q: `Will ${appName} apply to jobs for me?`,
+      a: `No — and that's on purpose. ${appName} helps you find the right roles, research them, and draft strong applications with AI, but you always review and apply yourself. You stay in control of exactly where you apply.`,
+    },
+    {
+      q: "How do job leads get in?",
+      a: "Connect the account where your job alerts arrive and they flow in as tracked leads automatically — no copy-paste. More sources are on the roadmap.",
+    },
+    {
+      q: "Is my data private?",
+      a: "Yes. Any account you connect is strictly read-only, your data stays yours, and nothing leaves without you. You can disconnect any time from Settings.",
+    },
+    {
+      q: "What does the AI actually do?",
+      a: "It summarizes each role, scores how well it fits you, and drafts tailored applications and outreach — so you spend time on the right roles and apply better. It never sends or applies on your behalf.",
+    },
+    {
+      q: `Who is ${appName} for?`,
+      a: "Anyone running a focused job search who'd rather apply well to the right handful of roles than blast a thousand — especially busy, mid-career professionals.",
+    },
+    {
+      q: "Is there a free plan?",
+      a: "Yes — new accounts start on the Free plan. Paid plans add higher limits and extra automation as your search scales.",
+    },
+  ];
 
   const PrimaryCta = () =>
     loggedIn ? (
@@ -258,6 +286,17 @@ export default async function LandingPage() {
                 ))}
               </div>
             </div>
+          </div>
+        </section>
+
+        {/* FAQ */}
+        <section id="faq" className="scroll-mt-20 border-t">
+          <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:py-24">
+            <h2 className="text-center text-3xl font-semibold tracking-tight sm:text-4xl">Frequently asked questions</h2>
+            <p className="mx-auto mt-4 max-w-xl text-center text-base text-muted-foreground">
+              The short version: you stay in control, and your data stays yours.
+            </p>
+            <Faq items={FAQ_ITEMS} />
           </div>
         </section>
 
