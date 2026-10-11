@@ -23,6 +23,8 @@ import {
   Bell,
   ScrollText,
   Download,
+  Crown,
+  ArrowUpRight,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -72,6 +74,8 @@ import {
 } from "@/lib/ai-prompts";
 import { signOutToHome, connectGoogle, changePassword } from "@/lib/auth-client";
 import { previewPromptAction } from "@/actions/ai";
+import { getMyPlanAction, type MyPlanDetails } from "@/actions/plan";
+import { planGradientClass } from "@/lib/plan-accent";
 import { PasswordInput } from "@/components/ui/password-input";
 import { PasswordStrength } from "@/components/ui/password-strength";
 import { PlanBadge } from "@/components/ui/plan-badge";
@@ -126,6 +130,7 @@ interface SettingsSection {
 
 const SECTION = {
   profile: { id: "profile", label: "Profile", icon: User, render: () => <ProfileCard /> },
+  plan: { id: "plan", label: "Plan", icon: Crown, render: () => <PlanDetailsCard /> },
   google: { id: "google", label: "Gmail connection", icon: Mail, render: () => <GoogleCard /> },
   schedule: { id: "schedule", label: "Sync schedule", icon: RefreshCw, render: () => <SyncScheduleCard /> },
   issues: { id: "issues", label: "Ingestion issues", icon: AlertTriangle, render: () => <IngestionIssuesCard /> },
@@ -141,7 +146,7 @@ const SECTION = {
 // leads: identity first, then the email pipeline that feeds everything, then
 // AI enrichment, then outreach. Account (log out) sits on its own at the end.
 const GROUPS: { label: string; items: SettingsSection[] }[] = [
-  { label: "General", items: [SECTION.profile] },
+  { label: "General", items: [SECTION.profile, SECTION.plan] },
   { label: "Email & sync", items: [SECTION.google, SECTION.schedule, SECTION.issues] },
   { label: "AI", items: [SECTION.ai, SECTION.prompts] },
   { label: "Outreach", items: [SECTION.followups, SECTION.resumes] },
@@ -399,6 +404,133 @@ function ProfileCard() {
 }
 
 /* ---------------- Google connection ---------------- */
+
+function PlanDetailsCard() {
+  const { open: openSupport } = useContactSupport();
+  const [plan, setPlan] = useState<MyPlanDetails | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getMyPlanAction().then((p) => {
+      setPlan(p);
+      setLoading(false);
+    });
+  }, []);
+
+  function requestUpgrade() {
+    openSupport({
+      category: "billing",
+      subject: "Upgrade request",
+      message: `<p>I'd like to upgrade my plan${plan ? ` (currently on ${plan.name})` : ""}. Please help me move to a higher plan.</p>`,
+      source: "plan",
+    });
+  }
+
+  const money = (n: number, cur: string) => `${cur === "USD" ? "$" : "₹"}${n.toLocaleString("en-IN")}`;
+  const daysLeft = plan?.expiresAt
+    ? Math.ceil((new Date(plan.expiresAt).getTime() - Date.now()) / 86400000)
+    : null;
+
+  return (
+    <div className="rounded-2xl border bg-card">
+      <div className="border-b p-4 md:p-5">
+        <h2 className="text-sm font-medium">Your plan</h2>
+        <p className="text-xs text-muted-foreground">Your current plan and what&apos;s included.</p>
+      </div>
+
+      {loading ? (
+        <p className="p-6 text-center text-sm text-muted-foreground">Loading…</p>
+      ) : !plan ? (
+        <div className="p-6 text-center">
+          <p className="text-sm font-medium">No plan assigned</p>
+          <p className="mt-1 text-xs text-muted-foreground">Contact support to get set up on a plan.</p>
+        </div>
+      ) : (
+        <div className="p-4 md:p-5">
+          {/* Coloured plan header */}
+          <div className={cn("rounded-xl bg-gradient-to-br p-4 text-white", planGradientClass(plan.accent))}>
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Crown className="size-5 shrink-0" aria-hidden />
+                <span className="text-lg font-semibold">{plan.name}</span>
+              </div>
+              <div className="text-right">
+                {plan.isFree ? (
+                  <span className="text-lg font-bold">Free</span>
+                ) : plan.monthlyPrice > 0 ? (
+                  <span className="text-lg font-bold">
+                    {money(plan.monthlyPrice, plan.currency)}
+                    <span className="text-xs font-normal opacity-80">/mo</span>
+                  </span>
+                ) : (
+                  <span className="text-lg font-bold">
+                    {money(plan.yearlyPrice, plan.currency)}
+                    <span className="text-xs font-normal opacity-80">/yr</span>
+                  </span>
+                )}
+              </div>
+            </div>
+            <p className="mt-1.5 text-xs text-white/85">
+              {plan.expiresAt ? (
+                <>
+                  Access until{" "}
+                  {new Date(plan.expiresAt).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}
+                  {daysLeft !== null && daysLeft <= 30 && daysLeft >= 0 && <span className="ml-1 opacity-90">· {daysLeft}d left</span>}
+                </>
+              ) : (
+                "No expiry"
+              )}
+            </p>
+          </div>
+
+          {/* Features */}
+          {plan.features.length > 0 && (
+            <ul className="mt-4 space-y-1.5">
+              {plan.features.map((f, i) => (
+                <li key={i} className="flex items-center gap-2 text-sm">
+                  <Check className="size-4 shrink-0 text-primary" aria-hidden />
+                  <span className="min-w-0">{f}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {/* Limits */}
+          <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+            <span>
+              Résumés: <span className="font-medium text-foreground">{plan.limitResumes === null ? "Unlimited" : plan.limitResumes}</span>
+            </span>
+            <span>
+              Custom AI prompts: <span className="font-medium text-foreground">{plan.allowCustomPrompts ? "Yes" : "No"}</span>
+            </span>
+          </div>
+
+          {/* Upgrade — only when a higher-priced active plan exists */}
+          {plan.upgradeAvailable ? (
+            <div className="relative mt-5">
+              <div
+                aria-hidden
+                className="absolute -inset-0.5 animate-pulse rounded-xl bg-gradient-to-r from-primary to-[oklch(0.5_0.2_308)] opacity-60 blur-md"
+              />
+              <button
+                type="button"
+                onClick={requestUpgrade}
+                className="relative flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-[oklch(0.5_0.2_308)] px-5 py-3 text-sm font-semibold text-primary-foreground shadow-lg transition-transform hover:scale-[1.01] active:scale-[0.99]"
+              >
+                <Sparkles className="size-4" aria-hidden /> Upgrade your plan
+                <ArrowUpRight className="size-4" aria-hidden />
+              </button>
+            </div>
+          ) : (
+            <p className="mt-5 flex items-center justify-center gap-1.5 rounded-xl bg-muted/50 px-4 py-3 text-sm text-muted-foreground">
+              <Check className="size-4 text-primary" aria-hidden /> You&apos;re on the top plan.
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function GoogleCard() {
   const google = useGoogle();

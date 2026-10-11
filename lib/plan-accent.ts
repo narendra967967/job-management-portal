@@ -18,3 +18,20 @@ export const PLAN_ACCENT_BADGE: Record<string, string> = {
 export function planBadgeClass(accent: string | null | undefined): string {
   return (accent && PLAN_ACCENT_BADGE[accent]) || PLAN_ACCENT_BADGE.indigo;
 }
+
+// Header gradient per accent (mirrors the admin plan card). Literal so Tailwind keeps them.
+export const PLAN_ACCENT_GRADIENT: Record<string, string> = {
+  indigo: "from-indigo-600 to-indigo-700",
+  violet: "from-violet-600 to-violet-700",
+  blue: "from-blue-600 to-blue-700",
+  teal: "from-teal-600 to-teal-700",
+  emerald: "from-emerald-600 to-emerald-700",
+  amber: "from-amber-600 to-amber-700",
+  rose: "from-rose-600 to-rose-700",
+  fuchsia: "from-fuchsia-600 to-fuchsia-700",
+};
+
+/** Gradient classes for a plan accent key; falls back to indigo. */
+export function planGradientClass(accent: string | null | undefined): string {
+  return (accent && PLAN_ACCENT_GRADIENT[accent]) || PLAN_ACCENT_GRADIENT.indigo;
+}
