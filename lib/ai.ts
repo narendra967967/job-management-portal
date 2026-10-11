@@ -82,7 +82,7 @@ async function callOpenRouter(
       "content-type": "application/json",
       authorization: `Bearer ${ai.key}`,
       "HTTP-Referer": "https://github.com/job-management-portal",
-      "X-Title": "Job Management Portal",
+      "X-Title": "Jobtiva",
     },
     body: JSON.stringify({
       model: ai.model,
@@ -176,7 +176,7 @@ async function callOpenAIVision(
       ...(base.includes("openrouter")
         ? {
             "HTTP-Referer": "https://github.com/job-management-portal",
-            "X-Title": "Job Management Portal",
+            "X-Title": "Jobtiva",
           }
         : {}),
     },

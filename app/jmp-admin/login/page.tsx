@@ -55,7 +55,7 @@ export default function AdminLoginPage() {
             className="size-12 rounded-full object-cover shadow-lg"
           />
           <div>
-            <h1 className="text-xl font-semibold text-white">JMP Admin</h1>
+            <h1 className="text-xl font-semibold text-white">Jobtiva Admin</h1>
             <p className="text-sm text-slate-400">Sign in to the control panel</p>
           </div>
         </div>

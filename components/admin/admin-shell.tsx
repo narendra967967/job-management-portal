@@ -99,7 +99,7 @@ function Brand() {
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src="/api/branding/logo" alt="Logo" width={32} height={32} className="size-8 shrink-0 rounded-full object-cover" />
       <div className="leading-tight">
-        <p className="text-sm font-semibold text-white">JMP Admin</p>
+        <p className="text-sm font-semibold text-white">Jobtiva Admin</p>
         <p className="text-[10px] text-slate-400">Control panel</p>
       </div>
     </div>

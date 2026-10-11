@@ -812,7 +812,7 @@ function DraftOutreachDialog({
               />
               <p className="mt-2 flex items-start gap-1.5 text-xs text-ai">
                 <Sparkles className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-                JMP never sends for you — copy the final text, send it yourself,
+                Jobtiva never sends for you — copy the final text, send it yourself,
                 then mark it sent to start the follow-up clock.
               </p>
             </div>

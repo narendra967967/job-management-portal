@@ -8,7 +8,7 @@ import { cache } from "react";
 import { db } from "@/lib/db";
 import { appSettings, appAssets } from "@/db/schema";
 
-export const DEFAULT_APP_NAME = "Job Management Portal";
+export const DEFAULT_APP_NAME = "Jobtiva";
 
 /** The configured app name (falls back to the default). */
 export const getAppName = cache(async (): Promise<string> => {

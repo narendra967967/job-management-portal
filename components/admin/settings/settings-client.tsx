@@ -581,7 +581,7 @@ function BillingCard({ initial }: { initial: AdminSettings["billing"] }) {
           <Field label="Company name" hint="Shown on invoices">
             <Input value={companyName} onChange={(e) => setCompanyName(e.target.value)} />
           </Field>
-          <Field label="Invoice number prefix" hint="e.g. JMP-0001">
+          <Field label="Invoice number prefix" hint="e.g. JOB-0001">
             <Input value={invoicePrefix} onChange={(e) => setInvoicePrefix(e.target.value)} />
           </Field>
         </div>
@@ -674,7 +674,7 @@ function EmailCard({ initial }: { initial: AdminSettings["smtp"] }) {
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="From name" hint="Sender name recipients see">
-            <Input value={fromName} onChange={(e) => setFromName(e.target.value)} placeholder="JMP" />
+            <Input value={fromName} onChange={(e) => setFromName(e.target.value)} placeholder="Jobtiva" />
           </Field>
           <Field label="From email" hint="Address emails are sent from">
             <Input type="email" value={fromEmail} onChange={(e) => setFromEmail(e.target.value)} placeholder="noreply@example.com" />

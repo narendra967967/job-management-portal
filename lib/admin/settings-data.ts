@@ -98,7 +98,7 @@ export async function loadAdminSettings(adminId: string): Promise<AdminSettings>
     profile: { name: u[0]?.name ?? "", email: u[0]?.email ?? "", mobile: u[0]?.mobile ?? "" },
     branding,
     general: {
-      appName: g?.appName ?? "Job Management Portal",
+      appName: g?.appName ?? "Jobtiva",
       supportEmail: g?.supportEmail ?? "",
       allowSignup: g?.allowSignup ?? false,
       maintenance: g?.maintenance ?? false,
@@ -134,7 +134,7 @@ export async function loadAdminSettings(adminId: string): Promise<AdminSettings>
       pricesIncludeTax: b?.pricesIncludeTax ?? false,
       companyName: b?.companyName ?? "",
       companyAddress: b?.companyAddress ?? "",
-      invoicePrefix: b?.invoicePrefix ?? "JMP-",
+      invoicePrefix: b?.invoicePrefix ?? "JOB-",
     },
     ai: {
       adminProvider: a?.adminProvider ?? "openai",

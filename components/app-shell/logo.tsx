@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
  *  Next's image-optimizer cache in the way. */
 export function Logo({
   showName = true,
-  name = "Job Management Portal",
+  name = "Jobtiva",
   className,
 }: {
   showName?: boolean;

@@ -1,4 +1,4 @@
-// Domain types for JMP. These describe the shape of the data the Phase 1 UI
+// Domain types for Jobtiva. These describe the shape of the data the Phase 1 UI
 // renders against mock data; the Drizzle schema in Phase 2 is written to match
 // what these reveal the UI actually needs.
 

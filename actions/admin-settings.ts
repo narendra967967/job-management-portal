@@ -247,7 +247,7 @@ export async function updateBillingAction(input: unknown): Promise<Result> {
     pricesIncludeTax: v.pricesIncludeTax,
     companyName: v.companyName || null,
     companyAddress: v.companyAddress || null,
-    invoicePrefix: v.invoicePrefix || "JMP-",
+    invoicePrefix: v.invoicePrefix || "JOB-",
   };
   if (v.keySecret) data.keySecretCiphertext = encryptSecret(v.keySecret);
   await db.insert(billingConfig).values({ id: "app", ...data }).onConflictDoUpdate({ target: billingConfig.id, set: data });

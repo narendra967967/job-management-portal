@@ -1,6 +1,6 @@
 import "server-only";
 
-// The single entry point for all JMP email — user side and admin side alike.
+// The single entry point for all Jobtiva email — user side and admin side alike.
 // Wraps the low-level SMTP sender (lib/mailer) in a consistent, branded template
 // so every message looks the same and automatically carries the app name + a
 // plain-text fallback. Use sendAppEmail() everywhere; reach for sendMail()
@@ -115,7 +115,7 @@ export async function renderAppEmail(opts: AppEmailOptions): Promise<{ html: str
 }
 
 /**
- * Send a branded JMP email. Resolves the app name + support email for the
+ * Send a branded Jobtiva email. Resolves the app name + support email for the
  * template, builds the HTML + a plain-text fallback, and sends via the global
  * SMTP config. Throws SMTP_NOT_CONFIGURED when SMTP isn't set up (callers decide
  * whether that's fatal).

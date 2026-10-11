@@ -482,7 +482,7 @@ function GoogleCard() {
         <div>
           <h2 className="text-sm font-medium">Google connection</h2>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Connect Gmail so JMP can read your LinkedIn job-alert emails.
+            Connect Gmail so Jobtiva can read your LinkedIn job-alert emails.
           </p>
         </div>
         <span
@@ -500,7 +500,7 @@ function GoogleCard() {
         <ShieldCheck className="mt-0.5 size-4 shrink-0 text-ai" aria-hidden />
         <p className="text-xs text-ai">
           Read-only access (<code className="text-[11px]">gmail.readonly</code>).
-          JMP can never send, delete, or modify anything in your mailbox.
+          Jobtiva can never send, delete, or modify anything in your mailbox.
         </p>
       </div>
 
@@ -549,7 +549,7 @@ function GoogleCard() {
           </Button>
           <p className="mt-2 text-[11px] text-muted-foreground">
             {google.configured
-              ? "Grants read-only Gmail access so JMP can fetch your LinkedIn job alerts."
+              ? "Grants read-only Gmail access so Jobtiva can fetch your LinkedIn job alerts."
               : "Gmail connection isn’t available yet — an administrator needs to configure Google access for this workspace."}
           </p>
         </div>
@@ -562,7 +562,7 @@ function GoogleCard() {
           Which emails to read
         </h3>
         <p className="mt-0.5 text-xs text-muted-foreground">
-          JMP only reads messages matching these rules. Tip: open a real
+          Jobtiva only reads messages matching these rules. Tip: open a real
           LinkedIn alert in Gmail and copy its “From” address to be sure.
         </p>
 
@@ -633,7 +633,7 @@ function GoogleCard() {
               {query}
             </p>
             <p className="mt-1 text-[11px] text-muted-foreground">
-              The first sync backfills this window; after that JMP fetches only
+              The first sync backfills this window; after that Jobtiva fetches only
               new mail and skips jobs already saved (deduped by LinkedIn job
               ID), so nothing is imported twice.
             </p>
@@ -677,7 +677,7 @@ function SyncScheduleCard() {
     <section className="rounded-2xl border bg-card p-4 md:p-5">
       <h2 className="text-sm font-medium">Sync schedule</h2>
       <p className="mt-0.5 text-xs text-muted-foreground">
-        How often JMP checks Gmail for new LinkedIn alerts.
+        How often Jobtiva checks Gmail for new LinkedIn alerts.
       </p>
 
       <div className="mt-4">

@@ -129,7 +129,7 @@ async function main() {
   console.log(`Seeding admin ${ADMIN_ID} (${ADMIN_EMAIL})…`);
   await db.insert(schema.user).values({
     id: ADMIN_ID,
-    name: "JMP Admin",
+    name: "Jobtiva Admin",
     email: ADMIN_EMAIL,
     emailVerified: true,
     role: "admin",
