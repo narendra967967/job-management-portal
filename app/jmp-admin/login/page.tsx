@@ -43,17 +43,24 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <div className="flex min-h-dvh items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4">
-      <div className="w-full max-w-sm">
+    <div className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4">
+      {/* Soft brand glow for depth on the dark panel. */}
+      <div aria-hidden className="pointer-events-none absolute -top-32 left-1/2 size-[32rem] -translate-x-1/2 rounded-full bg-primary/20 blur-3xl" />
+      <div aria-hidden className="pointer-events-none absolute -bottom-40 -right-24 size-96 rounded-full bg-[oklch(0.5_0.2_308_/_0.18)] blur-3xl" />
+      <div className="relative w-full max-w-sm">
         <div className="mb-6 flex flex-col items-center gap-3 text-center">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/api/branding/logo"
-            alt="Logo"
-            width={48}
-            height={48}
-            className="size-12 rounded-full object-cover shadow-lg"
-          />
+          {/* The mark is a gradient-on-transparent logo — seat it on a light tile
+              (and contain, not crop) so it reads on the dark control panel. */}
+          <span className="flex size-14 items-center justify-center rounded-2xl bg-white shadow-lg shadow-black/40 ring-1 ring-white/20">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/api/branding/logo"
+              alt="Jobtiva"
+              width={40}
+              height={40}
+              className="size-10 object-contain"
+            />
+          </span>
           <div>
             <h1 className="text-xl font-semibold text-white">Jobtiva Admin</h1>
             <p className="text-sm text-slate-400">Sign in to the control panel</p>
