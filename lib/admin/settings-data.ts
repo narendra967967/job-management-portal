@@ -19,7 +19,7 @@ import { getBranding } from "@/lib/branding";
 
 export interface AdminSettings {
   profile: { name: string; email: string; mobile: string };
-  general: { appName: string; supportEmail: string; allowSignup: boolean; maintenance: boolean };
+  general: { appName: string; tagline: string; showTagline: boolean; supportEmail: string; allowSignup: boolean; maintenance: boolean };
   branding: { hasLogo: boolean; logoVersion: number; hasFavicon: boolean; faviconVersion: number };
   security: {
     pwMinLength: number;
@@ -99,6 +99,8 @@ export async function loadAdminSettings(adminId: string): Promise<AdminSettings>
     branding,
     general: {
       appName: g?.appName ?? "Jobtiva",
+      tagline: g?.tagline ?? "",
+      showTagline: g?.showTagline ?? false,
       supportEmail: g?.supportEmail ?? "",
       allowSignup: g?.allowSignup ?? false,
       maintenance: g?.maintenance ?? false,

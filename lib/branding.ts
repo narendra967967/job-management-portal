@@ -22,6 +22,27 @@ export const getAppName = cache(async (): Promise<string> => {
   }
 });
 
+export interface TaglineState {
+  /** The tagline text (trimmed), or "" when none is set. */
+  text: string;
+  /** Whether the admin enabled showing it. */
+  show: boolean;
+}
+
+/** The configured tagline + whether it should be shown. Use `show && text` to gate. */
+export const getTagline = cache(async (): Promise<TaglineState> => {
+  try {
+    const [s] = await db
+      .select({ tagline: appSettings.tagline, showTagline: appSettings.showTagline })
+      .from(appSettings)
+      .limit(1);
+    return { text: s?.tagline?.trim() || "", show: !!s?.showTagline };
+  } catch {
+    // DB unavailable (e.g. during `next build`) — no tagline.
+    return { text: "", show: false };
+  }
+});
+
 /** The configured support email, or "" when none is set. */
 export const getSupportEmail = cache(async (): Promise<string> => {
   try {

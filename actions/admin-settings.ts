@@ -91,6 +91,8 @@ export async function updateGeneralAction(input: unknown): Promise<Result> {
   const p = z
     .object({
       appName: z.string().trim().min(1, "App name is required.").max(120),
+      tagline: z.string().trim().max(160, "Keep the tagline under 160 characters."),
+      showTagline: z.boolean(),
       supportEmail: z.string().trim().refine((v) => v === "" || EMAIL_RE.test(v), "Enter a valid support email."),
       allowSignup: z.boolean(),
       maintenance: z.boolean(),
@@ -100,13 +102,16 @@ export async function updateGeneralAction(input: unknown): Promise<Result> {
   const v = p.data;
   const data = {
     appName: v.appName,
+    tagline: v.tagline || null,
+    showTagline: v.showTagline,
     supportEmail: v.supportEmail || null,
     allowSignup: v.allowSignup,
     maintenance: v.maintenance,
   };
   await db.insert(appSettings).values({ id: "app", ...data }).onConflictDoUpdate({ target: appSettings.id, set: data });
   revalidate();
-  // App name drives the site-wide <title>, so refresh the whole app layout too.
+  // App name + tagline drive the site-wide <title> and brand surfaces, so refresh
+  // the whole app layout too.
   revalidatePath("/", "layout");
   return { ok: true };
 }

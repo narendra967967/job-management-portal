@@ -174,9 +174,9 @@ function useSaver() {
   return { busy, saved, error, setError, save };
 }
 
-function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+function Field({ label, hint, children, className }: { label: string; hint?: string; children: React.ReactNode; className?: string }) {
   return (
-    <label className="block space-y-1.5">
+    <label className={cn("block space-y-1.5", className)}>
       <Label className="text-xs text-muted-foreground">{label}</Label>
       {children}
       {hint && <span className="block text-[11px] text-muted-foreground">{hint}</span>}
@@ -339,6 +339,8 @@ function PasswordCard() {
 
 function GeneralCard({ initial, branding }: { initial: AdminSettings["general"]; branding: AdminSettings["branding"] }) {
   const [appName, setAppName] = useState(initial.appName);
+  const [tagline, setTagline] = useState(initial.tagline);
+  const [showTagline, setShowTagline] = useState(initial.showTagline);
   const [supportEmail, setSupportEmail] = useState(initial.supportEmail);
   const [allowSignup, setAllowSignup] = useState(initial.allowSignup);
   const [maintenance, setMaintenance] = useState(initial.maintenance);
@@ -353,12 +355,16 @@ function GeneralCard({ initial, branding }: { initial: AdminSettings["general"];
         <Field label="Support email" hint="Where user queries are directed">
           <Input type="email" value={supportEmail} onChange={(e) => setSupportEmail(e.target.value)} placeholder="support@example.com" />
         </Field>
+        <Field label="Tagline" hint="A short line shown under your app name on the sign-in screen and browser tab" className="sm:col-span-2">
+          <Input value={tagline} onChange={(e) => setTagline(e.target.value)} maxLength={160} placeholder="e.g. Your job search, organized end to end." />
+        </Field>
       </div>
       <div className="mt-4 space-y-3">
+        <Toggle checked={showTagline} onChange={setShowTagline} label="Show tagline" hint="Display the tagline on the sign-in screen and in the browser tab" />
         <Toggle checked={allowSignup} onChange={setAllowSignup} label="Allow self sign-up" hint="Off = new users are added by an admin only" />
         <Toggle checked={maintenance} onChange={setMaintenance} label="Maintenance mode" hint="Temporarily blocks user access to the app" />
       </div>
-      <SaveRow busy={sv.busy} saved={sv.saved} error={sv.error} onSave={() => sv.save(() => updateGeneralAction({ appName, supportEmail, allowSignup, maintenance }))} />
+      <SaveRow busy={sv.busy} saved={sv.saved} error={sv.error} onSave={() => sv.save(() => updateGeneralAction({ appName, tagline, showTagline, supportEmail, allowSignup, maintenance }))} />
 
       <SubHead>Branding</SubHead>
       <div className="grid gap-3 sm:grid-cols-2">

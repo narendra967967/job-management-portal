@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { getAppName, getBranding } from "@/lib/branding";
+import { getAppName, getBranding, getTagline } from "@/lib/branding";
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
@@ -12,9 +12,9 @@ const geistMono = Geist_Mono({
 // Title + favicon are admin-controlled (Settings → General → Branding), so the
 // whole site reflects changes without a code deploy.
 export async function generateMetadata(): Promise<Metadata> {
-  const [appName, branding] = await Promise.all([getAppName(), getBranding()]);
+  const [appName, tagline, branding] = await Promise.all([getAppName(), getTagline(), getBranding()]);
   return {
-    title: appName,
+    title: tagline.show && tagline.text ? `${appName} — ${tagline.text}` : appName,
     description:
       "Capture LinkedIn job-alert leads and manage AI-assisted outreach in one place.",
     icons: branding.hasFavicon

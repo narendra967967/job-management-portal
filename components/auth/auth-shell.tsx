@@ -1,7 +1,7 @@
 import { Sparkles, Gauge, Send } from "lucide-react";
 import { Logo } from "@/components/app-shell/logo";
 import { BrandDoodles } from "@/components/auth/brand-doodles";
-import { getAppName } from "@/lib/branding";
+import { getAppName, getTagline } from "@/lib/branding";
 
 const HIGHLIGHTS = [
   {
@@ -31,7 +31,8 @@ export async function AuthShell({
   subtitle: string;
   children: React.ReactNode;
 }) {
-  const appName = await getAppName();
+  const [appName, tagline] = await Promise.all([getAppName(), getTagline()]);
+  const showTagline = tagline.show && !!tagline.text;
   return (
     <main className="min-h-dvh lg:grid lg:grid-cols-2">
       {/* Brand panel — desktop only */}
@@ -46,9 +47,14 @@ export async function AuthShell({
           className="pointer-events-none absolute -bottom-28 -left-10 size-96 rounded-full bg-black/10 blur-3xl"
         />
 
-        <div className="relative flex items-center gap-2">
+        <div className="relative flex items-center gap-2.5">
           <Logo showName={false} name={appName} />
-          <span className="text-sm font-semibold tracking-tight">{appName}</span>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold tracking-tight">{appName}</p>
+            {showTagline && (
+              <p className="text-xs text-primary-foreground/70">{tagline.text}</p>
+            )}
+          </div>
         </div>
 
         <div className="relative">
@@ -78,8 +84,11 @@ export async function AuthShell({
       {/* Form panel */}
       <div className="flex min-h-dvh flex-col items-center justify-center px-6 py-12">
         <div className="w-full max-w-sm">
-          <div className="flex flex-col items-center text-center lg:hidden">
+          <div className="flex flex-col items-center gap-1 text-center lg:hidden">
             <Logo showName={false} name={appName} className="scale-110" />
+            {showTagline && (
+              <p className="mt-1 text-xs text-muted-foreground">{tagline.text}</p>
+            )}
           </div>
           <div className="mt-6 lg:mt-0">
             <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>

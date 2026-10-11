@@ -487,6 +487,9 @@ export const appAssets = pgTable("app_assets", {
 export const appSettings = pgTable("app_settings", {
   id: text("id").primaryKey().default("app"),
   appName: text("app_name").notNull().default("Jobtiva"),
+  // Optional short tagline shown under the app name on brand surfaces; gated by showTagline.
+  tagline: text("tagline"),
+  showTagline: boolean("show_tagline").notNull().default(false),
   supportEmail: text("support_email"),
   allowSignup: boolean("allow_signup").notNull().default(false),
   maintenance: boolean("maintenance").notNull().default(false),
