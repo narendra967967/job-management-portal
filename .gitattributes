@@ -1,0 +1,5 @@
+# Files that run on Linux must keep LF endings even on a Windows checkout
+# (core.autocrlf=true would otherwise turn them into CRLF and break bash/cron/nginx).
+*.sh            text eol=lf
+deploy/vps/**   text eol=lf
+Dockerfile      text eol=lf
