@@ -1,6 +1,8 @@
 # VPS runbook (preprod + prod)
 
-Both environments run on **one OVHcloud VPS-1 in Mumbai** (2 vCores · 4 GB RAM · 40 GB disk, Ubuntu 24.04).
+Both environments run on **one OVHcloud VPS-1 in Singapore** (2 vCores · 4 GB RAM · 40 GB disk, Ubuntu 24.04).
+Mumbai was out of stock at order time; Singapore adds ~30–80 ms from India, which is fine for this app.
+The same box also serves the static portfolio site **narendragupta.in** (see "Other sites on this server").
 No AWS, no container registry: CI builds the image and ships it over SSH.
 This replaces the AWS setup (EC2 + RDS + S3 + ECR). For DNS/OAuth details see `DOMAIN.md`; its
 cutover template still applies.
@@ -13,6 +15,9 @@ Internet ─► Nginx (host, :80/:443, Certbot TLS)
                                             DBs: jmp_prod / jmp_preprod, one role each
 Docker volumes: pgdata · uploads-prod · uploads-preprod (résumés, at /data/uploads)
 cron (deploy user): Gmail sync every 15 min · lead purge nightly · backup 03:00 IST
+
+Also on this box (unrelated to Jobtiva):
+  narendragupta.in, www ─► static files in /srv/portfolio/current (user `portfolio`)
 ```
 
 Everything Docker publishes is bound to `127.0.0.1`. That matters because Docker-published
@@ -43,7 +48,7 @@ Throughout this runbook, **"as `root`"** means `ssh ubuntu@<IP>` then `sudo -i`,
 
 ### Ordering on OVHcloud
 
-- **Location:** Asia-Pacific → **Mumbai**.
+- **Location:** Asia/Oceania → **Singapore** (Mumbai was out of stock). **Commitment:** 12 months (−10%; auto-renews — turn that off in the Control Panel if you plan to move).
 - **Image:** **Ubuntu 24.04** (plain OS, no preinstalled app).
 - **SSH key:** add your laptop's **public** key (`~/.ssh/id_ed25519.pub`; create one with
   `ssh-keygen -t ed25519` if you have none). If you skip this, OVH emails a password instead.
@@ -58,7 +63,7 @@ What OVH gives you:
   and isn't application-consistent. Check it's active under the VPS's **Backup** tab.
 - **KVM console + rescue mode** (VPS page in the Control Panel). This is how you get back in if an
   SSH or ufw change locks you out.
-- **Traffic quota:** in Mumbai, 500 GB/month, after which the speed drops to 10 Mbps. This app
+- **Traffic quota:** in Asia-Pacific (Singapore), 500 GB/month, after which the speed drops to 10 Mbps. This app
   uses a tiny fraction of that. The nightly Google Drive upload counts towards it too.
 - OVH's **Network Firewall** (Control Panel → Network → Public IP addresses): leave it
   **off**. ufw on the box does the job. That firewall is stateless, so turning it on without an
@@ -401,14 +406,37 @@ entire VPS to the last 24 h: Control Panel → VPS → **Backup** → Restore. T
   
   If disk gets tight, cut local backup retention in `backup.sh` before anything else (Drive still
   keeps 30 days).
-- **Traffic:** 500 GB/month in Mumbai, then the speed drops to 10 Mbps. The Control Panel shows
+- **Traffic:** 500 GB/month in Asia-Pacific, then the speed drops to 10 Mbps. The Control Panel shows
   usage; this app should stay at a few GB a month.
 - **Upgrade path:** OVH lets you resize VPS-1 → VPS-2 (8 GB) in place from the Control Panel
   (short reboot). If you do, raise the `mem_limit`s in `docker-compose.yml`.
 
 ---
 
+## Other sites on this server
+
+**narendragupta.in** (the owner's portfolio) is a static Astro build that Nginx serves directly.
+It uses no containers and no memory budget. Its setup, CI and runbook live in the
+**portfolio-website** repo (`deploy/VPS.md` there).
+
+Kept deliberately apart from Jobtiva:
+
+- its own Linux user, `portfolio`, with no Docker access and no sudo, owning only
+  `/srv/portfolio`;
+- its own CI key;
+- its own Nginx site file and certificate.
+
+A leaked portfolio deploy key therefore can't reach Jobtiva's database or uploads. Don't add the
+`portfolio` user to the docker group, and don't give the portfolio repo the Jobtiva `deploy` key.
+
+---
+
 ## 6. Shut down AWS
+
+> ⚠️ The AWS preprod EC2 **also serves narendragupta.in** (`/var/www/narendragupta.in`). Move the
+> portfolio to the VPS first (portfolio-website repo, `deploy/VPS.md`), or terminating the EC2
+> takes the portfolio offline. Its legacy workflow also uses the `jmp-github-actions` IAM role,
+> so set `PORTFOLIO_TARGET=vps` in that repo before deleting the role.
 
 Do this after prod has run cleanly on the VPS for about a week:
 
