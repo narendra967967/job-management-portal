@@ -34,6 +34,10 @@ yarn-error.log*
 .env*
 # ...but the placeholder example IS committed (real secrets never are)
 !.env*.example
+# VPS app env files are server-only (deploy/vps/app.env.example is the template)
+deploy/vps/env/
+*.env
+!*.env.example
 
 # vercel
 .vercel

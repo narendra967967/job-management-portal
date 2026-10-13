@@ -1,0 +1,13 @@
+# Jobtiva — crontab for the `deploy` user (install with: crontab /srv/jobtiva/crontab.txt).
+# Server clock is UTC. 21:30 UTC = 03:00 IST.
+#
+# Gmail sync gates each user by their own interval + quiet hours, so every 15 min is fine.
+*/15 * * * *  /srv/jobtiva/cron-run.sh prod sync     >> /srv/jobtiva/logs/cron.log 2>&1
+*/15 * * * *  /srv/jobtiva/cron-run.sh preprod sync  >> /srv/jobtiva/logs/cron.log 2>&1
+
+# Stale-lead purge (no-op unless enabled in admin Settings).
+0 21 * * *    /srv/jobtiva/cron-run.sh prod purge    >> /srv/jobtiva/logs/cron.log 2>&1
+10 21 * * *   /srv/jobtiva/cron-run.sh preprod purge >> /srv/jobtiva/logs/cron.log 2>&1
+
+# Nightly backup → local + Google Drive.
+30 21 * * *   /srv/jobtiva/backup.sh                 >> /srv/jobtiva/logs/backup.log 2>&1

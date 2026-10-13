@@ -1,0 +1,71 @@
+# Jobtiva on a single VPS — Postgres + the prod and preprod apps.
+# Lives at /srv/jobtiva/docker-compose.yml (shipped by CI on every deploy).
+#
+# Not in git (create on the server — see deploy/VPS.md):
+#   /srv/jobtiva/.env          ← compose vars: DB passwords + which image each app runs
+#   /srv/jobtiva/env/prod.env  ← prod app env      (unquoted KEY=value lines)
+#   /srv/jobtiva/env/preprod.env
+#
+# Nothing here is reachable from the internet directly: the apps bind to
+# 127.0.0.1 behind Nginx, and Postgres binds to 127.0.0.1 (SSH-tunnel only).
+
+name: jobtiva
+
+services:
+  postgres:
+    image: postgres:17-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in /srv/jobtiva/.env}
+      # Read by postgres-init.sh on FIRST start only (empty data volume).
+      PROD_DB_PASSWORD: ${PROD_DB_PASSWORD:?set PROD_DB_PASSWORD}
+      PREPROD_DB_PASSWORD: ${PREPROD_DB_PASSWORD:?set PREPROD_DB_PASSWORD}
+    command: ["postgres", "-c", "shared_buffers=256MB", "-c", "max_connections=60"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres-init.sh:/docker-entrypoint-initdb.d/10-init.sh:ro
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    mem_limit: 768m
+
+  app-prod:
+    image: ${PROD_IMAGE:-jobtiva:none}
+    restart: unless-stopped
+    # Optional to compose so `up -d postgres` works before prod exists;
+    # deploy.sh refuses to deploy an env without its file.
+    env_file:
+      - path: ./env/prod.env
+        required: false
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - uploads-prod:/data/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+    mem_limit: 900m
+
+  app-preprod:
+    image: ${PREPROD_IMAGE:-jobtiva:none}
+    restart: unless-stopped
+    env_file:
+      - path: ./env/preprod.env
+        required: false
+    ports:
+      - "127.0.0.1:3001:3000"
+    volumes:
+      - uploads-preprod:/data/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+    mem_limit: 700m
+
+volumes:
+  pgdata:
+  uploads-prod:
+  uploads-preprod:

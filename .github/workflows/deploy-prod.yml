@@ -1,0 +1,41 @@
+name: Deploy prod (VPS)
+
+# Push to `prod` → waits for approval on the "production" environment
+# (Settings → Environments → production → Required reviewers) → deploys.
+# If preprod already ran this exact commit, its tested image is promoted as-is.
+on:
+  push:
+    branches: [prod]
+  workflow_dispatch:
+
+concurrency:
+  group: vps-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: SSH setup
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/vps_key ~/.ssh/known_hosts
+          printf 'Host vps\n  HostName %s\n  User %s\n  IdentityFile ~/.ssh/vps_key\n  StrictHostKeyChecking yes\n  ServerAliveInterval 30\n' \
+            "$VPS_HOST" "$VPS_USER" > ~/.ssh/config
+
+      - name: Build (if needed), ship and deploy
+        run: bash deploy/vps/ci-ship.sh prod

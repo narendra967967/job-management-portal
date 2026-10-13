@@ -23,6 +23,8 @@ env:
 
 jobs:
   build-and-deploy:
+    # Legacy AWS path — skipped once preprod moves to the VPS (PREPROD_TARGET=vps).
+    if: vars.PREPROD_TARGET != 'vps'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
