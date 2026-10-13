@@ -1,6 +1,6 @@
-# Hostinger VPS runbook (preprod + prod)
+# VPS runbook (preprod + prod)
 
-Both environments run on **one Hostinger KVM 1** (1 vCPU · 4 GB RAM · 50 GB NVMe, Ubuntu 24.04).
+Both environments run on **one OVHcloud VPS-1 in Mumbai** (2 vCores · 4 GB RAM · 40 GB disk, Ubuntu 24.04).
 No AWS, no container registry: CI builds the image and ships it over SSH.
 This replaces the AWS setup (EC2 + RDS + S3 + ECR). For DNS/OAuth details see `DOMAIN.md`; its
 cutover template still applies.
@@ -38,17 +38,45 @@ the env.
 
 ## 1. One-time server setup
 
-In hPanel: pick the **Ubuntu 24.04** image, add your SSH public key, and note the IP.
-If you turn on Hostinger's firewall, open 22, 80 and 443 there as well.
+Throughout this runbook, **"as `root`"** means `ssh ubuntu@<IP>` then `sudo -i`, and
+**"as `deploy`"** means `ssh deploy@<IP>`.
 
-As `root`:
+### Ordering on OVHcloud
+
+- **Location:** Asia-Pacific → **Mumbai**.
+- **Image:** **Ubuntu 24.04** (plain OS, no preinstalled app).
+- **SSH key:** add your laptop's **public** key (`~/.ssh/id_ed25519.pub`; create one with
+  `ssh-keygen -t ed25519` if you have none). If you skip this, OVH emails a password instead.
+  Log in once, change it with `passwd`, and add the key.
+- When the VPS is ready, note its **IPv4** from Control Panel → Bare Metal Cloud → VPS.
+
+What OVH gives you:
+
+- The login user is **`ubuntu`** (with sudo). Root SSH is disabled; get root with `sudo -i`.
+- **Daily automated backup** (the last 24 h, rolling) is included. It's a whole-disk safety net
+  that sits *under* our own `backup.sh`, not a replacement for it: it lives in the same provider
+  and isn't application-consistent. Check it's active under the VPS's **Backup** tab.
+- **KVM console + rescue mode** (VPS page in the Control Panel). This is how you get back in if an
+  SSH or ufw change locks you out.
+- **Traffic quota:** in Mumbai, 500 GB/month, after which the speed drops to 10 Mbps. This app
+  uses a tiny fraction of that. The nightly Google Drive upload counts towards it too.
+- OVH's **Network Firewall** (Control Panel → Network → Public IP addresses): leave it
+  **off**. ufw on the box does the job. That firewall is stateless, so turning it on without an
+  "established" rule silently breaks outbound connections (apt, Docker pulls, Google, SMTP).
+
+```bash
+ssh ubuntu@<IP>
+sudo -i
+```
+
+Then, as `root`:
 
 ```bash
 apt update && apt -y full-upgrade
 apt -y install nginx certbot python3-certbot-nginx ufw fail2ban unattended-upgrades rclone curl
 dpkg-reconfigure -plow unattended-upgrades          # say Yes
 
-# 2 GB swap: headroom for the 1-vCPU / 4 GB box
+# 2 GB swap: headroom for the 4 GB box (OVH images ship without swap)
 fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
 echo '/swapfile none swap sw 0 0' >> /etc/fstab
 sysctl -w vm.swappiness=10 && echo 'vm.swappiness=10' > /etc/sysctl.d/99-swap.conf
@@ -68,19 +96,22 @@ adduser --disabled-password --gecos "" deploy
 usermod -aG docker deploy
 install -d -o deploy -g deploy -m 750 /srv/jobtiva /srv/jobtiva/env /srv/jobtiva/backups /srv/jobtiva/logs /srv/jobtiva/incoming
 install -d -o deploy -g deploy -m 700 /home/deploy/.ssh
-cp /root/.ssh/authorized_keys /home/deploy/.ssh/ && chown deploy:deploy /home/deploy/.ssh/authorized_keys
+cp /home/ubuntu/.ssh/authorized_keys /home/deploy/.ssh/ && chown deploy:deploy /home/deploy/.ssh/authorized_keys
 ```
 
-Lock SSH down. First confirm `ssh deploy@<IP>` works in a second terminal.
+Lock SSH down. First confirm `ssh deploy@<IP>` works in a second terminal. Keep using
+`ubuntu@<IP>` + `sudo -i` for root work; `deploy` deliberately has no sudo.
 
 ```bash
 cat > /etc/ssh/sshd_config.d/90-hardening.conf <<'EOF'
 PasswordAuthentication no
 KbdInteractiveAuthentication no
-PermitRootLogin prohibit-password
+PermitRootLogin no
 EOF
-systemctl reload ssh
+sshd -t && systemctl reload ssh
 ```
+
+If a later step locks you out, use the KVM console or rescue mode from the OVH Control Panel.
 
 ### CI deploy key
 
@@ -353,13 +384,27 @@ docker compose start app-prod
 
 **Test a restore once into preprod.** A backup you have never restored is a hope, not a backup.
 
+If the whole server is broken (bad upgrade, disk corruption), OVH's daily backup restores the
+entire VPS to the last 24 h: Control Panel → VPS → **Backup** → Restore. Then restore the latest
+`backup.sh` dump on top only if you need data newer than that snapshot.
+
 ### Capacity notes
 
 - **Memory:** about 2.4 GB is capped across the 3 containers, plus Nginx and the OS, with 2 GB
   swap as a buffer.
-- **CPU:** builds happen in CI, never on the box. The single vCPU only serves traffic.
-- **Disk:** check `df -h` now and then. Images take about 0.5 GB each, 5 are kept, and
-  `deploy.sh` prunes the rest.
+- **CPU:** builds happen in CI, never on the box. The 2 vCores only serve traffic.
+- **Disk (40 GB):** check `df -h` and `docker system df` now and then. Rough budget:
+  - OS + Docker: about 6 GB.
+  - Images: about 0.5 GB each; 5 are kept and `deploy.sh` prunes the rest.
+  - Postgres and uploads: small today.
+  - Local backups: 14 days.
+  
+  If disk gets tight, cut local backup retention in `backup.sh` before anything else (Drive still
+  keeps 30 days).
+- **Traffic:** 500 GB/month in Mumbai, then the speed drops to 10 Mbps. The Control Panel shows
+  usage; this app should stay at a few GB a month.
+- **Upgrade path:** OVH lets you resize VPS-1 → VPS-2 (8 GB) in place from the Control Panel
+  (short reboot). If you do, raise the `mem_limit`s in `docker-compose.yml`.
 
 ---
 
