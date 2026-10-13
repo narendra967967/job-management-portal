@@ -15,3 +15,5 @@ README.md
 .vscode
 .idea
 coverage
+# Server-side deploy kit (shipped to the VPS separately, never baked into the image).
+deploy

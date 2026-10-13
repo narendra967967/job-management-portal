@@ -8,18 +8,12 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { getCurrentUserId } from "@/lib/current-user";
 import { encryptSecret } from "@/lib/crypto";
-import {
-  isS3Configured,
-  putResumeObject,
-  getResumeObject,
-  deleteResumeObject,
-} from "@/lib/s3";
+import { storeResumeFile, readResumeFile, deleteResumeFile } from "@/lib/storage";
 import {
   account as accountT,
   gmailConfig as gmailConfigT,
   gmailIngestErrors as errorsT,
   resumes as resumesT,
-  resumeFiles as resumeFilesT,
   user as userT,
   userSettings as settingsT,
 } from "@/db/schema";
@@ -255,39 +249,20 @@ export async function uploadResumeAction(
       fileName: file.name,
       fileType: ext,
       sizeKb: Math.max(1, Math.round(file.size / 1024)),
-      // Placeholder; set to the S3 key (or "db") once the bytes are stored.
+      // Placeholder; set to the storage reference once the bytes are stored.
       blobUrl: "pending",
       resumeText: text || null,
       isDefault: false,
     })
     .returning({ id: resumesT.id });
 
-  if (isS3Configured()) {
-    // Store the file in S3; keep the key in blobUrl.
-    const key = `resumes/${userId}/${row.id}.${ext}`;
-    try {
-      await putResumeObject(key, bytes, contentType);
-    } catch {
-      // Roll back the metadata row so we don't leave a dangling résumé.
-      await db.delete(resumesT).where(eq(resumesT.id, row.id));
-      return { ok: false, error: "Couldn't store the file. Please try again." };
-    }
-    await db
-      .update(resumesT)
-      .set({ blobUrl: key })
-      .where(eq(resumesT.id, row.id));
-  } else {
-    // Local dev: keep the bytes in Postgres (resume_files).
-    await db
-      .update(resumesT)
-      .set({ blobUrl: "db" })
-      .where(eq(resumesT.id, row.id));
-    await db.insert(resumeFilesT).values({
-      resumeId: row.id,
-      userId,
-      contentType,
-      data: bytes,
-    });
+  try {
+    const blobUrl = await storeResumeFile({ userId, resumeId: row.id, ext, bytes, contentType });
+    await db.update(resumesT).set({ blobUrl }).where(eq(resumesT.id, row.id));
+  } catch {
+    // Roll back the metadata row so we don't leave a dangling résumé.
+    await db.delete(resumesT).where(eq(resumesT.id, row.id));
+    return { ok: false, error: "Couldn't store the file. Please try again." };
   }
 
   return { ok: true, resumeId: row.id };
@@ -308,34 +283,14 @@ export async function getResumeFileAction(id: string): Promise<
     .where(and(eq(resumesT.id, resumeId), eq(resumesT.userId, userId)));
   if (!meta) return { ok: false, error: "Résumé not found." };
 
-  // S3-backed résumé: blobUrl holds the object key.
-  if (meta.blobUrl && meta.blobUrl !== "db" && meta.blobUrl !== "pending") {
-    try {
-      const { body, contentType } = await getResumeObject(meta.blobUrl);
-      return {
-        ok: true,
-        fileName: meta.fileName,
-        contentType: contentType || "application/octet-stream",
-        base64: body.toString("base64"),
-      };
-    } catch {
-      return { ok: false, error: "Couldn't fetch the file from storage." };
-    }
-  }
-
-  // DB-backed (local dev).
-  const [f] = await db
-    .select({ contentType: resumeFilesT.contentType, data: resumeFilesT.data })
-    .from(resumeFilesT)
-    .where(
-      and(eq(resumeFilesT.resumeId, resumeId), eq(resumeFilesT.userId, userId)),
-    );
+  // Ownership is checked above; the storage layer reads from wherever the row points.
+  const f = await readResumeFile(meta.blobUrl, resumeId, userId);
   if (!f) return { ok: false, error: "No file stored for this résumé." };
   return {
     ok: true,
     fileName: meta.fileName,
     contentType: f.contentType,
-    base64: f.data.toString("base64"),
+    base64: f.body.toString("base64"),
   };
 }
 
@@ -356,23 +311,12 @@ export async function deleteResumeAction(id: string) {
   const userId = await getCurrentUserId();
   const resumeId = parseInput(zId, id);
 
-  // Remove the S3 object first (best-effort); DB rows cascade below.
+  // Remove the stored bytes first (best-effort); DB rows cascade below.
   const [meta] = await db
     .select({ blobUrl: resumesT.blobUrl })
     .from(resumesT)
     .where(and(eq(resumesT.id, resumeId), eq(resumesT.userId, userId)));
-  if (
-    meta?.blobUrl &&
-    meta.blobUrl !== "db" &&
-    meta.blobUrl !== "pending" &&
-    isS3Configured()
-  ) {
-    try {
-      await deleteResumeObject(meta.blobUrl);
-    } catch {
-      // Leave the orphaned object rather than blocking the delete.
-    }
-  }
+  if (meta?.blobUrl) await deleteResumeFile(meta.blobUrl);
 
   // user_settings.default_resume_id FK is ON DELETE SET NULL, so clearing the
   // default is automatic. resume_files cascades on the resumes FK.

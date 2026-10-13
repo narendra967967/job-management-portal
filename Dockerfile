@@ -34,10 +34,21 @@ ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     PORT=3000 \
     HOSTNAME=0.0.0.0
-RUN groupadd -g 1001 nodejs && useradd -u 1001 -g nodejs -m nextjs
+# /data/uploads is the upload storage mount point. A fresh named volume mounted
+# there inherits this ownership, so the non-root app user can write uploads
+# (STORAGE_DRIVER=local).
+RUN groupadd -g 1001 nodejs && useradd -u 1001 -g nodejs -m nextjs \
+ && mkdir -p /data/uploads && chown nextjs:nodejs /data/uploads
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+# Deploy-time tooling, run from this same image (no repo or npm ci on the server):
+# migrations + their runner, and the one-off résumé mover. The traced standalone
+# bundle only has the drizzle-orm files the app uses; the migrator needs the full
+# package (same version), so copy it over the traced copy.
+COPY --from=builder --chown=nextjs:nodejs /app/db/migrations ./db/migrations
+COPY --from=builder --chown=nextjs:nodejs /app/scripts/migrate.mjs /app/scripts/files-db-to-disk.mjs ./scripts/
+COPY --from=deps --chown=nextjs:nodejs /app/node_modules/drizzle-orm ./node_modules/drizzle-orm
 USER nextjs
 EXPOSE 3000
 CMD ["node", "server.js"]
