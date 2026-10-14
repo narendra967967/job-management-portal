@@ -51,6 +51,10 @@ export interface Plan {
   limitResumes: number | null;
   /** May users override AI prompts on this plan? */
   allowCustomPrompts: boolean;
+  /** Premium: personal notepad. */
+  allowNotes: boolean;
+  /** Premium: AI salary insight per job. */
+  allowSalaryInsight: boolean;
   features: string[];
   /** Recommended highlight — at most one plan. */
   popular: boolean;

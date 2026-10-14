@@ -40,6 +40,8 @@ const planSchema = z.object({
   currency: z.enum(["INR", "USD"]),
   limitResumes: z.coerce.number().int().min(0).max(100_000).nullable(),
   allowCustomPrompts: z.boolean(),
+  allowNotes: z.boolean().optional().default(false),
+  allowSalaryInsight: z.boolean().optional().default(false),
   features: z.array(z.string().trim().max(200)).max(30).optional().default([]),
   status: z.enum(["active", "inactive"]),
 });
@@ -60,6 +62,8 @@ function clean(v: PlanData) {
     currency: v.currency,
     limitResumes: v.limitResumes,
     allowCustomPrompts: v.allowCustomPrompts,
+    allowNotes: v.allowNotes,
+    allowSalaryInsight: v.allowSalaryInsight,
     features,
     status: v.status,
   };

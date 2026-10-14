@@ -506,6 +506,12 @@ function PlanDetailsCard() {
             <span>
               Custom AI prompts: <span className="font-medium text-foreground">{plan.allowCustomPrompts ? "Yes" : "No"}</span>
             </span>
+            <span>
+              Notes: <span className="font-medium text-foreground">{plan.allowNotes ? "Yes" : "No"}</span>
+            </span>
+            <span>
+              Salary insight: <span className="font-medium text-foreground">{plan.allowSalaryInsight ? "Yes" : "No"}</span>
+            </span>
           </div>
 
           {/* Upgrade — only when a higher-priced active plan exists */}

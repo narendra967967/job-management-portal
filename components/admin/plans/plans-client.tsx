@@ -275,6 +275,12 @@ function PlanCard({
             <Sparkles className="size-3.5" aria-hidden />
             Custom AI prompts: <span className="font-medium text-foreground">{plan.allowCustomPrompts ? "Yes" : "No"}</span>
           </span>
+          <span>
+            Notes: <span className="font-medium text-foreground">{plan.allowNotes ? "Yes" : "No"}</span>
+          </span>
+          <span>
+            Salary insight: <span className="font-medium text-foreground">{plan.allowSalaryInsight ? "Yes" : "No"}</span>
+          </span>
           {plan.isFree && (
             <span>
               Access: <span className="font-medium text-foreground">{plan.freeDurationDays > 0 ? `${plan.freeDurationDays} days` : "No expiry"}</span>

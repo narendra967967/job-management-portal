@@ -40,6 +40,8 @@ export interface PlanFormValues {
   currency: Currency;
   limitResumes: number | null;
   allowCustomPrompts: boolean;
+  allowNotes: boolean;
+  allowSalaryInsight: boolean;
   features: string[];
   status: PlanStatus;
 }
@@ -106,6 +108,8 @@ export function PlanFormDialog({
   const [resumesUnlimited, setResumesUnlimited] = useState(false);
   const [limitResumes, setLimitResumes] = useState("3");
   const [allowCustomPrompts, setAllowCustomPrompts] = useState(false);
+  const [allowNotes, setAllowNotes] = useState(false);
+  const [allowSalaryInsight, setAllowSalaryInsight] = useState(false);
   const [features, setFeatures] = useState<string[]>([""]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -127,6 +131,8 @@ export function PlanFormDialog({
     setResumesUnlimited(plan ? plan.limitResumes === null : false);
     setLimitResumes(String(plan?.limitResumes ?? 3));
     setAllowCustomPrompts(plan?.allowCustomPrompts ?? false);
+    setAllowNotes(plan?.allowNotes ?? false);
+    setAllowSalaryInsight(plan?.allowSalaryInsight ?? false);
     setFeatures(plan && plan.features.length ? [...plan.features] : [""]);
     setError("");
   }, [open, plan]);
@@ -185,6 +191,8 @@ export function PlanFormDialog({
       currency,
       limitResumes: resumesLimit,
       allowCustomPrompts,
+      allowNotes,
+      allowSalaryInsight,
       features: features.map((f) => f.trim()).filter(Boolean),
       status,
     });
@@ -344,6 +352,24 @@ export function PlanFormDialog({
                 className="size-4 cursor-pointer rounded border-input accent-primary"
               />
               Allow custom AI prompts on this plan
+            </label>
+            <label className="flex cursor-pointer items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={allowNotes}
+                onChange={(e) => setAllowNotes(e.target.checked)}
+                className="size-4 cursor-pointer rounded border-input accent-primary"
+              />
+              Notes (personal notepad)
+            </label>
+            <label className="flex cursor-pointer items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={allowSalaryInsight}
+                onChange={(e) => setAllowSalaryInsight(e.target.checked)}
+                className="size-4 cursor-pointer rounded border-input accent-primary"
+              />
+              AI salary insight on jobs
             </label>
           </Section>
 

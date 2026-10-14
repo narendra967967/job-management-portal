@@ -102,6 +102,7 @@ let reminders: Reminder[] = [];
 let tasks: Task[] = [];
 let resumes: Resume[] = [];
 let defaultResumeId = "";
+let features: WorkspaceData["features"] = { notes: false, salaryInsight: false };
 let appSettings: AppSettings = {
   reminderIntervalDays: 3,
   staleLeadDays: 14,
@@ -162,6 +163,7 @@ function apply(data: WorkspaceData) {
   gmailConfig = data.gmailConfig;
   syncIntervalHours = data.syncIntervalHours;
   gmailSync = data.gmailSync;
+  features = data.features;
   ingestErrors = data.ingestErrors;
   aiPrompts = data.aiPrompts;
   fitScores = data.fitScores;
@@ -198,6 +200,12 @@ const getOutreach = () => outreach;
 const getReminders = () => reminders;
 const getTasks = () => tasks;
 const getStoredNotifications = () => storedNotifications;
+
+const getFeatures = () => features;
+/** Premium features the user's plan includes (mirrors the server's decision). */
+export function useFeatures(): WorkspaceData["features"] {
+  return useSyncExternalStore(subscribe, getFeatures, getFeatures);
+}
 
 export function useLeads(): JobLead[] {
   return useSyncExternalStore(subscribe, getLeads, getLeads);

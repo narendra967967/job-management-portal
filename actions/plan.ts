@@ -19,6 +19,8 @@ export interface MyPlanDetails {
   currency: string;
   limitResumes: number | null;
   allowCustomPrompts: boolean;
+  allowNotes: boolean;
+  allowSalaryInsight: boolean;
   features: string[];
   freeDurationDays: number;
   /** ISO string, or null when the plan never expires. */
@@ -56,6 +58,8 @@ export async function getMyPlanAction(): Promise<MyPlanDetails | null> {
     currency: pl.currency,
     limitResumes: pl.limitResumes,
     allowCustomPrompts: pl.allowCustomPrompts,
+    allowNotes: pl.allowNotes,
+    allowSalaryInsight: pl.allowSalaryInsight,
     features: pl.features,
     freeDurationDays: pl.freeDurationDays,
     expiresAt: row.planExpiresAt ? row.planExpiresAt.toISOString() : null,

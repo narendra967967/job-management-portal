@@ -28,6 +28,7 @@ import {
 } from "@/db/schema";
 import { OUTREACH_KIND_LABELS, fitScoreKey } from "@/lib/types";
 import { listNotifications, type NotificationRow } from "@/lib/notifications";
+import { getFeatureAccess, type FeatureAccess } from "@/lib/entitlements";
 import type {
   AiSettings,
   Contact,
@@ -75,6 +76,8 @@ function ymd(d: Date | string | null): string | null {
 }
 
 export interface WorkspaceData {
+  /** Premium features this user's plan includes (server-decided). */
+  features: FeatureAccess;
   leads: JobLead[];
   details: Record<string, JobLeadDetail>;
   contacts: Contact[];
@@ -372,6 +375,7 @@ export async function loadWorkspace(userId: string): Promise<WorkspaceData> {
     gmailConfig,
     syncIntervalHours: settings?.syncIntervalHours ?? 24,
     gmailSync,
+    features: await getFeatureAccess(userId),
     ingestErrors,
     aiPrompts: {
       summary: settings?.promptSummary ?? "",

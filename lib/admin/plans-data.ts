@@ -36,6 +36,8 @@ export async function loadPlans(): Promise<Plan[]> {
     currency: (r.currency === "USD" ? "USD" : "INR") as Currency,
     limitResumes: r.limitResumes,
     allowCustomPrompts: r.allowCustomPrompts,
+    allowNotes: r.allowNotes,
+    allowSalaryInsight: r.allowSalaryInsight,
     features: r.features,
     popular: r.popular,
     status: r.status,
