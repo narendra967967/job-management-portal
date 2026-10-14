@@ -121,6 +121,9 @@ export const jobLeads = pgTable(
     origin: leadOrigin("origin").notNull().default("manual"),
     // Starred by the user (golden card + Top Choice filter).
     topChoice: boolean("top_choice").notNull().default(false),
+    // Set when the user manually moves the status BACKWARDS: automatic status
+    // changes then leave this lead alone until they move it forward themselves.
+    statusPinned: boolean("status_pinned").notNull().default(false),
     capturedAt: timestamp("captured_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

@@ -1,0 +1,1 @@
+ALTER TABLE "job_leads" ADD COLUMN "status_pinned" boolean DEFAULT false NOT NULL;

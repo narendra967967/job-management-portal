@@ -29,6 +29,11 @@ import {
 } from "@/lib/schemas";
 import { extractLinkedInJobId } from "@/lib/linkedin-parser";
 import { sourceFromUrl } from "@/lib/lead-source";
+import {
+  advanceLeadStatus,
+  pipelineRank,
+  type AutoStatusChange,
+} from "@/lib/auto-status";
 import { loadWorkspace, type WorkspaceData } from "@/lib/queries";
 import {
   contacts as contactsT,
@@ -111,10 +116,21 @@ export async function setLeadStatusAction(
   const input = parseInput(leadStatusSchema, { leadId, status, closeOutcome });
   const next = input.status as LeadStatus;
   await db.transaction(async (tx) => {
+    const [current] = await tx
+      .select({ status: leadsT.status })
+      .from(leadsT)
+      .where(and(eq(leadsT.id, input.leadId), eq(leadsT.userId, userId)));
+    if (!current) throw new Error("Lead not found.");
+    // A deliberate move BACKWARDS in the open pipeline pins the lead so the
+    // automatic status rules leave it alone; any other manual move unpins it.
+    const fromRank = pipelineRank(current.status);
+    const toRank = pipelineRank(next);
+    const statusPinned = fromRank >= 0 && toRank >= 0 && toRank < fromRank;
     const [row] = await tx
       .update(leadsT)
       .set({
         status: next,
+        statusPinned,
         closeOutcome:
           next === "closed" ? ((input.closeOutcome as CloseOutcome | null) ?? null) : null,
       })
@@ -148,15 +164,49 @@ export async function setLeadStatusAction(
 }
 
 /** Star / unstar a lead as a Top Choice. Scoped to the current user. */
-export async function setLeadTopChoiceAction(leadId: string, topChoice: boolean) {
+export async function setLeadTopChoiceAction(
+  leadId: string,
+  topChoice: boolean,
+): Promise<{ autoStatus: AutoStatusChange | null }> {
   const userId = await getCurrentUserId();
   const input = parseInput(topChoiceSchema, { leadId, topChoice });
-  const [row] = await db
+  return db.transaction(async (tx) => {
+    const [row] = await tx
+      .update(leadsT)
+      .set({ topChoice: input.topChoice })
+      .where(and(eq(leadsT.id, input.leadId), eq(leadsT.userId, userId)))
+      .returning({ id: leadsT.id });
+    if (!row) throw new Error("Lead not found.");
+    // Starring a lead means you're interested → Shortlisted.
+    const autoStatus = input.topChoice
+      ? await advanceLeadStatus(tx, userId, input.leadId, "shortlisted")
+      : null;
+    return { autoStatus };
+  });
+}
+
+/**
+ * Undo an automatic status change (the toast's Undo). Only reverts if the lead
+ * is still in the status automation moved it to, and doesn't pin it.
+ */
+export async function undoAutoStatusAction(
+  leadId: string,
+  from: LeadStatus,
+  to: LeadStatus,
+): Promise<void> {
+  const userId = await getCurrentUserId();
+  const a = parseInput(leadStatusSchema, { leadId, status: from, closeOutcome: null });
+  const b = parseInput(leadStatusSchema, { leadId, status: to, closeOutcome: null });
+  await db
     .update(leadsT)
-    .set({ topChoice: input.topChoice })
-    .where(and(eq(leadsT.id, input.leadId), eq(leadsT.userId, userId)))
-    .returning({ id: leadsT.id });
-  if (!row) throw new Error("Lead not found.");
+    .set({ status: a.status as LeadStatus })
+    .where(
+      and(
+        eq(leadsT.id, a.leadId),
+        eq(leadsT.userId, userId),
+        eq(leadsT.status, b.status as LeadStatus),
+      ),
+    );
 }
 
 /**
@@ -381,15 +431,20 @@ export async function addContactAction(input: {
 }) {
   const userId = await getCurrentUserId();
   const data = parseInput(addContactSchema, input);
-  await assertOwned(db, userId, { leadId: data.leadId });
-  await db.insert(contactsT).values({
-    userId,
-    leadId: data.leadId,
-    name: data.name,
-    title: data.title,
-    linkedinUrl: data.linkedinUrl || null,
-    connectionType: data.connectionType as ConnectionType,
-    aiParsed: data.aiParsed,
+  return db.transaction(async (tx) => {
+    await assertOwned(tx, userId, { leadId: data.leadId });
+    await tx.insert(contactsT).values({
+      userId,
+      leadId: data.leadId,
+      name: data.name,
+      title: data.title,
+      linkedinUrl: data.linkedinUrl || null,
+      connectionType: data.connectionType as ConnectionType,
+      aiParsed: data.aiParsed,
+    });
+    // Finding a recruiter / referral means you're working this job.
+    const autoStatus = await advanceLeadStatus(tx, userId, data.leadId, "shortlisted");
+    return { autoStatus };
   });
 }
 
@@ -432,10 +487,10 @@ export async function markSentAction(input: {
   kind: OutreachKind;
   channel: string;
   draftBody: string;
-}) {
+}): Promise<{ autoStatus: AutoStatusChange | null }> {
   const userId = await getCurrentUserId();
   const data = parseInput(markSentSchema, input);
-  await db.transaction(async (tx) => {
+  return db.transaction(async (tx) => {
     // The contact must be the user's AND belong to this lead.
     await assertOwned(tx, userId, { leadId: data.leadId, contactId: data.contactId });
     const now = new Date();
@@ -500,6 +555,16 @@ export async function markSentAction(input: {
       dueDate: dueDay,
       status: "open",
     });
+
+    // A referral ask comes before applying (→ Shortlisted); cold outreach or a
+    // follow-up means you've applied (→ Applied).
+    const autoStatus = await advanceLeadStatus(
+      tx,
+      userId,
+      data.leadId,
+      data.kind === "referral-ask" ? "shortlisted" : "applied",
+    );
+    return { autoStatus };
   });
 }
 
@@ -563,12 +628,12 @@ export async function addReminderManualAction(input: {
 export async function setReminderOutcomeAction(
   id: string,
   outcome: ReminderOutcome,
-) {
+): Promise<{ nextFollowUp: { dueDate: string; number: number } | null }> {
   const userId = await getCurrentUserId();
   const data = parseInput(reminderOutcomeSchema, { id, outcome });
   const next = data.outcome as ReminderOutcome;
   const done = next !== "pending";
-  await db.transaction(async (tx) => {
+  return db.transaction(async (tx) => {
     await tx
       .update(remindersT)
       .set({ outcome: next })
@@ -580,7 +645,94 @@ export async function setReminderOutcomeAction(
         completedAt: done ? new Date() : null,
       })
       .where(and(eq(tasksT.reminderId, data.id), eq(tasksT.userId, userId)));
+    // You sent the follow-up → line up the next one (FR-5.4).
+    const nextFollowUp =
+      next === "reminder-sent" ? await scheduleNextFollowUp(tx, userId, data.id) : null;
+    return { nextFollowUp };
   });
+}
+
+/**
+ * Automatic follow-up chain (FR-5.4). When a follow-up reminder tied to a sent
+ * message is marked "Reminder sent", schedule the next one after the user's
+ * reminder interval — up to `max_follow_ups` beyond the first. The chain stops
+ * on its own when the job is no longer open, and any other outcome
+ * ("Response received", "Not responded", "Closed") simply doesn't continue it.
+ * Idempotent: if a later reminder already exists in the chain, nothing is added.
+ */
+async function scheduleNextFollowUp(
+  tx: Tx,
+  userId: string,
+  reminderId: string,
+): Promise<{ dueDate: string; number: number } | null> {
+  const [rem] = await tx
+    .select({
+      leadId: remindersT.leadId,
+      outreachMessageId: remindersT.outreachMessageId,
+      sequence: remindersT.sequence,
+    })
+    .from(remindersT)
+    .where(and(eq(remindersT.id, reminderId), eq(remindersT.userId, userId)));
+  // Only real follow-ups (tied to a message you sent) form a chain.
+  if (!rem?.outreachMessageId) return null;
+
+  const [lead] = await tx
+    .select({ status: leadsT.status, company: leadsT.company })
+    .from(leadsT)
+    .where(and(eq(leadsT.id, rem.leadId), eq(leadsT.userId, userId)));
+  if (!lead || !isJobOpen(lead.status)) return null;
+
+  const [settings] = await tx
+    .select({
+      interval: settingsT.reminderIntervalDays,
+      maxFollowUps: settingsT.maxFollowUps,
+    })
+    .from(settingsT)
+    .where(eq(settingsT.userId, userId));
+  const intervalDays = settings?.interval ?? 3;
+  const maxFollowUps = settings?.maxFollowUps ?? 2;
+
+  const chain = await tx
+    .select({ sequence: remindersT.sequence })
+    .from(remindersT)
+    .where(
+      and(
+        eq(remindersT.userId, userId),
+        eq(remindersT.leadId, rem.leadId),
+        eq(remindersT.outreachMessageId, rem.outreachMessageId),
+      ),
+    );
+  if (chain.some((r) => r.sequence > rem.sequence)) return null; // already lined up
+  if (chain.length >= 1 + maxFollowUps) return null; // chain is complete
+
+  const number = chain.length + 1;
+  const due = new Date();
+  due.setDate(due.getDate() + intervalDays);
+  const dueAt = due.toISOString();
+
+  const [created] = await tx
+    .insert(remindersT)
+    .values({
+      userId,
+      leadId: rem.leadId,
+      outreachMessageId: rem.outreachMessageId,
+      sequence: await nextSequence(tx, userId, rem.leadId),
+      dueDate: dueAt,
+      outcome: "pending",
+      manual: false,
+      label: `Follow-up ${number}`,
+    })
+    .returning({ id: remindersT.id });
+  await tx.insert(tasksT).values({
+    userId,
+    jobId: rem.leadId,
+    reminderId: created.id,
+    title: `Follow up #${number} — ${lead.company}`,
+    kind: "follow-up",
+    dueDate: ymd(due),
+    status: "open",
+  });
+  return { dueDate: dueAt, number };
 }
 
 export async function snoozeReminderAction(id: string, newDueDate: string) {

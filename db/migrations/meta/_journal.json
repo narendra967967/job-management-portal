@@ -176,6 +176,13 @@
       "when": 1792006555579,
       "tag": "0024_premium_notes_salary_pause_followups",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1792006832287,
+      "tag": "0025_lead_status_pinned",
+      "breakpoints": true
     }
   ]
 }

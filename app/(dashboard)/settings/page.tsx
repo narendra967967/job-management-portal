@@ -1508,7 +1508,79 @@ function FollowUpsCard() {
         marked sent. Open leads with no pending follow-up for{" "}
         {settings.staleLeadDays} days are flagged <em>Stale</em> for review.
       </p>
+
+      <div className="mt-5 grid gap-3 border-t pt-4 sm:grid-cols-2">
+        <Field label="Automatic follow-ups after the first">
+          <Input
+            type="number"
+            min={0}
+            max={5}
+            step={1}
+            value={settings.maxFollowUps}
+            onChange={(e) => {
+              const n = Math.round(Number(e.target.value));
+              update({ maxFollowUps: Number.isFinite(n) ? Math.min(5, Math.max(0, n)) : 0 });
+            }}
+          />
+          <span className="block text-[11px] text-muted-foreground">
+            0–5. When you mark a follow-up as sent, the next one is scheduled
+            until this many are done. 0 turns it off.
+          </span>
+        </Field>
+        <div className="flex flex-col gap-1.5">
+          <span className="text-xs font-medium text-muted-foreground">
+            Update status automatically
+          </span>
+          <SettingSwitch
+            checked={settings.autoStatus}
+            onChange={(v) => update({ autoStatus: v })}
+            label="Update status automatically"
+          />
+          <span className="block text-[11px] text-muted-foreground">
+            Moves a job forward from what you do — e.g. adding a contact →
+            Shortlisted, sending cold outreach → Applied. Never moves backwards,
+            and you can always undo.
+          </span>
+        </div>
+      </div>
     </section>
+  );
+}
+
+/** Accessible on/off switch (44px touch target). */
+function SettingSwitch({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  onChange: (value: boolean) => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      onClick={() => onChange(!checked)}
+      className="inline-flex min-h-11 items-center gap-2 self-start rounded-lg focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+    >
+      <span
+        className={cn(
+          "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors",
+          checked ? "bg-primary" : "bg-muted-foreground/30",
+        )}
+      >
+        <span
+          className={cn(
+            "inline-block size-5 rounded-full bg-white shadow transition-transform",
+            checked ? "translate-x-5.5" : "translate-x-0.5",
+          )}
+        />
+      </span>
+      <span className="text-sm">{checked ? "On" : "Off"}</span>
+    </button>
   );
 }
 

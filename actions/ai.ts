@@ -6,6 +6,7 @@
 // when no API key is set in Settings). Scoped to the current user.
 
 import { and, eq } from "drizzle-orm";
+import { advanceLeadStatus, type AutoStatusChange } from "@/lib/auto-status";
 import { db } from "@/lib/db";
 import { getCurrentUserId } from "@/lib/current-user";
 import {
@@ -96,7 +97,7 @@ async function effectivePrompt(userId: string, kind: PromptKind): Promise<string
 export async function saveJdAction(
   leadId: string,
   jdText: string,
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<{ ok: true; autoStatus: AutoStatusChange | null } | { ok: false; error: string }> {
   const userId = await getCurrentUserId();
   let text: string;
   try {
@@ -115,7 +116,9 @@ export async function saveJdAction(
     .insert(detailsT)
     .values({ leadId, userId, jdText: text })
     .onConflictDoUpdate({ target: detailsT.leadId, set: { jdText: text } });
-  return { ok: true };
+  // Saving a JD means you're looking into this job → Shortlisted.
+  const autoStatus = await advanceLeadStatus(db, userId, leadId, "shortlisted");
+  return { ok: true, autoStatus };
 }
 
 /* ---------------- JD summary (FR-3.3) — stores JD + summary ---------------- */
@@ -123,7 +126,10 @@ export async function saveJdAction(
 export async function summarizeJdAction(
   leadId: string,
   jdText: string,
-): Promise<{ ok: true; summary: string } | { ok: false; error: string }> {
+): Promise<
+  | { ok: true; summary: string; autoStatus: AutoStatusChange | null }
+  | { ok: false; error: string; autoStatus?: AutoStatusChange | null }
+> {
   const userId = await getCurrentUserId();
   let text: string;
   try {
@@ -144,6 +150,8 @@ export async function summarizeJdAction(
     .insert(detailsT)
     .values({ leadId, userId, jdText: text })
     .onConflictDoUpdate({ target: detailsT.leadId, set: { jdText: text } });
+  // The JD is saved either way → Shortlisted (reported even if the AI fails).
+  const autoStatus = await advanceLeadStatus(db, userId, leadId, "shortlisted");
 
   try {
     const system = await effectivePrompt(userId, "summary");
@@ -152,9 +160,9 @@ export async function summarizeJdAction(
       .update(detailsT)
       .set({ aiSummary: summary })
       .where(eq(detailsT.leadId, leadId));
-    return { ok: true, summary };
+    return { ok: true, summary, autoStatus };
   } catch (err) {
-    return { ok: false, error: friendly(err) };
+    return { ok: false, error: friendly(err), autoStatus };
   }
 }
 
@@ -278,7 +286,8 @@ export async function scoreFitAction(
   leadId: string,
   resumeId: string,
 ): Promise<
-  { ok: true; score: number; rationale: string } | { ok: false; error: string }
+  | { ok: true; score: number; rationale: string; autoStatus: AutoStatusChange | null }
+  | { ok: false; error: string }
 > {
   const userId = await getCurrentUserId();
   let input: { leadId: string; resumeId: string };
@@ -366,7 +375,9 @@ export async function scoreFitAction(
         set: { score, rationale: rationale || null },
       });
 
-    return { ok: true, score, rationale };
+    // Checking your fit means you're evaluating it → Shortlisted.
+    const autoStatus = await advanceLeadStatus(db, userId, input.leadId, "shortlisted");
+    return { ok: true, score, rationale, autoStatus };
   } catch (err) {
     return { ok: false, error: friendly(err) };
   }

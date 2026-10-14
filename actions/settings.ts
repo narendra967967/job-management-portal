@@ -58,13 +58,20 @@ export async function updateProfileAction(input: {
 export async function updateFollowUpsAction(input: {
   reminderIntervalDays: number;
   staleLeadDays: number;
+  autoStatus: boolean;
+  maxFollowUps: number;
 }) {
   const userId = await getCurrentUserId();
-  const { reminderIntervalDays, staleLeadDays } = parseInput(
+  const { reminderIntervalDays, staleLeadDays, autoStatus, maxFollowUps } = parseInput(
     followUpsSchema,
     input,
   );
-  await upsertSettings(userId, { reminderIntervalDays, staleLeadDays });
+  await upsertSettings(userId, {
+    reminderIntervalDays,
+    staleLeadDays,
+    autoStatus,
+    maxFollowUps,
+  });
 }
 
 /* ---------------- default resume ---------------- */

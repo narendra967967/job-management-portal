@@ -21,24 +21,47 @@ export const toastManager = ToastPrimitive.createToastManager();
 
 type ToastType = "success" | "error" | "info";
 
-function show(type: ToastType, title: string, description?: string) {
-  return toastManager.add({
+/** Optional button on a toast (e.g. "Undo"). Clicking it also closes the toast. */
+export interface ToastAction {
+  label: string;
+  onClick: () => void;
+}
+
+function show(
+  type: ToastType,
+  title: string,
+  description?: string,
+  action?: ToastAction,
+) {
+  let id = "";
+  id = toastManager.add({
     title,
     description,
     type,
-    timeout: type === "error" ? 6000 : 4000,
+    // Give people time to reach an action button.
+    timeout: action ? 12000 : type === "error" ? 6000 : 4000,
     priority: type === "error" ? "high" : "low",
+    actionProps: action
+      ? {
+          children: action.label,
+          onClick: () => {
+            toastManager.close(id);
+            action.onClick();
+          },
+        }
+      : undefined,
   });
+  return id;
 }
 
 /** Imperative toast API — callable from anywhere. */
 export const toast = {
-  success: (title: string, description?: string) =>
-    show("success", title, description),
-  error: (title: string, description?: string) =>
-    show("error", title, description),
-  info: (title: string, description?: string) =>
-    show("info", title, description),
+  success: (title: string, description?: string, action?: ToastAction) =>
+    show("success", title, description, action),
+  error: (title: string, description?: string, action?: ToastAction) =>
+    show("error", title, description, action),
+  info: (title: string, description?: string, action?: ToastAction) =>
+    show("info", title, description, action),
 };
 
 const TYPE_STYLE: Record<
@@ -78,6 +101,9 @@ function ToastList() {
         <div className="min-w-0 flex-1">
           <ToastPrimitive.Title className="text-sm font-semibold" />
           <ToastPrimitive.Description className="mt-0.5 text-xs text-muted-foreground" />
+          {t.actionProps && (
+            <ToastPrimitive.Action className="mt-2 inline-flex min-h-8 items-center rounded-md border bg-background px-2.5 text-xs font-semibold text-primary transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none" />
+          )}
         </div>
         <ToastPrimitive.Close
           aria-label="Dismiss"

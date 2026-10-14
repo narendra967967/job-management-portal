@@ -24,6 +24,7 @@ import {
   markSentAction,
   setLeadStatusAction,
   setLeadTopChoiceAction,
+  undoAutoStatusAction,
   setReminderOutcomeAction,
   snoozeReminderAction,
   updateContactAction,
@@ -53,7 +54,8 @@ import { markNotificationsReadAction } from "@/actions/notifications";
 import { toast } from "@/components/ui/toast";
 import type { SyncResult } from "@/lib/gmail-sync";
 import type { GmailSyncStatus, IngestError } from "@/lib/queries";
-import { contactPersonKey, isJobOpen, fitScoreKey } from "@/lib/types";
+import { contactPersonKey, isJobOpen, fitScoreKey, OPEN_LEAD_STATUSES } from "@/lib/types";
+import { formatDateTime } from "@/lib/utils";
 import {
   CLOSE_OUTCOME_LABELS,
   LEAD_STATUS_LABELS,
@@ -84,6 +86,10 @@ import type { GmailConfigData, WorkspaceData } from "@/lib/queries";
 export interface AppSettings {
   reminderIntervalDays: number;
   staleLeadDays: number;
+  /** Move lead status forward automatically from the user's actions (#14). */
+  autoStatus: boolean;
+  /** Follow-ups auto-scheduled after the first one (FR-5.4), 0–5. */
+  maxFollowUps: number;
 }
 
 /* ---------------- state ---------------- */
@@ -96,7 +102,12 @@ let reminders: Reminder[] = [];
 let tasks: Task[] = [];
 let resumes: Resume[] = [];
 let defaultResumeId = "";
-let appSettings: AppSettings = { reminderIntervalDays: 3, staleLeadDays: 14 };
+let appSettings: AppSettings = {
+  reminderIntervalDays: 3,
+  staleLeadDays: 14,
+  autoStatus: true,
+  maxFollowUps: 2,
+};
 let profile: Profile = { name: "", email: "", mobile: "", plan: null };
 let google: GoogleConnection = {
   connected: false,
@@ -142,6 +153,8 @@ function apply(data: WorkspaceData) {
   appSettings = {
     reminderIntervalDays: data.reminderIntervalDays,
     staleLeadDays: data.staleLeadDays,
+    autoStatus: data.autoStatus,
+    maxFollowUps: data.maxFollowUps,
   };
   profile = data.profile;
   google = data.google;
@@ -253,6 +266,37 @@ function statusToast(status: LeadStatus, outcome: CloseOutcome | null) {
   return toast.success("Status updated", `Marked as ${LEAD_STATUS_LABELS[status]}.`);
 }
 
+/** Shape returned by actions that may move a lead's status automatically. */
+interface AutoStatusChange {
+  leadId: string;
+  from: LeadStatus;
+  to: LeadStatus;
+}
+
+/** Tell the user a lead moved on its own, with an Undo button (#14). */
+function announceAutoStatus(change: AutoStatusChange | null | undefined) {
+  if (!change) return;
+  const lead = findLead(change.leadId);
+  toast.info(
+    `Moved to ${LEAD_STATUS_LABELS[change.to]}`,
+    lead ? `${lead.title} · ${lead.company}` : undefined,
+    {
+      label: "Undo",
+      onClick: () => {
+        void (async () => {
+          try {
+            await undoAutoStatusAction(change.leadId, change.from, change.to);
+            await refresh();
+            toast.success(`Back to ${LEAD_STATUS_LABELS[change.from]}`);
+          } catch (e) {
+            toast.error("Couldn't undo", e instanceof Error ? e.message : undefined);
+          }
+        })();
+      },
+    },
+  );
+}
+
 export async function setLeadStatus(
   leadId: string,
   status: LeadStatus,
@@ -270,9 +314,10 @@ export async function setLeadStatus(
 /** Star / unstar a lead as a Top Choice. */
 export async function setLeadTopChoice(leadId: string, topChoice: boolean) {
   try {
-    await setLeadTopChoiceAction(leadId, topChoice);
+    const { autoStatus } = await setLeadTopChoiceAction(leadId, topChoice);
     await refresh();
     toast.success(topChoice ? "Marked as Top Choice" : "Removed from Top Choices");
+    announceAutoStatus(autoStatus);
   } catch (e) {
     toast.error("Couldn't update lead", e instanceof Error ? e.message : undefined);
   }
@@ -347,9 +392,10 @@ export async function addContact(input: {
   aiParsed: boolean;
 }) {
   try {
-    await addContactAction(input);
+    const { autoStatus } = await addContactAction(input);
     await refresh();
     toast.success("Contact added", input.name);
+    announceAutoStatus(autoStatus);
   } catch (e) {
     toast.error("Couldn't add contact", e instanceof Error ? e.message : undefined);
   }
@@ -393,9 +439,10 @@ export async function markSent(input: {
   draftBody: string;
 }) {
   try {
-    await markSentAction(input);
+    const { autoStatus } = await markSentAction(input);
     await refresh();
     toast.success("Message marked as sent", "Follow-up reminder scheduled.");
+    announceAutoStatus(autoStatus);
   } catch (e) {
     toast.error("Couldn't mark as sent", e instanceof Error ? e.message : undefined);
   }
@@ -418,9 +465,29 @@ export async function addReminderManual(input: {
 
 export async function setReminderOutcome(id: string, outcome: ReminderOutcome) {
   try {
-    await setReminderOutcomeAction(id, outcome);
+    const leadId = reminders.find((r) => r.id === id)?.leadId;
+    const { nextFollowUp } = await setReminderOutcomeAction(id, outcome);
     await refresh();
-    toast.success("Reminder updated", REMINDER_OUTCOME_LABELS[outcome]);
+    toast.success(
+      "Reminder updated",
+      nextFollowUp
+        ? `Follow-up ${nextFollowUp.number} scheduled for ${formatDateTime(nextFollowUp.dueDate)}.`
+        : REMINDER_OUTCOME_LABELS[outcome],
+    );
+    // A reply might be an interview invite — or a rejection — so ask (#14).
+    const lead = leadId ? findLead(leadId) : undefined;
+    if (
+      outcome === "response-received" &&
+      lead &&
+      appSettings.autoStatus &&
+      isJobOpen(lead.status) &&
+      OPEN_LEAD_STATUSES.indexOf(lead.status) < OPEN_LEAD_STATUSES.indexOf("interview")
+    ) {
+      toast.info("Got a reply — move to Interview?", `${lead.title} · ${lead.company}`, {
+        label: "Move to Interview",
+        onClick: () => void setLeadStatus(lead.id, "interview"),
+      });
+    }
   } catch (e) {
     toast.error("Couldn't update reminder", e instanceof Error ? e.message : undefined);
   }
@@ -595,6 +662,7 @@ export async function saveJd(
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const res = await saveJdAction(leadId, jdText);
   await refresh();
+  if (res.ok) announceAutoStatus(res.autoStatus);
   return res;
 }
 
@@ -606,6 +674,7 @@ export async function summarizeJd(
 ): Promise<{ ok: true; summary: string } | { ok: false; error: string }> {
   const res = await summarizeJdAction(leadId, jdText);
   await refresh();
+  announceAutoStatus(res.autoStatus);
   return res;
 }
 
@@ -681,7 +750,10 @@ export function useAllFitScores(): Record<string, FitScore> {
 /** Compute/refresh the AI fit score for a (lead, resume) pair. */
 export async function scoreFit(leadId: string, resumeId: string) {
   const res = await scoreFitAction(leadId, resumeId);
-  if (res.ok) await refresh();
+  if (res.ok) {
+    await refresh();
+    announceAutoStatus(res.autoStatus);
+  }
   return res;
 }
 

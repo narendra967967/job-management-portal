@@ -55,6 +55,8 @@ export const profileSchema = z.object({
 export const followUpsSchema = z.object({
   reminderIntervalDays: zDayCount,
   staleLeadDays: zDayCount,
+  autoStatus: z.boolean().default(true),
+  maxFollowUps: z.coerce.number().int().min(0).max(5).default(2),
 });
 
 export const gmailConfigSchema = z.object({

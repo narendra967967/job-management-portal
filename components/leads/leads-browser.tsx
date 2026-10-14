@@ -19,7 +19,6 @@ import {
   BellPlus,
   Bell,
   Send,
-  ExternalLink,
   Gauge,
   Flag,
   AlertTriangle,
@@ -59,7 +58,6 @@ import {
   SourceChip,
   TOP_CHOICE_CARD,
   TopChoiceStar,
-  openPostingLabel,
 } from "@/components/leads/lead-meta";
 import { fitBand } from "@/lib/fit";
 import { useSearchQuery } from "@/lib/search-store";
@@ -1501,16 +1499,7 @@ function LeadCard({
               </span>
             )}
           </button>
-          <a
-            href={lead.canonicalJobUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label={openPostingLabel(lead)}
-            title={openPostingLabel(lead)}
-            className="inline-flex size-11 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:size-9"
-          >
-            <ExternalLink className="size-4" aria-hidden />
-          </a>
+          {/* "Open on <platform>" lives in this menu (keeps the header narrow). */}
           <LeadCardMenu lead={lead} />
         </div>
       </div>

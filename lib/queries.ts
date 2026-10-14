@@ -85,6 +85,8 @@ export interface WorkspaceData {
   defaultResumeId: string | null;
   reminderIntervalDays: number;
   staleLeadDays: number;
+  autoStatus: boolean;
+  maxFollowUps: number;
   profile: Profile;
   google: GoogleConnection;
   aiSettings: AiSettings;
@@ -362,6 +364,8 @@ export async function loadWorkspace(userId: string): Promise<WorkspaceData> {
     defaultResumeId: settings?.defaultResumeId ?? resumes.find((r) => r.isDefault)?.id ?? null,
     reminderIntervalDays: settings?.reminderIntervalDays ?? 3,
     staleLeadDays: settings?.staleLeadDays ?? 14,
+    autoStatus: settings?.autoStatus ?? true,
+    maxFollowUps: settings?.maxFollowUps ?? 2,
     profile,
     google,
     aiSettings,
