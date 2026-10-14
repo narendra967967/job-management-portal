@@ -169,6 +169,13 @@
       "when": 1791998779680,
       "tag": "0023_lead_status_pipeline_source_topchoice",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1792006555579,
+      "tag": "0024_premium_notes_salary_pause_followups",
+      "breakpoints": true
     }
   ]
 }

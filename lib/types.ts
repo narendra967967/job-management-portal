@@ -356,3 +356,28 @@ export interface AiSettings {
   keyConfigured: boolean;
   keyLast4: string | null;
 }
+
+/**
+ * AI salary-expectation estimate for one job (premium). Generated from the JD,
+ * location/country and the user's résumé by the user's own AI key — an
+ * estimate from the model's general knowledge, NOT live market data.
+ */
+export interface SalaryInsight {
+  /** ISO 4217 code, e.g. "INR". */
+  currency: string;
+  /** Annual figures (the norm for salary talk), in `currency` units. */
+  low: number;
+  typical: number;
+  high: number;
+  /** What the user could reasonably ask for. */
+  suggestedAsk: number;
+  /** "Low" / "Medium" / "High" — how much the model trusts its own estimate. */
+  confidence: "low" | "medium" | "high";
+  summary: string;
+  factors: string[];
+  tips: string[];
+  /** What the estimate was based on (shown to the user). */
+  basis: { country: string; resumeLabel: string | null };
+  /** ISO timestamp it was generated. */
+  generatedAt: string;
+}

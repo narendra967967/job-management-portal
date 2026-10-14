@@ -29,6 +29,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { user } from "./auth-schema";
+import type { SalaryInsight } from "../lib/types";
 
 // Raw bytes column (node-postgres returns/accepts a Buffer).
 const bytea = customType<{ data: Buffer; driverData: Buffer }>({
@@ -159,6 +160,9 @@ export const jobLeadDetails = pgTable("job_lead_details", {
   jdText: text("jd_text"),
   aiSummary: text("ai_summary"),
   notes: text("notes"),
+  // AI salary-expectation estimate for this job (premium) + when it was made.
+  salaryInsight: jsonb("salary_insight").$type<SalaryInsight>(),
+  salaryInsightAt: timestamp("salary_insight_at", { withTimezone: true }),
 });
 
 /** Recruiter / referral contacts tied to a lead (maps Contact). */
@@ -340,6 +344,10 @@ export const userSettings = pgTable("user_settings", {
     .references(() => user.id, { onDelete: "cascade" }),
   reminderIntervalDays: integer("reminder_interval_days").notNull().default(3), // FR-5.1
   staleLeadDays: integer("stale_lead_days").notNull().default(14), // FR-2.4
+  // Move a lead's status forward automatically from what the user does on it.
+  autoStatus: boolean("auto_status").notNull().default(true),
+  // How many follow-ups are scheduled automatically after the first (FR-5.4).
+  maxFollowUps: integer("max_follow_ups").notNull().default(2),
   // How often the Gmail sync should run for this user (hours): 24/12/6/3/1.
   syncIntervalHours: integer("sync_interval_hours").notNull().default(24),
   defaultResumeId: uuid("default_resume_id").references(() => resumes.id, {
@@ -471,6 +479,9 @@ export const plans = pgTable("plans", {
   // null = unlimited.
   limitResumes: integer("limit_resumes"),
   allowCustomPrompts: boolean("allow_custom_prompts").notNull().default(false),
+  // Premium feature switches.
+  allowNotes: boolean("allow_notes").notNull().default(false),
+  allowSalaryInsight: boolean("allow_salary_insight").notNull().default(false),
   features: text("features").array().notNull().default(sql`'{}'::text[]`),
   popular: boolean("popular").notNull().default(false),
   status: planStatus("status").notNull().default("active"),
@@ -689,6 +700,21 @@ export const gmailConfig = pgTable("gmail_config", {
   subjectKeywords: text("subject_keywords"),
   lookbackDays: integer("lookback_days").notNull().default(30),
   connected: boolean("connected").notNull().default(false),
+  // Set while the user has paused syncing (null = active). Stays connected.
+  syncPausedAt: timestamp("sync_paused_at", { withTimezone: true }),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date()),
+});
+
+/** One personal notepad per user (premium for users; always on for admins). */
+export const userNotes = pgTable("user_notes", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  // Sanitized rich-text HTML.
+  content: text("content").notNull().default(""),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .defaultNow()
