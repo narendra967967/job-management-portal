@@ -4,7 +4,8 @@
 // Our contentEditable editors escape typed "<"/">" to entities, so there are no stray
 // raw brackets to worry about. Sanitize on write; render the stored (safe) HTML.
 
-const ALLOWED_TAGS = new Set(["p", "br", "b", "strong", "i", "em", "u", "ul", "ol", "li"]);
+// "div": contentEditable (Chrome) wraps new lines in <div>; keep them so line breaks survive.
+const ALLOWED_TAGS = new Set(["p", "div", "br", "b", "strong", "i", "em", "u", "ul", "ol", "li"]);
 
 export function sanitizeRichText(html: string): string {
   if (!html) return "";

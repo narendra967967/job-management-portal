@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { adminSignOut } from "@/lib/auth-admin-client";
+import { AdminNotesButton } from "@/components/admin/admin-notes-button";
 
 interface Item {
   href?: string;
@@ -293,6 +294,7 @@ export function AdminShell({
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <header className="flex shrink-0 items-center gap-3 border-b bg-card px-4 py-3 md:px-6">
           <h1 className="text-base font-semibold md:text-lg">{title}</h1>
+          <AdminNotesButton />
         </header>
         <main className="flex-1 overflow-y-auto p-4 md:p-6">{children}</main>
       </div>

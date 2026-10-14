@@ -12,6 +12,7 @@ import {
   PlanChip,
 } from "@/components/app-shell/top-bar";
 import { AutoSync } from "@/components/app-shell/auto-sync";
+import { NotesButton } from "@/components/notes/notes-button";
 import { Toaster } from "@/components/ui/toast";
 import {
   AddLeadProvider,
@@ -76,7 +77,11 @@ export default async function DashboardLayout({
               <PlanChip className="hidden sm:inline-flex" />
               <TopBarStats className="hidden sm:flex" />
               <HeaderAddLeadButton />
-              <SupportIconButton />
+              <NotesButton />
+              {/* On phones the floating help bubble covers this — keep room for search. */}
+              <div className="hidden sm:block">
+                <SupportIconButton />
+              </div>
               <NotificationsMenu />
             </div>
           </div>

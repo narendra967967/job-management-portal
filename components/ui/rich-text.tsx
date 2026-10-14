@@ -29,10 +29,15 @@ export function RichText({
   value,
   onChange,
   placeholder,
+  editorClassName,
+  ariaLabel,
 }: {
   value: string;
   onChange: (html: string) => void;
   placeholder?: string;
+  /** Extra classes for the editable area (e.g. a taller, scrolling notepad). */
+  editorClassName?: string;
+  ariaLabel?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -64,11 +69,15 @@ export function RichText({
         contentEditable
         suppressContentEditableWarning
         onInput={emit}
+        role="textbox"
+        aria-multiline="true"
+        aria-label={ariaLabel}
         data-placeholder={placeholder}
         className={cn(
           "min-h-28 px-3 py-2 text-sm outline-none",
           "[&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_b]:font-semibold [&_strong]:font-semibold",
           "empty:before:text-muted-foreground empty:before:content-[attr(data-placeholder)]",
+          editorClassName,
         )}
       />
     </div>
