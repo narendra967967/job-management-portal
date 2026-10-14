@@ -36,6 +36,12 @@ import {
 } from "@/lib/types";
 import { StatusBadge } from "@/components/leads/status-badge";
 import {
+  SourceChip,
+  TOP_CHOICE_CARD,
+  TopChoiceStar,
+  openPostingLabel,
+} from "@/components/leads/lead-meta";
+import {
   LeadActions,
   AddContactDialog,
   useLeadActionDialogs,
@@ -99,7 +105,7 @@ const OUTCOME_BANNER: Record<
   withdrawn: {
     icon: Undo2,
     className:
-      "border-status-reviewing-foreground/25 bg-status-reviewing text-status-reviewing-foreground",
+      "border-status-shortlisted-foreground/25 bg-status-shortlisted text-status-shortlisted-foreground",
   },
   "no-response": {
     icon: CircleSlash,
@@ -185,9 +191,15 @@ export function LeadDetailContent({
   return (
     <div className="space-y-5">
       {/* Header */}
-      <div className="rounded-2xl border bg-card p-4 md:p-5">
+      <div
+        className={cn(
+          "rounded-2xl border bg-card p-4 md:p-5",
+          lead.topChoice && TOP_CHOICE_CARD,
+        )}
+      >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
+            {lead.topChoice && <TopChoiceStar className="mb-2" />}
             <h1 className="text-lg leading-snug font-medium md:text-xl">
               {lead.title}
             </h1>
@@ -195,6 +207,7 @@ export function LeadDetailContent({
               <MapPin className="size-4 shrink-0" aria-hidden />
               {lead.company} · {lead.location}
             </p>
+            <SourceChip lead={lead} className="mt-2" />
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
             <StatusBadge status={status} />
@@ -352,7 +365,7 @@ export function LeadDetailContent({
             className={cn(buttonVariants({ variant: "outline" }), "px-4")}
           >
             <ExternalLink className="size-4" aria-hidden />
-            Open on LinkedIn
+            {openPostingLabel(lead)}
           </a>
         </div>
       </div>
@@ -450,7 +463,7 @@ function OverviewTab({ leadId, detail }: { leadId: string; detail?: JobLeadDetai
       <section className="rounded-xl border bg-card p-4">
         <h2 className="text-sm font-medium">Job description</h2>
         <p className="mt-0.5 text-xs text-muted-foreground">
-          Open the listing on LinkedIn, copy the description, and paste it here.
+          Open the job posting, copy the description, and paste it here.
         </p>
         <div className="mt-3">
           <MarkdownEditor

@@ -81,7 +81,7 @@ export function LeadRemindersDialog({
                       "flex size-9 shrink-0 items-center justify-center rounded-md",
                       done
                         ? "bg-status-applied text-status-applied-foreground"
-                        : "bg-status-reviewing text-status-reviewing-foreground",
+                        : "bg-status-shortlisted text-status-shortlisted-foreground",
                     )}
                   >
                     <Clock className="size-4" aria-hidden />

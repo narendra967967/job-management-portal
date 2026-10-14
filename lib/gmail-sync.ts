@@ -31,6 +31,7 @@ import {
   GOOGLE_NOT_CONNECTED,
 } from "@/lib/gmail";
 import { parseLinkedInAlert } from "@/lib/linkedin-parser";
+import { sourceFromUrl } from "@/lib/lead-source";
 import { isWithinQuietHours } from "@/lib/quiet-hours";
 
 export interface SyncResult {
@@ -146,6 +147,8 @@ export async function runSyncForUser(userId: string): Promise<SyncResult> {
               postedRelative: d.postedRelative,
               canonicalJobUrl: d.canonicalJobUrl,
               sourceMessageId: id,
+              source: sourceFromUrl(d.canonicalJobUrl),
+              origin: "system",
             });
             inserted++;
           } else if (isJobOpen(existing.status)) {

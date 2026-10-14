@@ -10,7 +10,9 @@ import {
   ChevronRight,
   ChevronDown,
   Sparkles,
-  Timer,
+  ListChecks,
+  MessagesSquare,
+  Award,
   CheckCircle2,
   Archive,
   UserPlus,
@@ -33,6 +35,7 @@ import {
   isJobOpen,
   isReadyForAction,
   fitScoreKey,
+  normalizeLeadStatus,
   type CloseOutcome,
   type JobLead,
   type LeadStatus,
@@ -41,6 +44,23 @@ import { StatusBadge } from "@/components/leads/status-badge";
 import { useLeadActionDialogs } from "@/components/leads/lead-actions";
 import { LeadDetailDialog } from "@/components/leads/lead-detail-dialog";
 import { LeadRemindersDialog } from "@/components/leads/lead-reminders-dialog";
+import {
+  ORIGIN_OPTIONS,
+  TOP_CHOICE_OPTIONS,
+  countLeadMetaFilters,
+  matchesLeadMeta,
+  sourceOptions,
+  type OriginFilter,
+  type SourceFilter,
+  type TopChoiceFilter,
+} from "@/components/leads/lead-filters";
+import {
+  LeadCardMenu,
+  SourceChip,
+  TOP_CHOICE_CARD,
+  TopChoiceStar,
+  openPostingLabel,
+} from "@/components/leads/lead-meta";
 import { fitBand } from "@/lib/fit";
 import { useSearchQuery } from "@/lib/search-store";
 import {
@@ -218,12 +238,12 @@ const STATUS_META: Record<
     num: "text-status-new-foreground",
     tint: "from-status-new/40",
   },
-  reviewing: {
-    icon: Timer,
-    bar: "bg-status-reviewing-foreground",
-    chip: "bg-status-reviewing text-status-reviewing-foreground",
-    num: "text-status-reviewing-foreground",
-    tint: "from-status-reviewing/40",
+  shortlisted: {
+    icon: ListChecks,
+    bar: "bg-status-shortlisted-foreground",
+    chip: "bg-status-shortlisted text-status-shortlisted-foreground",
+    num: "text-status-shortlisted-foreground",
+    tint: "from-status-shortlisted/40",
   },
   applied: {
     icon: CheckCircle2,
@@ -231,6 +251,20 @@ const STATUS_META: Record<
     chip: "bg-status-applied text-status-applied-foreground",
     num: "text-status-applied-foreground",
     tint: "from-status-applied/45",
+  },
+  interview: {
+    icon: MessagesSquare,
+    bar: "bg-status-interview-foreground",
+    chip: "bg-status-interview text-status-interview-foreground",
+    num: "text-status-interview-foreground",
+    tint: "from-status-interview/45",
+  },
+  "offer-received": {
+    icon: Award,
+    bar: "bg-status-offer-received-foreground",
+    chip: "bg-status-offer-received text-status-offer-received-foreground",
+    num: "text-status-offer-received-foreground",
+    tint: "from-status-offer-received/45",
   },
   discarded: {
     icon: Archive,
@@ -329,6 +363,9 @@ export function LeadsBrowser({ scope = "all" }: { scope?: LeadsScope }) {
   const [countryFilter, setCountryFilter] = useState<string>("all");
   const [titleFilter, setTitleFilter] = useState<string>("all");
   const [tagFilter, setTagFilter] = useState<string>("all");
+  const [topChoiceFilter, setTopChoiceFilter] = useState<TopChoiceFilter>("all");
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
+  const [originFilter, setOriginFilter] = useState<OriginFilter>("all");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange>("all");
   const [customFrom, setCustomFrom] = useState("");
@@ -348,7 +385,14 @@ export function LeadsBrowser({ scope = "all" }: { scope?: LeadsScope }) {
       const raw = sessionStorage.getItem(filtersKey);
       if (raw) {
         const v = JSON.parse(raw) as Record<string, unknown>;
-        if (typeof v.statusFilter === "string") setStatusFilter(v.statusFilter as StatusFilter);
+        // A saved status may predate a rename ("reviewing" → "shortlisted").
+        if (typeof v.statusFilter === "string")
+          setStatusFilter(
+            v.statusFilter === "all" ? "all" : (normalizeLeadStatus(v.statusFilter) ?? "all"),
+          );
+        if (typeof v.topChoiceFilter === "string") setTopChoiceFilter(v.topChoiceFilter as TopChoiceFilter);
+        if (typeof v.sourceFilter === "string") setSourceFilter(v.sourceFilter as SourceFilter);
+        if (typeof v.originFilter === "string") setOriginFilter(v.originFilter as OriginFilter);
         if (typeof v.bucketFilter === "string") setBucketFilter(v.bucketFilter as ArchiveBucket | "all");
         if (typeof v.locationFilter === "string") setLocationFilter(v.locationFilter as LocationFilter);
         if (typeof v.countryFilter === "string") setCountryFilter(v.countryFilter);
@@ -376,6 +420,9 @@ export function LeadsBrowser({ scope = "all" }: { scope?: LeadsScope }) {
           countryFilter,
           titleFilter,
           tagFilter,
+          topChoiceFilter,
+          sourceFilter,
+          originFilter,
           dateRange,
           customFrom,
           customTo,
@@ -394,6 +441,9 @@ export function LeadsBrowser({ scope = "all" }: { scope?: LeadsScope }) {
     countryFilter,
     titleFilter,
     tagFilter,
+    topChoiceFilter,
+    sourceFilter,
+    originFilter,
     dateRange,
     customFrom,
     customTo,
@@ -449,8 +499,10 @@ export function LeadsBrowser({ scope = "all" }: { scope?: LeadsScope }) {
   const counts = useMemo(() => {
     const c: Record<LeadStatus, number> = {
       new: 0,
-      reviewing: 0,
+      shortlisted: 0,
       applied: 0,
+      interview: 0,
+      "offer-received": 0,
       discarded: 0,
       closed: 0,
     };
@@ -490,6 +542,13 @@ export function LeadsBrowser({ scope = "all" }: { scope?: LeadsScope }) {
       out = out.filter((l) => countryOf(l.location) === countryFilter);
     if (titleFilter !== "all") out = out.filter((l) => l.title === titleFilter);
     if (tagFilter !== "all") out = out.filter((l) => l.tags.includes(tagFilter));
+    out = out.filter((l) =>
+      matchesLeadMeta(l, {
+        topChoice: topChoiceFilter,
+        source: sourceFilter,
+        origin: originFilter,
+      }),
+    );
     const q = search.trim().toLowerCase();
     if (q)
       out = out.filter(
@@ -561,14 +620,14 @@ export function LeadsBrowser({ scope = "all" }: { scope?: LeadsScope }) {
         out.sort(newest);
     }
     return out;
-  }, [leads, scope, statusFilter, bucketFilter, locationFilter, countryFilter, titleFilter, tagFilter, search, dateBounds, sort, fitScores, resumeChoice, defaultResumeId, pendingLeadIds, staleCutoff]);
+  }, [leads, scope, statusFilter, bucketFilter, locationFilter, countryFilter, titleFilter, tagFilter, topChoiceFilter, sourceFilter, originFilter, search, dateBounds, sort, fitScores, resumeChoice, defaultResumeId, pendingLeadIds, staleCutoff]);
 
   // Reset to the first page (and clear any selection) whenever the result set
   // changes.
   useEffect(() => {
     setPage(1);
     setSelected(new Set());
-  }, [scope, statusFilter, bucketFilter, locationFilter, countryFilter, titleFilter, tagFilter, search, dateBounds, sort]);
+  }, [scope, statusFilter, bucketFilter, locationFilter, countryFilter, titleFilter, tagFilter, topChoiceFilter, sourceFilter, originFilter, search, dateBounds, sort]);
 
   const activeFilterCount =
     ((scope === "archive" ? bucketFilter !== "all" : statusFilter !== "all")
@@ -578,6 +637,11 @@ export function LeadsBrowser({ scope = "all" }: { scope?: LeadsScope }) {
     (countryFilter !== "all" ? 1 : 0) +
     (titleFilter !== "all" ? 1 : 0) +
     (tagFilter !== "all" ? 1 : 0) +
+    countLeadMetaFilters({
+      topChoice: topChoiceFilter,
+      source: sourceFilter,
+      origin: originFilter,
+    }) +
     (dateRange !== "all" ? 1 : 0);
 
   const clearAllFilters = () => {
@@ -587,6 +651,9 @@ export function LeadsBrowser({ scope = "all" }: { scope?: LeadsScope }) {
     setCountryFilter("all");
     setTitleFilter("all");
     setTagFilter("all");
+    setTopChoiceFilter("all");
+    setSourceFilter("all");
+    setOriginFilter("all");
     setDateRange("all");
     setCustomFrom("");
     setCustomTo("");
@@ -639,7 +706,12 @@ export function LeadsBrowser({ scope = "all" }: { scope?: LeadsScope }) {
   return (
     <div className="space-y-4">
       {/* Metric row — each box also filters the list. Hidden on mobile. */}
-      <div className="hidden gap-2.5 sm:grid sm:grid-cols-3">
+      <div
+        className={cn(
+          "hidden gap-2.5 sm:grid sm:grid-cols-3",
+          scope !== "archive" && "lg:grid-cols-5",
+        )}
+      >
         {scope === "archive"
           ? ARCHIVE_BUCKETS.map((b) => {
               const meta = BUCKET_META[b];
@@ -792,6 +864,24 @@ export function LeadsBrowser({ scope = "all" }: { scope?: LeadsScope }) {
                     ]}
                   />
                 )}
+                <DrawerSelect
+                  label="Top Choice"
+                  value={topChoiceFilter}
+                  onValueChange={(v) => setTopChoiceFilter(v as TopChoiceFilter)}
+                  options={TOP_CHOICE_OPTIONS}
+                />
+                <DrawerSelect
+                  label="Source"
+                  value={sourceFilter}
+                  onValueChange={(v) => setSourceFilter(v as SourceFilter)}
+                  options={sourceOptions(leads)}
+                />
+                <DrawerSelect
+                  label="Added by"
+                  value={originFilter}
+                  onValueChange={(v) => setOriginFilter(v as OriginFilter)}
+                  options={ORIGIN_OPTIONS}
+                />
                 <DrawerSelect
                   label="Workplace"
                   value={locationFilter}
@@ -1356,7 +1446,10 @@ function LeadCard({
         }}
         aria-label={`View details for ${lead.title}`}
         className={cn(
-          "group relative flex h-full cursor-pointer flex-col overflow-hidden rounded-2xl border bg-card shadow-xs transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+          "group relative flex h-full cursor-pointer flex-col overflow-hidden rounded-2xl border bg-card transition-all hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+          lead.topChoice
+            ? TOP_CHOICE_CARD
+            : "shadow-xs hover:border-primary/40 hover:shadow-md",
           selected && "border-primary/60 ring-2 ring-primary/30",
         )}
       >
@@ -1412,17 +1505,19 @@ function LeadCard({
             href={lead.canonicalJobUrl}
             target="_blank"
             rel="noopener noreferrer"
-            aria-label="Open on LinkedIn"
-            title="Open on LinkedIn"
+            aria-label={openPostingLabel(lead)}
+            title={openPostingLabel(lead)}
             className="inline-flex size-11 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:size-9"
           >
             <ExternalLink className="size-4" aria-hidden />
           </a>
+          <LeadCardMenu lead={lead} />
         </div>
       </div>
 
       {/* BODY — clicking anywhere here opens the detail modal */}
       <div className="flex flex-1 flex-col p-4">
+        {lead.topChoice && <TopChoiceStar className="mb-1.5 self-start" />}
         <h3 className="text-sm leading-snug font-medium group-hover:text-primary">
           {lead.title}
         </h3>
@@ -1449,6 +1544,7 @@ function LeadCard({
           </span>
         </div>
         <div className="mt-auto flex flex-wrap items-center gap-1.5 pt-3">
+          <SourceChip lead={lead} />
           {lead.tags.map((tag, i) => (
             <span
               key={`${tag}-${i}`}
@@ -1478,7 +1574,7 @@ function LeadCard({
             </span>
           )}
           {lead.hasDueReminder && (
-            <span className="inline-flex items-center gap-1 rounded-md bg-status-reviewing px-2 py-0.5 text-[11px] font-medium text-status-reviewing-foreground">
+            <span className="inline-flex items-center gap-1 rounded-md bg-status-shortlisted px-2 py-0.5 text-[11px] font-medium text-status-shortlisted-foreground">
               <Clock className="size-3" aria-hidden />
               Follow-up due
             </span>

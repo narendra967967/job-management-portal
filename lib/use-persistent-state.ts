@@ -12,7 +12,9 @@ type StoreKind = "local" | "session";
 // Persisted keys, centralised so logout can clear the right ones.
 export const PERSIST_KEYS = {
   leadsView: "jmp.leads.view", // local
-  kanbanColumns: "jmp.kanban.columns", // local
+  // v2: statuses changed (Shortlisted/Interview/Offer Received) — start everyone
+  // on the new default columns instead of a stale saved set.
+  kanbanColumns: "jmp.kanban.columns.v2", // local
   kanbanSort: "jmp.kanban.sort", // local (per-column sort)
   leadsFilters: "jmp.leads.filters", // session (reset on logout)
 } as const;

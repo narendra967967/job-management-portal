@@ -126,7 +126,7 @@ export function DeactivatedNotice({ name }: { name: string }) {
 export function RenewNotice({ name }: { name: string }) {
   return (
     <Shell>
-      <span className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-status-reviewing text-status-reviewing-foreground">
+      <span className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-status-shortlisted text-status-shortlisted-foreground">
         <Clock className="size-7" aria-hidden />
       </span>
       <h1 className="mt-5 text-xl font-semibold tracking-tight">Your plan has expired</h1>

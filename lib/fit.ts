@@ -30,8 +30,8 @@ export function fitBand(score: number): FitBand {
   if (score >= 55)
     return {
       label: "Fair fit",
-      chip: "bg-status-reviewing text-status-reviewing-foreground",
-      text: "text-status-reviewing-foreground",
+      chip: "bg-status-shortlisted text-status-shortlisted-foreground",
+      text: "text-status-shortlisted-foreground",
       advice: "Partial match — consider a more tailored resume.",
     };
   return {

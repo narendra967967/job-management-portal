@@ -66,6 +66,12 @@ import {
   type LeadFilterValue,
 } from "@/components/leads/lead-filters";
 import { usePersistentState, PERSIST_KEYS } from "@/lib/use-persistent-state";
+import {
+  LeadCardMenu,
+  SourceChip,
+  TOP_CHOICE_CARD,
+  TopChoiceStar,
+} from "@/components/leads/lead-meta";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import {
   Dialog,
@@ -80,8 +86,10 @@ import { cn } from "@/lib/utils";
 
 const COL_ACCENT: Record<LeadStatus, string> = {
   new: "bg-status-new-foreground",
-  reviewing: "bg-status-reviewing-foreground",
+  shortlisted: "bg-status-shortlisted-foreground",
   applied: "bg-status-applied-foreground",
+  interview: "bg-status-interview-foreground",
+  "offer-received": "bg-status-offer-received-foreground",
   discarded: "bg-status-discarded-foreground",
   closed: "bg-status-closed-foreground",
 };
@@ -89,13 +97,15 @@ const COL_ACCENT: Record<LeadStatus, string> = {
 // Colour-coded, prominent count pill per column.
 const COL_COUNT: Record<LeadStatus, string> = {
   new: "bg-status-new text-status-new-foreground",
-  reviewing: "bg-status-reviewing text-status-reviewing-foreground",
+  shortlisted: "bg-status-shortlisted text-status-shortlisted-foreground",
   applied: "bg-status-applied text-status-applied-foreground",
+  interview: "bg-status-interview text-status-interview-foreground",
+  "offer-received": "bg-status-offer-received text-status-offer-received-foreground",
   discarded: "bg-status-discarded text-status-discarded-foreground",
   closed: "bg-status-closed text-status-closed-foreground",
 };
 
-const DEFAULT_COLUMNS: LeadStatus[] = ["new", "reviewing", "applied"];
+const DEFAULT_COLUMNS: LeadStatus[] = ["new", "shortlisted", "applied", "interview", "offer-received"];
 
 // Recommended background colours for the close-outcome buttons: green = good,
 // red = rejected, amber = withdrew, grey = no response.
@@ -105,7 +115,7 @@ const OUTCOME_BTN: Record<CloseOutcome, string> = {
   rejected:
     "border-transparent bg-destructive/10 text-destructive hover:bg-destructive/20",
   withdrawn:
-    "border-transparent bg-status-reviewing text-status-reviewing-foreground hover:bg-status-reviewing/80",
+    "border-transparent bg-status-shortlisted text-status-shortlisted-foreground hover:bg-status-shortlisted/80",
   "no-response":
     "border-transparent bg-status-discarded text-status-discarded-foreground hover:bg-status-discarded/80",
 };
@@ -305,8 +315,10 @@ export function LeadsKanban() {
   const byStatus = useMemo(() => {
     const map: Record<LeadStatus, JobLead[]> = {
       new: [],
-      reviewing: [],
+      shortlisted: [],
       applied: [],
+      interview: [],
+      "offer-received": [],
       discarded: [],
       closed: [],
     };
@@ -625,22 +637,27 @@ function KanbanCard({
   return (
     <div
       className={cn(
-        "rounded-lg border bg-card p-3 shadow-xs",
-        overlay ? "w-72 rotate-2 shadow-lg" : "hover:border-primary/40",
+        "rounded-lg border bg-card p-3",
+        lead.topChoice ? TOP_CHOICE_CARD : "shadow-xs",
+        overlay ? "w-72 rotate-2 shadow-lg" : !lead.topChoice && "hover:border-primary/40",
       )}
     >
       <div className="mb-1.5 flex items-center justify-between gap-2">
         <StatusBadge status={lead.status} />
-        <span
-          className={cn(
-            "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold tabular-nums",
-            cached && band ? band.chip : "bg-muted text-muted-foreground",
-          )}
-        >
-          <Gauge className="size-2.5" aria-hidden />
-          {cached ? cached.score : "NC"}
-        </span>
+        <div className="flex items-center gap-0.5">
+          <span
+            className={cn(
+              "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold tabular-nums",
+              cached && band ? band.chip : "bg-muted text-muted-foreground",
+            )}
+          >
+            <Gauge className="size-2.5" aria-hidden />
+            {cached ? cached.score : "NC"}
+          </span>
+          {!overlay && <LeadCardMenu lead={lead} className="-my-2 -mr-2" />}
+        </div>
       </div>
+      {lead.topChoice && <TopChoiceStar className="mb-1" />}
       <p className="line-clamp-2 text-sm font-medium leading-snug">{lead.title}</p>
       <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
         <MapPin className="size-3 shrink-0" aria-hidden />
@@ -649,6 +666,7 @@ function KanbanCard({
         </span>
       </p>
       <div className="mt-2 flex flex-wrap items-center gap-1">
+        <SourceChip lead={lead} className="px-1.5 text-[10px]" />
         {ready && (
           <Badge className="bg-status-applied text-status-applied-foreground">
             <CheckCircle2 className="size-2.5" aria-hidden />
@@ -656,7 +674,7 @@ function KanbanCard({
           </Badge>
         )}
         {lead.hasDueReminder && (
-          <Badge className="bg-status-reviewing text-status-reviewing-foreground">
+          <Badge className="bg-status-shortlisted text-status-shortlisted-foreground">
             <Clock className="size-2.5" aria-hidden />
             Due
           </Badge>

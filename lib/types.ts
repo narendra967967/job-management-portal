@@ -2,36 +2,89 @@
 // renders against mock data; the Drizzle schema in Phase 2 is written to match
 // what these reveal the UI actually needs.
 
-// Pipeline phases: new/reviewing/applied are OPEN (actionable); discarded and
-// closed are TERMINAL. A job only generates/accepts tasks & reminders while open.
+// Pipeline phases: new → shortlisted → applied → interview → offer-received are
+// OPEN (actionable); discarded and closed are TERMINAL. A job only
+// generates/accepts tasks & reminders while open. An offer stays open (you can
+// still negotiate / follow up) until you close it with an outcome.
 export type LeadStatus =
   | "new"
-  | "reviewing"
+  | "shortlisted"
   | "applied"
+  | "interview"
+  | "offer-received"
   | "discarded"
   | "closed";
 
 export const LEAD_STATUSES: LeadStatus[] = [
   "new",
-  "reviewing",
+  "shortlisted",
   "applied",
+  "interview",
+  "offer-received",
   "discarded",
   "closed",
 ];
 
 /** Statuses where the job is still being worked. */
-export const OPEN_LEAD_STATUSES: LeadStatus[] = ["new", "reviewing", "applied"];
+export const OPEN_LEAD_STATUSES: LeadStatus[] = [
+  "new",
+  "shortlisted",
+  "applied",
+  "interview",
+  "offer-received",
+];
 
 export function isJobOpen(status: LeadStatus): boolean {
-  return status === "new" || status === "reviewing" || status === "applied";
+  return OPEN_LEAD_STATUSES.includes(status);
 }
 
 export const LEAD_STATUS_LABELS: Record<LeadStatus, string> = {
   new: "New",
-  reviewing: "Reviewing",
+  shortlisted: "Shortlisted",
   applied: "Applied",
+  interview: "Interview",
+  "offer-received": "Offer Received",
   discarded: "Discarded",
   closed: "Closed",
+};
+
+/**
+ * Normalize a status read from somewhere that may predate a rename (browser
+ * storage, old links). "reviewing" became "shortlisted"; anything unknown → null.
+ */
+export function normalizeLeadStatus(raw: unknown): LeadStatus | null {
+  if (raw === "reviewing") return "shortlisted";
+  return LEAD_STATUSES.includes(raw as LeadStatus) ? (raw as LeadStatus) : null;
+}
+
+/** Where a lead was found (the job board / platform). Derived from its URL. */
+export type LeadSource =
+  | "linkedin"
+  | "naukri"
+  | "indeed"
+  | "glassdoor"
+  | "wellfound"
+  | "instahyre"
+  | "foundit"
+  | "other";
+
+export const LEAD_SOURCE_LABELS: Record<LeadSource, string> = {
+  linkedin: "LinkedIn Jobs",
+  naukri: "Naukri",
+  indeed: "Indeed",
+  glassdoor: "Glassdoor",
+  wellfound: "Wellfound",
+  instahyre: "Instahyre",
+  foundit: "foundit",
+  other: "Other",
+};
+
+/** How a lead got into the app: synced automatically, or added by hand. */
+export type LeadOrigin = "system" | "manual";
+
+export const LEAD_ORIGIN_LABELS: Record<LeadOrigin, string> = {
+  system: "Added by system",
+  manual: "Added manually",
 };
 
 // How a job concluded (set when status === "closed").
@@ -118,6 +171,12 @@ export interface JobLead {
   linkedinJobId: string;
   status: LeadStatus;
   closeOutcome?: CloseOutcome | null; // set when status === "closed"
+  /** Platform the job was found on (from its URL). */
+  source: LeadSource;
+  /** Synced automatically ("system") or added by the user ("manual"). */
+  origin: LeadOrigin;
+  /** The user starred this job as a Top Choice. */
+  topChoice: boolean;
   capturedAt: string; // ISO date
   contactCount: number;
   hasDueReminder: boolean;

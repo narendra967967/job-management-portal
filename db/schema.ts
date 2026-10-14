@@ -46,11 +46,15 @@ export * from "./auth-schema";
 
 export const leadStatus = pgEnum("lead_status", [
   "new",
-  "reviewing",
+  "shortlisted",
   "applied",
+  "interview",
+  "offer-received",
   "discarded",
   "closed",
 ]);
+// How a lead got in: the Gmail sync ("system") or the Add-lead form ("manual").
+export const leadOrigin = pgEnum("lead_origin", ["system", "manual"]);
 export const closeOutcome = pgEnum("close_outcome", [
   "offer",
   "rejected",
@@ -110,6 +114,12 @@ export const jobLeads = pgTable(
     canonicalJobUrl: text("canonical_job_url").notNull(),
     status: leadStatus("status").notNull().default("new"),
     closeOutcome: closeOutcome("close_outcome"), // set only when status = closed
+    // Job platform, derived from the URL (lib/lead-source.ts). Text, not an enum,
+    // so a new platform is a code change only.
+    source: text("source").notNull().default("other"),
+    origin: leadOrigin("origin").notNull().default("manual"),
+    // Starred by the user (golden card + Top Choice filter).
+    topChoice: boolean("top_choice").notNull().default(false),
     capturedAt: timestamp("captured_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

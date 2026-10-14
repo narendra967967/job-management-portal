@@ -11,14 +11,24 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { getCurrentUserId } from "@/lib/current-user";
 import {
+  addContactSchema,
+  addReminderSchema,
   createLeadSchema,
   editLeadSchema,
   deleteLeadsSchema,
+  leadStatusSchema,
+  markSentSchema,
   parseInput,
+  reminderOutcomeSchema,
+  snoozeReminderSchema,
+  topChoiceSchema,
+  updateContactSchema,
+  zId,
   type CreateLeadInput,
   type EditLeadInput,
 } from "@/lib/schemas";
 import { extractLinkedInJobId } from "@/lib/linkedin-parser";
+import { sourceFromUrl } from "@/lib/lead-source";
 import { loadWorkspace, type WorkspaceData } from "@/lib/queries";
 import {
   contacts as contactsT,
@@ -47,6 +57,49 @@ function ymd(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/**
+ * Throw unless every referenced row belongs to `userId`. Inserts below carry
+ * the caller's user_id, but the FKs alone would still let a crafted request
+ * hang rows off SOMEONE ELSE's lead/contact/message — so check ownership first.
+ */
+async function assertOwned(
+  tx: Tx | typeof db,
+  userId: string,
+  refs: { leadId?: string; contactId?: string; outreachMessageId?: string | null },
+) {
+  if (refs.leadId) {
+    const [r] = await tx
+      .select({ id: leadsT.id })
+      .from(leadsT)
+      .where(and(eq(leadsT.id, refs.leadId), eq(leadsT.userId, userId)));
+    if (!r) throw new Error("Lead not found.");
+  }
+  if (refs.contactId) {
+    const [r] = await tx
+      .select({ id: contactsT.id })
+      .from(contactsT)
+      .where(
+        and(
+          eq(contactsT.id, refs.contactId),
+          eq(contactsT.userId, userId),
+          ...(refs.leadId ? [eq(contactsT.leadId, refs.leadId)] : []),
+        ),
+      );
+    if (!r) throw new Error("Contact not found.");
+  }
+  if (refs.outreachMessageId) {
+    const [r] = await tx
+      .select({ id: outreachT.id })
+      .from(outreachT)
+      .where(
+        and(eq(outreachT.id, refs.outreachMessageId), eq(outreachT.userId, userId)),
+      );
+    if (!r) throw new Error("Message not found.");
+  }
+}
+
 /* ---------------- leads ---------------- */
 
 export async function setLeadStatusAction(
@@ -55,19 +108,27 @@ export async function setLeadStatusAction(
   closeOutcome: CloseOutcome | null = null,
 ) {
   const userId = await getCurrentUserId();
+  const input = parseInput(leadStatusSchema, { leadId, status, closeOutcome });
+  const next = input.status as LeadStatus;
   await db.transaction(async (tx) => {
-    await tx
+    const [row] = await tx
       .update(leadsT)
-      .set({ status, closeOutcome: status === "closed" ? closeOutcome : null })
-      .where(and(eq(leadsT.id, leadId), eq(leadsT.userId, userId)));
+      .set({
+        status: next,
+        closeOutcome:
+          next === "closed" ? ((input.closeOutcome as CloseOutcome | null) ?? null) : null,
+      })
+      .where(and(eq(leadsT.id, input.leadId), eq(leadsT.userId, userId)))
+      .returning({ id: leadsT.id });
+    if (!row) throw new Error("Lead not found.");
     // Terminal → cancel pending reminders + open tasks for this job.
-    if (!isJobOpen(status)) {
+    if (!isJobOpen(next)) {
       await tx
         .update(remindersT)
         .set({ outcome: "closed" })
         .where(
           and(
-            eq(remindersT.leadId, leadId),
+            eq(remindersT.leadId, input.leadId),
             eq(remindersT.userId, userId),
             eq(remindersT.outcome, "pending"),
           ),
@@ -77,13 +138,25 @@ export async function setLeadStatusAction(
         .set({ status: "done", completedAt: new Date() })
         .where(
           and(
-            eq(tasksT.jobId, leadId),
+            eq(tasksT.jobId, input.leadId),
             eq(tasksT.userId, userId),
             eq(tasksT.status, "open"),
           ),
         );
     }
   });
+}
+
+/** Star / unstar a lead as a Top Choice. Scoped to the current user. */
+export async function setLeadTopChoiceAction(leadId: string, topChoice: boolean) {
+  const userId = await getCurrentUserId();
+  const input = parseInput(topChoiceSchema, { leadId, topChoice });
+  const [row] = await db
+    .update(leadsT)
+    .set({ topChoice: input.topChoice })
+    .where(and(eq(leadsT.id, input.leadId), eq(leadsT.userId, userId)))
+    .returning({ id: leadsT.id });
+  if (!row) throw new Error("Lead not found.");
 }
 
 /**
@@ -178,6 +251,8 @@ export async function createLeadAction(input: {
           postedRelative: "just now",
           canonicalJobUrl: data.jobUrl,
           status: data.status as LeadStatus,
+          source: sourceFromUrl(data.jobUrl),
+          origin: "manual",
         })
         .returning({ id: leadsT.id });
 
@@ -254,6 +329,8 @@ export async function updateLeadAction(
           tags: data.tags,
           canonicalJobUrl: data.jobUrl,
           linkedinJobId,
+          // The URL may have changed platform; origin (system/manual) never changes.
+          source: sourceFromUrl(data.jobUrl),
           // status is intentionally not edited here (managed by the status control).
         })
         .where(and(eq(leadsT.id, leadId), eq(leadsT.userId, userId)))
@@ -303,14 +380,16 @@ export async function addContactAction(input: {
   aiParsed: boolean;
 }) {
   const userId = await getCurrentUserId();
+  const data = parseInput(addContactSchema, input);
+  await assertOwned(db, userId, { leadId: data.leadId });
   await db.insert(contactsT).values({
     userId,
-    leadId: input.leadId,
-    name: input.name,
-    title: input.title,
-    linkedinUrl: input.linkedinUrl || null,
-    connectionType: input.connectionType,
-    aiParsed: input.aiParsed,
+    leadId: data.leadId,
+    name: data.name,
+    title: data.title,
+    linkedinUrl: data.linkedinUrl || null,
+    connectionType: data.connectionType as ConnectionType,
+    aiParsed: data.aiParsed,
   });
 }
 
@@ -324,22 +403,25 @@ export async function updateContactAction(
   },
 ) {
   const userId = await getCurrentUserId();
+  const contactId = parseInput(zId, id);
+  const data = parseInput(updateContactSchema, patch);
   await db
     .update(contactsT)
     .set({
-      name: patch.name,
-      title: patch.title,
-      linkedinUrl: patch.linkedinUrl || null,
-      connectionType: patch.connectionType,
+      name: data.name,
+      title: data.title,
+      linkedinUrl: data.linkedinUrl || null,
+      connectionType: data.connectionType as ConnectionType,
     })
-    .where(and(eq(contactsT.id, id), eq(contactsT.userId, userId)));
+    .where(and(eq(contactsT.id, contactId), eq(contactsT.userId, userId)));
 }
 
 export async function deleteContactAction(id: string) {
   const userId = await getCurrentUserId();
+  const contactId = parseInput(zId, id);
   await db
     .delete(contactsT)
-    .where(and(eq(contactsT.id, id), eq(contactsT.userId, userId)));
+    .where(and(eq(contactsT.id, contactId), eq(contactsT.userId, userId)));
 }
 
 /* ---------------- outreach: mark sent (+ schedule reminder + task) ---------- */
@@ -352,7 +434,10 @@ export async function markSentAction(input: {
   draftBody: string;
 }) {
   const userId = await getCurrentUserId();
+  const data = parseInput(markSentSchema, input);
   await db.transaction(async (tx) => {
+    // The contact must be the user's AND belong to this lead.
+    await assertOwned(tx, userId, { leadId: data.leadId, contactId: data.contactId });
     const now = new Date();
     // Follow-up interval comes from the user's saved settings (FR-5.1).
     const [settings] = await tx
@@ -366,13 +451,13 @@ export async function markSentAction(input: {
       .insert(outreachT)
       .values({
         userId,
-        leadId: input.leadId,
-        contactId: input.contactId,
-        kind: input.kind,
-        channel: input.channel,
+        leadId: data.leadId,
+        contactId: data.contactId,
+        kind: data.kind as OutreachKind,
+        channel: data.channel,
         status: "sent",
-        draftBody: input.draftBody,
-        sentBody: input.draftBody,
+        draftBody: data.draftBody,
+        sentBody: data.draftBody,
         resumeId: null,
         createdAt: now,
         sentAt: now,
@@ -382,9 +467,9 @@ export async function markSentAction(input: {
     const [lead] = await tx
       .select({ company: leadsT.company })
       .from(leadsT)
-      .where(and(eq(leadsT.id, input.leadId), eq(leadsT.userId, userId)));
+      .where(and(eq(leadsT.id, data.leadId), eq(leadsT.userId, userId)));
 
-    const seq = await nextSequence(tx, userId, input.leadId);
+    const seq = await nextSequence(tx, userId, data.leadId);
     // Schedule intervalDays ahead, keeping the current time of day.
     const due = new Date();
     due.setDate(due.getDate() + intervalDays);
@@ -395,7 +480,7 @@ export async function markSentAction(input: {
       .insert(remindersT)
       .values({
         userId,
-        leadId: input.leadId,
+        leadId: data.leadId,
         // Link the reminder to the message it follows up, so we can explain why
         // it exists ("Follow-up on your … to …").
         outreachMessageId: msg.id,
@@ -408,7 +493,7 @@ export async function markSentAction(input: {
 
     await tx.insert(tasksT).values({
       userId,
-      jobId: input.leadId,
+      jobId: data.leadId,
       reminderId: rem.id,
       title: `Follow up — ${lead?.company ?? "lead"}`,
       kind: "follow-up",
@@ -439,32 +524,37 @@ export async function addReminderManualAction(input: {
   outreachMessageId: string | null;
 }) {
   const userId = await getCurrentUserId();
+  const data = parseInput(addReminderSchema, input);
   await db.transaction(async (tx) => {
+    await assertOwned(tx, userId, {
+      leadId: data.leadId,
+      outreachMessageId: data.outreachMessageId,
+    });
     const [lead] = await tx
       .select({ company: leadsT.company })
       .from(leadsT)
-      .where(and(eq(leadsT.id, input.leadId), eq(leadsT.userId, userId)));
-    const seq = await nextSequence(tx, userId, input.leadId);
+      .where(and(eq(leadsT.id, data.leadId), eq(leadsT.userId, userId)));
+    const seq = await nextSequence(tx, userId, data.leadId);
     const [rem] = await tx
       .insert(remindersT)
       .values({
         userId,
-        leadId: input.leadId,
-        outreachMessageId: input.outreachMessageId,
+        leadId: data.leadId,
+        outreachMessageId: data.outreachMessageId,
         sequence: seq,
-        dueDate: input.dueDate,
+        dueDate: data.dueDate,
         outcome: "pending",
         manual: true,
-        label: input.label || null,
+        label: data.label || null,
       })
       .returning({ id: remindersT.id });
     await tx.insert(tasksT).values({
       userId,
-      jobId: input.leadId,
+      jobId: data.leadId,
       reminderId: rem.id,
-      title: input.label || `Follow up — ${lead?.company ?? "lead"}`,
+      title: data.label || `Follow up — ${lead?.company ?? "lead"}`,
       kind: "follow-up",
-      dueDate: input.dueDate.slice(0, 10), // task board is day-granular
+      dueDate: data.dueDate.slice(0, 10), // task board is day-granular
       status: "open",
     });
   });
@@ -475,45 +565,49 @@ export async function setReminderOutcomeAction(
   outcome: ReminderOutcome,
 ) {
   const userId = await getCurrentUserId();
-  const done = outcome !== "pending";
+  const data = parseInput(reminderOutcomeSchema, { id, outcome });
+  const next = data.outcome as ReminderOutcome;
+  const done = next !== "pending";
   await db.transaction(async (tx) => {
     await tx
       .update(remindersT)
-      .set({ outcome })
-      .where(and(eq(remindersT.id, id), eq(remindersT.userId, userId)));
+      .set({ outcome: next })
+      .where(and(eq(remindersT.id, data.id), eq(remindersT.userId, userId)));
     await tx
       .update(tasksT)
       .set({
         status: done ? "done" : "open",
         completedAt: done ? new Date() : null,
       })
-      .where(and(eq(tasksT.reminderId, id), eq(tasksT.userId, userId)));
+      .where(and(eq(tasksT.reminderId, data.id), eq(tasksT.userId, userId)));
   });
 }
 
 export async function snoozeReminderAction(id: string, newDueDate: string) {
   const userId = await getCurrentUserId();
+  const data = parseInput(snoozeReminderSchema, { id, newDueDate });
   await db.transaction(async (tx) => {
     await tx
       .update(remindersT)
-      .set({ outcome: "pending", dueDate: newDueDate })
-      .where(and(eq(remindersT.id, id), eq(remindersT.userId, userId)));
+      .set({ outcome: "pending", dueDate: data.newDueDate })
+      .where(and(eq(remindersT.id, data.id), eq(remindersT.userId, userId)));
     await tx
       .update(tasksT)
-      .set({ status: "open", completedAt: null, dueDate: newDueDate.slice(0, 10) })
-      .where(and(eq(tasksT.reminderId, id), eq(tasksT.userId, userId)));
+      .set({ status: "open", completedAt: null, dueDate: data.newDueDate.slice(0, 10) })
+      .where(and(eq(tasksT.reminderId, data.id), eq(tasksT.userId, userId)));
   });
 }
 
 export async function deleteReminderAction(id: string) {
   const userId = await getCurrentUserId();
+  const reminderId = parseInput(zId, id);
   await db.transaction(async (tx) => {
     await tx
       .delete(tasksT)
-      .where(and(eq(tasksT.reminderId, id), eq(tasksT.userId, userId)));
+      .where(and(eq(tasksT.reminderId, reminderId), eq(tasksT.userId, userId)));
     await tx
       .delete(remindersT)
-      .where(and(eq(remindersT.id, id), eq(remindersT.userId, userId)));
+      .where(and(eq(remindersT.id, reminderId), eq(remindersT.userId, userId)));
   });
 }
 
@@ -521,15 +615,16 @@ export async function deleteReminderAction(id: string) {
 
 export async function completeTaskAction(id: string) {
   const userId = await getCurrentUserId();
+  const taskId = parseInput(zId, id);
   await db.transaction(async (tx) => {
     const [task] = await tx
       .select({ reminderId: tasksT.reminderId })
       .from(tasksT)
-      .where(and(eq(tasksT.id, id), eq(tasksT.userId, userId)));
+      .where(and(eq(tasksT.id, taskId), eq(tasksT.userId, userId)));
     await tx
       .update(tasksT)
       .set({ status: "done", completedAt: new Date() })
-      .where(and(eq(tasksT.id, id), eq(tasksT.userId, userId)));
+      .where(and(eq(tasksT.id, taskId), eq(tasksT.userId, userId)));
     if (task?.reminderId) {
       await tx
         .update(remindersT)

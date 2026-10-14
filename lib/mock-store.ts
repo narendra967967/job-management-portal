@@ -23,6 +23,7 @@ import {
   getWorkspace,
   markSentAction,
   setLeadStatusAction,
+  setLeadTopChoiceAction,
   setReminderOutcomeAction,
   snoozeReminderAction,
   updateContactAction,
@@ -261,6 +262,17 @@ export async function setLeadStatus(
     await setLeadStatusAction(leadId, status, closeOutcome);
     await refresh();
     statusToast(status, closeOutcome);
+  } catch (e) {
+    toast.error("Couldn't update lead", e instanceof Error ? e.message : undefined);
+  }
+}
+
+/** Star / unstar a lead as a Top Choice. */
+export async function setLeadTopChoice(leadId: string, topChoice: boolean) {
+  try {
+    await setLeadTopChoiceAction(leadId, topChoice);
+    await refresh();
+    toast.success(topChoice ? "Marked as Top Choice" : "Removed from Top Choices");
   } catch (e) {
     toast.error("Couldn't update lead", e instanceof Error ? e.message : undefined);
   }
@@ -885,8 +897,10 @@ function todayISO(): string {
 }
 
 function nudgeMessage(status: LeadStatus): string {
+  if (status === "offer-received") return "Decide on the offer, then close this lead";
+  if (status === "interview") return "Prepare, then log how the interview went";
   if (status === "applied") return "Follow up or close this lead";
-  if (status === "reviewing") return "Decide next step or close";
+  if (status === "shortlisted") return "Decide next step or close";
   return "Review — add a contact, or discard";
 }
 

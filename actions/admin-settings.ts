@@ -14,6 +14,7 @@ import { authAdmin } from "@/lib/auth-admin";
 import { encryptSecret } from "@/lib/crypto";
 import { validatePassword } from "@/lib/admin/password-policy-server";
 import { getAppName } from "@/lib/branding";
+import { LEAD_STATUSES, type LeadStatus } from "@/lib/types";
 import { sendAppEmail, SMTP_NOT_CONFIGURED } from "@/lib/email";
 import {
   appAssets,
@@ -206,7 +207,7 @@ export async function updateCronAction(input: unknown): Promise<Result> {
       purgeEnabled: z.boolean(),
       purgeDays: z.number().int().min(1).max(3650),
       purgeStatuses: z
-        .array(z.enum(["new", "reviewing", "applied", "discarded", "closed"]))
+        .array(z.enum(LEAD_STATUSES as [LeadStatus, ...LeadStatus[]]))
         .max(10),
     })
     .safeParse(input);

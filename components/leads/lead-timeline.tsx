@@ -20,7 +20,7 @@ const KIND_META: Record<
   message: { icon: Send, dot: "bg-status-applied text-status-applied-foreground" },
   reminder: {
     icon: Clock,
-    dot: "bg-status-reviewing text-status-reviewing-foreground",
+    dot: "bg-status-shortlisted text-status-shortlisted-foreground",
   },
   "reminder-resolved": {
     icon: CircleCheck,

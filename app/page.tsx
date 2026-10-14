@@ -31,7 +31,7 @@ export const dynamic = "force-dynamic";
 const FEATURES = [
   { icon: Inbox, title: "Capture every opportunity", body: "Job alerts from your inbox become tracked leads automatically — no copy-paste, nothing slips by." },
   { icon: Gauge, title: "AI fit scoring", body: "One click summarizes a role and scores how well it fits you — so you spend time on the ones worth it." },
-  { icon: LayoutGrid, title: "A pipeline you keep", body: "Move every lead through tidy stages — new, reviewing, applied, outreach — on a board you actually maintain." },
+  { icon: LayoutGrid, title: "A pipeline you keep", body: "Move every lead through tidy stages — new, shortlisted, applied, interview, offer — on a board you actually maintain." },
   { icon: Send, title: "Apply with better content", body: "Draft tailored applications and outreach with AI, then send them yourself. Jobtiva never applies for you." },
   { icon: Bell, title: "Reminders that stick", body: "Follow-up nudges and to-dos so a role that's right for you never falls through the cracks." },
   { icon: ShieldCheck, title: "Private by design", body: "Any account you connect is read-only, your data stays yours, and nothing leaves without you." },
@@ -46,7 +46,7 @@ const STEPS = [
 // Faux kanban board shown in the hero.
 const BOARD: { label: string; count: number; cards: { role: string; co: string; score?: string }[] }[] = [
   { label: "New", count: 5, cards: [{ role: "Senior Product Manager", co: "Acme Corp", score: "92" }, { role: "Growth Marketer", co: "Nimbus" }] },
-  { label: "Reviewing", count: 4, cards: [{ role: "UX Designer", co: "Pixela", score: "85" }, { role: "Data Analyst", co: "Corewave" }] },
+  { label: "Shortlisted", count: 4, cards: [{ role: "UX Designer", co: "Pixela", score: "85" }, { role: "Data Analyst", co: "Corewave" }] },
   { label: "Applied", count: 3, cards: [{ role: "Backend Engineer", co: "Flowbase", score: "88" }] },
 ];
 

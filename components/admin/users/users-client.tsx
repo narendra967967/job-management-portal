@@ -69,7 +69,7 @@ function ExpiryCell({ iso, onPlan }: { iso: string | null; onPlan?: boolean }) {
     tone = "text-destructive font-medium";
     note = "expired";
   } else if (d <= 30) {
-    tone = "text-status-reviewing-foreground font-medium";
+    tone = "text-status-shortlisted-foreground font-medium";
     note = `${d}d left`;
   }
   return (

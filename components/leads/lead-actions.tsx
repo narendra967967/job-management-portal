@@ -69,6 +69,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { TopChoiceMenuItem, openPostingLabel } from "@/components/leads/lead-meta";
 import { cn } from "@/lib/utils";
 
 type DialogKind = "contact" | "reminder" | "outreach" | "edit" | null;
@@ -135,6 +136,7 @@ export function LeadActions({
             <Pencil className="size-4" aria-hidden />
             Edit lead
           </DropdownMenuItem>
+          <TopChoiceMenuItem lead={lead} />
           <DropdownMenuSub>
             <DropdownMenuSubTrigger>
               <CircleDot className="size-4" aria-hidden />
@@ -210,7 +212,7 @@ export function LeadActions({
             }
           >
             <ExternalLink className="size-4" aria-hidden />
-            Open on LinkedIn
+            {openPostingLabel(lead)}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

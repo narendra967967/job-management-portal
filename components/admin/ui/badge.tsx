@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 const VARIANTS: Record<string, string> = {
   neutral: "bg-muted text-muted-foreground",
   success: "bg-status-applied text-status-applied-foreground",
-  warning: "bg-status-reviewing text-status-reviewing-foreground",
+  warning: "bg-status-shortlisted text-status-shortlisted-foreground",
   danger: "bg-destructive/10 text-destructive",
 };
 

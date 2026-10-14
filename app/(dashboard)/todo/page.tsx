@@ -145,7 +145,7 @@ function NudgeSection({ nudges }: { nudges: TodoNudge[] }) {
             key={lead.id}
             className="group flex items-center gap-2 rounded-xl border border-dashed bg-card p-3 transition-colors hover:border-primary/40"
           >
-            <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-md bg-status-reviewing text-status-reviewing-foreground">
+            <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-md bg-status-shortlisted text-status-shortlisted-foreground">
               <AlertTriangle className="size-4" aria-hidden />
             </span>
             <Link href={`/leads/${lead.id}`} className="min-w-0 flex-1">

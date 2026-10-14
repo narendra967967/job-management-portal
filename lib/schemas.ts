@@ -11,8 +11,12 @@ import "server-only";
 import { z } from "zod";
 import { splitMobile, validateMobile } from "@/lib/validation";
 import {
+  CLOSE_OUTCOME_LABELS,
   CONNECTION_TYPE_LABELS,
+  LEAD_STATUSES,
+  OPEN_LEAD_STATUSES,
   OUTREACH_KIND_LABELS,
+  REMINDER_OUTCOME_LABELS,
   RESUME_ALLOWED_EXT,
 } from "@/lib/types";
 
@@ -139,7 +143,7 @@ export const promptPreviewSchema = z.object({
 
 // Only the open statuses are offered here; closing a lead (with an outcome)
 // stays in the existing detail-page flow.
-const OPEN_STATUS = ["new", "reviewing", "applied"] as const;
+const OPEN_STATUS = OPEN_LEAD_STATUSES;
 
 /** Required http(s) URL — the per-user dedupe key. */
 const zRequiredUrl = z
@@ -210,6 +214,71 @@ export const deleteLeadsSchema = z
 export const scoreFitSchema = z.object({
   leadId: zId,
   resumeId: zId,
+});
+
+/** Change a lead's pipeline status (+ outcome when closing). */
+export const leadStatusSchema = z.object({
+  leadId: zId,
+  status: zEnum(LEAD_STATUSES, "Unknown status."),
+  closeOutcome: zEnum(Object.keys(CLOSE_OUTCOME_LABELS), "Unknown outcome.").nullable(),
+});
+
+/** Star / unstar a lead as a Top Choice. */
+export const topChoiceSchema = z.object({
+  leadId: zId,
+  topChoice: z.boolean(),
+});
+
+/* ---------------- contacts / outreach / reminders / tasks ---------------- */
+
+const contactFields = {
+  name: z.string().trim().min(1, "Contact name is required.").max(120),
+  title: z.string().trim().max(120).default(""),
+  // Lenient on purpose: the form accepts "linkedin.com/in/…" without a scheme.
+  linkedinUrl: z.string().trim().max(2048).default(""),
+  connectionType: zEnum(Object.keys(CONNECTION_TYPE_LABELS), "Unknown connection type."),
+};
+
+export const addContactSchema = z.object({
+  leadId: zId,
+  ...contactFields,
+  aiParsed: z.boolean().default(false),
+});
+
+export const updateContactSchema = z.object(contactFields);
+
+export const markSentSchema = z.object({
+  leadId: zId,
+  contactId: zId,
+  kind: zEnum(Object.keys(OUTREACH_KIND_LABELS), "Unknown outreach type."),
+  channel: z.string().trim().min(1).max(40),
+  draftBody: z.string().trim().min(1, "The message is empty.").max(20000),
+});
+
+/** A date or date-time string ("2026-10-14" or an ISO timestamp) that parses. */
+const zDateish = z
+  .string()
+  .trim()
+  .refine(
+    (v) => /^\d{4}-\d{2}-\d{2}/.test(v) && !Number.isNaN(Date.parse(v)),
+    "Enter a valid date.",
+  );
+
+export const addReminderSchema = z.object({
+  leadId: zId,
+  dueDate: zDateish,
+  label: z.string().trim().max(200).default(""),
+  outreachMessageId: zId.nullable().default(null),
+});
+
+export const reminderOutcomeSchema = z.object({
+  id: zId,
+  outcome: zEnum(Object.keys(REMINDER_OUTCOME_LABELS), "Unknown reminder outcome."),
+});
+
+export const snoozeReminderSchema = z.object({
+  id: zId,
+  newDueDate: zDateish,
 });
 
 /* ---------------- helper ---------------- */

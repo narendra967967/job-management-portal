@@ -40,7 +40,7 @@ export default function RemindersPage() {
                     "flex size-10 shrink-0 items-center justify-center rounded-full",
                     done
                       ? "bg-status-applied text-status-applied-foreground"
-                      : "bg-status-reviewing text-status-reviewing-foreground",
+                      : "bg-status-shortlisted text-status-shortlisted-foreground",
                   )}
                 >
                   <Clock className="size-5" aria-hidden />

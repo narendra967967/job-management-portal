@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 const BAR_COLORS = [
   "bg-destructive",
   "bg-destructive",
-  "bg-status-reviewing-foreground",
+  "bg-status-shortlisted-foreground",
   "bg-status-new-foreground",
   "bg-status-applied-foreground",
 ];

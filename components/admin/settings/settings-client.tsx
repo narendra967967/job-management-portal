@@ -43,6 +43,7 @@ import {
   removeBrandingAction,
 } from "@/actions/admin-settings";
 import { cn } from "@/lib/utils";
+import { LEAD_STATUSES, LEAD_STATUS_LABELS } from "@/lib/types";
 
 interface SettingsSection {
   id: string;
@@ -214,13 +215,7 @@ function SaveRow({ busy, saved, error, onSave, label = "Save changes" }: { busy:
 
 const TIMEZONES = ["Asia/Kolkata", "UTC", "America/New_York", "America/Los_Angeles", "Europe/London", "Asia/Dubai", "Asia/Singapore"];
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const LEAD_STATUSES = [
-  { value: "new", label: "New" },
-  { value: "reviewing", label: "Reviewing" },
-  { value: "applied", label: "Applied" },
-  { value: "discarded", label: "Discarded" },
-  { value: "closed", label: "Closed" },
-];
+const PURGE_STATUS_OPTIONS = LEAD_STATUSES.map((s) => ({ value: s, label: LEAD_STATUS_LABELS[s] }));
 
 function MultiSelect({ options, selected, onChange, placeholder = "Select…" }: { options: { value: string; label: string }[]; selected: string[]; onChange: (next: string[]) => void; placeholder?: string }) {
   const [open, setOpen] = useState(false);
@@ -835,7 +830,7 @@ function CronCard({ initial }: { initial: AdminSettings["cron"] }) {
           <Input type="number" min={1} value={purgeDays} onChange={(e) => setPurgeDays(e.target.value)} />
         </Field>
         <Field label="Applies to statuses" hint="Only leads in these statuses are purged">
-          <MultiSelect options={LEAD_STATUSES} selected={purgeStatuses} onChange={setPurgeStatuses} placeholder="Select statuses…" />
+          <MultiSelect options={PURGE_STATUS_OPTIONS} selected={purgeStatuses} onChange={setPurgeStatuses} placeholder="Select statuses…" />
         </Field>
       </div>
 

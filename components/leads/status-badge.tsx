@@ -3,8 +3,10 @@ import { LEAD_STATUS_LABELS, type LeadStatus } from "@/lib/types";
 
 const statusClasses: Record<LeadStatus, string> = {
   new: "bg-status-new text-status-new-foreground",
-  reviewing: "bg-status-reviewing text-status-reviewing-foreground",
+  shortlisted: "bg-status-shortlisted text-status-shortlisted-foreground",
   applied: "bg-status-applied text-status-applied-foreground",
+  interview: "bg-status-interview text-status-interview-foreground",
+  "offer-received": "bg-status-offer-received text-status-offer-received-foreground",
   discarded: "bg-status-discarded text-status-discarded-foreground",
   closed: "bg-status-closed text-status-closed-foreground",
 };

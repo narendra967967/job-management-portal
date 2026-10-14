@@ -73,7 +73,7 @@ export function TopBarStats({ className }: { className?: string }) {
         className={cn(
           "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors",
           dueCount > 0
-            ? "border-status-reviewing/50 bg-status-reviewing/60 text-status-reviewing-foreground hover:bg-status-reviewing"
+            ? "border-status-shortlisted/50 bg-status-shortlisted/60 text-status-shortlisted-foreground hover:bg-status-shortlisted"
             : "border-border bg-card text-muted-foreground hover:bg-muted",
         )}
       >
@@ -133,7 +133,7 @@ export function NotificationsMenu() {
                   className={cn(
                     "mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md",
                     n.kind === "reminder-due"
-                      ? "bg-status-reviewing text-status-reviewing-foreground"
+                      ? "bg-status-shortlisted text-status-shortlisted-foreground"
                       : n.kind === "system"
                         ? "bg-primary/10 text-primary"
                         : "bg-ai-muted text-ai",

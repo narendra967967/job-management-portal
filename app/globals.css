@@ -49,10 +49,16 @@
 
   --color-status-new: var(--status-new);
   --color-status-new-foreground: var(--status-new-foreground);
-  --color-status-reviewing: var(--status-reviewing);
-  --color-status-reviewing-foreground: var(--status-reviewing-foreground);
+  --color-status-shortlisted: var(--status-shortlisted);
+  --color-status-shortlisted-foreground: var(--status-shortlisted-foreground);
   --color-status-applied: var(--status-applied);
   --color-status-applied-foreground: var(--status-applied-foreground);
+  --color-top-choice: var(--top-choice);
+  --color-top-choice-foreground: var(--top-choice-foreground);
+  --color-status-interview: var(--status-interview);
+  --color-status-interview-foreground: var(--status-interview-foreground);
+  --color-status-offer-received: var(--status-offer-received);
+  --color-status-offer-received-foreground: var(--status-offer-received-foreground);
   --color-status-discarded: var(--status-discarded);
   --color-status-discarded-foreground: var(--status-discarded-foreground);
   --color-status-closed: var(--status-closed);
@@ -93,10 +99,16 @@
   /* Status tints: slightly more saturated so the dashboard reads with colour. */
   --status-new: oklch(0.925 0.05 255);
   --status-new-foreground: oklch(0.42 0.15 262);
-  --status-reviewing: oklch(0.93 0.075 82);
-  --status-reviewing-foreground: oklch(0.47 0.11 62);
+  --status-shortlisted: oklch(0.93 0.075 82);
+  --status-shortlisted-foreground: oklch(0.47 0.11 62);
   --status-applied: oklch(0.92 0.08 150);
   --status-applied-foreground: oklch(0.44 0.12 152);
+  --top-choice: oklch(0.8 0.15 82);
+  --top-choice-foreground: oklch(0.5 0.11 68);
+  --status-interview: oklch(0.925 0.06 200);
+  --status-interview-foreground: oklch(0.45 0.1 210);
+  --status-offer-received: oklch(0.93 0.06 345);
+  --status-offer-received-foreground: oklch(0.48 0.16 350);
   --status-discarded: oklch(0.94 0.006 274);
   --status-discarded-foreground: oklch(0.5 0.012 274);
   --status-closed: oklch(0.93 0.04 300);
@@ -141,10 +153,16 @@
 
   --status-new: oklch(0.3 0.06 255);
   --status-new-foreground: oklch(0.85 0.07 250);
-  --status-reviewing: oklch(0.32 0.06 70);
-  --status-reviewing-foreground: oklch(0.87 0.09 80);
+  --status-shortlisted: oklch(0.32 0.06 70);
+  --status-shortlisted-foreground: oklch(0.87 0.09 80);
   --status-applied: oklch(0.3 0.06 145);
   --status-applied-foreground: oklch(0.85 0.11 140);
+  --top-choice: oklch(0.8 0.14 85);
+  --top-choice-foreground: oklch(0.88 0.12 88);
+  --status-interview: oklch(0.31 0.05 210);
+  --status-interview-foreground: oklch(0.86 0.08 200);
+  --status-offer-received: oklch(0.32 0.07 350);
+  --status-offer-received-foreground: oklch(0.87 0.09 345);
   --status-discarded: oklch(0.32 0.005 90);
   --status-discarded-foreground: oklch(0.78 0.006 90);
   --status-closed: oklch(0.33 0.06 300);
@@ -181,6 +199,13 @@
     /* Smooth anchor scrolling on the marketing page (disabled under reduce-motion). */
     scroll-behavior: smooth;
   }
+}
+
+/* Top Choice lead cards: a soft golden glow (no animation, so nothing to reduce). */
+@utility top-choice-glow {
+  box-shadow:
+    0 0 0 1px color-mix(in oklch, var(--top-choice) 60%, transparent),
+    0 0 20px -3px color-mix(in oklch, var(--top-choice) 65%, transparent);
 }
 
 /* Accessibility: honour the OS "reduce motion" setting — neutralise animations

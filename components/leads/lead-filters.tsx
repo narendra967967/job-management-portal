@@ -8,7 +8,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { SlidersHorizontal, X } from "lucide-react";
-import type { JobLead } from "@/lib/types";
+import {
+  LEAD_ORIGIN_LABELS,
+  LEAD_SOURCE_LABELS,
+  type JobLead,
+  type LeadOrigin,
+  type LeadSource,
+} from "@/lib/types";
 import { countryOf } from "@/components/leads/leads-browser";
 import { Input } from "@/components/ui/input";
 import {
@@ -21,7 +27,59 @@ import {
 
 export type DateRange = "all" | "7d" | "30d" | "90d" | "custom";
 
-export interface LeadFilterValue {
+/* ---- Top Choice / Source / Added-by: shared by the list and board filters ---- */
+
+export type TopChoiceFilter = "all" | "top";
+export type SourceFilter = "all" | LeadSource;
+export type OriginFilter = "all" | LeadOrigin;
+
+export interface LeadMetaFilter {
+  topChoice?: TopChoiceFilter;
+  source?: SourceFilter;
+  origin?: OriginFilter;
+}
+
+/** Missing keys (filters saved before these existed) count as "all". */
+export function matchesLeadMeta(l: JobLead, f: LeadMetaFilter): boolean {
+  if (f.topChoice === "top" && !l.topChoice) return false;
+  if (f.source && f.source !== "all" && l.source !== f.source) return false;
+  if (f.origin && f.origin !== "all" && l.origin !== f.origin) return false;
+  return true;
+}
+
+export function countLeadMetaFilters(f: LeadMetaFilter): number {
+  return (
+    (f.topChoice === "top" ? 1 : 0) +
+    (f.source && f.source !== "all" ? 1 : 0) +
+    (f.origin && f.origin !== "all" ? 1 : 0)
+  );
+}
+
+export const TOP_CHOICE_OPTIONS = [
+  { value: "all", label: "All leads" },
+  { value: "top", label: "Top Choices only" },
+];
+
+export const ORIGIN_OPTIONS = [
+  { value: "all", label: "System and manual" },
+  ...(Object.keys(LEAD_ORIGIN_LABELS) as LeadOrigin[]).map((o) => ({
+    value: o,
+    label: LEAD_ORIGIN_LABELS[o],
+  })),
+];
+
+/** Source options: only the platforms that actually appear in the given leads. */
+export function sourceOptions(leads: JobLead[]) {
+  const present = new Set(leads.map((l) => l.source));
+  return [
+    { value: "all", label: "All sources" },
+    ...(Object.keys(LEAD_SOURCE_LABELS) as LeadSource[])
+      .filter((s) => present.has(s))
+      .map((s) => ({ value: s, label: LEAD_SOURCE_LABELS[s] })),
+  ];
+}
+
+export interface LeadFilterValue extends LeadMetaFilter {
   location: "all" | "remote";
   country: string;
   title: string;
@@ -32,6 +90,9 @@ export interface LeadFilterValue {
 }
 
 export const EMPTY_LEAD_FILTERS: LeadFilterValue = {
+  topChoice: "all",
+  source: "all",
+  origin: "all",
   location: "all",
   country: "all",
   title: "all",
@@ -61,7 +122,7 @@ function dateBounds(v: LeadFilterValue): { from: string | null; to: string | nul
 
 /** Apply the non-status filters to a set of leads. */
 export function applyLeadFilters(leads: JobLead[], v: LeadFilterValue): JobLead[] {
-  let out = leads;
+  let out = leads.filter((l) => matchesLeadMeta(l, v));
   if (v.location === "remote") out = out.filter((l) => l.remote);
   if (v.country !== "all") out = out.filter((l) => countryOf(l.location) === v.country);
   if (v.title !== "all") out = out.filter((l) => l.title === v.title);
@@ -74,6 +135,7 @@ export function applyLeadFilters(leads: JobLead[], v: LeadFilterValue): JobLead[
 
 export function countActiveLeadFilters(v: LeadFilterValue): number {
   return (
+    countLeadMetaFilters(v) +
     (v.location !== "all" ? 1 : 0) +
     (v.country !== "all" ? 1 : 0) +
     (v.title !== "all" ? 1 : 0) +
@@ -187,6 +249,24 @@ export function LeadFilters({
               </div>
 
               <div className="flex-1 space-y-4 overflow-y-auto p-4">
+                <DrawerSelect
+                  label="Top Choice"
+                  value={value.topChoice ?? "all"}
+                  onValueChange={(v) => set({ topChoice: v as TopChoiceFilter })}
+                  options={TOP_CHOICE_OPTIONS}
+                />
+                <DrawerSelect
+                  label="Source"
+                  value={value.source ?? "all"}
+                  onValueChange={(v) => set({ source: v as SourceFilter })}
+                  options={sourceOptions(leads)}
+                />
+                <DrawerSelect
+                  label="Added by"
+                  value={value.origin ?? "all"}
+                  onValueChange={(v) => set({ origin: v as OriginFilter })}
+                  options={ORIGIN_OPTIONS}
+                />
                 <DrawerSelect
                   label="Workplace"
                   value={value.location}
