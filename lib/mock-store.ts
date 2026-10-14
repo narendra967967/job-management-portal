@@ -49,6 +49,7 @@ import {
   updateSyncIntervalAction,
 } from "@/actions/settings";
 import { setSyncPausedAction, syncMyGmailAction } from "@/actions/gmail-sync";
+import { generateSalaryInsightAction } from "@/actions/salary";
 import { saveJdAction, summarizeJdAction, scoreFitAction } from "@/actions/ai";
 import { markNotificationsReadAction } from "@/actions/notifications";
 import { toast } from "@/components/ui/toast";
@@ -317,6 +318,13 @@ export async function setLeadStatus(
   } catch (e) {
     toast.error("Couldn't update lead", e instanceof Error ? e.message : undefined);
   }
+}
+
+/** Ask AI for a salary estimate for this job (premium); saved on the job. */
+export async function generateSalaryInsight(leadId: string) {
+  const res = await generateSalaryInsightAction(leadId);
+  if (res.ok) await refresh();
+  return res;
 }
 
 /** Star / unstar a lead as a Top Choice. */

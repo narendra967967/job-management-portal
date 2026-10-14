@@ -206,6 +206,8 @@ export interface JobLeadDetail {
   jdText: string | null;
   aiSummary: string | null;
   notes: string | null;
+  /** Saved AI salary estimate (premium), or null. */
+  salaryInsight: SalaryInsight | null;
 }
 
 export interface Contact {

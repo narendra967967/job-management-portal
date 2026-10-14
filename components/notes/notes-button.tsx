@@ -5,10 +5,10 @@
 // a lock; opening it explains the feature and offers the upgrade request.
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Lock, NotebookPen, Sparkles } from "lucide-react";
+import { Lock, NotebookPen } from "lucide-react";
 import { getMyNotesAction, saveMyNotesAction } from "@/actions/notes";
 import { useFeatures } from "@/lib/mock-store";
-import { useContactSupport } from "@/components/support/contact-support";
+import { PremiumLockedDialog } from "@/components/premium/premium-locked-dialog";
 import { RichText } from "@/components/ui/rich-text";
 import { Button } from "@/components/ui/button";
 import {
@@ -57,7 +57,11 @@ export function NotesButton() {
         (hasNotes ? (
           <NotesDialog onClose={() => setOpen(false)} />
         ) : (
-          <NotesLockedDialog onClose={() => setOpen(false)} />
+          <PremiumLockedDialog
+            feature="Notes"
+            description="Keep a private notepad right inside Jobtiva — interview prep, questions to ask, follow-up ideas — always one click away."
+            onClose={() => setOpen(false)}
+          />
         ))}
     </>
   );
@@ -196,46 +200,6 @@ function NotesDialog({ onClose }: { onClose: () => void }) {
             Save now
           </Button>
           <Button onClick={onClose}>Done</Button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function NotesLockedDialog({ onClose }: { onClose: () => void }) {
-  const { open: openSupport } = useContactSupport();
-  return (
-    <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Lock className="size-4 text-primary" aria-hidden />
-            Notes is a premium feature
-          </DialogTitle>
-          <DialogDescription>
-            Keep a private notepad right inside Jobtiva — interview prep,
-            questions to ask, follow-up ideas — always one click away.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="flex justify-end gap-2">
-          <Button variant="outline" onClick={onClose}>
-            Not now
-          </Button>
-          <Button
-            onClick={() => {
-              onClose();
-              openSupport({
-                category: "billing",
-                subject: "Upgrade request — Notes",
-                message:
-                  "<p>I'd like to upgrade my plan to use Notes. Please help me move to a plan that includes it.</p>",
-                source: "plan",
-              });
-            }}
-          >
-            <Sparkles className="size-4" aria-hidden />
-            Request upgrade
-          </Button>
         </div>
       </DialogContent>
     </Dialog>

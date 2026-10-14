@@ -203,6 +203,7 @@ export async function loadWorkspace(userId: string): Promise<WorkspaceData> {
       jdText: d.jdText,
       aiSummary: d.aiSummary,
       notes: d.notes,
+      salaryInsight: d.salaryInsight ?? null,
     };
   }
 

@@ -5,13 +5,15 @@
 //  - SourceChip:   where the job came from + whether it was added by the system
 //  - TopChoiceStar / TOP_CHOICE_CARD: the Top Choice marker + golden glow
 
-import { Bot, ExternalLink, MoreHorizontal, PenLine, Star } from "lucide-react";
+import { useState } from "react";
+import { Bot, ExternalLink, Lock, MoreHorizontal, PenLine, Star, Wallet } from "lucide-react";
 import {
   LEAD_ORIGIN_LABELS,
   LEAD_SOURCE_LABELS,
   type JobLead,
 } from "@/lib/types";
-import { setLeadTopChoice } from "@/lib/mock-store";
+import { setLeadTopChoice, useFeatures } from "@/lib/mock-store";
+import { SalaryInsightDialog } from "@/components/leads/salary-insight";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,6 +44,8 @@ export function LeadCardMenu({
   className?: string;
 }) {
   const stop = (e: React.SyntheticEvent) => e.stopPropagation();
+  const { salaryInsight: hasSalary } = useFeatures();
+  const [salaryOpen, setSalaryOpen] = useState(false);
   return (
     // Events from the portalled menu still bubble through the React tree, so
     // this wrapper keeps them from opening the card (click) or dragging it.
@@ -63,6 +67,11 @@ export function LeadCardMenu({
           </DropdownMenuGroup>
           <DropdownMenuSeparator />
           <TopChoiceMenuItem lead={lead} />
+          <DropdownMenuItem onClick={() => setSalaryOpen(true)}>
+            <Wallet className="size-4" aria-hidden />
+            Salary insight
+            {!hasSalary && <Lock className="ml-auto size-3.5 opacity-60" aria-label="Premium" />}
+          </DropdownMenuItem>
           <DropdownMenuItem
             onClick={() => window.open(lead.canonicalJobUrl, "_blank", "noopener")}
           >
@@ -71,6 +80,7 @@ export function LeadCardMenu({
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+      {salaryOpen && <SalaryInsightDialog lead={lead} onClose={() => setSalaryOpen(false)} />}
     </span>
   );
 }

@@ -32,6 +32,7 @@ import {
 import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { cn, formatDateTime } from "@/lib/utils";
+import { useMounted } from "@/lib/use-mounted";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import {
   useProfile,
@@ -546,6 +547,7 @@ function GoogleCard() {
   const [settings, updateSettings] = useGmailSettings();
   const syncStatus = useGmailSync();
   const paused = !!syncStatus.pausedAt;
+  const mounted = useMounted(); // pause date is locale-dependent → client-only
   const [pausing, setPausing] = useState(false);
   const { confirm, dialog: confirmDialog } = useConfirm();
 
@@ -705,7 +707,7 @@ function GoogleCard() {
           </div>
           {paused && (
             <p className="text-xs text-status-shortlisted-foreground">
-              Syncing is paused{syncStatus.pausedAt ? ` since ${formatDateTime(syncStatus.pausedAt)}` : ""}. Your
+              Syncing is paused{mounted && syncStatus.pausedAt ? ` since ${formatDateTime(syncStatus.pausedAt)}` : ""}. Your
               Google account stays connected — no new job alerts are fetched until you resume.
             </p>
           )}

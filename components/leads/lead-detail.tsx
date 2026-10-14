@@ -41,6 +41,7 @@ import {
   TopChoiceStar,
   openPostingLabel,
 } from "@/components/leads/lead-meta";
+import { SalaryInsightSection } from "@/components/leads/salary-insight";
 import {
   LeadActions,
   AddContactDialog,
@@ -398,8 +399,9 @@ export function LeadDetailContent({
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="mt-4">
+        <TabsContent value="overview" className="mt-4 space-y-4">
           <OverviewTab leadId={lead.id} detail={detail} />
+          <SalaryInsightSection lead={lead} />
         </TabsContent>
         <TabsContent value="contacts" className="mt-4">
           <ContactsTab lead={lead} canAct={open} />
