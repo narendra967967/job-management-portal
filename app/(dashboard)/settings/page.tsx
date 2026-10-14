@@ -26,6 +26,8 @@ import {
   Crown,
   ArrowUpRight,
   type LucideIcon,
+  Pause,
+  Play,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
@@ -47,6 +49,7 @@ import {
   useGoogle,
   disconnectGoogle,
   syncGmail,
+  setSyncPaused,
   useSyncInterval,
   useGmailSync,
   useIngestErrors,
@@ -535,6 +538,9 @@ function PlanDetailsCard() {
 function GoogleCard() {
   const google = useGoogle();
   const [settings, updateSettings] = useGmailSettings();
+  const syncStatus = useGmailSync();
+  const paused = !!syncStatus.pausedAt;
+  const [pausing, setPausing] = useState(false);
   const { confirm, dialog: confirmDialog } = useConfirm();
 
   const [sendersText, setSendersText] = useState("");
@@ -619,12 +625,14 @@ function GoogleCard() {
         </div>
         <span
           className={
-            google.connected
-              ? "rounded-full bg-status-applied px-2.5 py-0.5 text-[11px] font-medium text-status-applied-foreground"
-              : "rounded-full bg-muted px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground"
+            google.connected && paused
+              ? "rounded-full bg-status-shortlisted px-2.5 py-0.5 text-[11px] font-medium text-status-shortlisted-foreground"
+              : google.connected
+                ? "rounded-full bg-status-applied px-2.5 py-0.5 text-[11px] font-medium text-status-applied-foreground"
+                : "rounded-full bg-muted px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground"
           }
         >
-          {google.connected ? "Connected" : "Not connected"}
+          {google.connected ? (paused ? "Connected · Paused" : "Connected") : "Not connected"}
         </span>
       </div>
 
@@ -645,9 +653,29 @@ function GoogleCard() {
                 {google.email ?? "Google account"}
               </span>
             </p>
-            <div className="flex items-center gap-2">
-              <Button onClick={runSync} disabled={syncing}>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                onClick={runSync}
+                disabled={syncing || paused}
+                title={paused ? "Resume syncing to fetch new job alerts" : undefined}
+              >
                 {syncing ? "Syncing…" : "Sync now"}
+              </Button>
+              <Button
+                variant="outline"
+                disabled={pausing}
+                onClick={async () => {
+                  setPausing(true);
+                  await setSyncPaused(!paused);
+                  setPausing(false);
+                }}
+              >
+                {paused ? (
+                  <Play className="size-4" aria-hidden />
+                ) : (
+                  <Pause className="size-4" aria-hidden />
+                )}
+                {paused ? "Resume sync" : "Pause sync"}
               </Button>
               <Button
                 variant="outline"
@@ -669,6 +697,12 @@ function GoogleCard() {
               </Button>
             </div>
           </div>
+          {paused && (
+            <p className="text-xs text-status-shortlisted-foreground">
+              Syncing is paused{syncStatus.pausedAt ? ` since ${formatDateTime(syncStatus.pausedAt)}` : ""}. Your
+              Google account stays connected — no new job alerts are fetched until you resume.
+            </p>
+          )}
           {syncMsg && (
             <p className="text-xs text-muted-foreground">{syncMsg}</p>
           )}

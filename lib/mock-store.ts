@@ -47,7 +47,7 @@ import {
   updateResumeTextAction,
   updateSyncIntervalAction,
 } from "@/actions/settings";
-import { syncMyGmailAction } from "@/actions/gmail-sync";
+import { setSyncPausedAction, syncMyGmailAction } from "@/actions/gmail-sync";
 import { saveJdAction, summarizeJdAction, scoreFitAction } from "@/actions/ai";
 import { markNotificationsReadAction } from "@/actions/notifications";
 import { toast } from "@/components/ui/toast";
@@ -113,7 +113,7 @@ let gmailConfig: GmailConfigData = {
   connected: false,
 };
 let syncIntervalHours = 24;
-let gmailSync: GmailSyncStatus = { lastSyncedAt: null, lastRunAt: null, lastError: null };
+let gmailSync: GmailSyncStatus = { lastSyncedAt: null, lastRunAt: null, lastError: null, pausedAt: null };
 let ingestErrors: IngestError[] = [];
 let aiPrompts = { summary: "", draft: "", score: "" };
 let fitScores: Record<string, FitScore> = {};
@@ -700,12 +700,30 @@ export function currentSyncInfo(): {
   intervalHours: number;
   lastRunAt: string | null;
   connected: boolean;
+  paused: boolean;
 } {
   return {
     intervalHours: syncIntervalHours,
     lastRunAt: gmailSync.lastRunAt,
     connected: google.connected,
+    paused: !!gmailSync.pausedAt,
   };
+}
+
+/** Pause / resume job-alert syncing (stays connected). */
+export async function setSyncPaused(paused: boolean) {
+  try {
+    await setSyncPausedAction(paused);
+    await refresh();
+    toast.success(
+      paused ? "Sync paused" : "Sync resumed",
+      paused
+        ? "No new job alerts will be fetched until you resume."
+        : "Job alerts will sync again on your schedule.",
+    );
+  } catch (e) {
+    toast.error("Couldn't change sync", e instanceof Error ? e.message : undefined);
+  }
 }
 
 /* ---------------- derived: per-contact history across leads (FR-6.1) ------- */

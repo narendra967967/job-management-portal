@@ -36,6 +36,8 @@ import { isWithinQuietHours } from "@/lib/quiet-hours";
 
 export interface SyncResult {
   connected: boolean;
+  /** The user has paused syncing — nothing was fetched. */
+  paused?: boolean;
   fetched: number;
   inserted: number;
   renewed: number;
@@ -44,6 +46,16 @@ export interface SyncResult {
 }
 
 export async function runSyncForUser(userId: string): Promise<SyncResult> {
+  // Paused by the user: skip everything (cron AND "Sync now"), but stay
+  // connected — resuming picks up from the saved cursor.
+  const [pause] = await db
+    .select({ pausedAt: gmailConfigT.syncPausedAt })
+    .from(gmailConfigT)
+    .where(eq(gmailConfigT.userId, userId));
+  if (pause?.pausedAt) {
+    return { connected: true, paused: true, fetched: 0, inserted: 0, renewed: 0, errors: 0, message: "Sync is paused." };
+  }
+
   let accessToken: string;
   try {
     accessToken = await getGoogleAccessToken(userId);

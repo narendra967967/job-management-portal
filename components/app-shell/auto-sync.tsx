@@ -16,8 +16,8 @@ export function AutoSync() {
   useEffect(() => {
     async function maybeSync() {
       if (running.current) return;
-      const { intervalHours, lastRunAt, connected } = currentSyncInfo();
-      if (!connected) return;
+      const { intervalHours, lastRunAt, connected, paused } = currentSyncInfo();
+      if (!connected || paused) return;
       const due =
         !lastRunAt ||
         Date.now() - new Date(lastRunAt).getTime() >= intervalHours * 3_600_000;

@@ -55,6 +55,8 @@ export interface GmailSyncStatus {
   lastSyncedAt: string | null; // ISO
   lastRunAt: string | null; // ISO
   lastError: string | null;
+  /** Set while the user has paused syncing (ISO); null = active. */
+  pausedAt: string | null;
 }
 
 export interface IngestError {
@@ -338,6 +340,7 @@ export async function loadWorkspace(userId: string): Promise<WorkspaceData> {
     lastSyncedAt: ss?.lastSyncedAt ? ss.lastSyncedAt.toISOString() : null,
     lastRunAt: ss?.lastRunAt ? ss.lastRunAt.toISOString() : null,
     lastError: ss?.lastError ?? null,
+    pausedAt: gmail?.syncPausedAt ? gmail.syncPausedAt.toISOString() : null,
   };
 
   const ingestErrors: IngestError[] = errorRows.map((e) => ({
