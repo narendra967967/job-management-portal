@@ -6,8 +6,10 @@ import { useLeads, useReminders } from "@/lib/mock-store";
 import { ReminderActions } from "@/components/leads/reminder-actions";
 import { REMINDER_OUTCOME_LABELS } from "@/lib/types";
 import { cn, formatDateTime } from "@/lib/utils";
+import { useMounted } from "@/lib/use-mounted";
 
 export default function RemindersPage() {
+  const mounted = useMounted(); // due dates are locale/time-zone dependent → client-only
   const leadById = new Map(useLeads().map((l) => [l.id, l]));
   const rows = useReminders()
     .map((r) => ({ reminder: r, lead: leadById.get(r.leadId) }))
@@ -58,7 +60,7 @@ export default function RemindersPage() {
                     {lead!.company} ·{" "}
                     {done
                       ? REMINDER_OUTCOME_LABELS[reminder.outcome]
-                      : `${reminder.reason ?? `Reminder ${reminder.sequence}`} · due ${formatDateTime(reminder.dueDate)}`}
+                      : `${reminder.reason ?? `Reminder ${reminder.sequence}`} · due ${mounted ? formatDateTime(reminder.dueDate) : ""}`}
                   </p>
                 </Link>
                 <ReminderActions reminder={reminder} />

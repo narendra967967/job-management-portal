@@ -76,6 +76,7 @@ import {
   summarizeJd,
 } from "@/lib/mock-store";
 import { cn, formatDateTime } from "@/lib/utils";
+import { useMounted } from "@/lib/use-mounted";
 
 interface Props {
   lead: JobLead;
@@ -718,6 +719,7 @@ function OutreachTab({
 
 function RemindersTab({ leadId }: { leadId: string }) {
   const reminders = useRemindersForLead(leadId);
+  const mounted = useMounted(); // due dates are locale/time-zone dependent → client-only
   if (reminders.length === 0) {
     return (
       <EmptyState
@@ -749,7 +751,7 @@ function RemindersTab({ leadId }: { leadId: string }) {
               <p className="text-xs text-muted-foreground">
                 {done
                   ? REMINDER_OUTCOME_LABELS[r.outcome]
-                  : `Due ${formatDateTime(r.dueDate)}`}
+                  : `Due ${mounted ? formatDateTime(r.dueDate) : ""}`}
               </p>
             </div>
             <ReminderActions reminder={r} />

@@ -846,6 +846,7 @@ function SyncScheduleCard() {
   const [interval, setInterval] = useSyncInterval();
   const sync = useGmailSync();
   const [cfg] = useGmailSettings();
+  const mounted = useMounted(); // sync times are locale/time-zone dependent → client-only
 
   return (
     <section className="rounded-2xl border bg-card p-4 md:p-5">
@@ -883,7 +884,7 @@ function SyncScheduleCard() {
         ) : sync.lastSyncedAt ? (
           <p className="text-foreground">
             Next run fetches alerts received{" "}
-            <span className="font-medium">since {fmtDateTime(sync.lastSyncedAt)}</span>.
+            <span className="font-medium">since {mounted ? fmtDateTime(sync.lastSyncedAt) : ""}</span>.
           </p>
         ) : (
           <p className="text-foreground">
@@ -896,7 +897,7 @@ function SyncScheduleCard() {
           </p>
         )}
         <p className="mt-1 text-muted-foreground">
-          Last run: {fmtDateTime(sync.lastRunAt)}
+          Last run: {mounted ? fmtDateTime(sync.lastRunAt) : ""}
           {sync.lastError ? ` · last error: ${sync.lastError}` : ""}
         </p>
       </div>
@@ -913,6 +914,7 @@ function SyncScheduleCard() {
 
 function IngestionIssuesCard() {
   const errors = useIngestErrors();
+  const mounted = useMounted(); // timestamps are locale/time-zone dependent → client-only
   const { confirm, dialog: confirmDialog } = useConfirm();
   const { open: openSupport } = useContactSupport();
 
@@ -978,7 +980,7 @@ function IngestionIssuesCard() {
                 </p>
               )}
               <p className="mt-0.5 text-[11px] text-muted-foreground">
-                {fmtDateTime(e.createdAt)}
+                {mounted ? fmtDateTime(e.createdAt) : ""}
               </p>
             </li>
           ))}
