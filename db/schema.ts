@@ -30,6 +30,7 @@ import {
 
 import { user } from "./auth-schema";
 import type { SalaryInsight } from "../lib/types";
+import type { GuideSection } from "../lib/guides-model";
 
 // Raw bytes column (node-postgres returns/accepts a Buffer).
 const bytea = customType<{ data: Buffer; driverData: Buffer }>({
@@ -764,5 +765,45 @@ export const gmailProcessedMessages = pgTable(
   },
   (t) => [
     uniqueIndex("gmail_processed_messages_pk").on(t.userId, t.messageId),
+  ],
+);
+
+/* ------------------------------------------------------------------ */
+/* How-to guides (admin-managed content, shown on /guides)             */
+/* ------------------------------------------------------------------ */
+
+export const guideStatus = pgEnum("guide_status", ["active", "inactive"]);
+
+/**
+ * One How-to guide topic = one menu entry on /guides. Managed in the admin
+ * panel (Operations → How-to guides); only `active` topics reach users. The
+ * content (sections → blocks) is a Zod-validated jsonb document — see
+ * lib/guides-model.ts for its shape.
+ */
+export const guideTopics = pgTable(
+  "guide_topics",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    // URL id: /guides?topic=<slug>.
+    slug: text("slug").notNull(),
+    title: text("title").notNull(),
+    summary: text("summary").notNull().default(""),
+    icon: text("icon").notNull().default("book-open"),
+    // Menu heading the topic sits under (headings appear in topic order).
+    groupName: text("group_name").notNull().default("General"),
+    sortOrder: integer("sort_order").notNull().default(0),
+    status: guideStatus("status").notNull().default("inactive"),
+    inProgress: boolean("in_progress").notNull().default(false),
+    sections: jsonb("sections").$type<GuideSection[]>().notNull().default(sql`'[]'::jsonb`),
+    updatedBy: text("updated_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [
+    uniqueIndex("guide_topics_slug_uq").on(t.slug),
+    index("guide_topics_status_order_idx").on(t.status, t.sortOrder),
   ],
 );

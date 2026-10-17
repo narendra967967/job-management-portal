@@ -75,6 +75,7 @@ const GROUPS: Group[] = [
   {
     label: "Operations",
     items: [
+      { href: "/jmp-admin/guides", label: "How-to guides", icon: BookOpen },
       { label: "Gmail health", icon: Inbox, soon: true },
       { label: "Activity log", icon: ScrollText, soon: true },
     ],
@@ -86,6 +87,8 @@ const TITLES: Record<string, string> = {
   "/jmp-admin/users": "Users",
   "/jmp-admin/tickets": "Tickets",
   "/jmp-admin/plans": "Plans & Pricing",
+  "/jmp-admin/guides": "How-to guides",
+  "/jmp-admin/guides/new": "New guide",
   "/jmp-admin/settings": "Settings",
 };
 
@@ -215,7 +218,8 @@ export function AdminShell({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const title = TITLES[pathname] ?? "Admin";
+  const title =
+    TITLES[pathname] ?? (pathname.startsWith("/jmp-admin/guides/") ? "Edit guide" : "Admin");
 
   // Accordion: one group open at a time. The group holding the active page opens
   // on load and whenever navigation moves into it; opening another closes the rest.
