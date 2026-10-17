@@ -28,6 +28,7 @@ import {
   type LucideIcon,
   Pause,
   Play,
+  BookOpen,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
@@ -1091,6 +1092,13 @@ function AiProviderCard() {
             Powers job-description summaries, contact structuring, and outreach
             drafting.
           </p>
+          <Link
+            href="/guides?topic=ai-key"
+            className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-primary underline-offset-2 hover:underline"
+          >
+            <BookOpen className="size-3.5" aria-hidden />
+            How to get an API key
+          </Link>
         </div>
         <span
           className={

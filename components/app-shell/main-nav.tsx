@@ -20,7 +20,7 @@ import {
   ChevronDown,
   type LucideIcon,
 } from "lucide-react";
-import { LifeBuoy } from "lucide-react";
+import { BookOpen, LifeBuoy } from "lucide-react";
 import { Logo } from "@/components/app-shell/logo";
 import { SidebarAddLeadButton } from "@/components/leads/add-lead-dialog";
 import { SupportNavButton, useContactSupport } from "@/components/support/contact-support";
@@ -201,9 +201,22 @@ export function SidebarFooter() {
   const pathname = usePathname();
   const profile = useProfile();
   const active = isActive(pathname, "/settings");
+  const guidesActive = isActive(pathname, "/guides");
   return (
     <div className="mt-auto border-t p-3">
       <SupportNavButton className="mb-1" />
+      <Link
+        href="/guides"
+        className={cn(
+          "relative mb-1 flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
+          guidesActive
+            ? "bg-gradient-to-r from-primary/12 to-primary/[0.03] font-semibold text-primary before:absolute before:top-1/2 before:left-0 before:h-5 before:w-1 before:-translate-y-1/2 before:rounded-r-full before:bg-primary"
+            : "font-medium text-muted-foreground hover:bg-sidebar-accent hover:text-foreground",
+        )}
+      >
+        <BookOpen className="size-5 shrink-0" aria-hidden />
+        How-to guides
+      </Link>
       <Link
         href="/settings"
         className={cn(
