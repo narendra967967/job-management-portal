@@ -51,7 +51,11 @@ export function GuideEditor({
     [topic],
   );
   const [v, setV] = useState<FormValues>(initial);
-  const [slugTouched, setSlugTouched] = useState(!isNew);
+  // The URL id follows the title unless it was customised (an existing guide
+  // whose id doesn't match its title counts as customised).
+  const [slugTouched, setSlugTouched] = useState(
+    !isNew && !!topic && topic.slug !== slugify(topic.title),
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(justCreated);
@@ -147,17 +151,47 @@ export function GuideEditor({
               placeholder="Set up your AI key"
             />
           </Field>
-          <Field label="URL id" hint={`Link: /guides?topic=${v.slug || "…"} — changing it breaks old links.`}>
+          {/* URL id: follows the title automatically; "Edit" makes it custom. */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between gap-2">
+              <span id="guide-slug-label" className="text-sm font-medium">
+                URL id
+              </span>
+              {slugTouched ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSlugTouched(false);
+                    set({ slug: slugify(v.title) });
+                  }}
+                  className="min-h-8 text-xs font-medium text-primary hover:underline"
+                >
+                  Match title
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setSlugTouched(true)}
+                  className="min-h-8 text-xs font-medium text-primary hover:underline"
+                >
+                  Edit
+                </button>
+              )}
+            </div>
             <Input
+              aria-labelledby="guide-slug-label"
               value={v.slug}
               maxLength={60}
-              onChange={(e) => {
-                setSlugTouched(true);
-                set({ slug: slugify(e.target.value) });
-              }}
-              placeholder="set-up-your-ai-key"
+              readOnly={!slugTouched}
+              onChange={(e) => set({ slug: slugify(e.target.value) })}
+              placeholder="generated-from-the-title"
+              className={cn(!slugTouched && "bg-muted/50 text-muted-foreground")}
             />
-          </Field>
+            <span className="block text-[11px] text-muted-foreground">
+              {slugTouched ? "Custom" : "Generated from the title"} · /guides?topic={v.slug || "…"}
+              {!isNew && topic && v.slug !== topic.slug ? " — the old link will stop working." : ""}
+            </span>
+          </div>
           <Field label="Summary" hint="One line under the title." className="sm:col-span-2">
             <Input
               value={v.summary}
