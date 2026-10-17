@@ -32,6 +32,7 @@ import {
   Sparkles,
   ImagePlus,
   Loader2,
+  Star,
 } from "lucide-react";
 import {
   CONNECTION_TYPE_LABELS,
@@ -152,7 +153,6 @@ export interface LeadCoreValue {
   status: LeadStatus;
   tags: string[];
   jdText: string;
-  notes: string;
 }
 
 export const EMPTY_LEAD_CORE: LeadCoreValue = {
@@ -164,7 +164,6 @@ export const EMPTY_LEAD_CORE: LeadCoreValue = {
   status: "new",
   tags: [],
   jdText: "",
-  notes: "",
 };
 
 // Only the open statuses can be set here.
@@ -313,26 +312,15 @@ export function LeadCoreFields({
         </div>
       )}
 
-      <div className="grid gap-3 lg:grid-cols-2">
-        <Field label="Job description">
-          <MarkdownEditor
-            value={value.jdText}
-            onChange={(v) => onChange({ jdText: v })}
-            placeholder="Paste the full job description (optional — you can add it later)…"
-            className="min-h-28"
-            ariaLabel="Job description"
-          />
-        </Field>
-        <Field label="Notes">
-          <MarkdownEditor
-            value={value.notes}
-            onChange={(v) => onChange({ notes: v })}
-            placeholder="Anything to remember about this role (optional)…"
-            className="min-h-28"
-            ariaLabel="Notes"
-          />
-        </Field>
-      </div>
+      <Field label="Job description">
+        <MarkdownEditor
+          value={value.jdText}
+          onChange={(v) => onChange({ jdText: v })}
+          placeholder="Paste the full job description (optional — you can add it later)…"
+          className="min-h-28"
+          ariaLabel="Job description"
+        />
+      </Field>
     </div>
   );
 }
@@ -366,6 +354,7 @@ function AddLeadDialog({
 
   const [mode, setMode] = useState<"manual" | "ai">("manual");
   const [core, setCore] = useState<LeadCoreValue>(EMPTY_LEAD_CORE);
+  const [topChoice, setTopChoice] = useState(false);
 
   // Optional inline contact.
   const [cName, setCName] = useState("");
@@ -382,6 +371,7 @@ function AddLeadDialog({
     if (!open) return;
     setMode("manual");
     setCore(EMPTY_LEAD_CORE);
+    setTopChoice(false);
     setCName("");
     setCTitle("");
     setCUrl("");
@@ -415,6 +405,7 @@ function AddLeadDialog({
     setSaving(true);
     const res = await createLead({
       ...core,
+      topChoice,
       contact: cName.trim()
         ? { name: cName, title: cTitle, linkedinUrl: cUrl, connectionType: cType }
         : undefined,
@@ -479,6 +470,32 @@ function AddLeadDialog({
         <TabsContent value="manual" className="mt-4">
           <div className="space-y-4">
             <LeadCoreFields value={core} onChange={patch} />
+
+            {/* Same mark as the card's ⋯ menu → Mark as Top Choice. */}
+            <button
+              type="button"
+              aria-pressed={topChoice}
+              onClick={() => setTopChoice((v) => !v)}
+              className={cn(
+                "flex min-h-11 w-full items-center gap-3 rounded-lg border px-3 py-2 text-left transition-colors focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none",
+                topChoice ? "border-top-choice/70 bg-top-choice/10" : "hover:bg-muted/50",
+              )}
+            >
+              <Star
+                className={cn(
+                  "size-5 shrink-0",
+                  topChoice ? "fill-top-choice text-top-choice" : "text-muted-foreground",
+                )}
+                aria-hidden
+              />
+              <span className="min-w-0">
+                <span className="block text-sm font-medium">Mark as Top Choice</span>
+                <span className="block text-[11px] text-muted-foreground">
+                  Gold card, listed under the Top Choice filter. A New lead moves to
+                  Shortlisted when automatic status is on.
+                </span>
+              </span>
+            </button>
 
             {/* Optional inline contact */}
             <div className="rounded-lg border bg-muted/30 p-3">

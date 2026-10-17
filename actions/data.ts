@@ -266,7 +266,7 @@ export async function createLeadAction(input: {
   status: LeadStatus;
   tags: string[];
   jdText: string;
-  notes: string;
+  topChoice?: boolean;
   contact?: {
     name: string;
     title: string;
@@ -303,19 +303,21 @@ export async function createLeadAction(input: {
           status: data.status as LeadStatus,
           source: sourceFromUrl(data.jobUrl),
           origin: "manual",
+          topChoice: data.topChoice,
         })
         .returning({ id: leadsT.id });
 
       const leadId = row.id;
 
       // Detail row only when there's something to store.
-      if (data.jdText || data.notes) {
-        await tx.insert(detailsT).values({
-          leadId,
-          userId,
-          jdText: data.jdText || null,
-          notes: data.notes || null,
-        });
+      if (data.jdText) {
+        await tx.insert(detailsT).values({ leadId, userId, jdText: data.jdText });
+      }
+
+      // Same rule as starring an existing lead: Top Choice → Shortlisted
+      // (forward-only; respects the user's automatic-status setting).
+      if (data.topChoice) {
+        await advanceLeadStatus(tx, userId, leadId, "shortlisted");
       }
 
       if (data.contact) {
@@ -348,7 +350,7 @@ export async function createLeadAction(input: {
 
 /**
  * Edit a lead's core fields (title/company/location/remote/jobUrl/tags/status)
- * and its JD/notes. Changing the URL recomputes the per-user dedupe key, so a
+ * and its job description. Changing the URL recomputes the per-user dedupe key, so a
  * URL that collides with another of the user's leads is rejected (repetition
  * avoided). Scoped to the current user; returns a friendly result.
  */
@@ -388,18 +390,13 @@ export async function updateLeadAction(
 
       if (!row) throw new Error("LEAD_NOT_FOUND");
 
-      // Upsert the detail row for JD / notes.
+      // Upsert the detail row for the JD.
       await tx
         .insert(detailsT)
-        .values({
-          leadId,
-          userId,
-          jdText: data.jdText || null,
-          notes: data.notes || null,
-        })
+        .values({ leadId, userId, jdText: data.jdText || null })
         .onConflictDoUpdate({
           target: detailsT.leadId,
-          set: { jdText: data.jdText || null, notes: data.notes || null },
+          set: { jdText: data.jdText || null },
         });
     });
     return { ok: true };

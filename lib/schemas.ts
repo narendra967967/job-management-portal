@@ -198,12 +198,12 @@ const leadCoreShape = {
       "Each tag must be 40 characters or fewer.",
     ),
   jdText: z.string().trim().max(50000).default(""),
-  notes: z.string().trim().max(10000).default(""),
 } as const;
 
 export const createLeadSchema = z.object({
   ...leadCoreShape,
   status: zEnum(OPEN_STATUS, "Pick a valid status.").default("new"),
+  topChoice: z.boolean().default(false),
   contact: zLeadContact.optional(),
 });
 

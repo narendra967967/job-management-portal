@@ -1,7 +1,7 @@
 "use client";
 
 // Edit an existing lead's core details (title/company/location/remote/jobUrl/
-// tags) plus its JD/notes. Reuses the shared LeadCoreFields from the Add dialog.
+// tags) plus its job description. Reuses the shared LeadCoreFields from the Add dialog.
 // Status is left to the dedicated status control (not edited here), and the job
 // URL stays required + unique per user (a colliding URL is rejected server-side).
 
@@ -47,7 +47,6 @@ export function EditLeadDialog({
       status: isJobOpen(lead.status) ? lead.status : "new",
       tags: lead.tags,
       jdText: detail?.jdText ?? "",
-      notes: detail?.notes ?? "",
     });
     setSaving(false);
   }, [open, lead, detail]);

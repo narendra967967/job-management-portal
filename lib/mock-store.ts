@@ -350,7 +350,7 @@ export async function createLead(input: {
   status: LeadStatus;
   tags: string[];
   jdText: string;
-  notes: string;
+  topChoice?: boolean;
   contact?: {
     name: string;
     title: string;
@@ -363,7 +363,7 @@ export async function createLead(input: {
   return res;
 }
 
-/** Edit a lead's core fields + JD/notes. Refreshes on success; returns the
+/** Edit a lead's core fields + job description. Refreshes on success; returns the
  *  result so the dialog can surface validation / duplicate-URL errors. */
 export async function updateLead(
   leadId: string,
@@ -376,7 +376,6 @@ export async function updateLead(
     status: LeadStatus;
     tags: string[];
     jdText: string;
-    notes: string;
   },
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const res = await updateLeadAction(leadId, input);
