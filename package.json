@@ -27,7 +27,7 @@
     "drizzle-orm": "^0.45.2",
     "lucide-react": "^1.33.0",
     "mammoth": "^1.12.3",
-    "next": "15.5.23",
+    "next": "15.5.28",
     "nodemailer": "^10.0.10",
     "pdf-parse": "^2.4.5",
     "pg": "^8.23.0",
@@ -53,12 +53,17 @@
     "dotenv": "^17.4.2",
     "drizzle-kit": "^0.31.10",
     "eslint": "^9",
-    "eslint-config-next": "15.5.23",
+    "eslint-config-next": "15.5.28",
     "tailwindcss": "^4",
     "typescript": "^5"
   },
   "allowScripts": {
     "sharp@0.34.5": true,
     "unrs-resolver@1.12.2": true
+  },
+  "overrides": {
+    "next": {
+      "postcss": "8.5.30"
+    }
   }
 }
