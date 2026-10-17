@@ -20,6 +20,7 @@ import {
 } from "@/db/schema";
 import type { SalaryInsight } from "@/lib/types";
 import { toSalaryInsight } from "@/lib/salary-parse";
+import { salaryMarketFor } from "@/lib/geo";
 
 type Result =
   | { ok: true; insight: SalaryInsight }
@@ -28,11 +29,14 @@ type Result =
 const SYSTEM = [
   "You are a compensation analyst. Estimate the market salary for ONE job for",
   "the candidate described, so they can set a realistic expectation.",
-  "Work out the job's country (and so its currency) from the location and job",
-  "description. If it is unclear (e.g. just \"Remote\"), assume India and say so",
-  "in the summary.",
-  "Give ANNUAL total fixed pay (CTC / base) as plain full numbers in the local",
-  "currency's units — e.g. 1850000 for ₹18.5 lakh — never \"18.5L\" or \"$120k\".",
+  "The input tells you the pay MARKET and CURRENCY. When they are marked FIXED,",
+  "use exactly that market's pay levels and that currency — even if the résumé",
+  "suggests the candidate lives elsewhere. Only when the market is NOT given,",
+  "work it out from the job description (or, failing that, assume India and say",
+  "so in the summary).",
+  "Give ANNUAL total fixed pay (base / CTC) as plain full numbers in that",
+  "currency's units — e.g. 1850000 for ₹18.5 lakh or 145000 for €145k — never",
+  "\"18.5L\" or \"€145k\".",
   "Weigh the role's seniority, the company, the city/country market, and the",
   "candidate's experience and skills from their résumé.",
   "You do NOT have live market data: base the estimate on your general",
@@ -97,9 +101,17 @@ export async function generateSalaryInsightAction(leadId: string): Promise<Resul
     resumeRows[0];
   const resumeText = resume?.text?.trim() ?? "";
 
+  // The app — not the AI — decides the market + currency whenever the location
+  // allows it ("Remote (EU)" → Europe / EUR), so the answer can be checked.
+  const market = salaryMarketFor(lead.location);
+
   const context = [
     `Job: ${lead.title} at ${lead.company}`,
     `Location: ${lead.location}${lead.remote ? " (remote)" : ""}`,
+    market
+      ? `Pay market (FIXED — do not change): ${market.market}
+Currency (FIXED — do not change): ${market.currency}`
+      : "Pay market: not clear from the location — infer it from the job description; if still unclear, assume India (INR).",
     jd
       ? `Job description:\n${jd.slice(0, 12000)}`
       : "Job description: not provided — rely on the title, company and location.",
@@ -108,10 +120,16 @@ export async function generateSalaryInsightAction(leadId: string): Promise<Resul
       : "Candidate résumé: not provided — estimate for a typical candidate for this role.",
   ].join("\n\n");
 
+  const label = resumeText && resume ? resume.label : null;
   let insight: SalaryInsight;
   try {
-    const raw = await aiComplete(userId, SYSTEM, context, 900);
-    insight = toSalaryInsight(raw, resumeText && resume ? resume.label : null);
+    try {
+      insight = toSalaryInsight(await aiComplete(userId, SYSTEM, context, 900), label, market);
+    } catch (first) {
+      // One retry for an unreadable / wrong-currency answer.
+      if (!(first instanceof SyntaxError)) throw first;
+      insight = toSalaryInsight(await aiComplete(userId, SYSTEM, context, 900), label, market);
+    }
   } catch (err) {
     if (err instanceof SyntaxError) {
       return { ok: false, error: "The AI's answer couldn't be read. Please try again." };

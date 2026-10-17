@@ -379,7 +379,17 @@ export interface SalaryInsight {
   factors: string[];
   tips: string[];
   /** What the estimate was based on (shown to the user). */
-  basis: { country: string; resumeLabel: string | null };
+  basis: {
+    /** Pay market used, e.g. "India", "Europe (EU)". */
+    country: string;
+    resumeLabel: string | null;
+    /**
+     * "location": the app resolved it from the job's location (fixed for the AI);
+     * "inferred": the location said nothing usable, so the AI inferred it (or
+     * fell back to India). Missing on estimates saved before this existed.
+     */
+    marketSource?: "location" | "inferred";
+  };
   /** ISO timestamp it was generated. */
   generatedAt: string;
 }

@@ -15,7 +15,7 @@ import {
   type LeadOrigin,
   type LeadSource,
 } from "@/lib/types";
-import { countryOf } from "@/components/leads/leads-browser";
+import { countryOf } from "@/lib/geo";
 import { Input } from "@/components/ui/input";
 import {
   Select,

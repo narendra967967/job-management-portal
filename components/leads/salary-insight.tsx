@@ -120,7 +120,12 @@ export function SalaryInsightView({ insight }: { insight: SalaryInsight }) {
       <p className="flex items-start gap-1.5 text-[11px] text-muted-foreground">
         <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden />
         <span>
-          AI estimate for {insight.basis.country}
+          AI estimate for the {insight.basis.country} market
+          {insight.basis.marketSource === "location"
+            ? " (from the job's location)"
+            : insight.basis.marketSource === "inferred"
+              ? " (inferred — the location didn't say)"
+              : ""}
           {insight.basis.resumeLabel ? `, using your résumé “${insight.basis.resumeLabel}”` : ""}
           {mounted ? ` · ${formatDateTime(insight.generatedAt)}` : ""}. Based on the model&apos;s general knowledge — not
           live salary data. Use it as a starting point and check current listings.

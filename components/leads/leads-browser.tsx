@@ -40,6 +40,7 @@ import {
   type LeadStatus,
 } from "@/lib/types";
 import { StatusBadge } from "@/components/leads/status-badge";
+import { countryOf } from "@/lib/geo";
 import { useLeadActionDialogs } from "@/components/leads/lead-actions";
 import { LeadDetailDialog } from "@/components/leads/lead-detail-dialog";
 import { LeadRemindersDialog } from "@/components/leads/lead-reminders-dialog";
@@ -169,61 +170,8 @@ function toISODate(d: Date): string {
   ).padStart(2, "0")}`;
 }
 
-// Country derivation from LinkedIn's free-text location (the alert gives no
-// clean country). Heuristic, transparent: match a known country name first
-// (covers "India (Remote)", "London Area, United Kingdom (Hybrid)", …), then a
-// US "City, ST" pattern, then common cities → country; else "Other". Extend the
-// maps as new regions show up.
-const COUNTRY_NAMES = [
-  "United Arab Emirates",
-  "United States",
-  "United Kingdom",
-  "India",
-  "Canada",
-  "Australia",
-  "Germany",
-  "Ireland",
-  "Singapore",
-  "Netherlands",
-];
-const CITY_COUNTRY: Record<string, string> = {
-  london: "United Kingdom",
-  slough: "United Kingdom",
-  addlestone: "United Kingdom",
-  bromsgrove: "United Kingdom",
-  "newcastle upon tyne": "United Kingdom",
-  england: "United Kingdom",
-  dubai: "United Arab Emirates",
-  gurgaon: "India",
-  gurugram: "India",
-  noida: "India",
-  "new delhi": "India",
-  delhi: "India",
-  pune: "India",
-  bengaluru: "India",
-  bangalore: "India",
-  mumbai: "India",
-  hyderabad: "India",
-  chennai: "India",
-  chicago: "United States",
-  columbus: "United States",
-  madison: "United States",
-};
-
-export function countryOf(location: string): string {
-  const base = location
-    .replace(/\s*\((?:remote|hybrid|on-?site)\)\s*$/i, "")
-    .trim();
-  const lower = base.toLowerCase();
-  for (const c of COUNTRY_NAMES) {
-    if (lower.includes(c.toLowerCase())) return c;
-  }
-  if (/,\s*[A-Z]{2}$/.test(base)) return "United States"; // "Chicago, IL"
-  for (const [city, country] of Object.entries(CITY_COUNTRY)) {
-    if (lower.includes(city)) return country;
-  }
-  return "Other";
-}
+// Country derivation lives in lib/geo.ts (shared with the salary insight).
+export { countryOf };
 
 const STATUS_META: Record<
   LeadStatus,
