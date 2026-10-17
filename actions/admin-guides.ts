@@ -1,8 +1,8 @@
 "use server";
 
-// Admin How-to guides (Operations). Admin-guarded, Zod-validated (content shape +
-// URL rules in lib/guides-schema.ts). Every change revalidates the admin list and
-// the user /guides page, so edits are live immediately.
+// Admin How-to guides (Operations). Admin-guarded and Zod-validated; the HTML
+// body is sanitized (lib/guide-html.ts) before it's stored. Every change
+// revalidates the admin list and the user /guides page, so edits are live.
 
 import { asc, eq, max, ne, and } from "drizzle-orm";
 import { z } from "zod";
@@ -11,6 +11,7 @@ import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/current-user";
 import { guideTopics } from "@/db/schema";
 import { guideTopicSchema } from "@/lib/guides-schema";
+import { sanitizeGuideHtml } from "@/lib/guide-html";
 
 type Result = { ok: true } | { ok: false; error: string };
 
@@ -22,13 +23,7 @@ function revalidate() {
 }
 
 function firstIssue(e: z.ZodError): string {
-  const i = e.issues[0];
-  if (!i) return "Invalid input.";
-  // Point at the place in the content ("Section 2, block 3: …").
-  const sec = i.path[0] === "sections" && typeof i.path[1] === "number" ? i.path[1] + 1 : null;
-  const blk = i.path[2] === "blocks" && typeof i.path[3] === "number" ? i.path[3] + 1 : null;
-  const where = sec ? `Section ${sec}${blk ? `, block ${blk}` : ""}: ` : "";
-  return where + i.message;
+  return e.issues[0]?.message ?? "Invalid input.";
 }
 
 async function slugTaken(slug: string, exceptId?: string): Promise<boolean> {
@@ -54,10 +49,9 @@ export async function createGuideAction(input: unknown): Promise<{ ok: true; id:
       title: v.title,
       summary: v.summary,
       icon: v.icon,
-      groupName: v.group,
       status: v.status,
       inProgress: v.inProgress,
-      sections: v.sections,
+      contentHtml: sanitizeGuideHtml(v.contentHtml),
       sortOrder: (top ?? 0) + 10,
       updatedBy: adminId,
     })
@@ -82,10 +76,9 @@ export async function updateGuideAction(id: unknown, input: unknown): Promise<Re
       title: v.title,
       summary: v.summary,
       icon: v.icon,
-      groupName: v.group,
       status: v.status,
       inProgress: v.inProgress,
-      sections: v.sections,
+      contentHtml: sanitizeGuideHtml(v.contentHtml),
       updatedBy: adminId,
     })
     .where(eq(guideTopics.id, gid.data))
@@ -120,11 +113,7 @@ export async function deleteGuideAction(id: unknown): Promise<Result> {
   return { ok: true };
 }
 
-/**
- * Move a topic one place up/down WITHIN its menu group (the order users see),
- * then renumber everything 10, 20, 30… in that displayed order. Groups keep
- * their place (a group sits where its first topic is).
- */
+/** Move a topic one place up/down in the menu, then renumber 10, 20, 30… */
 export async function moveGuideAction(id: unknown, direction: unknown): Promise<Result> {
   await requireAdmin();
   const gid = zId.safeParse(id);
@@ -133,23 +122,14 @@ export async function moveGuideAction(id: unknown, direction: unknown): Promise<
 
   await db.transaction(async (tx) => {
     const rows = await tx
-      .select({ id: guideTopics.id, group: guideTopics.groupName })
+      .select({ id: guideTopics.id })
       .from(guideTopics)
       .orderBy(asc(guideTopics.sortOrder), asc(guideTopics.title));
-    // Displayed order: grouped by heading, headings in first-appearance order.
-    const groups: { label: string; ids: string[] }[] = [];
-    for (const r of rows) {
-      const g = groups.find((x) => x.label === r.group);
-      if (g) g.ids.push(r.id);
-      else groups.push({ label: r.group, ids: [r.id] });
-    }
-    const group = groups.find((g) => g.ids.includes(gid.data));
-    if (!group) return;
-    const i = group.ids.indexOf(gid.data);
+    const order = rows.map((r) => r.id);
+    const i = order.indexOf(gid.data);
     const j = dir.data === "up" ? i - 1 : i + 1;
-    if (j < 0 || j >= group.ids.length) return;
-    [group.ids[i], group.ids[j]] = [group.ids[j], group.ids[i]];
-    const order = groups.flatMap((g) => g.ids);
+    if (i < 0 || j < 0 || j >= order.length) return;
+    [order[i], order[j]] = [order[j], order[i]];
     for (let k = 0; k < order.length; k++) {
       await tx.update(guideTopics).set({ sortOrder: (k + 1) * 10 }).where(eq(guideTopics.id, order[k]));
     }

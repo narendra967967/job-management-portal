@@ -1,7 +1,6 @@
 "use client";
 
-// How-to guides list (admin). Topics grouped under their menu headings, in the
-// order users see them. Row actions: edit, activate / deactivate, move up /
+// How-to guides list (admin). A flat list in the order users see it. Row actions: edit, activate / deactivate, move up /
 // down, delete (confirmed). Data comes from the server page; each change goes
 // through a Server Action, then router.refresh() re-reads.
 
@@ -18,7 +17,7 @@ import {
   moveGuideAction,
   setGuideStatusAction,
 } from "@/actions/admin-guides";
-import { groupGuides, type GuideTopic } from "@/lib/guides-model";
+import type { GuideTopic } from "@/lib/guides-model";
 import { guideIcon } from "@/lib/guide-icons";
 import { useMounted } from "@/lib/use-mounted";
 import { cn, formatDateTime } from "@/lib/utils";
@@ -31,7 +30,6 @@ export function GuidesAdminClient({ topics }: { topics: GuideTopic[] }) {
   const [flash, setFlash] = useState("");
   const [flashErr, setFlashErr] = useState(false);
 
-  const groups = groupGuides(topics);
   const activeCount = topics.filter((t) => t.status === "active").length;
 
   function say(msg: string, err = false) {
@@ -83,17 +81,12 @@ export function GuidesAdminClient({ topics }: { topics: GuideTopic[] }) {
           .
         </Card>
       ) : (
-        groups.map((g) => (
-          <section key={g.label} className="space-y-2">
-            <h2 className="px-1 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
-              {g.label}
-            </h2>
             <Card className="divide-y p-0">
-              {g.topics.map((t, idx) => {
+              {topics.map((t, idx) => {
                 const Icon = guideIcon(t.icon);
                 const live = t.status === "active";
                 const rowBusy = busy === t.id;
-                const blocks = t.sections.reduce((n, s) => n + s.blocks.length, 0);
+                const words = t.contentHtml.replace(/<[^>]+>/g, " ").trim().split(/\s+/).filter(Boolean).length;
                 return (
                   <div
                     key={t.id}
@@ -120,9 +113,7 @@ export function GuidesAdminClient({ topics }: { topics: GuideTopic[] }) {
                           {t.inProgress && <Badge variant="warning">In progress</Badge>}
                         </div>
                         <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                          /guides?topic={t.slug} · {t.sections.length}{" "}
-                          {t.sections.length === 1 ? "section" : "sections"} · {blocks}{" "}
-                          {blocks === 1 ? "block" : "blocks"}
+                          /guides?topic={t.slug} · {words} {words === 1 ? "word" : "words"}
                           {mounted ? ` · updated ${formatDateTime(t.updatedAt)}` : ""}
                         </p>
                       </div>
@@ -133,7 +124,7 @@ export function GuidesAdminClient({ topics }: { topics: GuideTopic[] }) {
                         variant="ghost"
                         size="icon"
                         aria-label={`Move ${t.title} up`}
-                        title="Move up within this group"
+                        title="Move up"
                         disabled={rowBusy || idx === 0}
                         onClick={() => run(t.id, () => moveGuideAction(t.id, "up"))}
                       >
@@ -143,8 +134,8 @@ export function GuidesAdminClient({ topics }: { topics: GuideTopic[] }) {
                         variant="ghost"
                         size="icon"
                         aria-label={`Move ${t.title} down`}
-                        title="Move down within this group"
-                        disabled={rowBusy || idx === g.topics.length - 1}
+                        title="Move down"
+                        disabled={rowBusy || idx === topics.length - 1}
                         onClick={() => run(t.id, () => moveGuideAction(t.id, "down"))}
                       >
                         <ArrowDown className="size-4" aria-hidden />
@@ -196,8 +187,6 @@ export function GuidesAdminClient({ topics }: { topics: GuideTopic[] }) {
                 );
               })}
             </Card>
-          </section>
-        ))
       )}
 
       <ConfirmDialog

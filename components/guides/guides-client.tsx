@@ -1,30 +1,15 @@
 "use client";
 
 // How-to guides (user side). Same layout as Settings: a topic menu (a
-// horizontal strip on phones/tablets, a grouped side list on lg+) and the chosen
-// guide beside it. The active topic lives in the URL (?topic=<slug>) so guides
-// can be linked to from anywhere. Topics come from the DB (managed in the admin
-// panel, Operations → How-to guides); only active ones are passed in.
+// horizontal strip on phones/tablets, a side list on lg+) and the chosen guide
+// beside it. The active topic lives in the URL (?topic=<slug>). Topics and
+// their HTML bodies come from the DB (admin panel → Operations → How-to
+// guides); only active ones are passed in, already sanitized.
 
-import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import {
-  AlertTriangle,
-  ArrowRight,
-  ExternalLink,
-  Info,
-  Lightbulb,
-  LifeBuoy,
-  PlayCircle,
-} from "lucide-react";
-import {
-  groupGuides,
-  videoEmbedUrl,
-  type GuideBlock,
-  type GuideTopic,
-} from "@/lib/guides-model";
+import { LifeBuoy } from "lucide-react";
+import type { GuideTopic } from "@/lib/guides-model";
 import { guideIcon } from "@/lib/guide-icons";
-import { MarkdownLite } from "@/components/ui/markdown-lite";
 import { buttonVariants } from "@/components/ui/button";
 import { useContactSupport } from "@/components/support/contact-support";
 import { cn } from "@/lib/utils";
@@ -34,7 +19,6 @@ export function GuidesClient({ topics }: { topics: GuideTopic[] }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const topicParam = searchParams.get("topic");
-  const groups = groupGuides(topics);
   const current = topics.find((t) => t.slug === topicParam) ?? topics[0] ?? null;
 
   function select(slug: string) {
@@ -67,17 +51,10 @@ export function GuidesClient({ topics }: { topics: GuideTopic[] }) {
           ))}
         </nav>
 
-        {/* Desktop: grouped vertical list. */}
-        <nav aria-label="Guide topics" className="hidden lg:block lg:w-56 lg:shrink-0 lg:space-y-5">
-          {groups.map((g) => (
-            <div key={g.label} className="space-y-1">
-              <p className="px-3 text-[11px] font-semibold tracking-wider text-muted-foreground/60 uppercase">
-                {g.label}
-              </p>
-              {g.topics.map((t) => (
-                <TopicButton key={t.id} topic={t} active={t.id === current.id} onSelect={select} />
-              ))}
-            </div>
+        {/* Desktop: vertical list. */}
+        <nav aria-label="Guide topics" className="hidden lg:block lg:w-56 lg:shrink-0 lg:space-y-1">
+          {topics.map((t) => (
+            <TopicButton key={t.id} topic={t} active={t.id === current.id} onSelect={select} />
           ))}
         </nav>
 
@@ -141,18 +118,12 @@ function GuideArticle({ topic }: { topic: GuideTopic }) {
         </div>
       </header>
 
-      <div className="mt-5 space-y-7">
-        {topic.sections.map((s, i) => (
-          <section key={i} aria-labelledby={`${topic.slug}-s${i}`} className="space-y-3">
-            <h3 id={`${topic.slug}-s${i}`} className="text-sm font-semibold">
-              {s.heading}
-            </h3>
-            {s.blocks.map((b, j) => (
-              <Block key={j} block={b} />
-            ))}
-          </section>
-        ))}
-      </div>
+      {/* Admin-authored HTML, sanitized on save and again when loaded. */}
+      {topic.contentHtml ? (
+        <div className="guide-content mt-5" dangerouslySetInnerHTML={{ __html: topic.contentHtml }} />
+      ) : (
+        <p className="mt-5 text-sm text-muted-foreground">This guide doesn&apos;t have any content yet.</p>
+      )}
 
       <footer className="mt-8 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-muted/50 p-4">
         <p className="text-sm text-muted-foreground">Still stuck? We&apos;re happy to help.</p>
@@ -173,128 +144,4 @@ function GuideArticle({ topic }: { topic: GuideTopic }) {
       </footer>
     </article>
   );
-}
-
-const CALLOUT = {
-  tip: { icon: Lightbulb, cls: "border-status-applied-foreground/25 bg-status-applied text-status-applied-foreground", label: "Tip" },
-  note: { icon: Info, cls: "border-status-new-foreground/25 bg-status-new text-status-new-foreground", label: "Note" },
-  warning: {
-    icon: AlertTriangle,
-    cls: "border-status-shortlisted-foreground/25 bg-status-shortlisted text-status-shortlisted-foreground",
-    label: "Important",
-  },
-} as const;
-
-function Block({ block }: { block: GuideBlock }) {
-  switch (block.type) {
-    case "text":
-      return <MarkdownLite text={block.text} className="text-sm leading-relaxed" />;
-
-    case "steps":
-      return (
-        <ol className="space-y-3">
-          {block.steps.map((s, i) => (
-            <li key={i} className="flex gap-3">
-              <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground tabular-nums">
-                {i + 1}
-              </span>
-              <div className="min-w-0 pt-0.5">
-                <p className="text-sm font-medium">{s.title}</p>
-                {s.detail && <p className="mt-0.5 text-sm text-muted-foreground">{s.detail}</p>}
-              </div>
-            </li>
-          ))}
-        </ol>
-      );
-
-    case "callout": {
-      const t = CALLOUT[block.tone];
-      const Icon = t.icon;
-      return (
-        <div className={cn("flex gap-2.5 rounded-xl border p-3", t.cls)}>
-          <Icon className="mt-0.5 size-4 shrink-0" aria-hidden />
-          <div className="min-w-0 text-sm">
-            <p className="font-semibold">{block.title ?? t.label}</p>
-            <MarkdownLite text={block.text} className="mt-0.5 opacity-90" />
-          </div>
-        </div>
-      );
-    }
-
-    case "video": {
-      if (!block.url) {
-        return (
-          <div className="flex items-center gap-3 rounded-xl border border-dashed p-4 text-sm text-muted-foreground">
-            <PlayCircle className="size-6 shrink-0" aria-hidden />
-            <span>
-              <span className="font-medium text-foreground">{block.title}</span> — video coming soon.
-            </span>
-          </div>
-        );
-      }
-      const embed = videoEmbedUrl(block.url);
-      if (!embed) {
-        return (
-          <a
-            href={block.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={cn(buttonVariants({ variant: "outline" }), "px-3")}
-          >
-            <PlayCircle className="size-4" aria-hidden />
-            {block.title}
-            <ExternalLink className="size-3.5 opacity-60" aria-hidden />
-          </a>
-        );
-      }
-      return (
-        <figure>
-          <div className="aspect-video overflow-hidden rounded-xl border bg-muted">
-            <iframe
-              src={embed}
-              title={block.title}
-              loading="lazy"
-              allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-              referrerPolicy="strict-origin-when-cross-origin"
-              allowFullScreen
-              className="size-full"
-            />
-          </div>
-          <figcaption className="mt-1.5 text-xs text-muted-foreground">
-            {block.title}
-            {block.duration ? ` · ${block.duration}` : ""}
-          </figcaption>
-        </figure>
-      );
-    }
-
-    case "image":
-      return (
-        <figure>
-          {/* Static screenshots from /public — plain <img> keeps guides simple. */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={block.src}
-            alt={block.alt}
-            loading="lazy"
-            className="w-full rounded-xl border"
-          />
-          {block.caption && (
-            <figcaption className="mt-1.5 text-xs text-muted-foreground">{block.caption}</figcaption>
-          )}
-        </figure>
-      );
-
-    case "links":
-      return (
-        <div className="flex flex-wrap gap-2">
-          {block.links.map((l) => (
-            <Link key={l.href} href={l.href} className={cn(buttonVariants({ variant: "outline" }), "px-3")}>
-              {l.label}
-              <ArrowRight className="size-4" aria-hidden />
-            </Link>
-          ))}
-        </div>
-      );
-  }
 }

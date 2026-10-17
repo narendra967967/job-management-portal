@@ -7,6 +7,7 @@ import { asc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { guideTopics } from "@/db/schema";
 import type { GuideTopic } from "@/lib/guides-model";
+import { sanitizeGuideHtml } from "@/lib/guide-html";
 
 type Row = typeof guideTopics.$inferSelect;
 
@@ -17,11 +18,12 @@ function toTopic(r: Row): GuideTopic {
     title: r.title,
     summary: r.summary,
     icon: r.icon,
-    group: r.groupName,
     sortOrder: r.sortOrder,
     status: r.status,
     inProgress: r.inProgress,
-    sections: r.sections ?? [],
+    // Sanitized again on the way out, so even a row edited directly in the DB
+    // can't inject script.
+    contentHtml: sanitizeGuideHtml(r.contentHtml),
     updatedAt: r.updatedAt.toISOString(),
   };
 }
