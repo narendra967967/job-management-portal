@@ -207,3 +207,85 @@ export function salaryMarketFor(location: string): SalaryMarket | null {
   }
   return null;
 }
+
+/** Countries the profile "Country" picker offers (every one has a known currency). */
+export const COUNTRY_OPTIONS: string[] = Object.keys(CURRENCY_BY_COUNTRY).sort((a, b) =>
+  a.localeCompare(b),
+);
+
+/** Currency for a country name from COUNTRY_OPTIONS (null if unknown). */
+export function currencyForCountry(country: string): string | null {
+  return CURRENCY_BY_COUNTRY[country] ?? null;
+}
+
+// Mobile dial code → country. Only India is selectable in the mobile field
+// today (lib/validation.ts), but the others resolve as soon as they're enabled.
+const DIAL_COUNTRY: Record<string, string> = {
+  "+91": "India",
+  "+1": "United States",
+  "+44": "United Kingdom",
+  "+971": "United Arab Emirates",
+  "+966": "Saudi Arabia",
+  "+974": "Qatar",
+  "+65": "Singapore",
+  "+61": "Australia",
+  "+64": "New Zealand",
+  "+81": "Japan",
+  "+60": "Malaysia",
+  "+49": "Germany",
+  "+353": "Ireland",
+  "+31": "Netherlands",
+  "+33": "France",
+  "+34": "Spain",
+  "+39": "Italy",
+  "+351": "Portugal",
+  "+48": "Poland",
+  "+46": "Sweden",
+  "+45": "Denmark",
+  "+47": "Norway",
+  "+358": "Finland",
+  "+32": "Belgium",
+  "+43": "Austria",
+  "+41": "Switzerland",
+  "+357": "Cyprus",
+};
+
+/** Country for a stored mobile number ("+91 9876543210"), or null. */
+export function countryForMobile(mobile: string | null | undefined): string | null {
+  const m = (mobile ?? "").trim().match(/^\+(\d{1,4})/);
+  if (!m) return null;
+  // Longest matching code wins ("+971" before "+9…").
+  for (let len = Math.min(4, m[1].length); len >= 1; len--) {
+    const hit = DIAL_COUNTRY[`+${m[1].slice(0, len)}`];
+    if (hit) return hit;
+  }
+  return null;
+}
+
+/** Where the salary market came from (shown to the user). */
+export type MarketSource = "location" | "profile" | "mobile" | "default";
+
+/**
+ * The pay market for a job, always resolved by the app (never left to the AI):
+ *  1. the job's own location ("Remote (EU)" → Europe / EUR);
+ *  2. else the user's profile country;
+ *  3. else the country of their mobile number's dial code;
+ *  4. else India (the app's home market).
+ */
+export function resolveSalaryMarket(input: {
+  location: string;
+  profileCountry: string | null | undefined;
+  mobile: string | null | undefined;
+}): SalaryMarket & { source: MarketSource } {
+  const fromLocation = salaryMarketFor(input.location);
+  if (fromLocation) return { ...fromLocation, source: "location" };
+  const profile = input.profileCountry?.trim();
+  if (profile && currencyForCountry(profile)) {
+    return { market: profile, currency: currencyForCountry(profile)!, source: "profile" };
+  }
+  const fromMobile = countryForMobile(input.mobile);
+  if (fromMobile && currencyForCountry(fromMobile)) {
+    return { market: fromMobile, currency: currencyForCountry(fromMobile)!, source: "mobile" };
+  }
+  return { market: "India", currency: "INR", source: "default" };
+}

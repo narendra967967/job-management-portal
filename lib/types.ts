@@ -304,6 +304,8 @@ export interface Profile {
   name: string;
   email: string;
   mobile: string;
+  /** Where the user lives ("" = not set) — the salary market for unclear remote jobs. */
+  country: string;
   /** The user's assigned plan, or null when none. */
   plan: PlanSummary | null;
 }
@@ -384,11 +386,11 @@ export interface SalaryInsight {
     country: string;
     resumeLabel: string | null;
     /**
-     * "location": the app resolved it from the job's location (fixed for the AI);
-     * "inferred": the location said nothing usable, so the AI inferred it (or
-     * fell back to India). Missing on estimates saved before this existed.
+     * Where the market came from — the job's location, the user's profile
+     * country, their mobile dial code, or the India default. ("inferred" /
+     * missing only on estimates saved before the app resolved it itself.)
      */
-    marketSource?: "location" | "inferred";
+    marketSource?: "location" | "profile" | "mobile" | "default" | "inferred";
   };
   /** ISO timestamp it was generated. */
   generatedAt: string;

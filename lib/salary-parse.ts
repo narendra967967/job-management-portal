@@ -21,7 +21,11 @@ const list = (v: unknown, n: number) =>
 export function toSalaryInsight(
   raw: string,
   resumeLabel: string | null,
-  expected?: { market: string; currency: string } | null,
+  expected?: {
+    market: string;
+    currency: string;
+    source?: "location" | "profile" | "mobile" | "default";
+  } | null,
 ): SalaryInsight {
   const json = raw.replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
   const p = JSON.parse(json) as Record<string, unknown>;
@@ -48,7 +52,7 @@ export function toSalaryInsight(
     factors: list(p.factors, 5),
     tips: list(p.tips, 4),
     basis: expected
-      ? { country: expected.market, resumeLabel, marketSource: "location" }
+      ? { country: expected.market, resumeLabel, marketSource: expected.source ?? "location" }
       : { country: str(p.country, 80) || "Unknown", resumeLabel, marketSource: "inferred" },
     generatedAt: new Date().toISOString(),
   };

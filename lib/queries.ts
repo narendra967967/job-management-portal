@@ -312,6 +312,7 @@ export async function loadWorkspace(userId: string): Promise<WorkspaceData> {
     name: u?.name ?? "",
     email: u?.email ?? "",
     mobile: u?.mobile ?? "",
+    country: u?.country ?? "",
     plan,
   };
 

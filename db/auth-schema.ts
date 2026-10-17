@@ -13,6 +13,9 @@ export const user = pgTable("user", {
     .$onUpdate(() => /* @__PURE__ */ new Date())
     .notNull(),
   mobile: text("mobile"),
+  // Where the user lives (a name from lib/geo.ts COUNTRY_OPTIONS). Used to pick the
+  // pay market for remote jobs whose location doesn't say. Null = not set.
+  country: text("country"),
   // Admin-managed fields (Better Auth additionalFields in lib/auth.ts). Added by
   // hand because the better-auth CLI can't resolve the "@/" alias in this repo's
   // config; keep in sync with lib/auth.ts additionalFields.

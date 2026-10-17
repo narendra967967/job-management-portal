@@ -110,7 +110,7 @@ let appSettings: AppSettings = {
   autoStatus: true,
   maxFollowUps: 2,
 };
-let profile: Profile = { name: "", email: "", mobile: "", plan: null };
+let profile: Profile = { name: "", email: "", mobile: "", country: "", plan: null };
 let google: GoogleConnection = {
   connected: false,
   email: null,
@@ -618,7 +618,7 @@ export function useAiSettings(): AiSettings {
   return useSyncExternalStore(subscribe, getAiSettings, getAiSettings);
 }
 
-export async function updateProfile(input: { name: string; mobile: string }) {
+export async function updateProfile(input: { name: string; mobile: string; country: string }) {
   await updateProfileAction(input);
   await refresh();
 }

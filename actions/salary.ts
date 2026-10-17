@@ -15,12 +15,13 @@ import { parseInput, zId } from "@/lib/schemas";
 import {
   jobLeadDetails as detailsT,
   jobLeads as leadsT,
+  user as userT,
   resumes as resumesT,
   userSettings as settingsT,
 } from "@/db/schema";
 import type { SalaryInsight } from "@/lib/types";
 import { toSalaryInsight } from "@/lib/salary-parse";
-import { salaryMarketFor } from "@/lib/geo";
+import { resolveSalaryMarket } from "@/lib/geo";
 
 type Result =
   | { ok: true; insight: SalaryInsight }
@@ -29,11 +30,9 @@ type Result =
 const SYSTEM = [
   "You are a compensation analyst. Estimate the market salary for ONE job for",
   "the candidate described, so they can set a realistic expectation.",
-  "The input tells you the pay MARKET and CURRENCY. When they are marked FIXED,",
-  "use exactly that market's pay levels and that currency — even if the résumé",
-  "suggests the candidate lives elsewhere. Only when the market is NOT given,",
-  "work it out from the job description (or, failing that, assume India and say",
-  "so in the summary).",
+  "The input gives the pay MARKET and CURRENCY, marked FIXED. Use exactly that",
+  "market's pay levels and that currency — even if the résumé or job description",
+  "suggests somewhere else.",
   "Give ANNUAL total fixed pay (base / CTC) as plain full numbers in that",
   "currency's units — e.g. 1850000 for ₹18.5 lakh or 145000 for €145k — never",
   "\"18.5L\" or \"€145k\".",
@@ -101,17 +100,24 @@ export async function generateSalaryInsightAction(leadId: string): Promise<Resul
     resumeRows[0];
   const resumeText = resume?.text?.trim() ?? "";
 
-  // The app — not the AI — decides the market + currency whenever the location
-  // allows it ("Remote (EU)" → Europe / EUR), so the answer can be checked.
-  const market = salaryMarketFor(lead.location);
+  // The app — not the AI — decides the market + currency, so the answer can be
+  // checked: the job's location, else the profile country, else the mobile
+  // dial code's country, else India.
+  const [me] = await db
+    .select({ country: userT.country, mobile: userT.mobile })
+    .from(userT)
+    .where(eq(userT.id, userId));
+  const market = resolveSalaryMarket({
+    location: lead.location,
+    profileCountry: me?.country,
+    mobile: me?.mobile,
+  });
 
   const context = [
     `Job: ${lead.title} at ${lead.company}`,
     `Location: ${lead.location}${lead.remote ? " (remote)" : ""}`,
-    market
-      ? `Pay market (FIXED — do not change): ${market.market}
-Currency (FIXED — do not change): ${market.currency}`
-      : "Pay market: not clear from the location — infer it from the job description; if still unclear, assume India (INR).",
+    `Pay market (FIXED — do not change): ${market.market}
+Currency (FIXED — do not change): ${market.currency}`,
     jd
       ? `Job description:\n${jd.slice(0, 12000)}`
       : "Job description: not provided — rely on the title, company and location.",

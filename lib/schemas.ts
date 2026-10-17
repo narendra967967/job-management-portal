@@ -10,6 +10,7 @@ import "server-only";
 
 import { z } from "zod";
 import { splitMobile, validateMobile } from "@/lib/validation";
+import { COUNTRY_OPTIONS } from "@/lib/geo";
 import {
   CLOSE_OUTCOME_LABELS,
   CONNECTION_TYPE_LABELS,
@@ -50,6 +51,12 @@ const zEnum = <T extends readonly string[]>(values: T, msg: string) =>
 export const profileSchema = z.object({
   name: z.string().trim().min(1, "Name is required.").max(120),
   mobile: zMobile,
+  // "" = not set. Must be one of the supported countries (lib/geo.ts).
+  country: z
+    .string()
+    .trim()
+    .default("")
+    .refine((v) => v === "" || COUNTRY_OPTIONS.includes(v), "Pick a country from the list."),
 });
 
 export const followUpsSchema = z.object({

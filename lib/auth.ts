@@ -157,6 +157,8 @@ export const auth = betterAuth({
   user: {
     additionalFields: {
       mobile: { type: "string", required: false },
+      // Set from Settings → Profile (Server Action), not via the auth API.
+      country: { type: "string", required: false, input: false },
       // Admin-managed fields (not settable via the auth API — input: false).
       role: { type: "string", required: false, defaultValue: "user", input: false },
       status: { type: "string", required: false, defaultValue: "active", input: false },

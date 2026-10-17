@@ -33,6 +33,7 @@ import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { cn, formatDateTime } from "@/lib/utils";
 import { useMounted } from "@/lib/use-mounted";
+import { COUNTRY_OPTIONS } from "@/lib/geo";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import {
   useProfile,
@@ -283,12 +284,19 @@ interface ProfileErrors {
   mobile?: string;
 }
 
+const NO_COUNTRY = "__none";
+const COUNTRY_ITEMS: Record<string, string> = {
+  [NO_COUNTRY]: "Not set",
+  ...Object.fromEntries(COUNTRY_OPTIONS.map((c) => [c, c])),
+};
+
 function ProfileCard() {
   const profile = useProfile();
   const initialMobile = splitMobile(profile.mobile);
   const [name, setName] = useState(profile.name);
   const [dial, setDial] = useState(initialMobile.dial);
   const [national, setNational] = useState(initialMobile.national);
+  const [country, setCountry] = useState(profile.country);
   const [errors, setErrors] = useState<ProfileErrors>({});
   const [saved, setSaved] = useState(false);
 
@@ -297,6 +305,7 @@ function ProfileCard() {
     setName(profile.name);
     setDial(m.dial);
     setNational(m.national);
+    setCountry(profile.country);
     setErrors({});
   }, [profile]);
 
@@ -316,6 +325,7 @@ function ProfileCard() {
     updateProfile({
       name: name.trim(),
       mobile: joinMobile(dial, national),
+      country,
     });
     setSaved(true);
     setTimeout(() => setSaved(false), 1500);
@@ -383,6 +393,29 @@ function ProfileCard() {
           {errors.mobile && (
             <span className="text-[11px] text-destructive">{errors.mobile}</span>
           )}
+        </Field>
+        <Field label="Country you live in">
+          <Select
+            items={COUNTRY_ITEMS}
+            value={country || NO_COUNTRY}
+            onValueChange={(v) => setCountry(!v || v === NO_COUNTRY ? "" : v)}
+          >
+            <SelectTrigger aria-label="Country you live in" className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NO_COUNTRY}>Not set</SelectItem>
+              {COUNTRY_OPTIONS.map((c) => (
+                <SelectItem key={c} value={c}>
+                  {c}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <span className="text-[11px] text-muted-foreground">
+            Used for salary estimates on remote jobs whose location doesn&apos;t
+            say where they hire.
+          </span>
         </Field>
         <Field label="Email (login ID)">
           <Input
