@@ -4,6 +4,11 @@ How to point this app at a (new) domain, and the gotchas that will bite you if y
 don't. Written from the preprod move `preprod.jmp.narendragupta.in → preprod.jobtiva.in`
 (2026-10). Prod on the `jobtiva.in` apex follows the same recipe.
 
+> The example commands below come from the old single-container AWS box (`jmp`, `sudo docker …`).
+> On the current server (`VPS.md`) the containers are `app-preprod` / `app-prod`: read a value with
+> `docker compose exec app-preprod printenv BETTER_AUTH_URL`, and apply an env change with
+> `docker compose up -d app-preprod`, as `deploy` in `/srv/jobtiva`.
+
 ## How domains work here
 
 There is **one** source of truth: the `BETTER_AUTH_URL` env var. It drives:
@@ -41,11 +46,9 @@ config/infra only: DNS → TLS → `BETTER_AUTH_URL` → Nginx → Google OAuth 
 3. **Changing `BETTER_AUTH_URL` logs everyone out** — cookies are host-scoped, so a new host
    invalidates existing sessions. Expected; users just sign in again.
 
-4. **App env lives only in the box `.env`.** The CI deploy (`deploy/preprod-remote.sh`) runs the
-   app with `--env-file "$APP_DIR/.env"` and does **not** regenerate `.env` from SSM/GitHub — so
-   your edits persist and the next `push to preprod` picks them up automatically (it re-runs the
-   container from this same file). GitHub/SSM in this pipeline are only for AWS OIDC auth, running
-   the remote deploy via `aws ssm send-command`, and ECR — not app env.
+4. **App env lives only on the server**, in `/srv/jobtiva/env/<env>.env` (see `VPS.md`). CI never
+   writes it, so your edits persist. After an edit, `docker compose up -d app-<env>` re-creates the
+   container with the new values.
 
 5. **Google `gmail.readonly` is a restricted scope.** Keep the OAuth consent screen in
    **Testing** and add each connecting account as a **test user** (≤100) — no Google
@@ -85,10 +88,10 @@ For a host `<H>` (e.g. `preprod.jobtiva.in`, or `jobtiva.in` for prod):
 
 ## Prod specifics (jobtiva.in apex — later)
 
-Needs the deferred prod environment stood up first (2nd EC2 + Elastic IP, `jmp_prod` DB, prod
-S3 bucket, `deploy-prod.yml` gated on the `prod` branch). Then the same template, plus:
+Prod runs on the same EC2 as preprod (Elastic IP `13.205.239.50`); the full launch checklist is
+`VPS.md` section 4. In short, the same template, plus:
 
-- DNS: `A @ → <prod Elastic IP>`, and `www` → apex (CNAME to `jobtiva.in`, or an A record + a
+- DNS: `A @ → 13.205.239.50`, and `www` → apex (CNAME to `jobtiva.in`, or an A record + a
   www→apex 301 in Nginx).
 - Cert: `sudo certbot certonly --nginx -d jobtiva.in -d www.jobtiva.in`.
 - `BETTER_AUTH_URL=https://jobtiva.in`.

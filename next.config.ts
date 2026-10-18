@@ -6,7 +6,7 @@ const nextConfig: NextConfig = {
   output: "standalone",
   // Keep the résumé text extractors out of the bundle — they're Node-only and
   // used only inside Server Actions.
-  serverExternalPackages: ["mammoth", "nodemailer", "@aws-sdk/client-s3"],
+  serverExternalPackages: ["mammoth", "nodemailer"],
   experimental: {
     serverActions: {
       // Résumé uploads go through a Server Action (default cap: 1 MB). The app

@@ -1,7 +1,5 @@
-name: Deploy preprod (VPS)
+name: Deploy preprod
 
-# Active only when the repo variable PREPROD_TARGET is "vps"
-# (Settings → Secrets and variables → Actions → Variables).
 on:
   push:
     branches: [preprod]
@@ -17,7 +15,6 @@ permissions:
 
 jobs:
   deploy:
-    if: vars.PREPROD_TARGET == 'vps'
     # The server is an ARM (Graviton t4g) EC2, so build arm64 images natively.
     runs-on: ubuntu-24.04-arm
     steps:

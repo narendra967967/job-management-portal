@@ -4,13 +4,12 @@ import "server-only";
 //
 // Driver, picked at runtime:
 //   STORAGE_DRIVER=local  → files on disk under UPLOADS_DIR (the VPS; a Docker volume)
-//   else S3_BUCKET set    → Amazon S3 (legacy — only while preprod is still on AWS)
 //   else                  → bytes in Postgres (resume_files) — local dev
 //
 // Each résumé row records where ITS file lives in `resumes.blob_url`, so rows
 // written by any driver stay readable after the driver changes:
 //   "local:<key>" → disk     "db" → resume_files     "pending" → not stored yet
-//   anything else → a legacy S3 object key
+//   anything else → unreadable (legacy S3 keys; all were moved to disk at the AWS cutover)
 //
 // Files on disk are private: never served by Nginx, only streamed back through
 // the signed-in download action after an ownership check.
@@ -21,12 +20,6 @@ import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { resumeFiles } from "@/db/schema";
-import {
-  isS3Configured,
-  putResumeObject,
-  getResumeObject,
-  deleteResumeObject,
-} from "@/lib/s3";
 
 const LOCAL_PREFIX = "local:";
 
@@ -78,10 +71,6 @@ export async function storeResumeFile(input: {
     await putLocal(key, input.bytes);
     return LOCAL_PREFIX + key;
   }
-  if (isS3Configured()) {
-    await putResumeObject(key, input.bytes, input.contentType);
-    return key;
-  }
   await db.insert(resumeFiles).values({
     resumeId: input.resumeId,
     userId: input.userId,
@@ -112,13 +101,7 @@ export async function readResumeFile(
       .where(and(eq(resumeFiles.resumeId, resumeId), eq(resumeFiles.userId, userId)));
     return f ? { body: f.data, contentType: f.contentType } : null;
   }
-  if (blobUrl === "pending" || !isS3Configured()) return null;
-  try {
-    const { body, contentType } = await getResumeObject(blobUrl);
-    return { body, contentType: contentType || contentTypeFor(blobUrl) };
-  } catch {
-    return null;
-  }
+  return null;
 }
 
 /** Best-effort removal of a résumé's stored bytes (DB copies cascade with the row). */
@@ -126,8 +109,6 @@ export async function deleteResumeFile(blobUrl: string): Promise<void> {
   try {
     if (blobUrl.startsWith(LOCAL_PREFIX)) {
       await fs.rm(resolveKey(blobUrl.slice(LOCAL_PREFIX.length)), { force: true });
-    } else if (blobUrl !== "db" && blobUrl !== "pending" && isS3Configured()) {
-      await deleteResumeObject(blobUrl);
     }
   } catch {
     // Orphaned bytes are harmless; never block deleting the résumé itself.

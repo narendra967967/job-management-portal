@@ -223,7 +223,7 @@ If you skip rclone, backups stay local only and the log shows a warning every ni
 ### Portfolio
 
 Set up the `portfolio` user and `/srv/portfolio` now, following the portfolio-website repo's
-`deploy/VPS.md`, up to (not including) DNS/TLS. Its first publish happens at cutover.
+`deploy/VPS.md`, up to (not including) TLS. Its CI then publishes the site.
 
 ---
 
@@ -233,24 +233,18 @@ Go to **Settings → Secrets and variables → Actions**.
 
 | Secret | Value |
 |---|---|
-| `VPS_HOST` | `13.205.239.50` (set at cutover, after the Elastic IP moves) |
+| `VPS_HOST` | `13.205.239.50` |
 | `VPS_USER` | `deploy` |
 | `VPS_SSH_KEY` | contents of the private key `jobtiva-ci` |
-| `VPS_KNOWN_HOSTS` | output of `ssh-keyscan -t ed25519 13.205.239.50`, run from your laptop **after** the Elastic IP moves. Check the fingerprint against `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub` on the box |
-
-| Variable | Value |
-|---|---|
-| `PREPROD_TARGET` | `vps`. Set this only at cutover (section 3). Until then, pushes to `preprod` still go to the old AWS box |
+| `VPS_KNOWN_HOSTS` | the line printed **on the server** by `echo "13.205.239.50 $(cut -d' ' -f1,2 /etc/ssh/ssh_host_ed25519_key.pub)"`. (Windows' `ssh-keyscan` fails here with `unsupported KEX method sntrup761…` and prints no key.) |
 
 **Settings → Environments → New environment `production`**: add yourself as **Required reviewer**
 and restrict deployment branches to `prod`. Every prod deploy then waits for your click.
 
 Workflows:
 
-- **`deploy-preprod-vps.yml`** — runs on push to `preprod` when `PREPROD_TARGET=vps`.
-- **`deploy-prod.yml`** — runs on push to `prod`, after approval.
-- **`deploy-preprod.yml`** — the legacy AWS workflow (ECR + SSM). It skips itself once
-  `PREPROD_TARGET=vps`.
+- **`deploy-preprod-vps.yml`** ("Deploy preprod") — runs on push to `preprod`.
+- **`deploy-prod.yml`** ("Deploy prod") — runs on push to `prod`, after approval.
 
 The two server workflows run on GitHub's **ARM runner (`ubuntu-24.04-arm`)**, so images are built
 natively for the Graviton box. In a private repo these use the plan's free Actions minutes. Both call
@@ -274,99 +268,28 @@ A non-fast-forward merge still works, but it builds a fresh image.
 
 ---
 
-## 3. Cutover: preprod + portfolio (old AWS box → new EC2)
+## 3. Cutover from the old AWS setup — done 2026-10-18
 
-Do sections 1 and 2 first (except the secrets marked "at cutover"); none of that touches the live
-sites. The cutover itself takes about 20–30 minutes of downtime for preprod and the portfolio. Do it
-in one sitting so no new data lands on RDS after the dump.
+Preprod and narendragupta.in moved from the old t3.micro + RDS + S3 + ECR setup to this box:
 
-0. **Before you start:**
-   - Merge this work into `preprod` and push it. With `PREPROD_TARGET` still unset it deploys to
-     the old box as usual, which keeps using S3 (`S3_BUCKET` is set there).
-   - Prepare `/srv/jobtiva/env/preprod.env` on the new box (from `app.env.example`). In a Session
-     Manager shell on the **old** box, `sudo cat /home/ubuntu/job-management-portal/.env` and copy:
-     `BETTER_AUTH_SECRET`, **`APP_ENCRYPTION_KEY` (must be the same, or saved AI keys and Gmail
-     tokens become unreadable)**, `CRON_SECRET`, `GOOGLE_CLIENT_ID`/`SECRET`, and any `SMTP_*`.
-     Set the rest yourself:
-     - `DATABASE_URL=postgresql://jmp_preprod:<PREPROD_DB_PASSWORD>@postgres:5432/jmp_preprod`
-     - `BETTER_AUTH_URL=https://preprod.jobtiva.in`
-     - `STORAGE_DRIVER=local`
-     - `APP_ENV=Preprod`
+1. résumés copied from S3 into RDS (`db/resumes-s3-to-db.ts`, since removed);
+2. old app and its cron stopped;
+3. `pg_dump` taken **from this box straight from RDS** (same VPC, via a temporary extra security
+   group) and restored into `jmp_preprod`; user and lead counts matched;
+4. Elastic IP `13.205.239.50` re-associated to this instance, so DNS never changed;
+5. first CI deploy, then `files-db-to-disk.mjs` moved the résumé onto the uploads volume;
+6. Certbot for preprod.jobtiva.in, then the portfolio's first publish + certificate;
+7. cron installed **without** the prod lines (prod didn't exist yet); local + Drive backups verified.
 
-     Then `chmod 600 env/preprod.env`. Note the old box's `DATABASE_URL` too (the RDS one); step 3
-     needs it.
-   - Let the new box reach RDS: EC2 → Instances → `jobtiva` → Actions → Security → **Change security
-     groups** → add **`jmp-ec2-sg`** (the old box's group, which RDS already trusts). It's removed
-     again in section 6.
+Lessons worth keeping:
 
-1. **Pull résumés off S3 into the DB.** On the old box (Session Manager):
-   ```bash
-   cd /home/ubuntu/job-management-portal
-   sudo docker run --rm --env-file .env -v "$PWD:/app" -w /app node:22-bookworm-slim \
-     bash -lc "npm ci --no-audit --no-fund && npx tsx db/resumes-s3-to-db.ts"
-   ```
-   The script prints how many it copied. S3 is left untouched as a fallback.
-
-2. **Stop the old app and its cron** (old box):
-   ```bash
-   sudo docker stop jmp
-   sudo crontab -l -u ubuntu; sudo crontab -l     # find the gmail-sync line (ubuntu's or root's)
-   ```
-   Comment that line out with `sudo crontab -e -u ubuntu` (or `sudo crontab -e` if it is root's).
-   From here on, preprod is down.
-
-3. **Dump straight from RDS, then restore** (new box, as `deploy`). The `read` keeps the RDS
-   password out of shell history; use the old `DATABASE_URL` with `sslmode=require` in place of
-   `no-verify` (a node-pg-only value):
-   ```bash
-   cd /srv/jobtiva
-   read -rs RDS_URL; export RDS_URL                     # paste the URL, press Enter
-   psql "$RDS_URL" -tAc "show server_version"           # must be ≤ 18
-   docker run --rm -e RDS_URL postgres:18-bookworm sh -c 'pg_dump -Fc --no-owner --no-acl "$RDS_URL"' > incoming/preprod.dump
-   ls -lh incoming/preprod.dump
-   docker compose exec -T postgres pg_restore -U postgres -d jmp_preprod --no-owner --role=jmp_preprod \
-     < incoming/preprod.dump && rm incoming/preprod.dump
-   unset RDS_URL
-   ```
-   The `jmp_preprod` database must still be empty: no deploy has run yet.
-
-4. **Move the Elastic IP.** EC2 → **Elastic IPs** → select `13.205.239.50` → Actions → **Associate
-   Elastic IP address** → Instance: `jobtiva` → tick **Allow this Elastic IP address to be
-   reassociated** → Associate. The new box's temporary public IP is released automatically, and
-   preprod.jobtiva.in and narendragupta.in now point at it. Your laptop: `ssh deploy@13.205.239.50`
-   (if SSH warns that the host key changed, run `ssh-keygen -R 13.205.239.50` once).
-
-5. **First preprod deploy.** In GitHub, set `VPS_HOST` and `VPS_KNOWN_HOSTS` (section 2), then the
-   variable `PREPROD_TARGET=vps`. Go to **Actions → Deploy preprod (VPS) → Run workflow** on
-   `preprod`. It applies any newer migrations and starts `app-preprod`. Then move the résumés onto
-   disk:
-   ```bash
-   docker compose run --rm --no-deps app-preprod node scripts/files-db-to-disk.mjs
-   ```
-   This is idempotent. It verifies each file before deleting the DB copy.
-
-6. **TLS** (as `root`). DNS already points here, so this works straight away:
-   ```bash
-   certbot --nginx -d preprod.jobtiva.in --redirect -m <your-email> --agree-tos
-   ```
-   Renewal is automatic via certbot's systemd timer. Check it with `certbot renew --dry-run`.
-
-7. **Portfolio.** In the portfolio-website repo, set its secrets and `PORTFOLIO_TARGET=vps`, run
-   its deploy workflow, then add its certificate (that repo's `deploy/VPS.md`).
-
-8. **Verify.**
-   - HTTPS works; user login and `/jmp-admin` work.
-   - An existing résumé opens, and a new upload works.
-   - Gmail connect works: the Google client is the same, and the redirect URI is unchanged.
-   - `tail /srv/jobtiva/logs/cron.log` shows `200`s.
-   - After a push to `preprod`, the deploy goes green.
-   - https://narendragupta.in and `www` load.
-
-9. **Rollback (if needed):** move the Elastic IP back to the old instance, `sudo docker start jmp`
-   and restore its crontab there, then unset `PREPROD_TARGET`. Keep the old instance **stopped** and
-   RDS **stopped** (both keep their data; RDS restarts by itself after 7 days) until section 6.
-
----
+- **Match the Postgres major to the source.** RDS was 18.3; `pg_dump` refuses a newer server and
+  dumps don't restore into an older major. The compose service is `postgres:18` for that reason.
+  postgres:18+ images keep data in `/var/lib/postgresql/18/docker`, so the volume mounts at
+  `/var/lib/postgresql`.
+- Pass connection strings with `read -rs VAR` on its own line, then paste. Never on the command line,
+  where it lands in shell history.
+- Variables (`vars.*`) and secrets (`secrets.*`) are separate stores in GitHub Actions.
 
 ## 4. Prod launch on `jobtiva.in`
 
@@ -389,6 +312,8 @@ in one sitting so no new data lands on RDS after the dump.
    ```
 4. **Deploy.** Fast-forward `prod` to the tested preprod commit and push (you do this). Approve
    the run in Actions. Migrations build the empty schema.
+   Then switch on prod's scheduled jobs (as `deploy`): `crontab /srv/jobtiva/crontab.txt` — the full
+   file, which adds prod's Gmail sync and purge next to preprod's.
 5. **First admin.** **Never run `db:seed` here**: it wipes tables and creates known passwords.
    Use the non-destructive `db:add-user` over an SSH tunnel from the laptop:
    ```bash
@@ -488,30 +413,17 @@ Kept deliberately apart from Jobtiva:
 A leaked portfolio deploy key therefore can't reach Jobtiva's database or uploads. Don't add the
 `portfolio` user to the docker group, and don't give the portfolio repo the Jobtiva `deploy` key.
 
+
 ---
 
-## 6. Shut down the old AWS pieces
+## 6. Old AWS pieces — removed 2026-10-18
 
-The old pieces keep costing money (RDS above all), so don't leave them longer than needed. After
-preprod and the portfolio have run cleanly on the new box for a few days:
+Deleted after the cutover: the t3.micro `jmp-preprod`, RDS `jmp-db` (no final snapshot), S3
+`jmp-preprod-resumes`, ECR `jmp-app`, security groups `jmp-ec2-sg` / `jmp-rds-sg`, IAM roles
+`jmp-github-actions` / `jmp-ec2-preprod-role`, the GitHub OIDC provider, and a stray test
+instance in eu-north-1 (Stockholm). The code paths for S3, ECR and the SSM deploy are gone too.
 
-1. In GitHub, delete the legacy AWS workflow and the AWS role/OIDC references (also in the
-   portfolio repo). Code cleanup:
-   - remove `lib/s3.ts`;
-   - remove the `@aws-sdk/client-s3` dependency and its `serverExternalPackages` entry in
-     `next.config`;
-   - remove `deploy/preprod-remote.sh`, `db/resumes-s3-to-db.ts`, and the S3 vars.
-2. In the AWS console (ap-south-1):
-   - **EC2:** terminate the old instance `jmp-preprod` (`i-085d2024533e968fd`). **Do not release
-     the Elastic IP**: it now belongs to `jobtiva`. Then remove `jmp-ec2-sg` from `jobtiva`'s
-     security groups and delete `jmp-ec2-sg`.
-   - **RDS:** optionally take a final snapshot, export it, and delete that snapshot later. Then
-     delete the instance `jmp-db` and its security group `jmp-rds-sg`.
-   - **S3:** empty and delete the bucket `jmp-preprod-resumes`.
-   - **ECR:** delete the `jmp-app` repository.
-   - **SSM Parameter Store:** remove the `/jmp/*` parameters, if any.
-   - **IAM:** delete the `jmp-github-actions` role, the GitHub OIDC provider, and
-     `jmp-ec2-preprod-role`. Keep `jobtiva-ec2-ssm`.
-   - **CloudWatch:** delete the old log groups.
-3. A few days later, check **Billing → Bills**. In ap-south-1 only the `jobtiva` instance, its
-   20 GB volume and one public IPv4 address should still be accruing.
+What remains in AWS (ap-south-1): the `jobtiva` instance, its 20 GB volume, Elastic IP
+`13.205.239.50`, security group `jobtiva-sg`, key pair `jobtiva-laptop`, IAM role
+`jobtiva-ec2-ssm`, plus each region's free default VPC. Check **EC2 Global View** now and then:
+anything else is unexpected and billing.

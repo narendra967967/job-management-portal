@@ -1,4 +1,4 @@
-name: Deploy prod (VPS)
+name: Deploy prod
 
 # Push to `prod` → waits for approval on the "production" environment
 # (Settings → Environments → production → Required reviewers) → deploys.

@@ -1,5 +1,5 @@
 # Multi-stage build for the Next.js app (standalone output).
-# Runs as a small, non-root Node server on EC2. DB/S3/secrets are provided at
+# Runs as a small, non-root Node server on EC2. DB URL and secrets are provided at
 # RUNTIME via environment variables (never baked into the image).
 
 # 1) Install all deps (incl. dev — needed to build).
