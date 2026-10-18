@@ -1,4 +1,4 @@
-# Jobtiva on a single VPS — Postgres + the prod and preprod apps.
+# Jobtiva on a single server (AWS EC2 t4g.small: 2 vCPU, 2 GB) — Postgres + the prod and preprod apps.
 # Lives at /srv/jobtiva/docker-compose.yml (shipped by CI on every deploy).
 #
 # Not in git (create on the server — see deploy/VPS.md):
@@ -20,7 +20,8 @@ services:
       # Read by postgres-init.sh on FIRST start only (empty data volume).
       PROD_DB_PASSWORD: ${PROD_DB_PASSWORD:?set PROD_DB_PASSWORD}
       PREPROD_DB_PASSWORD: ${PREPROD_DB_PASSWORD:?set PREPROD_DB_PASSWORD}
-    command: ["postgres", "-c", "shared_buffers=256MB", "-c", "max_connections=60"]
+    # Sized for a 2 GB box: two apps × a 10-connection pool, plus headroom.
+    command: ["postgres", "-c", "shared_buffers=128MB", "-c", "max_connections=40"]
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./postgres-init.sh:/docker-entrypoint-initdb.d/10-init.sh:ro
@@ -31,7 +32,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
-    mem_limit: 768m
+    mem_limit: 384m
 
   app-prod:
     image: ${PROD_IMAGE:-jobtiva:none}
@@ -48,7 +49,10 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    mem_limit: 900m
+    mem_limit: 576m
+    environment:
+      # V8 sizes its heap from the container limit; give it room, but stay under the cap.
+      NODE_OPTIONS: --max-old-space-size=320
 
   app-preprod:
     image: ${PREPROD_IMAGE:-jobtiva:none}
@@ -63,7 +67,9 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    mem_limit: 700m
+    mem_limit: 448m
+    environment:
+      NODE_OPTIONS: --max-old-space-size=256
 
 volumes:
   pgdata:

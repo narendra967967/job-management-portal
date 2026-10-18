@@ -14,7 +14,7 @@ set -euo pipefail
 
 ENV="${1:-}"; SHA="${2:-}"; TARBALL="${3:-}"
 ROOT=/srv/jobtiva
-KEEP=5
+KEEP=3   # 20 GB disk: in-use images + the newest 3 for rollback
 
 case "$ENV" in
   prod)    VAR=PROD_IMAGE;    PORT=3000 ;;

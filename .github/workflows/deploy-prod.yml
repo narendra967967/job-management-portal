@@ -17,7 +17,8 @@ permissions:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    # The server is an ARM (Graviton t4g) EC2, so build arm64 images natively.
+    runs-on: ubuntu-24.04-arm
     environment: production
     steps:
       - uses: actions/checkout@v4

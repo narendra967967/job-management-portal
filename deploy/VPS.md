@@ -1,27 +1,40 @@
-# VPS runbook (preprod + prod)
+# Server runbook (preprod + prod on one AWS EC2)
 
-Both environments run on **one OVHcloud VPS-1 in Singapore** (2 vCores · 4 GB RAM · 40 GB disk, Ubuntu 24.04).
-Mumbai was out of stock at order time; Singapore adds ~30–80 ms from India, which is fine for this app.
-The same box also serves the static portfolio site **narendragupta.in** (see "Other sites on this server").
-No AWS, no container registry: CI builds the image and ships it over SSH.
-This replaces the AWS setup (EC2 + RDS + S3 + ECR). For DNS/OAuth details see `DOMAIN.md`; its
-cutover template still applies.
+Both environments run on **one AWS EC2 `t4g.small` in Mumbai (ap-south-1)**: 2 vCPU (ARM/Graviton),
+2 GB RAM, 20 GB gp3 disk, Ubuntu 24.04. The same box also serves the static portfolio site
+**narendragupta.in** (see "Other sites on this server").
+
+It replaces the old AWS setup (EC2 t3.micro + RDS + S3 + ECR + SSM deploys). Only the server itself
+is paid for now; there's no managed database and no container registry: CI builds the image and ships
+it over SSH. The box **reuses the existing Elastic IP `13.205.239.50`**, so the DNS for
+preprod.jobtiva.in and narendragupta.in does not change. For DNS/OAuth details see `DOMAIN.md`.
 
 ```
-Internet ─► Nginx (host, :80/:443, Certbot TLS)
-              ├─ jobtiva.in, www → apex ─► 127.0.0.1:3000  app-prod     (≤ 900 MB)
-              └─ preprod.jobtiva.in      ─► 127.0.0.1:3001  app-preprod  (≤ 700 MB)
-                                          postgres:17 on 127.0.0.1:5432 (≤ 768 MB)
-                                            DBs: jmp_prod / jmp_preprod, one role each
+Internet ─► 13.205.239.50 (Elastic IP) ─► Security group (22, 80, 443) ─► ufw
+            Nginx (host, :80/:443, Certbot TLS)
+              ├─ jobtiva.in, www → apex ─► 127.0.0.1:3000  app-prod     (≤ 576 MB)
+              ├─ preprod.jobtiva.in      ─► 127.0.0.1:3001  app-preprod  (≤ 448 MB)
+              └─ narendragupta.in, www   ─► static files in /srv/portfolio/current
+            postgres:17 on 127.0.0.1:5432 (≤ 384 MB) · DBs jmp_prod / jmp_preprod, one role each
 Docker volumes: pgdata · uploads-prod · uploads-preprod (résumés, at /data/uploads)
 cron (deploy user): Gmail sync every 15 min · lead purge nightly · backup 03:00 IST
-
-Also on this box (unrelated to Jobtiva):
-  narendragupta.in, www ─► static files in /srv/portfolio/current (user `portfolio`)
 ```
 
 Everything Docker publishes is bound to `127.0.0.1`. That matters because Docker-published
 ports **bypass ufw**. Only Nginx and SSH are reachable from outside.
+
+## Cost (Mumbai, on-demand, before GST)
+
+| Item | Until 31 Dec 2026 | From Jan 2027 |
+|---|---|---|
+| t4g.small | $0 (AWS t4g.small free trial, 750 h/month) | $0.0112/h ≈ $8.18/mo |
+| Public IPv4 (the Elastic IP) | $0.005/h ≈ $3.65/mo | same |
+| 20 GB gp3 | ≈ $1.82/mo | same |
+| Data transfer out | first 100 GB/mo free | same |
+| **Total** | **≈ $5.5/mo** | **≈ $13.7/mo** |
+
+Indian accounts billed by AWS India add 18% GST. Set an **AWS Budgets** alert (free) at $6/month
+so a surprise shows up by email, not on the bill.
 
 ## Layout on the box: `/srv/jobtiva` (owned by `deploy`)
 
@@ -44,30 +57,50 @@ the env.
 ## 1. One-time server setup
 
 Throughout this runbook, **"as `root`"** means `ssh ubuntu@<IP>` then `sudo -i`, and
-**"as `deploy`"** means `ssh deploy@<IP>`.
+**"as `deploy`"** means `ssh deploy@<IP>`. Until the Elastic IP moves (section 3), `<IP>` is the
+instance's temporary public IP; afterwards it is `13.205.239.50`.
 
-### Ordering on OVHcloud
+### Launching the EC2 instance
 
-- **Location:** Asia/Oceania → **Singapore** (Mumbai was out of stock). **Commitment:** 12 months (−10%; auto-renews — turn that off in the Control Panel if you plan to move).
-- **Image:** **Ubuntu 24.04** (plain OS, no preinstalled app).
-- **SSH key:** add your laptop's **public** key (`~/.ssh/id_ed25519.pub`; create one with
-  `ssh-keygen -t ed25519` if you have none). If you skip this, OVH emails a password instead.
-  Log in once, change it with `passwd`, and add the key.
-- When the VPS is ready, note its **IPv4** from Control Panel → Bare Metal Cloud → VPS.
+Region **Asia Pacific (Mumbai) ap-south-1** (top-right of the console). Same region and default VPC
+as the old box and RDS: the Elastic IP can only move within a region, and the preprod dump is
+taken straight from RDS over the VPC.
 
-What OVH gives you:
+1. **IAM role for emergency access** (IAM → Roles → Create role → AWS service → EC2): attach only
+   **`AmazonSSMManagedInstanceCore`**, name it `jobtiva-ec2-ssm`. It's free, and it lets you open a
+   shell from the console (Systems Manager → Session Manager) even if SSH or ufw locks you out.
+2. **Key pair** (EC2 → Key pairs → Actions → **Import key pair**): paste your laptop's **public**
+   key (`~/.ssh/id_ed25519.pub`; create one with `ssh-keygen -t ed25519` if you have none).
+   Name it `jobtiva-laptop`.
+3. **EC2 → Launch instance:**
+   - **Name:** `jobtiva`
+   - **AMI:** Ubuntu Server **24.04 LTS**, architecture **64-bit (Arm)**
+   - **Instance type:** **`t4g.small`**
+   - **Key pair:** `jobtiva-laptop`
+   - **Network settings → Edit:** default VPC; **Auto-assign public IP: Enable** (temporary, for
+     setup); **Create security group** `jobtiva-sg` with inbound:
+     - SSH 22 from **Anywhere 0.0.0.0/0**. GitHub Actions deploys over SSH from changing IPs.
+       Login is key-only (passwords are switched off below) and fail2ban bans brute-forcers.
+     - HTTP 80 and HTTPS 443 from **Anywhere**.
+   - **Storage:** **20 GiB, gp3**
+   - **Advanced details:**
+     - IAM instance profile: `jobtiva-ec2-ssm`
+     - Termination protection: **Enable**
+     - Credit specification: **Standard**. In "Unlimited" mode a sustained CPU burst is billed
+       extra; in Standard it just slows down to the baseline.
+4. Launch, wait for **2/2 status checks**, and note the **Public IPv4 address**.
+5. **Billing → Budgets → Create budget** → Monthly cost budget, $6, email alerts at 80% and 100%.
+
+What EC2 gives you (and doesn't):
 
 - The login user is **`ubuntu`** (with sudo). Root SSH is disabled; get root with `sudo -i`.
-- **Daily automated backup** (the last 24 h, rolling) is included. It's a whole-disk safety net
-  that sits *under* our own `backup.sh`, not a replacement for it: it lives in the same provider
-  and isn't application-consistent. Check it's active under the VPS's **Backup** tab.
-- **KVM console + rescue mode** (VPS page in the Control Panel). This is how you get back in if an
-  SSH or ufw change locks you out.
-- **Traffic quota:** in Asia-Pacific (Singapore), 500 GB/month, after which the speed drops to 10 Mbps. This app
-  uses a tiny fraction of that. The nightly Google Drive upload counts towards it too.
-- OVH's **Network Firewall** (Control Panel → Network → Public IP addresses): leave it
-  **off**. ufw on the box does the job. That firewall is stateless, so turning it on without an
-  "established" rule silently breaks outbound connections (apt, Docker pulls, Google, SMTP).
+- **No automatic backups.** Our `backup.sh` (Postgres dump + uploads → Google Drive) is the
+  backup. Optional whole-disk safety net: EC2 → Lifecycle Manager → daily EBS snapshot, keep 3.
+  Snapshots are incremental and cost roughly $0.05 per GB-month actually stored (check the Mumbai
+  price on the EBS pricing page before enabling).
+- **Lockout recovery:** Systems Manager → Session Manager → Start session (thanks to the IAM role).
+  The SSM agent ships with Canonical's Ubuntu AMIs.
+- The security group is the outer firewall; ufw on the box is a second layer.
 
 ```bash
 ssh ubuntu@<IP>
@@ -78,10 +111,10 @@ Then, as `root`:
 
 ```bash
 apt update && apt -y full-upgrade
-apt -y install nginx certbot python3-certbot-nginx ufw fail2ban unattended-upgrades rclone curl
+apt -y install nginx certbot python3-certbot-nginx ufw fail2ban unattended-upgrades rclone curl postgresql-client
 dpkg-reconfigure -plow unattended-upgrades          # say Yes
 
-# 2 GB swap: headroom for the 4 GB box (OVH images ship without swap)
+# 2 GB swap: overflow for the 2 GB box (EC2 Ubuntu images ship without swap)
 fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
 echo '/swapfile none swap sw 0 0' >> /etc/fstab
 sysctl -w vm.swappiness=10 && echo 'vm.swappiness=10' > /etc/sysctl.d/99-swap.conf
@@ -116,7 +149,7 @@ EOF
 sshd -t && systemctl reload ssh
 ```
 
-If a later step locks you out, use the KVM console or rescue mode from the OVH Control Panel.
+If a later step locks you out, use Session Manager (above).
 
 ### CI deploy key
 
@@ -127,7 +160,7 @@ for this:
 ssh-keygen -t ed25519 -f jobtiva-ci -C "github-actions@jobtiva" -N ""
 ```
 
-Append `jobtiva-ci.pub` to `/home/deploy/.ssh/authorized_keys` on the VPS.
+Append `jobtiva-ci.pub` to `/home/deploy/.ssh/authorized_keys` on the server.
 `jobtiva-ci` (the private half) goes into GitHub (step 2). Then delete it from the laptop.
 
 ### First copy of the kit + bootstrap (as `deploy`)
@@ -139,7 +172,7 @@ the laptop:
 scp -r deploy/vps/* scripts/cron/jmp-cron.sh deploy@<IP>:/srv/jobtiva/
 ```
 
-Then on the VPS, as `deploy`:
+Then on the server, as `deploy`:
 
 ```bash
 cd /srv/jobtiva && chmod +x *.sh
@@ -164,7 +197,7 @@ rm -f /etc/nginx/sites-enabled/default
 nginx -t && systemctl reload nginx
 ```
 
-TLS comes after DNS points here (section 3, step 6).
+TLS comes after the Elastic IP moves here (section 3).
 
 ### Google Drive backups (rclone)
 
@@ -187,6 +220,11 @@ Backups contain résumés and user data, so **encrypt them**. Use an rclone *cry
 
 If you skip rclone, backups stay local only and the log shows a warning every night.
 
+### Portfolio
+
+Set up the `portfolio` user and `/srv/portfolio` now, following the portfolio-website repo's
+`deploy/VPS.md`, up to (not including) DNS/TLS. Its first publish happens at cutover.
+
 ---
 
 ## 2. GitHub setup
@@ -195,14 +233,14 @@ Go to **Settings → Secrets and variables → Actions**.
 
 | Secret | Value |
 |---|---|
-| `VPS_HOST` | VPS IP |
+| `VPS_HOST` | `13.205.239.50` (set at cutover, after the Elastic IP moves) |
 | `VPS_USER` | `deploy` |
 | `VPS_SSH_KEY` | contents of the private key `jobtiva-ci` |
-| `VPS_KNOWN_HOSTS` | output of `ssh-keyscan -t ed25519 <IP>`. Run it from your laptop and check the fingerprint against `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub` on the box |
+| `VPS_KNOWN_HOSTS` | output of `ssh-keyscan -t ed25519 13.205.239.50`, run from your laptop **after** the Elastic IP moves. Check the fingerprint against `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub` on the box |
 
 | Variable | Value |
 |---|---|
-| `PREPROD_TARGET` | `vps`. Set this only at cutover (section 3, step 7). Until then, pushes to `preprod` still go to AWS |
+| `PREPROD_TARGET` | `vps`. Set this only at cutover (section 3). Until then, pushes to `preprod` still go to the old AWS box |
 
 **Settings → Environments → New environment `production`**: add yourself as **Required reviewer**
 and restrict deployment branches to `prod`. Every prod deploy then waits for your click.
@@ -211,9 +249,12 @@ Workflows:
 
 - **`deploy-preprod-vps.yml`** — runs on push to `preprod` when `PREPROD_TARGET=vps`.
 - **`deploy-prod.yml`** — runs on push to `prod`, after approval.
-- **`deploy-preprod.yml`** — the legacy AWS workflow. It skips itself once `PREPROD_TARGET=vps`.
+- **`deploy-preprod.yml`** — the legacy AWS workflow (ECR + SSM). It skips itself once
+  `PREPROD_TARGET=vps`.
 
-All three call `deploy/vps/ci-ship.sh`, which:
+The two server workflows run on GitHub's **ARM runner (`ubuntu-24.04-arm`)**, so images are built
+natively for the Graviton box. In a private repo these use the plan's free Actions minutes. Both call
+`deploy/vps/ci-ship.sh`, which:
 
 1. syncs the kit;
 2. builds and ships the image, unless that exact commit's image is already on the box;
@@ -225,7 +266,7 @@ All three call `deploy/vps/ci-ship.sh`, which:
 2. switches the container;
 3. health-checks `/login`;
 4. **rolls back automatically** if the health check fails;
-5. keeps the 5 newest images for rollback.
+5. keeps the 3 newest images for rollback.
 
 **Promote, don't rebuild:** fast-forward `prod` to the commit preprod tested
 (`git merge --ff-only preprod`). Same SHA means the exact image you tested on preprod goes live.
@@ -233,84 +274,97 @@ A non-fast-forward merge still works, but it builds a fresh image.
 
 ---
 
-## 3. Preprod cutover (AWS → VPS)
+## 3. Cutover: preprod + portfolio (old AWS box → new EC2)
 
-Expect about 15 minutes of preprod downtime. Do steps 1–3 in one sitting so no new data lands on
-AWS after the dump.
+Do sections 1 and 2 first (except the secrets marked "at cutover"); none of that touches the live
+sites. The cutover itself takes about 20–30 minutes of downtime for preprod and the portfolio. Do it
+in one sitting so no new data lands on RDS after the dump.
 
-0. **Before you start:** merge this work into `preprod` and push it. With `PREPROD_TARGET` still
-   unset it deploys to AWS as usual. The AWS box keeps using S3 because `S3_BUCKET` is set there,
-   and its checkout now contains `db/resumes-s3-to-db.ts`.
+0. **Before you start:**
+   - Merge this work into `preprod` and push it. With `PREPROD_TARGET` still unset it deploys to
+     the old box as usual, which keeps using S3 (`S3_BUCKET` is set there).
+   - Prepare `/srv/jobtiva/env/preprod.env` on the new box (from `app.env.example`). In a Session
+     Manager shell on the **old** box, `sudo cat /home/ubuntu/job-management-portal/.env` and copy:
+     `BETTER_AUTH_SECRET`, **`APP_ENCRYPTION_KEY` (must be the same, or saved AI keys and Gmail
+     tokens become unreadable)**, `CRON_SECRET`, `GOOGLE_CLIENT_ID`/`SECRET`, and any `SMTP_*`.
+     Set the rest yourself:
+     - `DATABASE_URL=postgresql://jmp_preprod:<PREPROD_DB_PASSWORD>@postgres:5432/jmp_preprod`
+     - `BETTER_AUTH_URL=https://preprod.jobtiva.in`
+     - `STORAGE_DRIVER=local`
+     - `APP_ENV=Preprod`
 
-1. **Pull résumés off S3 into the DB.** Run this on the AWS preprod box (SSM session):
+     Then `chmod 600 env/preprod.env`. Note the old box's `DATABASE_URL` too (the RDS one); step 3
+     needs it.
+   - Let the new box reach RDS: EC2 → Instances → `jobtiva` → Actions → Security → **Change security
+     groups** → add **`jmp-ec2-sg`** (the old box's group, which RDS already trusts). It's removed
+     again in section 6.
+
+1. **Pull résumés off S3 into the DB.** On the old box (Session Manager):
    ```bash
    cd /home/ubuntu/job-management-portal
    sudo docker run --rm --env-file .env -v "$PWD:/app" -w /app node:22-bookworm-slim \
      bash -lc "npm ci --no-audit --no-fund && npx tsx db/resumes-s3-to-db.ts"
    ```
-   The script prints how many it copied. S3 is left untouched as a fallback. The running AWS app
-   keeps serving the files from the DB.
+   The script prints how many it copied. S3 is left untouched as a fallback.
 
-2. **Stop writes, then dump.** On the AWS box:
+2. **Stop the old app and its cron** (old box):
    ```bash
    sudo docker stop jmp
-   sudo docker run --rm --env-file .env postgres:17 sh -c 'psql "$DATABASE_URL" -tAc "show server_version"'   # must be ≤ 17
-   sudo docker run --rm --env-file .env postgres:17 sh -c 'pg_dump -Fc --no-owner --no-acl "$DATABASE_URL"' > /tmp/preprod.dump
-   ls -lh /tmp/preprod.dump
+   sudo crontab -l -u ubuntu; sudo crontab -l     # find the gmail-sync line (ubuntu's or root's)
    ```
-   If `psql` rejects the URL's `sslmode`, replace it with `sslmode=require` for this command.
-   `no-verify` is a node-pg-only value.
+   Comment that line out with `sudo crontab -e -u ubuntu` (or `sudo crontab -e` if it is root's).
+   From here on, preprod is down.
 
-3. **Copy the dump and the secrets to the VPS.**
-   - The dump: on the AWS box, make a throwaway key with
-     `ssh-keygen -t ed25519 -f /tmp/k -N ""`. Append `/tmp/k.pub` to the VPS
-     `deploy` `authorized_keys`. Then run:
-     ```bash
-     scp -i /tmp/k /tmp/preprod.dump deploy@<VPS-IP>:/srv/jobtiva/incoming/
-     ```
-     Afterwards, remove that key line from the VPS and `rm /tmp/k*`.
-   - The secrets: run `sudo cat .env` on the AWS box and copy these values into
-     `/srv/jobtiva/env/preprod.env` (from `app.env.example`):
-     `BETTER_AUTH_SECRET`, **`APP_ENCRYPTION_KEY` (must be the same, or saved AI keys and Gmail
-     tokens become unreadable)**, `CRON_SECRET`, `GOOGLE_CLIENT_ID`/`SECRET`, and any `SMTP_*`.
-   - Set the rest yourself:
-     - `DATABASE_URL=postgresql://jmp_preprod:<PREPROD_DB_PASSWORD>@postgres:5432/jmp_preprod`
-     - `BETTER_AUTH_URL=https://preprod.jobtiva.in`
-     - `STORAGE_DRIVER=local`
-     - `APP_ENV=Preprod`
-   - Then run `chmod 600 env/preprod.env`.
-
-4. **Restore** (VPS, as `deploy`). The database must still be empty: no deploy has run yet.
+3. **Dump straight from RDS, then restore** (new box, as `deploy`). The `read` keeps the RDS
+   password out of shell history; use the old `DATABASE_URL` with `sslmode=require` in place of
+   `no-verify` (a node-pg-only value):
    ```bash
    cd /srv/jobtiva
+   read -rs RDS_URL; export RDS_URL                     # paste the URL, press Enter
+   psql "$RDS_URL" -tAc "show server_version"           # must be ≤ 17
+   docker run --rm -e RDS_URL postgres:17-bookworm sh -c 'pg_dump -Fc --no-owner --no-acl "$RDS_URL"' > incoming/preprod.dump
+   ls -lh incoming/preprod.dump
    docker compose exec -T postgres pg_restore -U postgres -d jmp_preprod --no-owner --role=jmp_preprod \
      < incoming/preprod.dump && rm incoming/preprod.dump
+   unset RDS_URL
    ```
+   The `jmp_preprod` database must still be empty: no deploy has run yet.
 
-5. **First deploy.** On GitHub, set the variable `PREPROD_TARGET=vps`. Then go to
-   **Actions → Deploy preprod (VPS) → Run workflow** on `preprod`. It applies any newer
-   migrations and starts `app-preprod`. Then move the résumés onto disk:
+4. **Move the Elastic IP.** EC2 → **Elastic IPs** → select `13.205.239.50` → Actions → **Associate
+   Elastic IP address** → Instance: `jobtiva` → tick **Allow this Elastic IP address to be
+   reassociated** → Associate. The new box's temporary public IP is released automatically, and
+   preprod.jobtiva.in and narendragupta.in now point at it. Your laptop: `ssh deploy@13.205.239.50`
+   (if SSH warns that the host key changed, run `ssh-keygen -R 13.205.239.50` once).
+
+5. **First preprod deploy.** In GitHub, set `VPS_HOST` and `VPS_KNOWN_HOSTS` (section 2), then the
+   variable `PREPROD_TARGET=vps`. Go to **Actions → Deploy preprod (VPS) → Run workflow** on
+   `preprod`. It applies any newer migrations and starts `app-preprod`. Then move the résumés onto
+   disk:
    ```bash
    docker compose run --rm --no-deps app-preprod node scripts/files-db-to-disk.mjs
    ```
    This is idempotent. It verifies each file before deleting the DB copy.
 
-6. **DNS + TLS.** At the registrar, point `preprod.jobtiva.in` A to the VPS IP (TTL 300). Keep
-   the apex NS record. Once `nslookup preprod.jobtiva.in` returns the VPS IP, run as `root`:
+6. **TLS** (as `root`). DNS already points here, so this works straight away:
    ```bash
    certbot --nginx -d preprod.jobtiva.in --redirect -m <your-email> --agree-tos
    ```
    Renewal is automatic via certbot's systemd timer. Check it with `certbot renew --dry-run`.
 
-7. **Verify.**
+7. **Portfolio.** In the portfolio-website repo, set its secrets and `PORTFOLIO_TARGET=vps`, run
+   its deploy workflow, then add its certificate (that repo's `deploy/VPS.md`).
+
+8. **Verify.**
    - HTTPS works; user login and `/jmp-admin` work.
    - An existing résumé opens, and a new upload works.
    - Gmail connect works: the Google client is the same, and the redirect URI is unchanged.
    - `tail /srv/jobtiva/logs/cron.log` shows `200`s.
    - After a push to `preprod`, the deploy goes green.
+   - https://narendragupta.in and `www` load.
 
-8. Leave AWS **stopped but intact** for a week as the rollback. To roll back: point DNS back,
-   start the `jmp` container on AWS, and unset `PREPROD_TARGET`.
+9. **Rollback (if needed):** move the Elastic IP back to the old instance, `sudo docker start jmp`
+   and restore its crontab there, then unset `PREPROD_TARGET`. Keep the old instance **stopped** and
+   RDS **stopped** (both keep their data; RDS restarts by itself after 7 days) until section 6.
 
 ---
 
@@ -328,8 +382,8 @@ AWS after the dump.
    ln -s /etc/nginx/sites-available/jobtiva.in.conf /etc/nginx/sites-enabled/
    nginx -t && systemctl reload nginx
    ```
-3. **DNS.** Point the `@` A record and the `www` A record (or a CNAME to `jobtiva.in`) at the VPS
-   IP. Once both resolve:
+3. **DNS.** Point the `@` A record and the `www` A record (or a CNAME to `jobtiva.in`) at
+   `13.205.239.50`. Once both resolve:
    ```bash
    certbot --nginx -d jobtiva.in -d www.jobtiva.in --redirect
    ```
@@ -338,7 +392,7 @@ AWS after the dump.
 5. **First admin.** **Never run `db:seed` here**: it wipes tables and creates known passwords.
    Use the non-destructive `db:add-user` over an SSH tunnel from the laptop:
    ```bash
-   ssh -N -L 15432:127.0.0.1:5432 deploy@<VPS-IP>        # leave running
+   ssh -N -L 15432:127.0.0.1:5432 deploy@13.205.239.50        # leave running
    # second terminal, repo root:
    DATABASE_URL=postgresql://jmp_prod:<PROD_DB_PASSWORD>@127.0.0.1:15432/jmp_prod \
    ADD_USER_EMAIL=<admin email> ADD_USER_PASSWORD=<strong password> ADD_USER_NAME="Admin" \
@@ -366,8 +420,9 @@ All commands run as `deploy` in `/srv/jobtiva`.
 |---|---|
 | Status / memory | `docker compose ps` · `docker stats --no-stream` · `free -h` · `df -h` |
 | Logs | `docker compose logs -f --tail 100 app-prod` (or `app-preprod`, `postgres`) |
-| Roll back | `./deploy.sh prod <older-sha>`. The last 5 images stay on the box; list them with `docker images jobtiva` |
+| Roll back | `./deploy.sh prod <older-sha>`. The last 3 images stay on the box; list them with `docker images jobtiva` |
 | Apply an env change | edit `env/prod.env`, then `docker compose up -d app-prod` |
+| Free memory when not testing | `docker compose stop app-preprod` (start it again with `docker compose up -d app-preprod`) |
 | Run a cron job now | `./cron-run.sh prod sync` |
 | Backup now | `./backup.sh` |
 | psql | `docker compose exec postgres psql -U postgres -d jmp_prod` |
@@ -389,27 +444,31 @@ docker compose start app-prod
 
 **Test a restore once into preprod.** A backup you have never restored is a hope, not a backup.
 
-If the whole server is broken (bad upgrade, disk corruption), OVH's daily backup restores the
-entire VPS to the last 24 h: Control Panel → VPS → **Backup** → Restore. Then restore the latest
-`backup.sh` dump on top only if you need data newer than that snapshot.
+If the whole server is lost, launch a fresh instance (section 1), move the Elastic IP to it, and
+restore the latest dump + uploads from Google Drive. If you enabled EBS snapshots, you can instead
+create a volume from the latest snapshot and attach it.
 
 ### Capacity notes
 
-- **Memory:** about 2.4 GB is capped across the 3 containers, plus Nginx and the OS, with 2 GB
-  swap as a buffer.
-- **CPU:** builds happen in CI, never on the box. The 2 vCores only serve traffic.
-- **Disk (40 GB):** check `df -h` and `docker system df` now and then. Rough budget:
-  - OS + Docker: about 6 GB.
-  - Images: about 0.5 GB each; 5 are kept and `deploy.sh` prunes the rest.
+- **Memory (2 GB):** about 1.4 GB is capped across the 3 containers (Postgres 384 MB with
+  `shared_buffers=128MB`, prod 576 MB, preprod 448 MB), plus Nginx and the OS, with 2 GB swap as
+  the overflow. The portfolio is static and uses none. If `free -h` shows swap in steady use,
+  stop preprod when you're not testing, or resize (below).
+- **CPU:** builds happen in CI, never on the box. The t4g.small runs at full speed in bursts and
+  falls back to its baseline when the burst allowance is used up (Standard credit mode: no extra
+  charge). EC2's Monitoring tab shows **CPUCreditBalance**; if it sits near zero, resize.
+- **Disk (20 GB):** check `df -h` and `docker system df` now and then. Rough budget:
+  - OS: about 3 GB; swap file 2 GB.
+  - Images: about 0.5 GB each; 3 are kept and `deploy.sh` prunes the rest; Postgres image 0.4 GB.
   - Postgres and uploads: small today.
   - Local backups: 14 days.
-  
-  If disk gets tight, cut local backup retention in `backup.sh` before anything else (Drive still
-  keeps 30 days).
-- **Traffic:** 500 GB/month in Asia-Pacific, then the speed drops to 10 Mbps. The Control Panel shows
-  usage; this app should stay at a few GB a month.
-- **Upgrade path:** OVH lets you resize VPS-1 → VPS-2 (8 GB) in place from the Control Panel
-  (short reboot). If you do, raise the `mem_limit`s in `docker-compose.yml`.
+
+  If disk gets tight, cut local backup retention in `backup.sh` first (Drive still keeps 30 days),
+  or grow the volume: EC2 → Volumes → Modify (no downtime), then `growpart` + `resize2fs`.
+- **Traffic:** the first 100 GB/month out is free; this app should stay at a few GB.
+- **Upgrade path:** stop the instance → Actions → Instance settings → **Change instance type** →
+  `t4g.medium` (4 GB, ≈ $16.35/mo) → start. The disk, data and Elastic IP stay. Then raise the
+  `mem_limit`s and `NODE_OPTIONS` in `docker-compose.yml`.
 
 ---
 
@@ -431,28 +490,28 @@ A leaked portfolio deploy key therefore can't reach Jobtiva's database or upload
 
 ---
 
-## 6. Shut down AWS
+## 6. Shut down the old AWS pieces
 
-> ⚠️ The AWS preprod EC2 **also serves narendragupta.in** (`/var/www/narendragupta.in`). Move the
-> portfolio to the VPS first (portfolio-website repo, `deploy/VPS.md`), or terminating the EC2
-> takes the portfolio offline. Its legacy workflow also uses the `jmp-github-actions` IAM role,
-> so set `PORTFOLIO_TARGET=vps` in that repo before deleting the role.
+The old pieces keep costing money (RDS above all), so don't leave them longer than needed. After
+preprod and the portfolio have run cleanly on the new box for a few days:
 
-Do this after prod has run cleanly on the VPS for about a week:
-
-1. In GitHub, delete the AWS workflow and the AWS role/OIDC references. Code cleanup:
+1. In GitHub, delete the legacy AWS workflow and the AWS role/OIDC references (also in the
+   portfolio repo). Code cleanup:
    - remove `lib/s3.ts`;
    - remove the `@aws-sdk/client-s3` dependency and its `serverExternalPackages` entry in
      `next.config`;
    - remove `deploy/preprod-remote.sh`, `db/resumes-s3-to-db.ts`, and the S3 vars.
 2. In the AWS console (ap-south-1):
-   - **EC2:** terminate the preprod instance. **Release the Elastic IP**: an unattached EIP is
-     billed.
+   - **EC2:** terminate the old instance `jmp-preprod` (`i-085d2024533e968fd`). **Do not release
+     the Elastic IP**: it now belongs to `jobtiva`. Then remove `jmp-ec2-sg` from `jobtiva`'s
+     security groups and delete `jmp-ec2-sg`.
    - **RDS:** optionally take a final snapshot, export it, and delete that snapshot later. Then
-     delete the instance.
-   - **S3:** empty and delete the bucket.
+     delete the instance `jmp-db` and its security group `jmp-rds-sg`.
+   - **S3:** empty and delete the bucket `jmp-preprod-resumes`.
    - **ECR:** delete the `jmp-app` repository.
-   - **SSM:** remove the parameters, if any.
-   - **IAM:** delete the `jmp-github-actions` role and the GitHub OIDC provider.
-   - **CloudWatch:** delete the log groups.
-3. A few days later, check **Billing → Bills**. Nothing in ap-south-1 should still be accruing.
+   - **SSM Parameter Store:** remove the `/jmp/*` parameters, if any.
+   - **IAM:** delete the `jmp-github-actions` role, the GitHub OIDC provider, and
+     `jmp-ec2-preprod-role`. Keep `jobtiva-ec2-ssm`.
+   - **CloudWatch:** delete the old log groups.
+3. A few days later, check **Billing → Bills**. In ap-south-1 only the `jobtiva` instance, its
+   20 GB volume and one public IPv4 address should still be accruing.

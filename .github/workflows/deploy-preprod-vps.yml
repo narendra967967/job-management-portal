@@ -18,7 +18,8 @@ permissions:
 jobs:
   deploy:
     if: vars.PREPROD_TARGET == 'vps'
-    runs-on: ubuntu-latest
+    # The server is an ARM (Graviton t4g) EC2, so build arm64 images natively.
+    runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v4
 
