@@ -15,7 +15,7 @@ Internet ─► 13.205.239.50 (Elastic IP) ─► Security group (22, 80, 443) �
               ├─ jobtiva.in, www → apex ─► 127.0.0.1:3000  app-prod     (≤ 576 MB)
               ├─ preprod.jobtiva.in      ─► 127.0.0.1:3001  app-preprod  (≤ 448 MB)
               └─ narendragupta.in, www   ─► static files in /srv/portfolio/current
-            postgres:17 on 127.0.0.1:5432 (≤ 384 MB) · DBs jmp_prod / jmp_preprod, one role each
+            postgres:18 on 127.0.0.1:5432 (≤ 384 MB) · DBs jmp_prod / jmp_preprod, one role each
 Docker volumes: pgdata · uploads-prod · uploads-preprod (résumés, at /data/uploads)
 cron (deploy user): Gmail sync every 15 min · lead purge nightly · backup 03:00 IST
 ```
@@ -321,8 +321,8 @@ in one sitting so no new data lands on RDS after the dump.
    ```bash
    cd /srv/jobtiva
    read -rs RDS_URL; export RDS_URL                     # paste the URL, press Enter
-   psql "$RDS_URL" -tAc "show server_version"           # must be ≤ 17
-   docker run --rm -e RDS_URL postgres:17-bookworm sh -c 'pg_dump -Fc --no-owner --no-acl "$RDS_URL"' > incoming/preprod.dump
+   psql "$RDS_URL" -tAc "show server_version"           # must be ≤ 18
+   docker run --rm -e RDS_URL postgres:18-bookworm sh -c 'pg_dump -Fc --no-owner --no-acl "$RDS_URL"' > incoming/preprod.dump
    ls -lh incoming/preprod.dump
    docker compose exec -T postgres pg_restore -U postgres -d jmp_preprod --no-owner --role=jmp_preprod \
      < incoming/preprod.dump && rm incoming/preprod.dump

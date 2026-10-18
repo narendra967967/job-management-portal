@@ -13,7 +13,8 @@ name: jobtiva
 
 services:
   postgres:
-    image: postgres:17-bookworm
+    # Same major as the old RDS (18.x), so its dump restores cleanly.
+    image: postgres:18-bookworm
     restart: unless-stopped
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in /srv/jobtiva/.env}
@@ -23,7 +24,8 @@ services:
     # Sized for a 2 GB box: two apps × a 10-connection pool, plus headroom.
     command: ["postgres", "-c", "shared_buffers=128MB", "-c", "max_connections=40"]
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      # postgres:18+ keeps PGDATA under /var/lib/postgresql/18/docker; mount the parent.
+      - pgdata:/var/lib/postgresql
       - ./postgres-init.sh:/docker-entrypoint-initdb.d/10-init.sh:ro
     ports:
       - "127.0.0.1:5432:5432"
