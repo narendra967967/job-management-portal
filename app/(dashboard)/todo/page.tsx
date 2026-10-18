@@ -29,7 +29,7 @@ export default function TodoPage() {
         </p>
       </div>
 
-      {isEmpty ? (
+      {!groups.ready ? null : isEmpty ? (
         <div className="flex flex-col items-center rounded-2xl border border-dashed bg-card px-6 py-12 text-center">
           <span className="flex size-11 items-center justify-center rounded-full bg-muted text-muted-foreground">
             <ListChecks className="size-5" aria-hidden />

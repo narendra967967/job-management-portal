@@ -57,6 +57,7 @@ import type { SyncResult } from "@/lib/gmail-sync";
 import type { GmailSyncStatus, IngestError } from "@/lib/queries";
 import { contactPersonKey, isJobOpen, fitScoreKey, OPEN_LEAD_STATUSES } from "@/lib/types";
 import { formatDateTime } from "@/lib/utils";
+import { useMounted } from "@/lib/use-mounted";
 import {
   CLOSE_OUTCOME_LABELS,
   LEAD_STATUS_LABELS,
@@ -995,10 +996,23 @@ export interface TodoGroups {
   noDate: TodoItem[];
   nudges: TodoNudge[];
   openCount: number;
+  /**
+   * False during SSR and the first client render: the buckets depend on the
+   * viewer's local "today", so they're only filled in after mount.
+   */
+  ready: boolean;
 }
 
+/**
+ * The viewer's local calendar day as "YYYY-MM-DD" — the same basis due dates
+ * are created on (see reminder-actions). Not toISOString(): that's the UTC day,
+ * which lags local midnight in UTC+ zones (00:00–05:30 in India).
+ */
 function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate(),
+  ).padStart(2, "0")}`;
 }
 
 function nudgeMessage(status: LeadStatus): string {
@@ -1012,6 +1026,21 @@ function nudgeMessage(status: LeadStatus): string {
 export function useTodos(): TodoGroups {
   const allTasks = useTasks();
   const allLeads = useLeads();
+  const mounted = useMounted();
+
+  // The server's time zone may differ from the viewer's, so don't bucket
+  // until mount (avoids a hydration mismatch).
+  if (!mounted) {
+    return {
+      overdue: [],
+      today: [],
+      upcoming: [],
+      noDate: [],
+      nudges: [],
+      openCount: 0,
+      ready: false,
+    };
+  }
 
   const today = todayISO();
   const overdue: TodoItem[] = [];
@@ -1051,7 +1080,7 @@ export function useTodos(): TodoGroups {
 
   const openCount =
     overdue.length + todayItems.length + upcoming.length + noDate.length;
-  return { overdue, today: todayItems, upcoming, noDate, nudges, openCount };
+  return { overdue, today: todayItems, upcoming, noDate, nudges, openCount, ready: true };
 }
 
 /* ---------------- derived: notifications (top-bar bell) ---------------- */
