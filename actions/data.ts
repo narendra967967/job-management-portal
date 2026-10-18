@@ -58,8 +58,21 @@ export async function getWorkspace(): Promise<WorkspaceData> {
   return loadWorkspace(await getCurrentUserId());
 }
 
-function ymd(d: Date): string {
-  return d.toISOString().slice(0, 10);
+/**
+ * The calendar day ("YYYY-MM-DD") `d` falls on in `timeZone` — the viewer's
+ * zone, sent by the client. Task due dates are day-granular and compared
+ * against the viewer's local "today", so they must not be the UTC day.
+ */
+function localDay(d: Date | string, timeZone: string): string {
+  // A bare date is already a calendar day (and would parse as UTC midnight).
+  if (typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+  // en-CA formats as YYYY-MM-DD.
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(d));
 }
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -484,6 +497,7 @@ export async function markSentAction(input: {
   kind: OutreachKind;
   channel: string;
   draftBody: string;
+  timeZone?: string;
 }): Promise<{ autoStatus: AutoStatusChange | null }> {
   const userId = await getCurrentUserId();
   const data = parseInput(markSentSchema, input);
@@ -526,7 +540,7 @@ export async function markSentAction(input: {
     const due = new Date();
     due.setDate(due.getDate() + intervalDays);
     const dueAt = due.toISOString();
-    const dueDay = ymd(due);
+    const dueDay = localDay(due, data.timeZone);
 
     const [rem] = await tx
       .insert(remindersT)
@@ -584,6 +598,7 @@ export async function addReminderManualAction(input: {
   dueDate: string; // ISO datetime
   label: string;
   outreachMessageId: string | null;
+  timeZone?: string;
 }) {
   const userId = await getCurrentUserId();
   const data = parseInput(addReminderSchema, input);
@@ -616,7 +631,7 @@ export async function addReminderManualAction(input: {
       reminderId: rem.id,
       title: data.label || `Follow up — ${lead?.company ?? "lead"}`,
       kind: "follow-up",
-      dueDate: data.dueDate.slice(0, 10), // task board is day-granular
+      dueDate: localDay(data.dueDate, data.timeZone), // task board is day-granular
       status: "open",
     });
   });
@@ -625,9 +640,10 @@ export async function addReminderManualAction(input: {
 export async function setReminderOutcomeAction(
   id: string,
   outcome: ReminderOutcome,
+  timeZone?: string,
 ): Promise<{ nextFollowUp: { dueDate: string; number: number } | null }> {
   const userId = await getCurrentUserId();
-  const data = parseInput(reminderOutcomeSchema, { id, outcome });
+  const data = parseInput(reminderOutcomeSchema, { id, outcome, timeZone });
   const next = data.outcome as ReminderOutcome;
   const done = next !== "pending";
   return db.transaction(async (tx) => {
@@ -644,7 +660,9 @@ export async function setReminderOutcomeAction(
       .where(and(eq(tasksT.reminderId, data.id), eq(tasksT.userId, userId)));
     // You sent the follow-up → line up the next one (FR-5.4).
     const nextFollowUp =
-      next === "reminder-sent" ? await scheduleNextFollowUp(tx, userId, data.id) : null;
+      next === "reminder-sent"
+        ? await scheduleNextFollowUp(tx, userId, data.id, data.timeZone)
+        : null;
     return { nextFollowUp };
   });
 }
@@ -661,6 +679,7 @@ async function scheduleNextFollowUp(
   tx: Tx,
   userId: string,
   reminderId: string,
+  timeZone: string,
 ): Promise<{ dueDate: string; number: number } | null> {
   const [rem] = await tx
     .select({
@@ -726,15 +745,19 @@ async function scheduleNextFollowUp(
     reminderId: created.id,
     title: `Follow up #${number} — ${lead.company}`,
     kind: "follow-up",
-    dueDate: ymd(due),
+    dueDate: localDay(due, timeZone),
     status: "open",
   });
   return { dueDate: dueAt, number };
 }
 
-export async function snoozeReminderAction(id: string, newDueDate: string) {
+export async function snoozeReminderAction(
+  id: string,
+  newDueDate: string,
+  timeZone?: string,
+) {
   const userId = await getCurrentUserId();
-  const data = parseInput(snoozeReminderSchema, { id, newDueDate });
+  const data = parseInput(snoozeReminderSchema, { id, newDueDate, timeZone });
   await db.transaction(async (tx) => {
     await tx
       .update(remindersT)
@@ -742,7 +765,11 @@ export async function snoozeReminderAction(id: string, newDueDate: string) {
       .where(and(eq(remindersT.id, data.id), eq(remindersT.userId, userId)));
     await tx
       .update(tasksT)
-      .set({ status: "open", completedAt: null, dueDate: data.newDueDate.slice(0, 10) })
+      .set({
+        status: "open",
+        completedAt: null,
+        dueDate: localDay(data.newDueDate, data.timeZone),
+      })
       .where(and(eq(tasksT.reminderId, data.id), eq(tasksT.userId, userId)));
   });
 }

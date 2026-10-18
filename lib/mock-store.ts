@@ -445,6 +445,12 @@ export async function deleteContact(id: string) {
   }
 }
 
+/** The browser's IANA time zone. Sent with reminder actions so the server can
+ *  store a follow-up task's due date as the user's local calendar day. */
+function viewerTimeZone(): string {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone;
+}
+
 /** Mark a drafted message sent + schedule the follow-up reminder/task. The
  *  follow-up interval is read from saved settings server-side. */
 export async function markSent(input: {
@@ -455,7 +461,7 @@ export async function markSent(input: {
   draftBody: string;
 }) {
   try {
-    const { autoStatus } = await markSentAction(input);
+    const { autoStatus } = await markSentAction({ ...input, timeZone: viewerTimeZone() });
     await refresh();
     toast.success("Message marked as sent", "Follow-up reminder scheduled.");
     announceAutoStatus(autoStatus);
@@ -471,7 +477,7 @@ export async function addReminderManual(input: {
   outreachMessageId: string | null;
 }) {
   try {
-    await addReminderManualAction(input);
+    await addReminderManualAction({ ...input, timeZone: viewerTimeZone() });
     await refresh();
     toast.success("Reminder added");
   } catch (e) {
@@ -482,7 +488,7 @@ export async function addReminderManual(input: {
 export async function setReminderOutcome(id: string, outcome: ReminderOutcome) {
   try {
     const leadId = reminders.find((r) => r.id === id)?.leadId;
-    const { nextFollowUp } = await setReminderOutcomeAction(id, outcome);
+    const { nextFollowUp } = await setReminderOutcomeAction(id, outcome, viewerTimeZone());
     await refresh();
     toast.success(
       "Reminder updated",
@@ -511,7 +517,7 @@ export async function setReminderOutcome(id: string, outcome: ReminderOutcome) {
 
 export async function snoozeReminder(id: string, newDueDate: string) {
   try {
-    await snoozeReminderAction(id, newDueDate);
+    await snoozeReminderAction(id, newDueDate, viewerTimeZone());
     await refresh();
     toast.success("Reminder snoozed");
   } catch (e) {

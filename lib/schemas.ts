@@ -256,12 +256,32 @@ export const addContactSchema = z.object({
 
 export const updateContactSchema = z.object(contactFields);
 
+/**
+ * The viewer's IANA time zone (e.g. "Asia/Kolkata"), sent by the client so the
+ * server can turn a due timestamp into the user's local calendar day. Falls
+ * back to UTC when absent.
+ */
+const zTimeZone = z
+  .string()
+  .trim()
+  .max(64)
+  .refine((v) => {
+    try {
+      new Intl.DateTimeFormat("en-US", { timeZone: v });
+      return true;
+    } catch {
+      return false;
+    }
+  }, "Unknown time zone.")
+  .default("UTC");
+
 export const markSentSchema = z.object({
   leadId: zId,
   contactId: zId,
   kind: zEnum(Object.keys(OUTREACH_KIND_LABELS), "Unknown outreach type."),
   channel: z.string().trim().min(1).max(40),
   draftBody: z.string().trim().min(1, "The message is empty.").max(20000),
+  timeZone: zTimeZone,
 });
 
 /** A date or date-time string ("2026-10-14" or an ISO timestamp) that parses. */
@@ -278,16 +298,19 @@ export const addReminderSchema = z.object({
   dueDate: zDateish,
   label: z.string().trim().max(200).default(""),
   outreachMessageId: zId.nullable().default(null),
+  timeZone: zTimeZone,
 });
 
 export const reminderOutcomeSchema = z.object({
   id: zId,
   outcome: zEnum(Object.keys(REMINDER_OUTCOME_LABELS), "Unknown reminder outcome."),
+  timeZone: zTimeZone,
 });
 
 export const snoozeReminderSchema = z.object({
   id: zId,
   newDueDate: zDateish,
+  timeZone: zTimeZone,
 });
 
 /* ---------------- helper ---------------- */
