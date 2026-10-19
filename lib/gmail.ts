@@ -11,35 +11,49 @@ import "server-only";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { account as accountT } from "@/db/schema";
+import { auth } from "@/lib/auth";
 
 export const GOOGLE_NOT_CONNECTED = "GOOGLE_NOT_CONNECTED";
 
-/** Fresh access token for the user's linked Google account (refreshes each call;
- *  fine for a low-frequency sync). Throws GOOGLE_NOT_CONNECTED if not linked. */
-export async function getGoogleAccessToken(userId: string): Promise<string> {
+/** The user's linked Google account row id, or null when not connected. */
+async function googleAccountId(userId: string): Promise<string | null> {
   const [acct] = await db
-    .select({ refreshToken: accountT.refreshToken })
+    .select({ id: accountT.id, refreshToken: accountT.refreshToken })
     .from(accountT)
     .where(and(eq(accountT.userId, userId), eq(accountT.providerId, "google")));
+  return acct?.refreshToken ? acct.id : null;
+}
 
-  if (!acct?.refreshToken) throw new Error(GOOGLE_NOT_CONNECTED);
-
-  const res = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      client_id: process.env.GOOGLE_CLIENT_ID ?? "",
-      client_secret: process.env.GOOGLE_CLIENT_SECRET ?? "",
-      refresh_token: acct.refreshToken,
-      grant_type: "refresh_token",
-    }),
-  });
-  if (!res.ok) {
-    throw new Error(`Google token refresh failed ${res.status}: ${(await res.text()).slice(0, 200)}`);
+/** A valid access token for the user's linked Google account. Better Auth
+ *  decrypts the stored tokens (encryptOAuthTokens) and refreshes when expired.
+ *  Throws GOOGLE_NOT_CONNECTED if not linked. */
+export async function getGoogleAccessToken(userId: string): Promise<string> {
+  const accountId = await googleAccountId(userId);
+  if (!accountId) throw new Error(GOOGLE_NOT_CONNECTED);
+  try {
+    const { accessToken } = await auth.api.getAccessToken({ body: { accountId, userId } });
+    if (!accessToken) throw new Error("No access token from Google.");
+    return accessToken;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new Error(`Google token refresh failed: ${msg.slice(0, 200)}`);
   }
-  const data = await res.json();
-  if (!data.access_token) throw new Error("No access_token from Google.");
-  return data.access_token as string;
+}
+
+/** Revoke Jobtiva's access at Google (best effort). Revoking the access token
+ *  also revokes its refresh token, so the grant disappears from the user's
+ *  Google Account permissions. */
+export async function revokeGoogleAccess(userId: string): Promise<void> {
+  try {
+    const token = await getGoogleAccessToken(userId);
+    await fetch("https://oauth2.googleapis.com/revoke", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ token }),
+    });
+  } catch {
+    // Already invalid/expired or not connected — nothing left to revoke.
+  }
 }
 
 const GMAIL = "https://gmail.googleapis.com/gmail/v1/users/me";

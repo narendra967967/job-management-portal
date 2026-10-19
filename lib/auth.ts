@@ -141,6 +141,11 @@ export const auth = betterAuth({
     },
   },
   account: {
+    // Google access/refresh tokens are encrypted at rest (keyed by
+    // BETTER_AUTH_SECRET). Read them only through auth.api.getAccessToken
+    // (lib/gmail.ts), which decrypts and refreshes. Tokens stored before this
+    // was enabled are plaintext and still readable; reconnecting re-encrypts.
+    encryptOAuthTokens: true,
     accountLinking: {
       enabled: true,
       // The linked Google account's email may differ from the login email.

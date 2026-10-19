@@ -8,6 +8,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { getCurrentUserId } from "@/lib/current-user";
 import { encryptSecret } from "@/lib/crypto";
+import { revokeGoogleAccess } from "@/lib/gmail";
 import { storeResumeFile, readResumeFile, deleteResumeFile } from "@/lib/storage";
 import {
   account as accountT,
@@ -209,9 +210,11 @@ export async function updateGmailConfigAction(input: {
 
 /* ---------------- Google (Gmail) connection ---------------- */
 
-/** Unlink the user's Google account (removes the stored refresh token). */
+/** Unlink the user's Google account: revoke the grant at Google, then delete
+ *  the stored (encrypted) tokens. */
 export async function disconnectGoogleAction() {
   const userId = await getCurrentUserId();
+  await revokeGoogleAccess(userId);
   await db
     .delete(accountT)
     .where(and(eq(accountT.userId, userId), eq(accountT.providerId, "google")));
