@@ -76,6 +76,10 @@ export const gmailConfigSchema = z.object({
   label: z.string().trim().max(200),
   subjectKeywords: z.string().trim().max(500),
   lookbackDays: z.coerce.number().int().min(0).max(3650),
+}).refine((v) => v.senders.length > 0 || v.label.length > 0, {
+  // Keeps Gmail reads limited to job alerts (never the whole mailbox).
+  message: "Add at least one sender (or a Gmail label) so only job-alert emails are read.",
+  path: ["senders"],
 });
 
 export const aiProviderSchema = z.object({

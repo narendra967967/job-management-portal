@@ -650,6 +650,12 @@ function GoogleCard() {
       );
       return;
     }
+    if (draft.senders.length === 0 && !draft.label.trim()) {
+      setSendersError(
+        "Add at least one sender (or a Gmail label) so only job-alert emails are read.",
+      );
+      return;
+    }
     setSendersError("");
     updateSettings(draft);
     setSaved(true);
@@ -786,8 +792,12 @@ function GoogleCard() {
               aria-invalid={!!sendersError}
               className="min-h-20 font-mono text-[13px]"
             />
-            {sendersError && (
+            {sendersError ? (
               <span className="text-[11px] text-destructive">{sendersError}</span>
+            ) : (
+              <span className="text-[11px] text-muted-foreground">
+                Required — at least one sender, or a Gmail label below.
+              </span>
             )}
           </Field>
 

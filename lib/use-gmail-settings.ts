@@ -29,7 +29,11 @@ export const DEFAULT_GMAIL_SETTINGS: GmailSettings = {
 export function buildGmailQuery(s: GmailSettings): string {
   const parts: string[] = [];
 
-  const senders = s.senders.map((x) => x.trim()).filter(Boolean);
+  // Never search the whole mailbox: with no sender and no label (e.g. rows saved
+  // before the form required one), fall back to the default job-alert senders.
+  // gmail.readonly is only justified for job alerts — see the privacy policy.
+  let senders = s.senders.map((x) => x.trim()).filter(Boolean);
+  if (!senders.length && !s.label.trim()) senders = DEFAULT_GMAIL_SETTINGS.senders;
   if (senders.length) {
     parts.push(
       senders.length === 1
@@ -52,5 +56,5 @@ export function buildGmailQuery(s: GmailSettings): string {
 
   if (s.lookbackDays > 0) parts.push(`newer_than:${s.lookbackDays}d`);
 
-  return parts.join(" ") || "in:inbox";
+  return parts.join(" ");
 }
