@@ -59,17 +59,20 @@ config/infra only: DNS → TLS → `BETTER_AUTH_URL` → Nginx → Google OAuth 
    exact redirect URI registered. It must be, character for character:
    `https://<host>/api/auth/callback/google` (no trailing slash, https). The JS origin is
    just `https://<host>`. Check the live client with
-   `sudo docker exec jmp printenv GOOGLE_CLIENT_ID` and match it in the Console.
+   `docker compose exec app-prod printenv GOOGLE_CLIENT_ID` (or `app-preprod`) and match it in the Console.
 
-## Current preprod facts
+## Current facts (2026-10-19)
 
-- `preprod.jobtiva.in` → A record → **13.205.239.50** (EC2 Elastic IP, box name `jmp-preprod`).
+- `jobtiva.in`, `www.jobtiva.in`, `preprod.jobtiva.in` (and the portfolio `narendragupta.in`) → A records →
+  **13.205.239.50**, the Elastic IP of the single EC2 `jobtiva` (see `VPS.md`).
 - DNS is hosted at the jobtiva.in registrar (HostingRaja nameservers). **Keep the apex `NS` record** — deleting it breaks the whole zone.
-- Nginx site: `/etc/nginx/sites-available/preprod.jmp.conf`.
-- Certs: `/etc/letsencrypt/live/preprod.jobtiva.in/` (app) and `/etc/letsencrypt/live/preprod.jmp.narendragupta.in/` (old host, still used by the 301-redirect block).
-- Container image: `504721334099.dkr.ecr.ap-south-1.amazonaws.com/jmp-app:preprod-latest`.
-- Google OAuth (project `sturdy-conduit-511311-g6`): client `247994552151-…`, redirect `https://preprod.jobtiva.in/api/auth/callback/google`, JS origin `https://preprod.jobtiva.in`.
-- Connect to the box via **SSM Session Manager**; `docker` needs `sudo`; `.env` is `chmod 600` (read with `sudo`).
+- Nginx sites: `/etc/nginx/sites-available/{jobtiva.in,preprod.jobtiva.in}.conf`; certs under `/etc/letsencrypt/live/`.
+- Google OAuth: **one** Google Cloud project "Jobtiva" and one Web client ("Jobtiva web") shared by local,
+  preprod and prod. Origins: `http://localhost:3000`, `https://preprod.jobtiva.in`, `https://jobtiva.in`; each with
+  `/api/auth/callback/google` as a redirect URI. Consent screen: External, **Testing** (≤100 test users;
+  restricted-scope connections expire after 7 days until the app is verified). Gmail API enabled; only
+  `gmail.readonly` requested.
+- App env: `/srv/jobtiva/env/{preprod,prod}.env` on the server, `.env.local` on the laptop.
 
 ## Cutover steps (template)
 
