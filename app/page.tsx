@@ -3,8 +3,9 @@
 // /login and self-registration at /signup (shown only when the admin enables it).
 //
 // Positioning: Jobtiva is an *intentional* job-search workspace — manage the roles
-// that are right for you and apply well, not a mass-apply automation tool. Copy is
-// platform-agnostic (no Gmail/Google specifics — more integrations may come later).
+// that are right for you and apply well, not a mass-apply automation tool. The hero
+// and features stay platform-agnostic, but the FAQ names Gmail and why it is used:
+// Google's OAuth verification requires the homepage to explain the data access.
 
 import Link from "next/link";
 import {
@@ -67,11 +68,15 @@ export default async function LandingPage() {
     },
     {
       q: "How do job leads get in?",
-      a: "Connect the account where your job alerts arrive and they flow in as tracked leads automatically — no copy-paste. More sources are on the roadmap.",
+      a: "Connect the Gmail account where your job alerts arrive and they flow in as tracked leads automatically — no copy-paste. You can also add leads by hand or paste a job post. More sources are on the roadmap.",
+    },
+    {
+      q: `Why does ${appName} ask for access to my Gmail?`,
+      a: `Connecting Gmail is optional. If you connect it, ${appName} gets read-only access (Google's gmail.readonly permission) and uses it for one thing: finding your job-alert emails — LinkedIn alerts by default — and turning them into tracked leads. It never sends, changes or deletes email, and doesn't read anything else. You can disconnect any time from Settings. Full details are in our Privacy policy.`,
     },
     {
       q: "Is my data private?",
-      a: "Yes. Any account you connect is strictly read-only, your data stays yours, and nothing leaves without you. You can disconnect any time from Settings.",
+      a: "Yes. Gmail access is strictly read-only and limited to your job-alert emails, your data stays yours, and nothing leaves without you — it's never sold or used for advertising. You can disconnect any time from Settings.",
     },
     {
       q: "What does the AI actually do?",
