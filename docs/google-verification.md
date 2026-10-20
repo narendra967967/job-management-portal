@@ -88,8 +88,10 @@ Upload to YouTube Studio → Visibility **Unlisted** → paste the link in the v
   about $540 to $6,000 for Tier 2). Book it before submitting the form.
 - Tier 2 = scans you run (e.g. the lab's DAST/SAST tooling) + lab validation. Do a dry run first:
   - dependencies: `npm audit` clean of high/critical (16 remaining were dev/CLI-only at last check);
-  - headers: add a Content-Security-Policy, HSTS, `X-Content-Type-Options`, `Referrer-Policy`,
-    `frame-ancestors` (Nginx or `next.config` headers) — none are set today;
+  - headers: ✅ set in `next.config.ts` (`e67fc1a`) — CSP (prod builds), HSTS, nosniff,
+    Referrer-Policy, X-Frame-Options/frame-ancestors, COOP, Permissions-Policy; `X-Powered-By` off.
+    Open item: CSP `script-src` still allows `'unsafe-inline'` (Next.js bootstrap) — move to a nonce-based
+    CSP if the lab flags it. Nginx `server_tokens off` hides its version (server step);
   - auth: rate limiting on login/reset (sign-up has it), session/cookie flags, password policy (admin);
   - secrets only in env/DB-encrypted; TLS A grade (`ssllabs.com`);
   - documented data deletion process (see the privacy policy).
