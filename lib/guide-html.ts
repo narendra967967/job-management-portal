@@ -9,6 +9,7 @@ import "server-only";
 
 import sanitizeHtml from "sanitize-html";
 
+// Keep in step with GUIDE_FRAME_HOSTS in next.config.ts (CSP frame-src).
 const IFRAME_HOSTS = [
   "www.youtube.com",
   "youtube.com",
