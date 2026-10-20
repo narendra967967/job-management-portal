@@ -79,6 +79,10 @@ Use a real Jobtiva account and a Gmail inbox that has at least one LinkedIn job-
 
 Upload to YouTube Studio → Visibility **Unlisted** → paste the link in the verification form.
 
+**Uploaded (2026-10-20):** https://youtu.be/1iM7YGYXzVM — "Jobtiva – Gmail read-only access (OAuth
+verification demo)", 6:02, channel @Jobtiva. Plays logged out. Covers scenes 1–9 except showing the source
+job-alert email in Gmail (add it if a reviewer asks).
+
 ---
 
 ## 3. CASA (security assessment) — prepare before submitting
