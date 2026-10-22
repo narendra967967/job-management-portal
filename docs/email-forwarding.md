@@ -57,6 +57,8 @@ Adding a new site later = admin adds the sender + signing domain (no code) **and
 | Area | Active | Inactive |
 |---|---|---|
 | User Settings → **Gmail connection** and **Sync schedule** tabs | shown | hidden |
+| Admin Settings → Cron & schedule → **Gmail sync / quiet hours** section | shown | hidden (lead retention/purge section stays) |
+| Saved schedule values (each user's sync interval and pause, admin quiet hours) | used | **kept, not deleted** — back in effect when switched on again |
 | Scheduled Gmail sync (cron) and "Sync now" | run | skip every user |
 | Linking a Google account | works | **rejected server-side** (Better Auth hook + actions), not just hidden |
 | Existing connections | kept | **all broken on switch-off:** each token revoked at Google, then the `account` rows (provider `google`) deleted. Leads stay |
