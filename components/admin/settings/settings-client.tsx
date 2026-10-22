@@ -21,6 +21,7 @@ import {
   ChevronDown,
   Upload,
   Image as ImageIcon,
+  Inbox,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/admin/ui/button";
@@ -44,6 +45,9 @@ import {
 } from "@/actions/admin-settings";
 import { cn } from "@/lib/utils";
 import { LEAD_STATUSES, LEAD_STATUS_LABELS } from "@/lib/types";
+import { Field, SaveRow, SubHead, Toggle, selectCls } from "@/components/admin/settings/form-bits";
+import { EmailIntakeCard } from "@/components/admin/settings/email-intake-card";
+import { useMockIntake } from "@/lib/email-intake-mock";
 
 interface SettingsSection {
   id: string;
@@ -58,6 +62,7 @@ const SECTION = {
   general: { id: "general", label: "General", icon: Cog, render: (i: AdminSettings) => <GeneralCard initial={i.general} branding={i.branding} /> },
   billing: { id: "billing", label: "Billing", icon: CreditCard, render: (i: AdminSettings) => <BillingCard initial={i.billing} /> },
   email: { id: "email", label: "Email / SMTP", icon: Mail, render: (i: AdminSettings) => <EmailCard initial={i.smtp} /> },
+  intake: { id: "intake", label: "Email intake", icon: Inbox, render: () => <EmailIntakeCard /> },
   ai: { id: "ai", label: "AI", icon: Sparkles, render: (i: AdminSettings) => <AiCard initial={i.ai} /> },
   cron: { id: "cron", label: "Cron & schedule", icon: Clock, render: (i: AdminSettings) => <CronCard initial={i.cron} /> },
   security: { id: "security", label: "Security", icon: ShieldCheck, render: (i: AdminSettings) => <SecurityCard initial={i.security} /> },
@@ -65,7 +70,7 @@ const SECTION = {
 
 const GROUPS: { label: string; items: SettingsSection[] }[] = [
   { label: "Account", items: [SECTION.profile, SECTION.password] },
-  { label: "Application", items: [SECTION.general, SECTION.billing, SECTION.email, SECTION.ai, SECTION.cron, SECTION.security] },
+  { label: "Application", items: [SECTION.general, SECTION.billing, SECTION.email, SECTION.intake, SECTION.ai, SECTION.cron, SECTION.security] },
 ];
 const SECTIONS: SettingsSection[] = GROUPS.flatMap((g) => g.items);
 
@@ -144,8 +149,6 @@ export function SettingsClient({ initial }: { initial: AdminSettings }) {
 
 /* ---------------- shared ---------------- */
 
-const selectCls =
-  "h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
 const textareaCls =
   "min-h-20 w-full rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
 
@@ -175,43 +178,6 @@ function useSaver() {
   return { busy, saved, error, setError, save };
 }
 
-function Field({ label, hint, children, className }: { label: string; hint?: string; children: React.ReactNode; className?: string }) {
-  return (
-    <label className={cn("block space-y-1.5", className)}>
-      <Label className="text-xs text-muted-foreground">{label}</Label>
-      {children}
-      {hint && <span className="block text-[11px] text-muted-foreground">{hint}</span>}
-    </label>
-  );
-}
-
-function SubHead({ children }: { children: React.ReactNode }) {
-  return <h3 className="mt-5 mb-3 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">{children}</h3>;
-}
-
-function Toggle({ checked, onChange, label, hint }: { checked: boolean; onChange: (v: boolean) => void; label: string; hint?: string }) {
-  return (
-    <label className="flex cursor-pointer items-start gap-2 text-sm">
-      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="mt-0.5 size-4 cursor-pointer rounded border-input accent-primary" />
-      <span>
-        {label}
-        {hint && <span className="block text-[11px] text-muted-foreground">{hint}</span>}
-      </span>
-    </label>
-  );
-}
-
-function SaveRow({ busy, saved, error, onSave, label = "Save changes" }: { busy: boolean; saved: boolean; error: string; onSave: () => void; label?: string }) {
-  return (
-    <>
-      {error && <p className="mt-3 text-xs text-destructive">{error}</p>}
-      <div className="mt-4 flex items-center gap-3">
-        <Button onClick={onSave} disabled={busy}>{busy ? "Saving…" : label}</Button>
-        {saved && <span className="text-xs text-status-applied-foreground">Saved</span>}
-      </div>
-    </>
-  );
-}
 
 const TIMEZONES = ["Asia/Kolkata", "UTC", "America/New_York", "America/Los_Angeles", "Europe/London", "Asia/Dubai", "Asia/Singapore"];
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -788,6 +754,9 @@ function CronCard({ initial }: { initial: AdminSettings["cron"] }) {
   const [purgeDays, setPurgeDays] = useState(String(initial.purgeDays));
   const [purgeStatuses, setPurgeStatuses] = useState<string[]>(initial.purgeStatuses);
   const sv = useSaver();
+  // Quiet hours only govern Gmail sync, so they follow the Connect Gmail switch
+  // (values are kept while hidden). PHASE 2: switch state is sample data.
+  const gmailEnabled = useMockIntake().config.gmailOAuthEnabled;
 
   function toggleDay(d: string) {
     setQuietDays((cur) => (cur.includes(d) ? cur.filter((x) => x !== d) : [...cur, d]));
@@ -796,6 +765,8 @@ function CronCard({ initial }: { initial: AdminSettings["cron"] }) {
   return (
     <section className="rounded-2xl border bg-card p-4 md:p-5">
       <h2 className="text-sm font-medium">Cron & schedule</h2>
+      {gmailEnabled && (
+      <>
       <p className="mt-2 text-xs text-muted-foreground">Each user sets their own sync frequency; the scheduler just honors it. These controls are global overrides.</p>
 
       <SubHead>Quiet hours</SubHead>
@@ -822,6 +793,8 @@ function CronCard({ initial }: { initial: AdminSettings["cron"] }) {
           <p className="mt-1.5 text-[11px] text-muted-foreground">For an overnight window, pick the start day — it carries through past midnight (e.g. Sat covers Sat night to the next morning). No days = every day.</p>
         </div>
       </div>
+      </>
+      )}
 
       <SubHead>Lead retention</SubHead>
       <Toggle checked={purgeEnabled} onChange={setPurgeEnabled} label="Auto-delete stale leads" hint="Keeps the database lean over time" />

@@ -12,6 +12,7 @@ import {
   LayoutDashboard,
   Users,
   BookOpen,
+  MailOpen,
   Tag,
   Repeat,
   CreditCard,
@@ -76,6 +77,7 @@ const GROUPS: Group[] = [
     label: "Operations",
     items: [
       { href: "/jmp-admin/guides", label: "How-to guides", icon: BookOpen },
+      { href: "/jmp-admin/inbound-log", label: "Inbound email log", icon: MailOpen },
       { label: "Gmail health", icon: Inbox, soon: true },
       { label: "Activity log", icon: ScrollText, soon: true },
     ],
@@ -88,6 +90,7 @@ const TITLES: Record<string, string> = {
   "/jmp-admin/tickets": "Tickets",
   "/jmp-admin/plans": "Plans & Pricing",
   "/jmp-admin/guides": "How-to guides",
+  "/jmp-admin/inbound-log": "Inbound email log",
   "/jmp-admin/guides/new": "New guide",
   "/jmp-admin/settings": "Settings",
 };

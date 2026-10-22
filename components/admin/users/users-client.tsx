@@ -20,6 +20,7 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
+  Forward,
 } from "lucide-react";
 import { Button } from "@/components/admin/ui/button";
 import { Input } from "@/components/admin/ui/input";
@@ -53,6 +54,9 @@ import {
   resetAdminUserPasswordAction,
 } from "@/actions/admin-users";
 import { cn } from "@/lib/utils";
+import { useMounted } from "@/lib/use-mounted";
+import { timeAgo } from "@/lib/email-intake-model";
+import { mockUserForwarding } from "@/lib/email-intake-mock";
 
 const initials = (n: string) => n.split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase();
 
@@ -103,6 +107,7 @@ export function UsersClient({ initialUsers, plans }: { initialUsers: AdminUserRo
   const [deleteTarget, setDeleteTarget] = useState<AdminUserRow | null>(null);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [resetTarget, setResetTarget] = useState<AdminUserRow | null>(null);
+  const [fwdResetTarget, setFwdResetTarget] = useState<AdminUserRow | null>(null);
   const [resetPw, setResetPw] = useState("");
   const [resetBusy, setResetBusy] = useState(false);
 
@@ -327,6 +332,7 @@ export function UsersClient({ initialUsers, plans }: { initialUsers: AdminUserRo
               <th className="hidden px-4 py-2.5 font-medium sm:table-cell">Plan</th>
               <th className="px-4 py-2.5 font-medium">Expires</th>
               <th className="hidden px-4 py-2.5 font-medium md:table-cell">Leads</th>
+              <th className="hidden px-4 py-2.5 font-medium md:table-cell">Forwarding</th>
               <th className="hidden px-4 py-2.5 font-medium lg:table-cell">Last login</th>
               <th className="px-4 py-2.5" />
             </tr>
@@ -365,6 +371,7 @@ export function UsersClient({ initialUsers, plans }: { initialUsers: AdminUserRo
                 </td>
                 <td className="px-4 py-3 text-xs"><ExpiryCell iso={u.expiresAt} onPlan={!!u.planName} /></td>
                 <td className="hidden px-4 py-3 tabular-nums md:table-cell">{u.leads}</td>
+                <td className="hidden px-4 py-3 md:table-cell"><ForwardingCell userId={u.id} /></td>
                 <td className="hidden px-4 py-3 text-muted-foreground lg:table-cell">{u.lastLogin}</td>
                 <td className="px-4 py-3 text-right">
                   <DropdownMenu>
@@ -374,6 +381,7 @@ export function UsersClient({ initialUsers, plans }: { initialUsers: AdminUserRo
                     <DropdownMenuContent>
                       <DropdownMenuItem onClick={() => { setEditing(u); setFormOpen(true); }}><Pencil /> Edit</DropdownMenuItem>
                       <DropdownMenuItem onClick={() => { setResetTarget(u); setResetPw(""); }}><KeyRound /> Reset password</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setFwdResetTarget(u)}><Forward /> Reset forwarding address</DropdownMenuItem>
                       <DropdownMenuItem onClick={() => toggleStatus(u)}>
                         {u.status === "active" ? (<><UserX /> Deactivate</>) : (<><UserCheck /> Activate</>)}
                       </DropdownMenuItem>
@@ -387,7 +395,7 @@ export function UsersClient({ initialUsers, plans }: { initialUsers: AdminUserRo
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-4 py-10 text-center text-sm text-muted-foreground">No users match your filters.</td>
+                <td colSpan={9} className="px-4 py-10 text-center text-sm text-muted-foreground">No users match your filters.</td>
               </tr>
             )}
           </tbody>
@@ -424,6 +432,17 @@ export function UsersClient({ initialUsers, plans }: { initialUsers: AdminUserRo
         confirmLabel="Delete permanently"
         destructive
         onConfirm={() => { if (deleteTarget) void doDelete(deleteTarget); }}
+      />
+
+      {/* PHASE 2: sample data — the reset isn't saved yet */}
+      <ConfirmDialog
+        open={fwdResetTarget !== null}
+        onOpenChange={(o) => !o && setFwdResetTarget(null)}
+        title={`Reset forwarding address for ${fwdResetTarget?.name ?? "user"}?`}
+        description="Their current address stops working immediately. They will need to add the new address in Gmail and update their filter."
+        confirmLabel="Reset address"
+        destructive
+        onConfirm={() => { if (fwdResetTarget) say(`Forwarding address reset for ${fwdResetTarget.name} (sample data).`); setFwdResetTarget(null); }}
       />
 
       <ConfirmDialog
@@ -465,4 +484,22 @@ export function UsersClient({ initialUsers, plans }: { initialUsers: AdminUserRo
       </Dialog>
     </div>
   );
+}
+
+/** Per-user forwarding status (A4). PHASE 2: sample data. */
+function ForwardingCell({ userId }: { userId: string }) {
+  const mounted = useMounted(); // relative time + sample data use the clock
+  if (!mounted) return <span className="text-muted-foreground">—</span>;
+  const f = mockUserForwarding(userId);
+  if (f.lastReceivedAt) {
+    return (
+      <span className="flex flex-col gap-0.5">
+        <Badge variant="success">Working</Badge>
+        <span className="text-[11px] text-muted-foreground">Last alert {timeAgo(f.lastReceivedAt)}</span>
+      </span>
+    );
+  }
+  if (f.confirmedAt) return <Badge variant="warning">Waiting for alert</Badge>;
+  if (f.addressCreatedAt) return <Badge variant="warning">Not confirmed</Badge>;
+  return <Badge variant="neutral">Not set up</Badge>;
 }
