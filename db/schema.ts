@@ -768,6 +768,109 @@ export const gmailProcessedMessages = pgTable(
 );
 
 /* ------------------------------------------------------------------ */
+/* Email intake — forwarded job alerts (docs/email-forwarding.md)       */
+/* Message-level dedupe reuses gmail_processed_messages (RFC Message-ID, */
+/* shared with the Connect Gmail path) and parse issues reuse           */
+/* gmail_ingest_errors.                                                 */
+/* ------------------------------------------------------------------ */
+
+export const inboundStatus = pgEnum("inbound_status", [
+  "accepted",
+  "rejected",
+  "unsupported",
+  "duplicate",
+  "gmail_code",
+]);
+
+export const inboundParser = pgEnum("inbound_parser", ["linkedin", "none"]);
+
+/** One private forwarding address per user (`<token>@<receiving domain>`).
+ *  Resetting replaces the token, so the old address stops working at once. */
+export const inboundAddresses = pgTable(
+  "inbound_addresses",
+  {
+    userId: text("user_id")
+      .primaryKey()
+      .references(() => user.id, { onDelete: "cascade" }),
+    token: text("token").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    // Gmail's forwarding-confirmation code, shown in Settings until confirmed.
+    gmailCode: text("gmail_code"),
+    gmailCodeAt: timestamp("gmail_code_at", { withTimezone: true }),
+    // Set when the user says they verified it in Gmail, or at the first alert.
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+    firstReceivedAt: timestamp("first_received_at", { withTimezone: true }),
+    lastReceivedAt: timestamp("last_received_at", { withTimezone: true }),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [uniqueIndex("inbound_addresses_token_uq").on(t.token)],
+);
+
+/** One row per received email — metadata only, never content. Each environment
+ *  logs in its own database. Purged after 30 days. */
+export const inboundEmailLog = pgTable(
+  "inbound_email_log",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
+    // Null when the recipient address matched no user.
+    userId: text("user_id").references(() => user.id, { onDelete: "cascade" }),
+    // Full sender address — kept only for accepted job-site mail.
+    fromAddress: text("from_address"),
+    // Always kept; the only sender detail for rejected mail.
+    fromDomain: text("from_domain").notNull(),
+    signingDomain: text("signing_domain"),
+    status: inboundStatus("status").notNull(),
+    reason: text("reason").notNull(),
+    sizeBytes: integer("size_bytes").notNull().default(0),
+    messageId: text("message_id"),
+    leadsCreated: integer("leads_created").notNull().default(0),
+  },
+  (t) => [
+    index("inbound_email_log_received_idx").on(t.receivedAt.desc()),
+    index("inbound_email_log_user_received_idx").on(t.userId, t.receivedAt.desc()),
+  ],
+);
+
+/** Settings → Email intake (one "app" row): both intake switches + size cap. */
+export const emailIntakeConfig = pgTable("email_intake_config", {
+  id: text("id").primaryKey().default("app"),
+  forwardingEnabled: boolean("forwarding_enabled").notNull().default(true),
+  // "Connect Gmail" (Google OAuth) and everything tied to it.
+  gmailOAuthEnabled: boolean("gmail_oauth_enabled").notNull().default(true),
+  maxBytes: integer("max_bytes").notNull().default(2 * 1024 * 1024),
+  gmailToggledAt: timestamp("gmail_toggled_at", { withTimezone: true }),
+  gmailToggledBy: text("gmail_toggled_by").references(() => user.id, { onDelete: "set null" }),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date()),
+});
+
+/** Allowed senders: who may send, which DKIM domain must sign, which reader
+ *  turns the email into leads ("none" = accepted but logged as unsupported). */
+export const inboundSenders = pgTable(
+  "inbound_senders",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    // Exact address or "*@domain", stored lowercase.
+    match: text("match").notNull(),
+    signingDomain: text("signing_domain").notNull(),
+    parser: inboundParser("parser").notNull().default("none"),
+    enabled: boolean("enabled").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [uniqueIndex("inbound_senders_match_uq").on(t.match)],
+);
+
+/* ------------------------------------------------------------------ */
 /* How-to guides (admin-managed content, shown on /guides)             */
 /* ------------------------------------------------------------------ */
 

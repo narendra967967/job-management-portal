@@ -84,19 +84,30 @@ job (revokes can take a few seconds per user) and reports progress/result to the
 "Gmail connection" and "Sync schedule" stay, but only while the admin's Connect Gmail switch is active
 (§4a). Email forwarding (U1–U7) works either way; both can run side by side. Lead **retention/purge** stays.
 
-## 5. Data model (Phase 3 — needs owner OK: touches several tables)
+## 5. Data model (Phase 3 — migration `0030_email_intake`)
 
-New:
-- **`inbound_addresses`** — `user_id` (PK, FK cascade), `token` (unique, 10+ chars, random), `created_at`,
-  `gmail_code`, `gmail_code_at`, `confirmed_at`, `first_received_at`, `last_received_at`.
-- **`inbound_email_log`** — `id`, `received_at`, `user_id` (nullable — unknown recipient), `env`,
-  `from_address` (**accepted job-site mail only**), `from_domain` (always — the only sender info kept for
-  rejected mail), `signing_domain`, `status` (`accepted | rejected | unsupported | duplicate | gmail_code`),
-  `reason`, `size_bytes`, `message_id`, `leads_created`. Index on `received_at` for the 30-day purge.
-- **`email_intake_config`** (single row, like `cron_config`) — `forwarding_enabled` (default true),
-  `gmail_oauth_enabled` (default true), `max_bytes`, `gmail_toggled_at`, `gmail_toggled_by`.
-- **`inbound_senders`** — `id`, `match` (`jobalerts-noreply@linkedin.com` or `*@domain`), `signing_domain`,
-  `parser` (`linkedin` | `none`), `enabled`, timestamps. Seeded with LinkedIn.
+New (enums `inbound_status`, `inbound_parser`):
+- **`inbound_addresses`** — `user_id` (PK, FK → user, cascade), `token` (unique, random), `created_at`,
+  `gmail_code`, `gmail_code_at`, `confirmed_at`, `first_received_at`, `last_received_at`, `updated_at`.
+  `confirmed_at` is set when the user clicks **"I've verified it in Gmail"** under the code (Phase 4 adds
+  that button — Gmail doesn't tell us), or automatically at the first accepted alert.
+- **`inbound_email_log`** — `id`, `received_at`, `user_id` (nullable = unknown recipient; cascade on user
+  delete), `from_address` (**accepted job-site mail only**), `from_domain` (always — the only sender info
+  for rejected mail), `signing_domain`, `status` (`accepted | rejected | unsupported | duplicate |
+  gmail_code`), `reason`, `size_bytes`, `message_id`, `leads_created`. Indexes on `received_at` (30-day
+  purge) and (`user_id`, `received_at`). **No `env` column:** prod and preprod each have their own
+  database, so each admin panel shows its own log — the Phase 2 "Prod + preprod" filter is dropped in
+  Phase 4.
+- **`email_intake_config`** (one row `id = 'app'`, like `cron_config`) — `forwarding_enabled` (true),
+  `gmail_oauth_enabled` (true), `max_bytes` (2 MB), `gmail_toggled_at`, `gmail_toggled_by` (FK → user,
+  set null), `updated_at`. Seeded.
+- **`inbound_senders`** — `id`, `match` (unique, lowercase: `jobalerts-noreply@linkedin.com` or
+  `*@domain`), `signing_domain`, `parser` (`linkedin` | `none`, default `none`), `enabled`, timestamps.
+  Seeded with the 3 LinkedIn alert senders.
+
+Verified 2026-10-23: fresh DB 0000→0030; a copy of local data (6 users, 279 leads intact); constraint and
+cascade tests (duplicate token / second address / unknown user / duplicate sender / bad enum rejected;
+deleting a user removes their address and log rows, nulls `gmail_toggled_by`, keeps anonymous rows).
 
 Reused as-is: `gmail_processed_messages` (dedupe by RFC `Message-ID`, **shared by both intake paths** so
 an alert arriving via Connect Gmail *and* forwarding is processed once — no false "Re-newed" tag),
