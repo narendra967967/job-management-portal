@@ -1,6 +1,6 @@
 # Email forwarding — spec (Phase 1)
 
-Status: **approved scope, 2026-10-22** (D1 revised the same day). Adds email forwarding as the main intake; "Connect Gmail" (Google OAuth, `gmail.readonly`) stays behind an admin on/off switch.
+Status: **approved scope, 2026-10-22** (D1 revised the same day; phases reordered UI → DB on 2026-10-23). Adds email forwarding as the main intake; "Connect Gmail" (Google OAuth, `gmail.readonly`) stays behind an admin on/off switch.
 Jobtiva receives job-alert emails that users **forward** to a private address, so it needs **no Google
 permission at all**: no OAuth verification, no paid CASA assessment, no 100-user cap, no "unverified app"
 screen. Pattern used by e.g. TripIt (`plans@tripit.com`).
@@ -79,40 +79,59 @@ job (revokes can take a few seconds per user) and reports progress/result to the
 | U5 | **Reset my address** (confirm dialog) | New address shown; reminder to update the Gmail filter |
 | U6 | **Ingestion issues** (existing): forwarded emails that couldn't be read — subject only (only for accepted, verified senders) | Unsupported/unparseable alerts listed |
 | U7 | **Leads empty state / banner** when forwarding isn't set up | Links to Settings → Email forwarding |
+| U8 | **Can't auto-forward?** note for company-managed (Google Workspace) accounts whose admin blocks external forwarding — points **only** to manual forwarding (forward an alert by hand to the same address) or **Add with AI** | Shown in the setup guide; no other workaround offered |
 
 "Gmail connection" and "Sync schedule" stay, but only while the admin's Connect Gmail switch is active
 (§4a). Email forwarding (U1–U7) works either way; both can run side by side. Lead **retention/purge** stays.
 
-## 5. Data model (Phase 2 — needs owner OK: touches several tables)
+## 5. Data model (Phase 3 — needs owner OK: touches several tables)
 
 New:
 - **`inbound_addresses`** — `user_id` (PK, FK cascade), `token` (unique, 10+ chars, random), `created_at`,
   `gmail_code`, `gmail_code_at`, `confirmed_at`, `first_received_at`, `last_received_at`.
 - **`inbound_email_log`** — `id`, `received_at`, `user_id` (nullable — unknown recipient), `env`,
-  `from_address`, `signing_domain`, `status` (`accepted | rejected | unsupported | duplicate | gmail_code`),
+  `from_address` (**accepted job-site mail only**), `from_domain` (always — the only sender info kept for
+  rejected mail), `signing_domain`, `status` (`accepted | rejected | unsupported | duplicate | gmail_code`),
   `reason`, `size_bytes`, `message_id`, `leads_created`. Index on `received_at` for the 30-day purge.
 - **`email_intake_config`** (single row, like `cron_config`) — `forwarding_enabled` (default true),
   `gmail_oauth_enabled` (default true), `max_bytes`, `gmail_toggled_at`, `gmail_toggled_by`.
 - **`inbound_senders`** — `id`, `match` (`jobalerts-noreply@linkedin.com` or `*@domain`), `signing_domain`,
   `parser` (`linkedin` | `none`), `enabled`, timestamps. Seeded with LinkedIn.
 
-Reused as-is: `gmail_processed_messages` (dedupe by RFC `Message-ID`), `gmail_ingest_errors` (parse
-issues), `job_leads` (`origin = 'system'`, `source` from URL).
+Reused as-is: `gmail_processed_messages` (dedupe by RFC `Message-ID`, **shared by both intake paths** so
+an alert arriving via Connect Gmail *and* forwarding is processed once — no false "Re-newed" tag),
+`gmail_ingest_errors` (parse issues), `job_leads` (`origin = 'system'`, `source` from URL).
 
 Nothing is removed (D1 revised): `gmail_config`, `gmail_sync_state`, `user_settings.sync_interval_hours`
 and the quiet-hours columns of `cron_config` stay for the Connect Gmail feature. Switching it off deletes
 only Google `account` rows (after revoking their tokens).
 
-## 6. Architecture (Phase 3)
+## 6. Architecture (Phase 4)
 
 ```
 Gmail ──SMTP:25 (STARTTLS)──► mail-in container (smtp-server)
                                │ accepts RCPT only for <token>@in.jobtiva.in / in.preprod.jobtiva.in
                                │ size cap, timeouts, connection & per-token rate limits, never relays
-                               ▼  POST raw message + recipient (private Docker network, bearer INBOUND_SECRET)
+                               │ writes the message to a short-lived spool (disk) → replies 250 at once
+                               ▼  dispatcher: POST spooled message (private Docker network, INBOUND_SECRET),
+                                  bounded concurrency, retry with backoff, then delete from spool
             app-prod /api/inbound/email      or      app-preprod /api/inbound/email
                                │ mailauth DKIM/ARC → sender allow-list → parser → leads → log
 ```
+
+### Load & retries (owner requirement: retrying senders must never affect the system)
+- **Short SMTP sessions:** the receiver only validates the recipient, enforces size, spools to disk and
+  answers. Parsing happens later, off the connection, so slow work never holds connections open.
+- **Hard caps:** max simultaneous connections (e.g. 50), per-IP connection rate, per-token messages per
+  hour, max message size (SMTP `SIZE` refuses big mail before it's sent), idle and total timeouts.
+- **Cheap rejection first:** unknown recipients get `550` at `RCPT` — no body is ever received for them.
+- **Back-pressure:** if the spool or the app is saturated the receiver answers `451 try again later`;
+  sending servers (Gmail) back off and retry on their own schedule (minutes → hours, up to ~5 days), so a
+  burst is spread out rather than piled on. Permanent `5xx` only for genuinely bad mail.
+- **Bounded processing:** the dispatcher feeds the app with low fixed concurrency (e.g. 2), so the web app's
+  memory/CPU stay predictable no matter how much mail queues. Spool files older than 24 h are dropped and
+  logged (bodies never kept beyond processing).
+- **Abuse:** fail2ban jail for repeated SMTP protocol errors; connection logs metadata only.
 
 - **mail-in** runs from the app image (`node scripts/mail-in.mjs`) — no second build; ~128 MB cap; host
   port 25 → container 2525, non-root. Routes by recipient domain to the matching app.
@@ -129,7 +148,10 @@ Gmail ──SMTP:25 (STARTTLS)──► mail-in container (smtp-server)
 2. DKIM (or ARC from Gmail) must pass for an allowed signing domain; From must match an allowed sender.
 3. Limits: max size, idle/total timeouts, max concurrent connections, messages per token per hour.
 4. Internal endpoint: bearer secret, reachable only from the Docker network, Zod-validated, size-capped.
-5. Privacy: bodies never stored; rejected mail logs no subject; log purged after 30 days.
+5. Privacy: bodies never stored (spool holds a message only until processed, max 24 h); rejected mail logs
+   neither subject nor full sender — sender **domain** only; log purged after 30 days.
+5b. Load: a flood test (many concurrent connections + retries) leaves the web apps responsive; caps and
+   `451` back-pressure behave as specified.
 6. Admin actions `requireAdmin` + Zod; address reset invalidates immediately.
 6b. Connect Gmail switch: with it off, the Google link callback, Sync now and the cron all refuse server-side;
    after switch-off no `account` row with provider `google` remains and each token was revoked at Google.
@@ -149,12 +171,15 @@ Cloud project stays (Connect Gmail still uses it).
 
 | Phase | Output | Checkpoint (owner) |
 |---|---|---|
-| 1 Finalize | this spec | approve spec |
-| 2 DB | migrations for §5 (new tables first; removals after the switch) | approve schema |
-| 3 Structure | mail-in container, DNS, TLS, port 25, routing | a test email reaches preprod |
-| 4 Code + UI | admin A1–A5, user U1–U7, endpoint, parser routing, Gmail removal | demo on preprod with own Gmail |
-| 5 Security | tests in §7 with results | review report |
-| 6 Content | pages + guide + Google retirement | review wording |
+| 1 Finalize | this spec | approve spec ✅ |
+| 2 UI (sample data) | admin A1–A6 and user U1–U8 screens, fully navigable on mock data (CLAUDE.md: UI first) | click through admin + user screens |
+| 3 DB | migrations for §5 — shaped by what Phase 2's UI needs | approve schema |
+| 4 Structure + wiring | mail-in container + spool, DNS, TLS, port 25, routing; endpoint, parser routing, switch enforcement; mocks replaced by real data | demo on preprod with own Gmail |
+| 5 Security | tests in §7 with results (incl. load) + the login rate-limit fix | review report |
+| 6 Content | Home, Privacy, Terms (incl. general review), guide, in-app texts | review wording |
+
+Samples for parser/DKIM tests: 4 real LinkedIn alerts (`.eml`, owner's Desktop `linkedin-samples`, all
+`d=linkedin.com` + Gmail ARC seal). Used locally only — never committed (personal data).
 
 Order of release: forwarding + the Connect Gmail switch ship on preprod first, then prod, with the switch
 **on** (today's behaviour). The owner decides when to turn Connect Gmail off — so nobody loses intake
