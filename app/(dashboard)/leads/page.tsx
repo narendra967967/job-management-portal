@@ -3,6 +3,7 @@
 import { List, Columns3 } from "lucide-react";
 import { LeadsBrowser } from "@/components/leads/leads-browser";
 import { LeadsKanban } from "@/components/leads/leads-kanban";
+import { ForwardingSetupBanner } from "@/components/forwarding/forwarding-setup-banner";
 import { useIsDesktop } from "@/lib/use-media-query";
 import { usePersistentState, PERSIST_KEYS } from "@/lib/use-persistent-state";
 import { cn } from "@/lib/utils";
@@ -26,7 +27,7 @@ export default function LeadsPage() {
       <div className="flex flex-wrap items-baseline gap-x-2">
         <h1 className="text-lg font-semibold tracking-tight">Leads</h1>
         <p className="hidden text-sm text-muted-foreground sm:block">
-          Job alerts captured from your inbox.
+          Job alerts you forward, and leads you add.
         </p>
         {/* View toggle — laptop only */}
         <div className="ml-auto hidden rounded-lg border bg-card p-0.5 lg:inline-flex">
@@ -44,6 +45,8 @@ export default function LeadsPage() {
           />
         </div>
       </div>
+
+      <ForwardingSetupBanner />
 
       {showBoard ? <LeadsKanban /> : <LeadsBrowser />}
     </div>

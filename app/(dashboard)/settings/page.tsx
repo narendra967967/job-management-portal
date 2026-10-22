@@ -15,6 +15,7 @@ import {
   Filter,
   User,
   Mail,
+  Forward,
   RefreshCw,
   AlertTriangle,
   LifeBuoy,
@@ -65,6 +66,8 @@ import {
   updateAiPrompts,
 } from "@/lib/mock-store";
 import { buildGmailQuery } from "@/lib/use-gmail-settings";
+import { EmailForwardingCard } from "@/components/forwarding/email-forwarding-card";
+import { useMockIntake } from "@/lib/email-intake-mock";
 import {
   COUNTRY_CODES,
   isValidEmail,
@@ -137,6 +140,7 @@ interface SettingsSection {
 const SECTION = {
   profile: { id: "profile", label: "Profile", icon: User, render: () => <ProfileCard /> },
   plan: { id: "plan", label: "Plan", icon: Crown, render: () => <PlanDetailsCard /> },
+  forwarding: { id: "forwarding", label: "Email forwarding", icon: Forward, render: () => <EmailForwardingCard /> },
   google: { id: "google", label: "Gmail connection", icon: Mail, render: () => <GoogleCard /> },
   schedule: { id: "schedule", label: "Sync schedule", icon: RefreshCw, render: () => <SyncScheduleCard /> },
   issues: { id: "issues", label: "Ingestion issues", icon: AlertTriangle, render: () => <IngestionIssuesCard /> },
@@ -151,14 +155,22 @@ const SECTION = {
 // Grouped and ordered by how central each area is to capturing and acting on
 // leads: identity first, then the email pipeline that feeds everything, then
 // AI enrichment, then outreach. Account (log out) sits on its own at the end.
-const GROUPS: { label: string; items: SettingsSection[] }[] = [
-  { label: "General", items: [SECTION.profile, SECTION.plan] },
-  { label: "Email & sync", items: [SECTION.google, SECTION.schedule, SECTION.issues] },
-  { label: "AI", items: [SECTION.ai, SECTION.prompts] },
-  { label: "Outreach", items: [SECTION.followups, SECTION.resumes] },
-];
+// "Gmail connection" and "Sync schedule" exist only while the admin's Connect
+// Gmail switch is on (docs/email-forwarding.md §4a); forwarding is always listed.
+function settingsGroups(gmailEnabled: boolean): { label: string; items: SettingsSection[] }[] {
+  return [
+    { label: "General", items: [SECTION.profile, SECTION.plan] },
+    {
+      label: "Email & sync",
+      items: gmailEnabled
+        ? [SECTION.forwarding, SECTION.google, SECTION.schedule, SECTION.issues]
+        : [SECTION.forwarding, SECTION.issues],
+    },
+    { label: "AI", items: [SECTION.ai, SECTION.prompts] },
+    { label: "Outreach", items: [SECTION.followups, SECTION.resumes] },
+  ];
+}
 const FOOTER: SettingsSection[] = [SECTION.help, SECTION.account];
-const SECTIONS: SettingsSection[] = [...GROUPS.flatMap((g) => g.items), ...FOOTER];
 
 function TabButton({
   section,
@@ -200,6 +212,9 @@ export default function SettingsPage() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const tabParam = searchParams.get("tab");
+  const gmailEnabled = useMockIntake().config.gmailOAuthEnabled; // PHASE 2: sample data
+  const GROUPS = settingsGroups(gmailEnabled);
+  const SECTIONS: SettingsSection[] = [...GROUPS.flatMap((g) => g.items), ...FOOTER];
   const active = SECTIONS.some((s) => s.id === tabParam) ? (tabParam as string) : SECTIONS[0].id;
   const current = SECTIONS.find((s) => s.id === active) ?? SECTIONS[0];
 
