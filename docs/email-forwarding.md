@@ -1,6 +1,6 @@
 # Email forwarding — spec (Phase 1)
 
-Status: **approved scope, 2026-10-22.** Replaces "Connect Gmail" (Google OAuth, `gmail.readonly`).
+Status: **approved scope, 2026-10-22** (D1 revised the same day). Adds email forwarding as the main intake; "Connect Gmail" (Google OAuth, `gmail.readonly`) stays behind an admin on/off switch.
 Jobtiva receives job-alert emails that users **forward** to a private address, so it needs **no Google
 permission at all**: no OAuth verification, no paid CASA assessment, no 100-user cap, no "unverified app"
 screen. Pattern used by e.g. TripIt (`plans@tripit.com`).
@@ -9,7 +9,7 @@ screen. Pattern used by e.g. TripIt (`plans@tripit.com`).
 
 | # | Decision |
 |---|---|
-| D1 | **Remove "Connect Gmail"** entirely once forwarding ships (OAuth, Gmail sync, sync schedule). |
+| D1 | **Keep "Connect Gmail", behind an admin on/off switch** (A6). Active = everything works as today. Inactive = the whole option disappears, sync stops, and **every existing connection is broken** (tokens revoked at Google + deleted). Default: active. *(Revised 2026-10-22 — was "remove".)* |
 | D2 | Address = random token only: `k7f2m9x4p3@in.jobtiva.in` (no names — unguessable). |
 | D3 | Domains: **`in.jobtiva.in`** (prod), **`in.preprod.jobtiva.in`** (preprod). Local dev: no SMTP; a dev-only "simulate email" path. |
 | D4 | **LinkedIn job alerts at launch.** Other senders can be allowed by an admin (config) but need a parser (code) — until then they're logged as *Unsupported format*. |
@@ -50,6 +50,21 @@ Adding a new site later = admin adds the sender + signing domain (no code) **and
 | A3 | **Dashboard → "Forwarding health"** (replaces "Gmail health"): received / accepted / rejected for 24 h and 7 d, top rejection reasons, last email received, users set up vs not | Numbers match the log table |
 | A4 | **Users:** per-user forwarding status (address created · Gmail confirmed · first alert · last alert) and **Reset address** | Reset makes the old address reject immediately |
 | A5 | **Operations → Inbound email log:** time, user, sender, status, reason, size. **No content, no subject** for rejected mail. Kept 30 days | Filter by status/user; auto-purged after 30 days |
+| A6 | **Settings → Email intake → "Connect Gmail" switch**, with a confirmation dialog both ways. Off dialog states how many users get disconnected; on dialog warns about Google's 100-user cap / unverified-app screen | See §4a for exact effects; switching is logged (who, when) |
+
+### 4a. Connect Gmail switch — effects
+
+| Area | Active | Inactive |
+|---|---|---|
+| User Settings → **Gmail connection** and **Sync schedule** tabs | shown | hidden |
+| Scheduled Gmail sync (cron) and "Sync now" | run | skip every user |
+| Linking a Google account | works | **rejected server-side** (Better Auth hook + actions), not just hidden |
+| Existing connections | kept | **all broken on switch-off:** each token revoked at Google, then the `account` rows (provider `google`) deleted. Leads stay |
+| Admin dashboard Gmail widgets | shown | hidden (Forwarding health stays) |
+| Home FAQ / Privacy Gmail sections | shown | hidden — public pages describe only what's active |
+
+Switching back on doesn't restore connections — each user reconnects. Turning it off runs as a background
+job (revokes can take a few seconds per user) and reports progress/result to the admin.
 
 ## 4. User side (mobile-first: 375 / 768 px)
 
@@ -63,8 +78,8 @@ Adding a new site later = admin adds the sender + signing domain (no code) **and
 | U6 | **Ingestion issues** (existing): forwarded emails that couldn't be read — subject only (only for accepted, verified senders) | Unsupported/unparseable alerts listed |
 | U7 | **Leads empty state / banner** when forwarding isn't set up | Links to Settings → Email forwarding |
 
-Removed for users: "Gmail connection", "Sync schedule" (sync interval, pause) — mail now arrives in real
-time. Lead **retention/purge** stays.
+"Gmail connection" and "Sync schedule" stay, but only while the admin's Connect Gmail switch is active
+(§4a). Email forwarding (U1–U7) works either way; both can run side by side. Lead **retention/purge** stays.
 
 ## 5. Data model (Phase 2 — needs owner OK: touches several tables)
 
@@ -74,16 +89,17 @@ New:
 - **`inbound_email_log`** — `id`, `received_at`, `user_id` (nullable — unknown recipient), `env`,
   `from_address`, `signing_domain`, `status` (`accepted | rejected | unsupported | duplicate | gmail_code`),
   `reason`, `size_bytes`, `message_id`, `leads_created`. Index on `received_at` for the 30-day purge.
-- **`inbound_config`** (single row, like `cron_config`) — `enabled`, `max_bytes`.
+- **`email_intake_config`** (single row, like `cron_config`) — `forwarding_enabled` (default true),
+  `gmail_oauth_enabled` (default true), `max_bytes`, `gmail_toggled_at`, `gmail_toggled_by`.
 - **`inbound_senders`** — `id`, `match` (`jobalerts-noreply@linkedin.com` or `*@domain`), `signing_domain`,
   `parser` (`linkedin` | `none`), `enabled`, timestamps. Seeded with LinkedIn.
 
 Reused as-is: `gmail_processed_messages` (dedupe by RFC `Message-ID`), `gmail_ingest_errors` (parse
 issues), `job_leads` (`origin = 'system'`, `source` from URL).
 
-Removed (after release, D1): Google `account` rows (tokens **revoked first** by a one-off script),
-`gmail_config`, `gmail_sync_state`, `user_settings.sync_interval_hours`, the quiet-hours columns of
-`cron_config` (purge columns stay).
+Nothing is removed (D1 revised): `gmail_config`, `gmail_sync_state`, `user_settings.sync_interval_hours`
+and the quiet-hours columns of `cron_config` stay for the Connect Gmail feature. Switching it off deletes
+only Google `account` rows (after revoking their tokens).
 
 ## 6. Architecture (Phase 3)
 
@@ -101,8 +117,8 @@ Gmail ──SMTP:25 (STARTTLS)──► mail-in container (smtp-server)
 - TLS: Certbot certificate for `in.jobtiva.in` + `in.preprod.jobtiva.in`, mounted read-only.
 - DNS (HostingRaja): `A in → 13.205.239.50`, `MX in → in.jobtiva.in`; same for `in.preprod`.
 - AWS security group + ufw: open **25/tcp** inbound. (Inbound 25 is allowed on EC2; we never send on 25.)
-- Remove: Gmail-sync cron lines + `/api/cron/gmail-sync`, `lib/gmail.ts`, `lib/gmail-sync.ts`, Google
-  social provider + `GOOGLE_CLIENT_*` env. Purge cron stays.
+- Gmail OAuth code, its cron line and `GOOGLE_CLIENT_*` env **stay**; every entry point checks
+  `gmail_oauth_enabled` (cron sync, Sync now, link hook, settings data, dashboard widgets).
 - Runbooks: `deploy/VPS.md`, `deploy/DOMAIN.md`.
 
 ## 7. Security (Phase 5 — each item tested and reported)
@@ -113,16 +129,19 @@ Gmail ──SMTP:25 (STARTTLS)──► mail-in container (smtp-server)
 4. Internal endpoint: bearer secret, reachable only from the Docker network, Zod-validated, size-capped.
 5. Privacy: bodies never stored; rejected mail logs no subject; log purged after 30 days.
 6. Admin actions `requireAdmin` + Zod; address reset invalidates immediately.
+6b. Connect Gmail switch: with it off, the Google link callback, Sync now and the cron all refuse server-side;
+   after switch-off no `account` row with provider `google` remains and each token was revoked at Google.
 7. Test cases: forged LinkedIn email, ARC-only pass, oversized, unknown token, relay attempt, duplicate
    Message-ID, malformed MIME, disabled forwarding, unsupported sender.
 8. `npm audit` + security headers re-checked with the new dependencies.
 
 ## 8. Content (Phase 6)
 
-Home FAQ (leads intake, "Does Jobtiva read my email?"), Privacy (forwarding replaces Gmail access; remove
-Google Limited Use section), Terms (forward only mail you're entitled to; unsupported mail may be
-rejected; plus the pending general review), How-to guide "Set up email forwarding", in-app texts, and
-retiring the Google Cloud project / `docs/google-verification.md`.
+Home FAQ (leads intake via forwarding; "Does Jobtiva read my email?"; the Gmail FAQ shown only while
+Connect Gmail is active), Privacy (a forwarding section; the Gmail / Google Limited Use section rendered only
+while Connect Gmail is active), Terms (forward only mail you're entitled to; unsupported mail may be
+rejected; plus the pending general review), How-to guide "Set up email forwarding", in-app texts. The Google
+Cloud project stays (Connect Gmail still uses it).
 
 ## 9. Phases & checkpoints
 
@@ -135,5 +154,6 @@ retiring the Google Cloud project / `docs/google-verification.md`.
 | 5 Security | tests in §7 with results | review report |
 | 6 Content | pages + guide + Google retirement | review wording |
 
-Order of release: forwarding ships **alongside** Connect Gmail on preprod first; once verified, prod; then
-the removal migration (tokens revoked) — so nobody loses intake during the switch.
+Order of release: forwarding + the Connect Gmail switch ship on preprod first, then prod, with the switch
+**on** (today's behaviour). The owner decides when to turn Connect Gmail off — so nobody loses intake
+during the switch.
