@@ -7,8 +7,9 @@
 // (U1–U5, U8). While setup is under way it polls for progress, so Gmail's code
 // shows up within seconds without a reload.
 //
-// Layout: only what's needed now. The current setup step is expanded, finished
-// ones collapse to a ticked title, and explanations sit behind InfoTips.
+// Layout: the three setup steps are an accordion with the full instructions —
+// the current step opens by itself, finished ones turn green. Short side notes
+// sit behind InfoTips.
 
 import { useEffect, useState } from "react";
 import { Check, ChevronRight, Copy, ExternalLink, Mail, MailCheck, RotateCcw, ShieldCheck, Briefcase } from "lucide-react";
@@ -131,36 +132,33 @@ export function EmailForwardingCard() {
     );
   }
 
+  // Full instructions in an accordion: the current step opens by itself,
+  // any step can be opened, finished steps turn green.
   const steps = (
-    <ol className="space-y-1">
-      <Step n={1} current={current} title="Add the address in Gmail">
-        <Path items={["Settings", "See all settings", "Forwarding and POP/IMAP", "Add a forwarding address"]} />
-        <p className="mt-2">
-          Paste your address, then <b className="font-medium text-foreground">Next → Proceed</b>.
-        </p>
+    <div className="space-y-2">
+      <Step n={1} current={current} title="Add your address in Gmail">
+        In Gmail, open <b>Settings</b> (gear icon) → <b>See all settings</b> → <b>Forwarding and POP/IMAP</b>{" "}
+        → <b>Add a forwarding address</b>, paste your address and click <b>Next</b> → <b>Proceed</b>.
       </Step>
-      <Step
-        n={2}
-        current={current}
-        title="Approve it"
-        tip="Leave Gmail's own forwarding option on “Disable forwarding”. The filter in step 3 forwards only job alerts."
-      >
-        <p>A confirm button appears above within seconds.</p>
+      <Step n={2} current={current} title="Confirm it">
+        Gmail sends a confirmation to your Jobtiva address — a <b>Confirm forwarding</b> button appears{" "}
+        <b>at the top of this card</b> within a few seconds. Click it to approve. Leave the forwarding option
+        itself on <b>Disable forwarding</b>; the filter below forwards only job alerts.
       </Step>
-      <Step n={3} current={current} title="Forward job alerts" tip="Gmail keeps the original email in your inbox.">
-        <p>
-          In Gmail search, open <b className="font-medium text-foreground">Show search options</b> and paste
-          into <b className="font-medium text-foreground">From</b>:
-        </p>
-        <div className="mt-2 flex items-stretch gap-2">
+      <Step n={3} current={current} title="Create a filter for job alerts">
+        In Gmail&rsquo;s search bar, click <b>Show search options</b>. In <b>From</b>, paste:
+        <span className="mt-2 flex items-stretch gap-2">
           <code className="min-w-0 flex-1 rounded-lg bg-muted/60 px-2.5 py-2 font-mono text-[11px] leading-relaxed break-all text-foreground">
             {GMAIL_FILTER_FROM}
           </code>
           <CopyButton value={GMAIL_FILTER_FROM} label="Copy" iconOnly />
-        </div>
-        <Path className="mt-2" items={["Create filter", "Forward it to", "your address", "Create filter"]} />
+        </span>
+        <span className="mt-2 block">
+          Click <b>Create filter</b>, tick <b>Forward it to</b>, choose your Jobtiva address, then{" "}
+          <b>Create filter</b>. Gmail keeps the original email in your inbox.
+        </span>
       </Step>
-    </ol>
+    </div>
   );
 
   return (
@@ -261,21 +259,9 @@ export function EmailForwardingCard() {
         </div>
       )}
 
-      {/* U2 — setup guide; folds away once forwarding works */}
-      {stage === "working" ? (
-        <details className="group mt-4">
-          <summary className="flex min-h-10 cursor-pointer list-none items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground">
-            <ChevronRight className="size-3.5 transition-transform group-open:rotate-90" aria-hidden />
-            Setup steps
-          </summary>
-          <div className="mt-2">{steps}</div>
-        </details>
-      ) : (
-        <div className="mt-5">
-          <p className="text-xs font-medium text-muted-foreground">Set up in Gmail · once, about 2 minutes</p>
-          <div className="mt-2">{steps}</div>
-        </div>
-      )}
+      {/* U2 — setup guide */}
+      <p className="mt-5 mb-2 text-xs font-medium text-muted-foreground">Set up in Gmail · once, about 2 minutes</p>
+      {steps}
 
       {/* U8 + privacy + U5 — one quiet row */}
       <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-1 border-t pt-3 text-xs">
@@ -357,61 +343,60 @@ function LinkifiedGoogleText({ text }: { text: string }) {
   );
 }
 
-/** A menu path as small chips: Settings › Forwarding › … */
-function Path({ items, className }: { items: string[]; className?: string }) {
-  return (
-    <p className={cn("flex flex-wrap items-center gap-1", className)}>
-      {items.map((item, i) => (
-        <span key={`${item}-${i}`} className="inline-flex items-center gap-1">
-          {i > 0 && <ChevronRight className="size-3 text-muted-foreground/60" aria-hidden />}
-          <span className="rounded-md bg-muted/70 px-1.5 py-0.5 text-[11px] font-medium text-foreground">{item}</span>
-        </span>
-      ))}
-    </p>
-  );
-}
-
-/** One setup step. Done steps collapse to a ticked title; the current one
- *  shows its instructions; later ones show just the title. */
+/** One accordion step. Opens by itself when it becomes the current step;
+ *  the user can open or close any step. Done = green with a tick. */
 function Step({
   n,
   current,
   title,
-  tip,
   children,
 }: {
   n: number;
   current: number;
   title: string;
-  tip?: string;
   children: React.ReactNode;
 }) {
   const done = n < current;
   const active = n === current;
+  const [open, setOpen] = useState(active);
+  // Follow progress: open the step that just became current, fold finished ones.
+  useEffect(() => {
+    setOpen(n === current);
+  }, [n, current]);
+
   return (
-    <li className={cn("flex gap-3 rounded-lg px-2 py-2", active && "bg-muted/40")}>
-      <span
-        className={cn(
-          "mt-px flex size-5 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold",
-          done && "bg-status-applied text-status-applied-foreground",
-          active && "bg-primary text-primary-foreground",
-          !done && !active && "bg-muted text-muted-foreground",
-        )}
-        aria-hidden
-      >
-        {done ? <Check className="size-3" /> : n}
-      </span>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1.5">
-          <p className={cn("text-sm", active ? "font-medium" : "text-muted-foreground")}>
-            {title}
-            {done && <span className="sr-only"> (done)</span>}
-          </p>
-          {active && tip && <InfoTip label={`About: ${title}`}>{tip}</InfoTip>}
-        </div>
-        {active && <div className="mt-1.5 text-xs leading-relaxed text-muted-foreground">{children}</div>}
+    <details
+      open={open}
+      onToggle={(e) => setOpen(e.currentTarget.open)}
+      className={cn(
+        "group rounded-xl border transition-colors",
+        done && "border-status-applied-foreground/25 bg-status-applied/30",
+        active && "border-primary/30 bg-primary/[0.03]",
+      )}
+    >
+      <summary className="flex min-h-12 cursor-pointer list-none items-center gap-3 px-3 py-2 [&::-webkit-details-marker]:hidden">
+        <span
+          className={cn(
+            "flex size-6 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold",
+            done && "bg-status-applied-foreground text-white",
+            active && "bg-primary text-primary-foreground",
+            !done && !active && "bg-muted text-muted-foreground",
+          )}
+          aria-hidden
+        >
+          {done ? <Check className="size-3.5" /> : n}
+        </span>
+        <span className={cn("min-w-0 flex-1 text-sm font-medium", !done && !active && "text-muted-foreground")}>
+          {title}
+          {done && <span className="sr-only"> (done)</span>}
+        </span>
+        {done && <span className="text-[11px] font-medium text-status-applied-foreground">Done</span>}
+        <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" aria-hidden />
+      </summary>
+      <div className="px-3 pb-3 pl-12 text-xs leading-relaxed text-muted-foreground [&_b]:font-medium [&_b]:text-foreground">
+        {children}
       </div>
-    </li>
+    </details>
   );
 }
 
