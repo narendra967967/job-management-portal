@@ -5,9 +5,12 @@
 #   /srv/jobtiva/.env          ← compose vars: DB passwords + which image each app runs
 #   /srv/jobtiva/env/prod.env  ← prod app env      (unquoted KEY=value lines)
 #   /srv/jobtiva/env/preprod.env
+#   /srv/jobtiva/env/mail-in.env  ← mail receiver env (only with the "mail" profile)
 #
 # Nothing here is reachable from the internet directly: the apps bind to
 # 127.0.0.1 behind Nginx, and Postgres binds to 127.0.0.1 (SSH-tunnel only).
+# The one exception is mail-in (SMTP port 25, email forwarding), which only
+# starts when COMPOSE_PROFILES=mail is set in /srv/jobtiva/.env.
 
 name: jobtiva
 
@@ -73,7 +76,36 @@ services:
     environment:
       NODE_OPTIONS: --max-old-space-size=256
 
+  # Email forwarding receiver (scripts/mail-in.mjs, docs/email-forwarding.md §6):
+  # accepts mail for the in.* domains on port 25, spools it, and posts it to the
+  # matching app over this private network. Runs from the prod app image;
+  # deploy.sh moves it along with every prod deploy.
+  mail-in:
+    profiles: ["mail"]
+    image: ${MAIL_IN_IMAGE:-jobtiva:none}
+    restart: unless-stopped
+    command: ["node", "scripts/mail-in.mjs"]
+    env_file:
+      - path: ./env/mail-in.env
+        required: false
+    environment:
+      INBOUND_ROUTES: in.jobtiva.in=http://app-prod:3000,in.preprod.jobtiva.in=http://app-preprod:3000
+      INBOUND_HOSTNAME: in.jobtiva.in
+      INBOUND_SPOOL: /data/mail-spool
+      # Copied out of /etc/letsencrypt by the certbot deploy hook (deploy/VPS.md),
+      # readable by the container's non-root user.
+      INBOUND_TLS_KEY: /tls/privkey.pem
+      INBOUND_TLS_CERT: /tls/fullchain.pem
+      NODE_OPTIONS: --max-old-space-size=96
+    ports:
+      - "25:2525"
+    volumes:
+      - mail-spool:/data/mail-spool
+      - ./mail-tls:/tls:ro
+    mem_limit: 128m
+
 volumes:
   pgdata:
   uploads-prod:
   uploads-preprod:
+  mail-spool:

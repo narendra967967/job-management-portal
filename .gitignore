@@ -45,3 +45,6 @@ deploy/vps/env/
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local mail receiver spool (npm run mail-in)
+/.mail-spool/

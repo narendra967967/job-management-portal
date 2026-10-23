@@ -36,9 +36,10 @@ ENV NODE_ENV=production \
     HOSTNAME=0.0.0.0
 # /data/uploads is the upload storage mount point. A fresh named volume mounted
 # there inherits this ownership, so the non-root app user can write uploads
-# (STORAGE_DRIVER=local).
+# (STORAGE_DRIVER=local). /data/mail-spool is the same for the mail-in spool.
 RUN groupadd -g 1001 nodejs && useradd -u 1001 -g nodejs -m nextjs \
- && mkdir -p /data/uploads && chown nextjs:nodejs /data/uploads
+ && mkdir -p /data/uploads /data/mail-spool \
+ && chown nextjs:nodejs /data/uploads /data/mail-spool
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
@@ -49,6 +50,13 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/db/migrations ./db/migrations
 COPY --from=builder --chown=nextjs:nodejs /app/scripts/migrate.mjs /app/scripts/files-db-to-disk.mjs ./scripts/
 COPY --from=deps --chown=nextjs:nodejs /app/node_modules/drizzle-orm ./node_modules/drizzle-orm
+# The mail receiver (the mail-in compose service) runs from this same image and
+# is not part of the Next.js trace: copy it and its runtime deps in full.
+COPY --from=builder --chown=nextjs:nodejs /app/scripts/mail-in.mjs ./scripts/
+COPY --from=deps --chown=nextjs:nodejs /app/node_modules/smtp-server ./node_modules/smtp-server
+COPY --from=deps --chown=nextjs:nodejs /app/node_modules/nodemailer ./node_modules/nodemailer
+COPY --from=deps --chown=nextjs:nodejs /app/node_modules/ipv6-normalize ./node_modules/ipv6-normalize
+COPY --from=deps --chown=nextjs:nodejs /app/node_modules/punycode.js ./node_modules/punycode.js
 USER nextjs
 EXPOSE 3000
 CMD ["node", "server.js"]

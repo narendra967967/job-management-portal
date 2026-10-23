@@ -65,8 +65,17 @@ if [ "$ok" -ne 1 ]; then
 fi
 echo "== $ENV is live on $IMAGE =="
 
+# The mail receiver runs from the prod image.
+if [ "$ENV" = prod ]; then
+  set_var MAIL_IN_IMAGE "$IMAGE"
+  if grep -qE '^COMPOSE_PROFILES=([^#]*,)?mail(,|$)' .env; then
+    echo "== Restart mail-in on $IMAGE =="
+    docker compose up -d --no-deps mail-in
+  fi
+fi
+
 echo "== Prune old images (keep in-use + newest $KEEP) =="
-INUSE="$(get_var PROD_IMAGE) $(get_var PREPROD_IMAGE)"
+INUSE="$(get_var PROD_IMAGE) $(get_var PREPROD_IMAGE) $(get_var MAIL_IN_IMAGE)"
 docker images jobtiva --format '{{.CreatedAt}}|{{.Repository}}:{{.Tag}}' \
   | sort -r | cut -d'|' -f2 | tail -n +$((KEEP + 1)) \
   | while read -r img; do
