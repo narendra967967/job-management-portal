@@ -2,14 +2,14 @@
 
 // Settings → Email forwarding (user side). The user forwards job-alert emails
 // from Gmail to a private Jobtiva address; this card shows the address, walks
-// through Gmail's one-time setup, shows Gmail's confirmation code when it
+// through Gmail's one-time setup, shows Gmail's confirmation (link or code) when it
 // arrives, and reports whether alerts are coming in. Spec: docs/email-forwarding.md
 // (U1–U5, U8). While setup is under way it polls for progress, so Gmail's code
 // shows up within seconds without a reload.
 
 import { useEffect, useState } from "react";
-import { Check, Copy, MailCheck, RotateCcw, ShieldCheck, Briefcase } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Check, Copy, ExternalLink, MailCheck, RotateCcw, ShieldCheck, Briefcase } from "lucide-react";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useMounted } from "@/lib/use-mounted";
@@ -162,21 +162,44 @@ export function EmailForwardingCard() {
         </p>
       )}
 
-      {/* U3 — Gmail's confirmation code */}
-      {stage === "code_received" && fwd.gmailCode && (
+      {/* U3 — Gmail's confirmation: a link (current Gmail) or a code (older format) */}
+      {stage === "code_received" && (
         <div className="mt-4 rounded-xl border-2 border-primary/30 bg-primary/5 p-4">
-          <p className="text-xs font-medium text-primary">Gmail confirmation code</p>
-          <div className="mt-2 flex flex-wrap items-center gap-3">
-            <span className="font-mono text-2xl font-semibold tracking-widest">{fwd.gmailCode}</span>
-            <CopyButton value={fwd.gmailCode} label="Copy code" />
-          </div>
-          <p className="mt-2 text-[11px] text-muted-foreground">
-            Received{mounted && fwd.gmailCodeAt ? ` ${timeAgo(fwd.gmailCodeAt)}` : ""}. Paste it into
-            Gmail (step 2 below) and click Verify, then let us know here.
+          <p className="text-xs font-medium text-primary">Confirm forwarding in Gmail</p>
+          {fwd.gmailConfirmFrom && (
+            <p className="mt-1.5 text-sm break-all">
+              <b>{fwd.gmailConfirmFrom}</b> asked to forward mail here.
+            </p>
+          )}
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            Received{mounted && fwd.gmailCodeAt ? ` ${timeAgo(fwd.gmailCodeAt)}` : ""}. Only continue if
+            that&rsquo;s your Gmail account.
           </p>
-          <Button size="sm" onClick={markVerified} disabled={busy} className="mt-3 min-h-10 gap-1.5">
+          {fwd.gmailConfirmUrl && (
+            <a
+              href={fwd.gmailConfirmUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={cn(buttonVariants({ size: "sm" }), "mt-3 min-h-10 gap-1.5")}
+            >
+              <ExternalLink className="size-3.5" aria-hidden />
+              Confirm forwarding
+            </a>
+          )}
+          {fwd.gmailCode && (
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <span className="font-mono text-2xl font-semibold tracking-widest">{fwd.gmailCode}</span>
+              <CopyButton value={fwd.gmailCode} label="Copy code" />
+            </div>
+          )}
+          <p className="mt-3 text-[11px] text-muted-foreground">
+            {fwd.gmailConfirmUrl
+              ? "Opens Google's confirmation page in a new tab. Once it says the request is confirmed, come back and tell us below."
+              : "Paste the code into Gmail (step 2 below) and click Verify, then tell us below."}
+          </p>
+          <Button variant="outline" size="sm" onClick={markVerified} disabled={busy} className="mt-2 min-h-10 gap-1.5">
             <Check className="size-3.5" aria-hidden />
-            I&rsquo;ve verified it in Gmail
+            I&rsquo;ve confirmed it
           </Button>
         </div>
       )}
@@ -193,12 +216,11 @@ export function EmailForwardingCard() {
         <Step
           n={2}
           done={stage === "waiting_first_alert" || stage === "working"}
-          title="Confirm the code"
+          title="Confirm it"
         >
-          Gmail sends a confirmation code to your Jobtiva address — it appears{" "}
-          <b>at the top of this card</b> within a few seconds. Paste it into Gmail and click{" "}
-          <b>Verify</b>. Leave the forwarding option itself on <b>Disable forwarding</b>; the filter below
-          forwards only job alerts.
+          Gmail sends a confirmation to your Jobtiva address — a <b>Confirm forwarding</b> button
+          appears <b>at the top of this card</b> within a few seconds. Click it to approve. Leave the
+          forwarding option itself on <b>Disable forwarding</b>; the filter below forwards only job alerts.
         </Step>
         <Step n={3} done={stage === "working"} title="Create a filter for job alerts">
           In Gmail&rsquo;s search bar, click <b>Show search options</b>. In <b>From</b>, paste:

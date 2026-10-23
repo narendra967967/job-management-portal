@@ -81,6 +81,8 @@ function toMyForwarding(row: typeof addressesT.$inferSelect): MyForwarding {
   return {
     address: `${row.token}@${receivingDomain()}`,
     gmailCode: row.gmailCode,
+    gmailConfirmUrl: row.gmailConfirmUrl,
+    gmailConfirmFrom: row.gmailConfirmFrom,
     gmailCodeAt: iso(row.gmailCodeAt),
     confirmedAt: iso(row.confirmedAt),
     firstReceivedAt: iso(row.firstReceivedAt),
@@ -116,6 +118,8 @@ export async function resetForwarding(userId: string): Promise<MyForwarding> {
         .set({
           token: newToken(),
           gmailCode: null,
+          gmailConfirmUrl: null,
+          gmailConfirmFrom: null,
           gmailCodeAt: null,
           confirmedAt: null,
           firstReceivedAt: null,

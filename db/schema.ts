@@ -794,8 +794,13 @@ export const inboundAddresses = pgTable(
       .references(() => user.id, { onDelete: "cascade" }),
     token: text("token").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-    // Gmail's forwarding-confirmation code, shown in Settings until confirmed.
+    // Gmail's forwarding confirmation, shown in Settings until confirmed:
+    // today a link (mail-settings.google.com/mail/vf-…), in older/other
+    // formats a numeric code. gmail_code_at = when either arrived;
+    // gmail_confirm_from = the Gmail account that asked to forward here.
     gmailCode: text("gmail_code"),
+    gmailConfirmUrl: text("gmail_confirm_url"),
+    gmailConfirmFrom: text("gmail_confirm_from"),
     gmailCodeAt: timestamp("gmail_code_at", { withTimezone: true }),
     // Set when the user says they verified it in Gmail, or at the first alert.
     confirmedAt: timestamp("confirmed_at", { withTimezone: true }),

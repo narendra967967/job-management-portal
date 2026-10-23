@@ -2,7 +2,7 @@ import "server-only";
 
 // Email forwarding — process one received email (spec: docs/email-forwarding.md).
 //
-//   recipient check (RCPT) → size → parse MIME → Gmail confirmation code?
+//   recipient check (RCPT) → size → parse MIME → Gmail confirmation (link/code)?
 //   → sender allow-list → DKIM (or Gmail's ARC seal) for the allowed signing
 //   domain → dedupe (RFC Message-ID, shared with Connect Gmail) → parser →
 //   leads → address timestamps → log (metadata only).
@@ -29,6 +29,7 @@ import { getIntakeConfig, loadSenders, receivingDomain, userIdForToken } from "@
 import { domainWithin, type InboundSender, type InboundStatus } from "@/lib/email-intake-model";
 import { parseLinkedInAlert } from "@/lib/linkedin-parser";
 import { ingestAlertDrafts } from "@/lib/lead-ingest";
+import { gmailConfirmation } from "@/lib/inbound/gmail-confirmation";
 
 export type SmtpOutcome = { code: 250 | 451 | 550; message: string };
 
@@ -168,22 +169,19 @@ export async function processInbound(raw: Buffer, recipient: string): Promise<Sm
   // Only DKIM + ARC are used; skip the DMARC/BIMI DNS lookups.
   const auth = await authenticate(raw, { trustReceived: false, disableDmarc: true, disableBimi: true });
 
-  // Gmail's forwarding-confirmation email → show the code in Settings.
+  // Gmail's forwarding-confirmation email → show the link (or code) in Settings.
   if (from === GMAIL_CONFIRM_FROM) {
     const vouched = signedFor(auth, GMAIL_CONFIRM_DOMAIN);
-    const code =
-      /\(#(\d{6,12})\)/.exec(parsed.subject ?? "")?.[1] ??
-      /confirmation code:\s*(\d{6,12})/i.exec(parsed.text ?? "")?.[1] ??
-      null;
-    if (!vouched || !code) {
-      await log({ userId, status: "rejected", reason: vouched ? "No code found" : "Signature check failed", fromDomain, sizeBytes: raw.length });
+    const confirm = vouched ? gmailConfirmation(parsed) : null;
+    if (!vouched || !confirm) {
+      await log({ userId, status: "rejected", reason: vouched ? "No confirmation link or code found" : "Signature check failed", fromDomain, sizeBytes: raw.length });
       return { code: 250, message: "Accepted" };
     }
     await db
       .update(addressesT)
-      .set({ gmailCode: code, gmailCodeAt: new Date() })
+      .set({ ...confirm, gmailCodeAt: new Date() })
       .where(eq(addressesT.userId, userId));
-    await log({ userId, status: "gmail_code", reason: "Confirmation code shown to user", fromAddress: from, fromDomain, signingDomain: vouched, sizeBytes: raw.length, messageId });
+    await log({ userId, status: "gmail_code", reason: "Gmail confirmation shown to user", fromAddress: from, fromDomain, signingDomain: vouched, sizeBytes: raw.length, messageId });
     return { code: 250, message: "Accepted" };
   }
 

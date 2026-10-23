@@ -76,8 +76,12 @@ export interface ForwardingHealth {
 /** The signed-in user's forwarding address and its progress. */
 export interface MyForwarding {
   address: string;
-  /** Gmail's forwarding confirmation code, when one has arrived. */
+  /** Gmail's forwarding confirmation code (older format), when one has arrived. */
   gmailCode: string | null;
+  /** Gmail's confirmation link (current format) — verify link only, never cancel. */
+  gmailConfirmUrl: string | null;
+  /** The Gmail account that asked to forward to this address. */
+  gmailConfirmFrom: string | null;
   gmailCodeAt: string | null;
   confirmedAt: string | null;
   firstReceivedAt: string | null;
@@ -87,7 +91,7 @@ export interface MyForwarding {
 /** Per-user forwarding status as admins see it. */
 export interface UserForwardingStatus {
   addressCreatedAt: string | null;
-  /** Gmail's confirmation code arrived (setup started in Gmail). */
+  /** Gmail's confirmation (link or code) arrived — setup started in Gmail. */
   gmailCodeAt: string | null;
   confirmedAt: string | null;
   firstReceivedAt: string | null;
@@ -96,14 +100,16 @@ export interface UserForwardingStatus {
 
 export type ForwardingStage =
   | "not_started" // address exists, nothing received yet
-  | "code_received" // Gmail's confirmation code arrived, not yet confirmed
+  | "code_received" // Gmail's confirmation (link or code) arrived, not yet confirmed
   | "waiting_first_alert" // Gmail confirmed, no job alert yet
   | "working"; // at least one alert received
 
-export function forwardingStage(f: Pick<MyForwarding, "gmailCode" | "confirmedAt" | "firstReceivedAt">): ForwardingStage {
+export function forwardingStage(
+  f: Pick<MyForwarding, "gmailCode" | "gmailConfirmUrl" | "confirmedAt" | "firstReceivedAt">,
+): ForwardingStage {
   if (f.firstReceivedAt) return "working";
   if (f.confirmedAt) return "waiting_first_alert";
-  if (f.gmailCode) return "code_received";
+  if (f.gmailCode || f.gmailConfirmUrl) return "code_received";
   return "not_started";
 }
 
