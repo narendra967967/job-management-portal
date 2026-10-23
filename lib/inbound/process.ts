@@ -29,7 +29,7 @@ import { getIntakeConfig, loadSenders, receivingDomain, userIdForToken } from "@
 import { domainWithin, type InboundSender, type InboundStatus } from "@/lib/email-intake-model";
 import { parseLinkedInAlert } from "@/lib/linkedin-parser";
 import { ingestAlertDrafts } from "@/lib/lead-ingest";
-import { gmailConfirmation } from "@/lib/inbound/gmail-confirmation";
+import { describeConfirmationEmail, gmailConfirmation } from "@/lib/inbound/gmail-confirmation";
 
 export type SmtpOutcome = { code: 250 | 451 | 550; message: string };
 
@@ -70,7 +70,7 @@ async function log(entry: {
   await db.insert(logT).values({
     userId: entry.userId,
     status: entry.status,
-    reason: entry.reason.slice(0, 200),
+    reason: entry.reason.slice(0, 400),
     // Full sender only for mail we accepted from a verified job site.
     fromAddress: entry.status === "rejected" ? null : (entry.fromAddress ?? null),
     fromDomain: entry.fromDomain.slice(0, 253),
@@ -174,7 +174,7 @@ export async function processInbound(raw: Buffer, recipient: string): Promise<Sm
     const vouched = signedFor(auth, GMAIL_CONFIRM_DOMAIN);
     const confirm = vouched ? gmailConfirmation(parsed) : null;
     if (!vouched || !confirm) {
-      await log({ userId, status: "rejected", reason: vouched ? "No confirmation link or code found" : "Signature check failed", fromDomain, sizeBytes: raw.length });
+      await log({ userId, status: "rejected", reason: vouched ? `No confirmation link or code found (${describeConfirmationEmail(parsed)})` : "Signature check failed", fromDomain, sizeBytes: raw.length });
       return { code: 250, message: "Accepted" };
     }
     await db
