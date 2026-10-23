@@ -1,9 +1,10 @@
 "use client";
 
-// Admin → Settings → Email intake (A1, A2, A6): forwarding on/off and size
-// limit, the Connect Gmail switch (confirmed both ways), and the allowed
-// senders list. Spec: docs/email-forwarding.md. Values come from the server
-// page; every change goes through actions/admin-email-intake.ts, then refreshes.
+// Admin → Settings → Email intake, as two boxes: Connect Gmail (A6, the
+// switch, confirmed both ways) and Email forwarding (A1 on/off + size limit,
+// with A2 the allowed senders it accepts). Spec: docs/email-forwarding.md.
+// Values come from the server page; every change goes through
+// actions/admin-email-intake.ts, then refreshes.
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -93,84 +94,87 @@ export function EmailIntakeCard({ initial }: { initial: AdminSettings["intake"] 
   }
 
   return (
-    <section className="rounded-2xl border bg-card p-4 md:p-5">
-      <h2 className="text-sm font-medium">Email intake</h2>
+    <div className="space-y-4">
+      {/* A6 — Connect Gmail */}
+      <section className="rounded-2xl border bg-card p-4 md:p-5">
+        <h2 className="text-sm font-medium">Connect Gmail</h2>
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <Badge variant={config.gmailOAuthEnabled ? "success" : "neutral"}>
+            {config.gmailOAuthEnabled ? "Active" : "Inactive"}
+          </Badge>
+          <span className="text-xs text-muted-foreground">
+            {config.gmailOAuthEnabled
+              ? `${plural(gmailConnectedUsers, "user")} connected`
+              : "Hidden from users · no syncs"}
+            {mounted && config.gmailToggledAt
+              ? ` · changed by ${config.gmailToggledBy ?? "admin"}, ${formatDateTime(config.gmailToggledAt)}`
+              : ""}
+          </span>
+          <Button
+            variant={config.gmailOAuthEnabled ? "destructive" : "default"}
+            className="ml-auto min-h-9"
+            onClick={() => setGmailDialog(true)}
+          >
+            {config.gmailOAuthEnabled ? "Turn off" : "Turn on"}
+          </Button>
+        </div>
+        {gmailFlash && (
+          <p role="status" className="mt-3 rounded-lg bg-status-applied px-3 py-2 text-xs text-status-applied-foreground">
+            {gmailFlash}
+          </p>
+        )}
+        {gmailError && <p className="mt-3 text-xs text-destructive">{gmailError}</p>}
+        <ConfirmDialog
+          open={gmailDialog}
+          onOpenChange={setGmailDialog}
+          title={config.gmailOAuthEnabled ? "Turn off Connect Gmail?" : "Turn on Connect Gmail?"}
+          description={
+            config.gmailOAuthEnabled
+              ? `This immediately disconnects ${plural(gmailConnectedUsers, "user")} and revokes Jobtiva's access to their Gmail. The Gmail connection and Sync schedule options disappear for everyone. Existing leads stay. If you turn it back on, each user must reconnect.`
+              : "Users will see the Gmail connection and Sync schedule options again. Google still limits unverified apps to 100 users in total and shows them an 'unverified app' warning."
+          }
+          confirmLabel={config.gmailOAuthEnabled ? "Turn off" : "Turn on"}
+          destructive={config.gmailOAuthEnabled}
+          onConfirm={applyGmailSwitch}
+        />
+      </section>
 
-      {/* A1 */}
-      <SubHead>Email forwarding</SubHead>
-      <Toggle
-        checked={forwarding}
-        onChange={setForwarding}
-        label="Accept forwarded job alerts"
-        hint="Off: incoming mail is refused with a temporary error, so senders retry later"
-      />
-      <div className="mt-3 grid gap-3 sm:grid-cols-2">
-        <Field label="Receiving domain" hint="Set per environment on the server">
-          <Input value={config.receivingDomain} readOnly className="bg-muted/40 text-muted-foreground" />
-        </Field>
-        <Field label="Max email size (MB)" hint="LinkedIn alerts are about 0.1 MB · allowed 0.25–10">
-          <Input
-            type="number"
-            min={0.25}
-            max={10}
-            step={0.25}
-            value={maxMb}
-            onChange={(e) => {
-              setMaxMb(e.target.value);
-              if (error) setError("");
-            }}
-            className="w-32"
+      {/* A1 + A2 — Email forwarding and the senders it accepts */}
+      <section className="rounded-2xl border bg-card p-4 md:p-5">
+        <h2 className="text-sm font-medium">Email forwarding</h2>
+        <div className="mt-3">
+          <Toggle
+            checked={forwarding}
+            onChange={setForwarding}
+            label="Accept forwarded job alerts"
+            hint="Off: incoming mail is refused with a temporary error, so senders retry later"
           />
-        </Field>
-      </div>
-      <SaveRow busy={busy} saved={saved} error={error} onSave={saveForwarding} />
+        </div>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <Field label="Receiving domain" hint="Set per environment on the server">
+            <Input value={config.receivingDomain} readOnly className="bg-muted/40 text-muted-foreground" />
+          </Field>
+          <Field label="Max email size (MB)" hint="LinkedIn alerts are about 0.1 MB · allowed 0.25–10">
+            <Input
+              type="number"
+              min={0.25}
+              max={10}
+              step={0.25}
+              value={maxMb}
+              onChange={(e) => {
+                setMaxMb(e.target.value);
+                if (error) setError("");
+              }}
+              className="w-32"
+            />
+          </Field>
+        </div>
+        <SaveRow busy={busy} saved={saved} error={error} onSave={saveForwarding} />
 
-      {/* A6 */}
-      <SubHead>Connect Gmail</SubHead>
-      <div className="flex flex-wrap items-center gap-3">
-        <Badge variant={config.gmailOAuthEnabled ? "success" : "neutral"}>
-          {config.gmailOAuthEnabled ? "Active" : "Inactive"}
-        </Badge>
-        <span className="text-xs text-muted-foreground">
-          {config.gmailOAuthEnabled
-            ? `${plural(gmailConnectedUsers, "user")} connected`
-            : "Hidden from users · no syncs"}
-          {mounted && config.gmailToggledAt
-            ? ` · changed by ${config.gmailToggledBy ?? "admin"}, ${formatDateTime(config.gmailToggledAt)}`
-            : ""}
-        </span>
-        <Button
-          variant={config.gmailOAuthEnabled ? "destructive" : "default"}
-          className="ml-auto min-h-9"
-          onClick={() => setGmailDialog(true)}
-        >
-          {config.gmailOAuthEnabled ? "Turn off" : "Turn on"}
-        </Button>
-      </div>
-      {gmailFlash && (
-        <p role="status" className="mt-3 rounded-lg bg-status-applied px-3 py-2 text-xs text-status-applied-foreground">
-          {gmailFlash}
-        </p>
-      )}
-      {gmailError && <p className="mt-3 text-xs text-destructive">{gmailError}</p>}
-      <ConfirmDialog
-        open={gmailDialog}
-        onOpenChange={setGmailDialog}
-        title={config.gmailOAuthEnabled ? "Turn off Connect Gmail?" : "Turn on Connect Gmail?"}
-        description={
-          config.gmailOAuthEnabled
-            ? `This immediately disconnects ${plural(gmailConnectedUsers, "user")} and revokes Jobtiva's access to their Gmail. The Gmail connection and Sync schedule options disappear for everyone. Existing leads stay. If you turn it back on, each user must reconnect.`
-            : "Users will see the Gmail connection and Sync schedule options again. Google still limits unverified apps to 100 users in total and shows them an 'unverified app' warning."
-        }
-        confirmLabel={config.gmailOAuthEnabled ? "Turn off" : "Turn on"}
-        destructive={config.gmailOAuthEnabled}
-        onConfirm={applyGmailSwitch}
-      />
-
-      {/* A2 */}
-      <SubHead>Allowed senders</SubHead>
-      <SendersTable senders={senders} onChanged={() => router.refresh()} />
-    </section>
+        <SubHead>Allowed senders</SubHead>
+        <SendersTable senders={senders} onChanged={() => router.refresh()} />
+      </section>
+    </div>
   );
 }
 
