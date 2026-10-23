@@ -52,7 +52,6 @@ export const INBOUND_STATUS_LABELS: Record<InboundStatus, string> = {
 export interface InboundLogEntry {
   id: string;
   receivedAt: string;
-  env: "prod" | "preprod";
   user: { name: string; email: string } | null;
   /** Full sender address — only kept for accepted job-site mail. */
   fromAddress: string | null;

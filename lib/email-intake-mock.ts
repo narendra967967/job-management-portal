@@ -192,7 +192,6 @@ export function mockLog(): InboundLogEntry[] {
     rows.push({
       id: `log-${i}`,
       receivedAt: minsAgo(4 + i * 37),
-      env: i % 6 === 5 ? "preprod" : "prod",
       user,
       fromAddress,
       fromDomain,

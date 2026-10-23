@@ -12,6 +12,13 @@ import { z } from "zod";
 import { splitMobile, validateMobile } from "@/lib/validation";
 import { COUNTRY_OPTIONS } from "@/lib/geo";
 import {
+  MAX_BYTES_MAX,
+  MAX_BYTES_MIN,
+  domainWithin,
+  isValidDomain,
+  senderMatchDomain,
+} from "@/lib/email-intake-model";
+import {
   CLOSE_OUTCOME_LABELS,
   CONNECTION_TYPE_LABELS,
   LEAD_STATUSES,
@@ -316,6 +323,47 @@ export const snoozeReminderSchema = z.object({
   newDueDate: zDateish,
   timeZone: zTimeZone,
 });
+
+/* ---------------- email intake (admin) ---------------- */
+
+export const intakeSettingsSchema = z.object({
+  forwardingEnabled: z.boolean(),
+  maxBytes: z.coerce
+    .number()
+    .int()
+    .min(MAX_BYTES_MIN, `Max email size must be at least ${MAX_BYTES_MIN / 1024} KB.`)
+    .max(MAX_BYTES_MAX, `Max email size can't exceed ${MAX_BYTES_MAX / (1024 * 1024)} MB.`),
+});
+
+export const gmailSwitchSchema = z.object({ enabled: z.boolean() });
+
+export const inboundSenderSchema = z
+  .object({
+    match: z.string().trim().toLowerCase().min(3).max(254),
+    signingDomain: z.string().trim().toLowerCase().min(3).max(253),
+    parser: zEnum(["linkedin", "none"] as const, "Unknown reader."),
+    enabled: z.boolean().default(true),
+  })
+  .superRefine((v, ctx) => {
+    const md = senderMatchDomain(v.match);
+    if (!md) {
+      ctx.addIssue({ code: "custom", path: ["match"], message: "Enter an email address or *@domain (e.g. *@naukri.com)." });
+      return;
+    }
+    if (!isValidDomain(v.signingDomain)) {
+      ctx.addIssue({ code: "custom", path: ["signingDomain"], message: "Enter a domain like linkedin.com." });
+      return;
+    }
+    if (!domainWithin(md, v.signingDomain)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["signingDomain"],
+        message: `The sender's domain (${md}) must be ${v.signingDomain} or one of its subdomains.`,
+      });
+    }
+  });
+
+export type InboundSenderInput = z.infer<typeof inboundSenderSchema>;
 
 /* ---------------- helper ---------------- */
 

@@ -10,7 +10,7 @@ import "server-only";
 
 import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { account as accountT } from "@/db/schema";
+import { account as accountT, gmailConfig as gmailConfigT } from "@/db/schema";
 import { auth } from "@/lib/auth";
 
 export const GOOGLE_NOT_CONNECTED = "GOOGLE_NOT_CONNECTED";
@@ -38,6 +38,20 @@ export async function getGoogleAccessToken(userId: string): Promise<string> {
     const msg = err instanceof Error ? err.message : String(err);
     throw new Error(`Google token refresh failed: ${msg.slice(0, 200)}`);
   }
+}
+
+/** Connect Gmail switched off by an admin: revoke every user's grant at Google,
+ *  then delete all stored Google tokens (account rows) and mark Gmail
+ *  disconnected. Leads stay. Returns how many connections were removed. */
+export async function disconnectAllGoogle(): Promise<number> {
+  const rows = await db
+    .select({ userId: accountT.userId })
+    .from(accountT)
+    .where(eq(accountT.providerId, "google"));
+  for (const r of rows) await revokeGoogleAccess(r.userId); // sequential: gentle on Google
+  await db.delete(accountT).where(eq(accountT.providerId, "google"));
+  await db.update(gmailConfigT).set({ connected: false });
+  return rows.length;
 }
 
 /** Revoke Jobtiva's access at Google (best effort). Revoking the access token

@@ -34,12 +34,10 @@ export function InboundLogClient() {
   const mounted = useMounted(); // sample timestamps use the clock
   const rows = useMemo(() => (mounted ? mockLog() : []), [mounted]);
   const [status, setStatus] = useState<InboundStatus | "all">("all");
-  const [env, setEnv] = useState<"all" | "prod" | "preprod">("all");
   const [q, setQ] = useState("");
 
   const filtered = rows.filter((r) => {
     if (status !== "all" && r.status !== status) return false;
-    if (env !== "all" && r.env !== env) return false;
     const needle = q.trim().toLowerCase();
     if (!needle) return true;
     return [r.user?.name, r.user?.email, r.fromAddress, r.fromDomain, r.reason]
@@ -73,16 +71,6 @@ export function InboundLogClient() {
             </option>
           ))}
         </select>
-        <select
-          aria-label="Environment"
-          className={selectCls}
-          value={env}
-          onChange={(e) => setEnv(e.target.value as "all" | "prod" | "preprod")}
-        >
-          <option value="all">Prod + preprod</option>
-          <option value="prod">Prod</option>
-          <option value="preprod">Preprod</option>
-        </select>
         <span className="ml-auto rounded-md border border-dashed border-amber-400 bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
           Sample data
         </span>
@@ -106,7 +94,6 @@ export function InboundLogClient() {
               <tr key={r.id} className="border-b last:border-0 hover:bg-muted/40">
                 <td className="px-4 py-2.5 whitespace-nowrap text-muted-foreground">
                   {formatDateTime(r.receivedAt)}
-                  {r.env === "preprod" && <span className="ml-1.5 text-[10px] text-primary">preprod</span>}
                 </td>
                 <td className="px-4 py-2.5">
                   {r.user ? (
@@ -146,7 +133,6 @@ export function InboundLogClient() {
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
               {r.reason} · {formatBytes(r.sizeBytes)}
-              {r.env === "preprod" ? " · preprod" : ""}
             </p>
           </li>
         ))}
