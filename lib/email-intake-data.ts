@@ -4,7 +4,7 @@ import "server-only";
 // Spec: docs/email-forwarding.md. Callers enforce auth (actions / routes).
 
 import { randomBytes } from "node:crypto";
-import { and, desc, eq, gte, isNotNull, lt, sql, count } from "drizzle-orm";
+import { and, desc, eq, gte, ilike, isNotNull, lt, or, sql, count, type SQL } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   emailIntakeConfig as configT,
@@ -18,6 +18,7 @@ import type {
   ForwardingHealth,
   InboundLogEntry,
   InboundSender,
+  InboundStatus,
   MyForwarding,
   UserForwardingStatus,
 } from "@/lib/email-intake-model";
@@ -164,7 +165,26 @@ export async function loadSenders(): Promise<InboundSender[]> {
 
 /* ---------------- log + health (admin) ---------------- */
 
-export async function listInboundLog(limit = 500): Promise<InboundLogEntry[]> {
+export const INBOUND_LOG_PAGE = 200;
+
+/** Newest first, filtered in the database (status + free text over user,
+ *  sender and reason), capped at INBOUND_LOG_PAGE rows. */
+export async function listInboundLog(opts: { status?: InboundStatus; q?: string } = {}): Promise<InboundLogEntry[]> {
+  const where: SQL[] = [];
+  if (opts.status) where.push(eq(logT.status, opts.status));
+  const q = opts.q?.trim().slice(0, 100);
+  if (q) {
+    const like = `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+    where.push(
+      or(
+        ilike(userT.name, like),
+        ilike(userT.email, like),
+        ilike(logT.fromAddress, like),
+        ilike(logT.fromDomain, like),
+        ilike(logT.reason, like),
+      )!,
+    );
+  }
   const rows = await db
     .select({
       l: logT,
@@ -173,8 +193,9 @@ export async function listInboundLog(limit = 500): Promise<InboundLogEntry[]> {
     })
     .from(logT)
     .leftJoin(userT, eq(userT.id, logT.userId))
+    .where(where.length ? and(...where) : undefined)
     .orderBy(desc(logT.receivedAt))
-    .limit(limit);
+    .limit(INBOUND_LOG_PAGE);
   return rows.map(({ l, name, email }) => ({
     id: l.id,
     receivedAt: l.receivedAt.toISOString(),
@@ -216,7 +237,11 @@ export async function forwardingHealth(): Promise<ForwardingHealth> {
       .orderBy(desc(count()))
       .limit(5),
     db.select({ at: logT.receivedAt }).from(logT).orderBy(desc(logT.receivedAt)).limit(1),
-    db.select({ n: count() }).from(addressesT).where(isNotNull(addressesT.firstReceivedAt)),
+    db
+      .select({ n: count() })
+      .from(addressesT)
+      .innerJoin(userT, eq(userT.id, addressesT.userId))
+      .where(and(isNotNull(addressesT.firstReceivedAt), eq(userT.role, "user"))),
     db.select({ n: count() }).from(userT).where(eq(userT.role, "user")),
   ]);
 
@@ -237,6 +262,7 @@ export async function userForwardingStatuses(): Promise<Record<string, UserForwa
       r.userId,
       {
         addressCreatedAt: iso(r.createdAt),
+        gmailCodeAt: iso(r.gmailCodeAt),
         confirmedAt: iso(r.confirmedAt),
         firstReceivedAt: iso(r.firstReceivedAt),
         lastReceivedAt: iso(r.lastReceivedAt),

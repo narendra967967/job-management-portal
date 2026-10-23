@@ -4,7 +4,7 @@ import "server-only";
 // profile). Mutations live in actions/admin-settings.ts. Secrets are returned only
 // as a "configured" flag / last4, never decrypted.
 
-import { eq } from "drizzle-orm";
+import { countDistinct, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   appSettings,
@@ -14,8 +14,11 @@ import {
   appAiConfig,
   smtpConfig,
   user,
+  account,
 } from "@/db/schema";
 import { getBranding } from "@/lib/branding";
+import { getIntakeConfig, loadSenders } from "@/lib/email-intake-data";
+import type { EmailIntakeConfig, InboundSender } from "@/lib/email-intake-model";
 
 export interface AdminSettings {
   profile: { name: string; email: string; mobile: string };
@@ -74,10 +77,16 @@ export interface AdminSettings {
     fromName: string;
     replyTo: string;
   };
+  intake: {
+    config: EmailIntakeConfig;
+    senders: InboundSender[];
+    /** Users with a linked Google account (what turning Connect Gmail off breaks). */
+    gmailConnectedUsers: number;
+  };
 }
 
 export async function loadAdminSettings(adminId: string): Promise<AdminSettings> {
-  const [u, gen, sec, cron, bill, ai, smtp, branding] = await Promise.all([
+  const [u, gen, sec, cron, bill, ai, smtp, branding, intakeConfig, senders, google] = await Promise.all([
     db.select({ name: user.name, email: user.email, mobile: user.mobile }).from(user).where(eq(user.id, adminId)).limit(1),
     db.select().from(appSettings).limit(1),
     db.select().from(securityConfig).limit(1),
@@ -86,6 +95,9 @@ export async function loadAdminSettings(adminId: string): Promise<AdminSettings>
     db.select().from(appAiConfig).limit(1),
     db.select().from(smtpConfig).limit(1),
     getBranding(),
+    getIntakeConfig(),
+    loadSenders(),
+    db.select({ n: countDistinct(account.userId) }).from(account).where(eq(account.providerId, "google")),
   ]);
   const g = gen[0];
   const s = sec[0];
@@ -158,5 +170,17 @@ export async function loadAdminSettings(adminId: string): Promise<AdminSettings>
       fromName: m?.fromName ?? "",
       replyTo: m?.replyTo ?? "",
     },
+    intake: {
+      config: { ...intakeConfig, gmailToggledBy: await toggledByName(intakeConfig.gmailToggledBy) },
+      senders,
+      gmailConnectedUsers: google[0]?.n ?? 0,
+    },
   };
+}
+
+/** The config stores the admin's id; show their name. */
+async function toggledByName(id: string | null): Promise<string | null> {
+  if (!id) return null;
+  const [u] = await db.select({ name: user.name, email: user.email }).from(user).where(eq(user.id, id));
+  return u ? u.name || u.email : null;
 }

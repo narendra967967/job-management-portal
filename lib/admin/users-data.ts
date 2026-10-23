@@ -6,6 +6,8 @@ import "server-only";
 import { ne, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { user, plans, jobLeads } from "@/db/schema";
+import { userForwardingStatuses } from "@/lib/email-intake-data";
+import type { UserForwardingStatus } from "@/lib/email-intake-model";
 
 export type AdminUserStatus = "active" | "inactive";
 export type AdminUserRole = "user" | "admin";
@@ -28,6 +30,8 @@ export interface AdminUserRow {
   /** Relative last-login string, e.g. "2h ago" or "—". */
   lastLogin: string;
   leads: number;
+  /** Email forwarding progress; null until the user first opens the app. */
+  forwarding: UserForwardingStatus | null;
 }
 
 export interface PlanOption {
@@ -62,7 +66,7 @@ export async function listPlanOptions(): Promise<PlanOption[]> {
 /** All users for the admin grid, optionally excluding one id (the logged-in admin,
  *  so they can't accidentally deactivate/delete themselves). */
 export async function listAdminUsers(excludeId?: string): Promise<AdminUserRow[]> {
-  const [users, planRows, leadCounts] = await Promise.all([
+  const [users, planRows, leadCounts, forwarding] = await Promise.all([
     db
       .select({
         id: user.id,
@@ -84,6 +88,7 @@ export async function listAdminUsers(excludeId?: string): Promise<AdminUserRow[]
       .select({ userId: jobLeads.userId, n: sql<number>`count(*)::int` })
       .from(jobLeads)
       .groupBy(jobLeads.userId),
+    userForwardingStatuses(),
   ]);
 
   const planById = new Map(planRows.map((p) => [p.id, p]));
@@ -103,5 +108,6 @@ export async function listAdminUsers(excludeId?: string): Promise<AdminUserRow[]
     createdAt: new Date(u.createdAt).toISOString(),
     lastLogin: relativeTime(u.lastLoginAt ? new Date(u.lastLoginAt) : null),
     leads: leadsByUser.get(u.id) ?? 0,
+    forwarding: forwarding[u.id] ?? null,
   }));
 }

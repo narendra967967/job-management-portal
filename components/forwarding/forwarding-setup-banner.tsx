@@ -1,19 +1,19 @@
 "use client";
 
 // Leads page nudge (U7): shown until email forwarding is working, so new users
-// find the main way leads get in. PHASE 2: driven by sample data.
+// find the main way leads get in.
 
 import Link from "next/link";
 import { Forward } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { forwardingStage } from "@/lib/email-intake-model";
-import { mockMyForwarding, useMockIntake } from "@/lib/email-intake-mock";
+import { useIntake } from "@/lib/mock-store";
 import { cn } from "@/lib/utils";
 
 export function ForwardingSetupBanner() {
-  const mock = useMockIntake();
-  if (!mock.config.forwardingEnabled) return null;
-  const stage = forwardingStage(mockMyForwarding(mock));
+  const { forwardingEnabled, forwarding } = useIntake();
+  if (!forwardingEnabled) return null;
+  const stage = forwardingStage(forwarding);
   if (stage === "working") return null;
 
   const midway = stage !== "not_started";

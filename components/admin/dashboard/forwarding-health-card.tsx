@@ -1,18 +1,15 @@
 "use client";
 
-// Dashboard → Forwarding health (A3) and the Connect Gmail gate for the Gmail
-// health card. PHASE 2: sample data (lib/email-intake-mock.ts).
+// Dashboard → Forwarding health (A3). Figures come from the server page
+// (lib/email-intake-data forwardingHealth).
 
 import Link from "next/link";
 import { ArrowRight, Forward } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/admin/ui/card";
-import { mockHealth, useMockIntake } from "@/lib/email-intake-mock";
-import { timeAgo } from "@/lib/email-intake-model";
+import { timeAgo, type ForwardingHealth } from "@/lib/email-intake-model";
 import { useMounted } from "@/lib/use-mounted";
 
-export function ForwardingHealthCard() {
-  const { config } = useMockIntake();
-  const h = mockHealth();
+export function ForwardingHealthCard({ health: h, forwardingEnabled }: { health: ForwardingHealth; forwardingEnabled: boolean }) {
   const mounted = useMounted();
   const rate = (a: number, r: number) => (a + r ? Math.round((a / (a + r)) * 100) : 100);
 
@@ -30,7 +27,7 @@ export function ForwardingHealthCard() {
         </Link>
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
-        {!config.forwardingEnabled && (
+        {!forwardingEnabled && (
           <p className="rounded-lg bg-destructive/10 px-2.5 py-1.5 text-xs text-destructive">Forwarding is turned off</p>
         )}
         <StatRow label="Users set up" value={`${h.usersSetUp} / ${h.usersTotal}`} ok={h.usersSetUp > 0} />
@@ -59,12 +56,6 @@ export function ForwardingHealthCard() {
       </CardContent>
     </Card>
   );
-}
-
-/** Renders its children only while Connect Gmail is active. */
-export function GmailOnly({ children }: { children: React.ReactNode }) {
-  const { config } = useMockIntake();
-  return config.gmailOAuthEnabled ? <>{children}</> : null;
 }
 
 function StatRow({ label, value, ok, warn }: { label: string; value: string; ok?: boolean; warn?: boolean }) {

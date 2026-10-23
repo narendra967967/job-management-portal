@@ -47,7 +47,6 @@ import { cn } from "@/lib/utils";
 import { LEAD_STATUSES, LEAD_STATUS_LABELS } from "@/lib/types";
 import { Field, SaveRow, SubHead, Toggle, selectCls } from "@/components/admin/settings/form-bits";
 import { EmailIntakeCard } from "@/components/admin/settings/email-intake-card";
-import { useMockIntake } from "@/lib/email-intake-mock";
 
 interface SettingsSection {
   id: string;
@@ -62,9 +61,9 @@ const SECTION = {
   general: { id: "general", label: "General", icon: Cog, render: (i: AdminSettings) => <GeneralCard initial={i.general} branding={i.branding} /> },
   billing: { id: "billing", label: "Billing", icon: CreditCard, render: (i: AdminSettings) => <BillingCard initial={i.billing} /> },
   email: { id: "email", label: "Email / SMTP", icon: Mail, render: (i: AdminSettings) => <EmailCard initial={i.smtp} /> },
-  intake: { id: "intake", label: "Email intake", icon: Inbox, render: () => <EmailIntakeCard /> },
+  intake: { id: "intake", label: "Email intake", icon: Inbox, render: (i: AdminSettings) => <EmailIntakeCard initial={i.intake} /> },
   ai: { id: "ai", label: "AI", icon: Sparkles, render: (i: AdminSettings) => <AiCard initial={i.ai} /> },
-  cron: { id: "cron", label: "Cron & schedule", icon: Clock, render: (i: AdminSettings) => <CronCard initial={i.cron} /> },
+  cron: { id: "cron", label: "Cron & schedule", icon: Clock, render: (i: AdminSettings) => <CronCard initial={i.cron} gmailEnabled={i.intake.config.gmailOAuthEnabled} /> },
   security: { id: "security", label: "Security", icon: ShieldCheck, render: (i: AdminSettings) => <SecurityCard initial={i.security} /> },
 } satisfies Record<string, SettingsSection>;
 
@@ -744,7 +743,7 @@ function AiCard({ initial }: { initial: AdminSettings["ai"] }) {
 
 /* ---------------- Application: Cron & schedule ---------------- */
 
-function CronCard({ initial }: { initial: AdminSettings["cron"] }) {
+function CronCard({ initial, gmailEnabled }: { initial: AdminSettings["cron"]; gmailEnabled: boolean }) {
   const [quietEnabled, setQuietEnabled] = useState(initial.quietEnabled);
   const [quietFrom, setQuietFrom] = useState(initial.quietFrom);
   const [quietTo, setQuietTo] = useState(initial.quietTo);
@@ -755,8 +754,7 @@ function CronCard({ initial }: { initial: AdminSettings["cron"] }) {
   const [purgeStatuses, setPurgeStatuses] = useState<string[]>(initial.purgeStatuses);
   const sv = useSaver();
   // Quiet hours only govern Gmail sync, so they follow the Connect Gmail switch
-  // (values are kept while hidden). PHASE 2: switch state is sample data.
-  const gmailEnabled = useMockIntake().config.gmailOAuthEnabled;
+  // (values are kept while hidden).
 
   function toggleDay(d: string) {
     setQuietDays((cur) => (cur.includes(d) ? cur.filter((x) => x !== d) : [...cur, d]));

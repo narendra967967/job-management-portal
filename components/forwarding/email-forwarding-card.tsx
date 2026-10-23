@@ -4,9 +4,10 @@
 // from Gmail to a private Jobtiva address; this card shows the address, walks
 // through Gmail's one-time setup, shows Gmail's confirmation code when it
 // arrives, and reports whether alerts are coming in. Spec: docs/email-forwarding.md
-// (U1–U5, U8). PHASE 2: driven by sample data (lib/email-intake-mock.ts).
+// (U1–U5, U8). While setup is under way it polls for progress, so Gmail's code
+// shows up within seconds without a reload.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Check, Copy, MailCheck, RotateCcw, ShieldCheck, Briefcase } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
@@ -20,12 +21,12 @@ import {
   timeAgo,
   type ForwardingStage,
 } from "@/lib/email-intake-model";
+import { setForwardingState, useIntake } from "@/lib/mock-store";
 import {
-  mockMyForwarding,
-  newMockToken,
-  updateMockIntake,
-  useMockIntake,
-} from "@/lib/email-intake-mock";
+  confirmMyForwardingAction,
+  getMyForwardingAction,
+  resetMyForwardingAction,
+} from "@/actions/email-intake";
 
 const STAGE_PILL: Record<ForwardingStage, string> = {
   not_started: "bg-muted text-muted-foreground",
@@ -34,12 +35,55 @@ const STAGE_PILL: Record<ForwardingStage, string> = {
   working: "bg-status-applied text-status-applied-foreground",
 };
 
+/** Poll cadence by stage: fast while Gmail's code is expected, slower while
+ *  waiting for the first alert, none once it works. */
+const POLL_MS: Record<ForwardingStage, number | null> = {
+  not_started: 5_000,
+  code_received: 5_000,
+  waiting_first_alert: 20_000,
+  working: null,
+};
+const POLL_FOR_MS = 15 * 60_000; // per visit; reopening the tab starts again
+
 export function EmailForwardingCard() {
-  const mock = useMockIntake();
-  const fwd = mockMyForwarding(mock);
+  const { forwardingEnabled, forwarding: fwd } = useIntake();
   const stage = forwardingStage(fwd);
   const mounted = useMounted(); // relative times use the clock → client-only
   const { confirm, dialog } = useConfirm();
+  const [busy, setBusy] = useState(false);
+
+  const pollMs = forwardingEnabled ? POLL_MS[stage] : null;
+  useEffect(() => {
+    if (!pollMs) return;
+    let stopped = false;
+    const until = Date.now() + POLL_FOR_MS;
+    const timer = setInterval(async () => {
+      if (Date.now() > until) return clearInterval(timer); // idle tab: stop asking
+      if (document.hidden) return;
+      try {
+        const next = await getMyForwardingAction();
+        if (!stopped) setForwardingState(next);
+      } catch {
+        // Transient — the next tick retries.
+      }
+    }, pollMs);
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+    };
+  }, [pollMs]);
+
+  async function markVerified() {
+    setBusy(true);
+    try {
+      setForwardingState(await confirmMyForwardingAction());
+      toast.success("Gmail forwarding confirmed", "Now create the filter in step 3.");
+    } catch {
+      toast.error("Couldn't save that", "Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function resetAddress() {
     const ok = await confirm({
@@ -50,11 +94,18 @@ export function EmailForwardingCard() {
       destructive: true,
     });
     if (!ok) return;
-    updateMockIntake({ addressToken: newMockToken(), previewStage: "not_started" });
-    toast.success("New address created", "Add it in Gmail and update your filter.");
+    setBusy(true);
+    try {
+      setForwardingState(await resetMyForwardingAction());
+      toast.success("New address created", "Add it in Gmail and update your filter.");
+    } catch {
+      toast.error("Couldn't reset your address", "Please try again.");
+    } finally {
+      setBusy(false);
+    }
   }
 
-  if (!mock.config.forwardingEnabled) {
+  if (!forwardingEnabled) {
     return (
       <section className="rounded-2xl border bg-card p-4 md:p-5">
         <h2 className="text-sm font-medium">Email forwarding</h2>
@@ -68,9 +119,7 @@ export function EmailForwardingCard() {
 
   return (
     <section className="rounded-2xl border bg-card p-4 md:p-5">
-      <SampleDataBar stage={mock.previewStage} />
-
-      <div className="mt-3 flex items-start justify-between gap-3">
+      <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-sm font-medium">Email forwarding</h2>
           <p className="mt-0.5 text-xs text-muted-foreground">
@@ -123,8 +172,12 @@ export function EmailForwardingCard() {
           </div>
           <p className="mt-2 text-[11px] text-muted-foreground">
             Received{mounted && fwd.gmailCodeAt ? ` ${timeAgo(fwd.gmailCodeAt)}` : ""}. Paste it into
-            Gmail (step 2 below) and click Verify.
+            Gmail (step 2 below) and click Verify, then let us know here.
           </p>
+          <Button size="sm" onClick={markVerified} disabled={busy} className="mt-3 min-h-10 gap-1.5">
+            <Check className="size-3.5" aria-hidden />
+            I&rsquo;ve verified it in Gmail
+          </Button>
         </div>
       )}
 
@@ -185,7 +238,7 @@ export function EmailForwardingCard() {
 
       {/* U5 — reset */}
       <div className="mt-5 border-t pt-4">
-        <Button variant="outline" size="sm" onClick={resetAddress} className="min-h-10 gap-1.5">
+        <Button variant="outline" size="sm" onClick={resetAddress} disabled={busy} className="min-h-10 gap-1.5">
           <RotateCcw className="size-3.5" aria-hidden />
           Reset my address
         </Button>
@@ -247,30 +300,5 @@ function CopyButton({ value, label }: { value: string; label: string }) {
       {copied ? <Check className="size-3.5" aria-hidden /> : <Copy className="size-3.5" aria-hidden />}
       {copied ? "Copied" : label}
     </Button>
-  );
-}
-
-/** PHASE 2 ONLY: lets reviewers step through the states. Removed in Phase 4. */
-function SampleDataBar({ stage }: { stage: ForwardingStage }) {
-  const stages: ForwardingStage[] = ["not_started", "code_received", "waiting_first_alert", "working"];
-  return (
-    <div className="rounded-lg border border-dashed border-amber-400/60 bg-amber-50 p-2.5 text-[11px] text-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
-      <p className="font-medium">Preview with sample data — pick a state to see it:</p>
-      <div className="mt-1.5 flex flex-wrap gap-1.5">
-        {stages.map((s) => (
-          <button
-            key={s}
-            type="button"
-            onClick={() => updateMockIntake({ previewStage: s })}
-            className={cn(
-              "min-h-8 rounded-md border px-2 py-1 font-medium",
-              s === stage ? "border-amber-600 bg-amber-200/70 dark:bg-amber-800/60" : "border-amber-300 bg-white/60 dark:bg-transparent",
-            )}
-          >
-            {FORWARDING_STAGE_LABELS[s]}
-          </button>
-        ))}
-      </div>
-    </div>
   );
 }

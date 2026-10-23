@@ -2,10 +2,11 @@
 
 // Admin → Settings → Email intake (A1, A2, A6): forwarding on/off and size
 // limit, the Connect Gmail switch (confirmed both ways), and the allowed
-// senders list. Spec: docs/email-forwarding.md. PHASE 2: sample data only
-// (lib/email-intake-mock.ts) — nothing is saved to the server yet.
+// senders list. Spec: docs/email-forwarding.md. Values come from the server
+// page; every change goes through actions/admin-email-intake.ts, then refreshes.
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/admin/ui/button";
 import { Input } from "@/components/admin/ui/input";
@@ -31,17 +32,22 @@ import {
   type InboundSender,
 } from "@/lib/email-intake-model";
 import {
-  MOCK_GMAIL_CONNECTED_USERS,
-  resetMockIntake,
-  updateMockConfig,
-  updateMockIntake,
-  useMockIntake,
-} from "@/lib/email-intake-mock";
+  createSenderAction,
+  deleteSenderAction,
+  setGmailOAuthEnabledAction,
+  setSenderEnabledAction,
+  updateIntakeSettingsAction,
+  updateSenderAction,
+} from "@/actions/admin-email-intake";
+import type { AdminSettings } from "@/lib/admin/settings-data";
 import { useMounted } from "@/lib/use-mounted";
 import { formatDateTime } from "@/lib/utils";
 
-export function EmailIntakeCard() {
-  const { config, senders } = useMockIntake();
+const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
+
+export function EmailIntakeCard({ initial }: { initial: AdminSettings["intake"] }) {
+  const { config, senders, gmailConnectedUsers } = initial;
+  const router = useRouter();
   const mounted = useMounted();
 
   // A1 — forwarding settings (local draft, saved explicitly)
@@ -49,8 +55,9 @@ export function EmailIntakeCard() {
   const [maxMb, setMaxMb] = useState(String(config.maxBytes / (1024 * 1024)));
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
 
-  function saveForwarding() {
+  async function saveForwarding() {
     const mb = Number(maxMb);
     const bytes = Math.round(mb * 1024 * 1024);
     if (!Number.isFinite(mb) || bytes < MAX_BYTES_MIN || bytes > MAX_BYTES_MAX) {
@@ -58,41 +65,36 @@ export function EmailIntakeCard() {
       return;
     }
     setError("");
-    updateMockConfig({ forwardingEnabled: forwarding, maxBytes: bytes });
+    setBusy(true);
+    const res = await updateIntakeSettingsAction({ forwardingEnabled: forwarding, maxBytes: bytes });
+    setBusy(false);
+    if (!res.ok) return setError(res.error);
     setSaved(true);
     setTimeout(() => setSaved(false), 1800);
+    router.refresh();
   }
 
   // A6 — Connect Gmail switch
   const [gmailDialog, setGmailDialog] = useState(false);
   const [gmailFlash, setGmailFlash] = useState("");
-  function applyGmailSwitch() {
+  const [gmailError, setGmailError] = useState("");
+  async function applyGmailSwitch() {
     const turningOff = config.gmailOAuthEnabled;
-    updateMockConfig({
-      gmailOAuthEnabled: !turningOff,
-      gmailToggledAt: new Date().toISOString(),
-      gmailToggledBy: "You",
-    });
+    setGmailError("");
+    const res = await setGmailOAuthEnabledAction({ enabled: !turningOff });
+    if (!res.ok) return setGmailError(res.error);
     setGmailFlash(
       turningOff
-        ? `Connect Gmail turned off — ${MOCK_GMAIL_CONNECTED_USERS} connections revoked and removed.`
+        ? `Connect Gmail turned off — ${plural(res.disconnected, "connection")} revoked and removed.`
         : "Connect Gmail turned on — users can connect Gmail again.",
     );
     setTimeout(() => setGmailFlash(""), 4000);
+    router.refresh();
   }
 
   return (
     <section className="rounded-2xl border bg-card p-4 md:p-5">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-medium">Email intake</h2>
-        <button
-          type="button"
-          onClick={resetMockIntake}
-          className="min-h-8 rounded-md border border-dashed border-amber-400 bg-amber-50 px-2 text-[11px] font-medium text-amber-900 dark:bg-amber-950/30 dark:text-amber-200"
-        >
-          Sample data · reset
-        </button>
-      </div>
+      <h2 className="text-sm font-medium">Email intake</h2>
 
       {/* A1 */}
       <SubHead>Email forwarding</SubHead>
@@ -121,7 +123,7 @@ export function EmailIntakeCard() {
           />
         </Field>
       </div>
-      <SaveRow busy={false} saved={saved} error={error} onSave={saveForwarding} />
+      <SaveRow busy={busy} saved={saved} error={error} onSave={saveForwarding} />
 
       {/* A6 */}
       <SubHead>Connect Gmail</SubHead>
@@ -131,7 +133,7 @@ export function EmailIntakeCard() {
         </Badge>
         <span className="text-xs text-muted-foreground">
           {config.gmailOAuthEnabled
-            ? `${MOCK_GMAIL_CONNECTED_USERS} users connected`
+            ? `${plural(gmailConnectedUsers, "user")} connected`
             : "Hidden from users · no syncs"}
           {mounted && config.gmailToggledAt
             ? ` · changed by ${config.gmailToggledBy ?? "admin"}, ${formatDateTime(config.gmailToggledAt)}`
@@ -150,13 +152,14 @@ export function EmailIntakeCard() {
           {gmailFlash}
         </p>
       )}
+      {gmailError && <p className="mt-3 text-xs text-destructive">{gmailError}</p>}
       <ConfirmDialog
         open={gmailDialog}
         onOpenChange={setGmailDialog}
         title={config.gmailOAuthEnabled ? "Turn off Connect Gmail?" : "Turn on Connect Gmail?"}
         description={
           config.gmailOAuthEnabled
-            ? `This immediately disconnects ${MOCK_GMAIL_CONNECTED_USERS} users and revokes Jobtiva's access to their Gmail. The Gmail connection and Sync schedule options disappear for everyone. Existing leads stay. If you turn it back on, each user must reconnect.`
+            ? `This immediately disconnects ${plural(gmailConnectedUsers, "user")} and revokes Jobtiva's access to their Gmail. The Gmail connection and Sync schedule options disappear for everyone. Existing leads stay. If you turn it back on, each user must reconnect.`
             : "Users will see the Gmail connection and Sync schedule options again. Google still limits unverified apps to 100 users in total and shows them an 'unverified app' warning."
         }
         confirmLabel={config.gmailOAuthEnabled ? "Turn off" : "Turn on"}
@@ -166,14 +169,14 @@ export function EmailIntakeCard() {
 
       {/* A2 */}
       <SubHead>Allowed senders</SubHead>
-      <SendersTable senders={senders} />
+      <SendersTable senders={senders} onChanged={() => router.refresh()} />
     </section>
   );
 }
 
 /* ---------------- A2: allowed senders ---------------- */
 
-function SendersTable({ senders }: { senders: InboundSender[] }) {
+function SendersTable({ senders, onChanged }: { senders: InboundSender[]; onChanged: () => void }) {
   // The form target stays set while the dialog animates closed (only `formOpen`
   // flips), so the dialog never renders empty; `formKey` resets the form per open.
   const [formOpen, setFormOpen] = useState(false);
@@ -186,16 +189,22 @@ function SendersTable({ senders }: { senders: InboundSender[] }) {
   }
   const [deleting, setDeleting] = useState<InboundSender | null>(null);
   const [error, setError] = useState("");
+  const [pending, setPending] = useState(false);
   const enabledCount = senders.filter((s) => s.enabled).length;
 
-  function save(next: InboundSender[]) {
-    if (!next.some((s) => s.enabled)) {
-      setError("Keep at least one sender enabled, or turn email forwarding off instead.");
-      return false;
-    }
+  /** Runs one change; the server keeps at least one sender enabled. */
+  async function run(fn: () => Promise<{ ok: boolean; error?: string }>): Promise<string | null> {
+    setPending(true);
     setError("");
-    updateMockIntake({ senders: next });
-    return true;
+    const res = await fn();
+    setPending(false);
+    if (!res.ok) return res.error ?? "Couldn't save.";
+    onChanged();
+    return null;
+  }
+  async function setEnabled(s: InboundSender, enabled: boolean) {
+    const err = await run(() => setSenderEnabledAction(s.id, enabled));
+    if (err) setError(err);
   }
 
   return (
@@ -225,7 +234,8 @@ function SendersTable({ senders }: { senders: InboundSender[] }) {
                     type="checkbox"
                     aria-label={`Enable ${s.match}`}
                     checked={s.enabled}
-                    onChange={(e) => save(senders.map((x) => (x.id === s.id ? { ...x, enabled: e.target.checked } : x)))}
+                    disabled={pending}
+                    onChange={(e) => setEnabled(s, e.target.checked)}
                     className="size-4 cursor-pointer accent-primary"
                   />
                 </td>
@@ -250,7 +260,8 @@ function SendersTable({ senders }: { senders: InboundSender[] }) {
                 <input
                   type="checkbox"
                   checked={s.enabled}
-                  onChange={(e) => save(senders.map((x) => (x.id === s.id ? { ...x, enabled: e.target.checked } : x)))}
+                  disabled={pending}
+                    onChange={(e) => setEnabled(s, e.target.checked)}
                   className="size-4 accent-primary"
                 />
                 Enabled
@@ -278,9 +289,13 @@ function SendersTable({ senders }: { senders: InboundSender[] }) {
             key={formKey}
             initial={target === "new" ? null : target}
             onClose={() => setFormOpen(false)}
-            onSave={(s) => {
-              const next = target === "new" ? [...senders, s] : senders.map((x) => (x.id === s.id ? s : x));
-              if (save(next)) setFormOpen(false);
+            onSave={async (s) => {
+              const input = { match: s.match, signingDomain: s.signingDomain, parser: s.parser, enabled: s.enabled };
+              const err = await run(() =>
+                target === "new" ? createSenderAction(input) : updateSenderAction(target.id, input),
+              );
+              if (!err) setFormOpen(false);
+              return err;
             }}
           />
         </DialogContent>
@@ -292,10 +307,12 @@ function SendersTable({ senders }: { senders: InboundSender[] }) {
         description="Emails from this sender will be rejected from now on. Leads already created stay."
         confirmLabel="Remove sender"
         destructive
-        onConfirm={() => {
+        onConfirm={async () => {
           const d = deleting;
           setDeleting(null);
-          if (d) save(senders.filter((x) => x.id !== d.id));
+          if (!d) return;
+          const err = await run(() => deleteSenderAction(d.id));
+          if (err) setError(err);
         }}
       />
     </div>
@@ -329,14 +346,17 @@ function SenderForm({
 }: {
   initial: InboundSender | null;
   onClose: () => void;
-  onSave: (s: InboundSender) => void;
+  /** Resolves to an error message, or null when saved. */
+  onSave: (s: InboundSender) => Promise<string | null>;
 }) {
   const [match, setMatch] = useState(initial?.match ?? "");
   const [signingDomain, setSigningDomain] = useState(initial?.signingDomain ?? "");
   const [parser, setParser] = useState<InboundParser>(initial?.parser ?? "none");
   const [errors, setErrors] = useState<{ match?: string; signingDomain?: string }>({});
+  const [serverError, setServerError] = useState("");
+  const [saving, setSaving] = useState(false);
 
-  function submit() {
+  async function submit() {
     const m = match.trim().toLowerCase();
     const d = signingDomain.trim().toLowerCase();
     const next: typeof errors = {};
@@ -346,7 +366,10 @@ function SenderForm({
     else if (md && !domainWithin(md, d)) next.signingDomain = `The sender's domain (${md}) must be ${d} or one of its subdomains.`;
     setErrors(next);
     if (Object.keys(next).length) return;
-    onSave({ id: initial?.id ?? `s-${Date.now()}`, match: m, signingDomain: d, parser, enabled: initial?.enabled ?? true });
+    setSaving(true);
+    const err = await onSave({ id: initial?.id ?? "", match: m, signingDomain: d, parser, enabled: initial?.enabled ?? true });
+    setSaving(false);
+    setServerError(err ?? "");
   }
 
   return (
@@ -388,12 +411,15 @@ function SenderForm({
               ))}
             </select>
           </Field>
+          {serverError && <p className="text-xs text-destructive">{serverError}</p>}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button onClick={submit}>{initial ? "Save sender" : "Add sender"}</Button>
+          <Button onClick={submit} disabled={saving}>
+            {initial ? "Save sender" : "Add sender"}
+          </Button>
         </DialogFooter>
     </>
   );

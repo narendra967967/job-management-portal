@@ -20,7 +20,8 @@ import {
 import { Badge } from "@/components/admin/ui/badge";
 import { DonutChart, VizStyle } from "@/components/admin/ui/charts";
 import { TimeSeriesCard } from "@/components/admin/dashboard/time-series-card";
-import { ForwardingHealthCard, GmailOnly } from "@/components/admin/dashboard/forwarding-health-card";
+import { ForwardingHealthCard } from "@/components/admin/dashboard/forwarding-health-card";
+import { forwardingHealth, getIntakeConfig } from "@/lib/email-intake-data";
 import { requireAdmin } from "@/lib/current-user";
 import { ticketRef } from "@/lib/tickets-model";
 import {
@@ -76,6 +77,7 @@ export default async function AdminDashboardPage() {
     activity,
     system,
   } = await loadDashboardMetrics();
+  const [fwdHealth, intake] = await Promise.all([forwardingHealth(), getIntakeConfig()]);
 
   return (
     <div className="space-y-6">
@@ -289,9 +291,9 @@ export default async function AdminDashboardPage() {
 
       {/* Operations: forwarding + Gmail health (Connect Gmail only) + storage + system */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <ForwardingHealthCard />
+        <ForwardingHealthCard health={fwdHealth} forwardingEnabled={intake.forwardingEnabled} />
 
-        <GmailOnly>
+        {intake.gmailOAuthEnabled && (
         <Card>
           <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
             <CardTitle className="flex items-center gap-2">
@@ -315,7 +317,7 @@ export default async function AdminDashboardPage() {
             />
           </CardContent>
         </Card>
-        </GmailOnly>
+        )}
 
         <Card>
           <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">

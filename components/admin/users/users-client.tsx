@@ -56,7 +56,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useMounted } from "@/lib/use-mounted";
 import { timeAgo } from "@/lib/email-intake-model";
-import { mockUserForwarding } from "@/lib/email-intake-mock";
+import { resetUserForwardingAction } from "@/actions/admin-email-intake";
 
 const initials = (n: string) => n.split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase();
 
@@ -120,6 +120,13 @@ export function UsersClient({ initialUsers, plans }: { initialUsers: AdminUserRo
     setFlashErr(true);
     setFlash(msg);
     setTimeout(() => setFlash(""), 4000);
+  }
+
+  async function doResetForwarding(u: AdminUserRow) {
+    const res = await resetUserForwardingAction(u.id);
+    if (!res.ok) return sayErr(res.error);
+    say(`Forwarding address reset for ${u.name}.`);
+    router.refresh();
   }
 
   const filtered = useMemo(() => {
@@ -371,7 +378,7 @@ export function UsersClient({ initialUsers, plans }: { initialUsers: AdminUserRo
                 </td>
                 <td className="px-4 py-3 text-xs"><ExpiryCell iso={u.expiresAt} onPlan={!!u.planName} /></td>
                 <td className="hidden px-4 py-3 tabular-nums md:table-cell">{u.leads}</td>
-                <td className="hidden px-4 py-3 md:table-cell"><ForwardingCell userId={u.id} /></td>
+                <td className="hidden px-4 py-3 md:table-cell"><ForwardingCell f={u.forwarding} /></td>
                 <td className="hidden px-4 py-3 text-muted-foreground lg:table-cell">{u.lastLogin}</td>
                 <td className="px-4 py-3 text-right">
                   <DropdownMenu>
@@ -434,7 +441,6 @@ export function UsersClient({ initialUsers, plans }: { initialUsers: AdminUserRo
         onConfirm={() => { if (deleteTarget) void doDelete(deleteTarget); }}
       />
 
-      {/* PHASE 2: sample data — the reset isn't saved yet */}
       <ConfirmDialog
         open={fwdResetTarget !== null}
         onOpenChange={(o) => !o && setFwdResetTarget(null)}
@@ -442,7 +448,7 @@ export function UsersClient({ initialUsers, plans }: { initialUsers: AdminUserRo
         description="Their current address stops working immediately. They will need to add the new address in Gmail and update their filter."
         confirmLabel="Reset address"
         destructive
-        onConfirm={() => { if (fwdResetTarget) say(`Forwarding address reset for ${fwdResetTarget.name} (sample data).`); setFwdResetTarget(null); }}
+        onConfirm={() => { if (fwdResetTarget) void doResetForwarding(fwdResetTarget); setFwdResetTarget(null); }}
       />
 
       <ConfirmDialog
@@ -486,20 +492,21 @@ export function UsersClient({ initialUsers, plans }: { initialUsers: AdminUserRo
   );
 }
 
-/** Per-user forwarding status (A4). PHASE 2: sample data. */
-function ForwardingCell({ userId }: { userId: string }) {
-  const mounted = useMounted(); // relative time + sample data use the clock
-  if (!mounted) return <span className="text-muted-foreground">—</span>;
-  const f = mockUserForwarding(userId);
-  if (f.lastReceivedAt) {
+/** Per-user forwarding status (A4). */
+function ForwardingCell({ f }: { f: AdminUserRow["forwarding"] }) {
+  const mounted = useMounted(); // relative time uses the clock
+  if (f?.lastReceivedAt) {
     return (
       <span className="flex flex-col gap-0.5">
         <Badge variant="success">Working</Badge>
-        <span className="text-[11px] text-muted-foreground">Last alert {timeAgo(f.lastReceivedAt)}</span>
+        <span className="text-[11px] text-muted-foreground">
+          {mounted ? `Last alert ${timeAgo(f.lastReceivedAt)}` : "\u00a0"}
+        </span>
       </span>
     );
   }
-  if (f.confirmedAt) return <Badge variant="warning">Waiting for alert</Badge>;
-  if (f.addressCreatedAt) return <Badge variant="warning">Not confirmed</Badge>;
+  if (f?.confirmedAt) return <Badge variant="warning">Waiting for alert</Badge>;
+  // The address exists from the first visit; a Gmail code means setup began.
+  if (f?.gmailCodeAt) return <Badge variant="warning">Not confirmed</Badge>;
   return <Badge variant="neutral">Not set up</Badge>;
 }

@@ -87,6 +87,8 @@ export interface MyForwarding {
 /** Per-user forwarding status as admins see it. */
 export interface UserForwardingStatus {
   addressCreatedAt: string | null;
+  /** Gmail's confirmation code arrived (setup started in Gmail). */
+  gmailCodeAt: string | null;
   confirmedAt: string | null;
   firstReceivedAt: string | null;
   lastReceivedAt: string | null;

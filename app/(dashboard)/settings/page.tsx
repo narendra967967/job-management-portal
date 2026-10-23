@@ -64,10 +64,10 @@ import {
   removeAiKey,
   useAiPrompts,
   updateAiPrompts,
+  useIntake,
 } from "@/lib/mock-store";
 import { buildGmailQuery } from "@/lib/use-gmail-settings";
 import { EmailForwardingCard } from "@/components/forwarding/email-forwarding-card";
-import { useMockIntake } from "@/lib/email-intake-mock";
 import {
   COUNTRY_CODES,
   isValidEmail,
@@ -212,7 +212,7 @@ export default function SettingsPage() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const tabParam = searchParams.get("tab");
-  const gmailEnabled = useMockIntake().config.gmailOAuthEnabled; // PHASE 2: sample data
+  const gmailEnabled = useIntake().gmailOAuthEnabled;
   const GROUPS = settingsGroups(gmailEnabled);
   const SECTIONS: SettingsSection[] = [...GROUPS.flatMap((g) => g.items), ...FOOTER];
   const active = SECTIONS.some((s) => s.id === tabParam) ? (tabParam as string) : SECTIONS[0].id;
