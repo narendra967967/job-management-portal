@@ -1,8 +1,11 @@
 // LinkedIn job-alert email parser (pure, testable independently — FRD NFR).
 //
-// Tuned against a real "email_job_alert_digest_01" template (Sept 2026). Each
-// job card carries data-test-id="job-card" and contains:
-//   - a bold title anchor:      <a ... class="...font-bold...">Project Manager</a>
+// Tuned against real templates: "email_job_alert_digest_01" (Sept 2026) and
+// the newer generic-section emails (Oct 2026, e.g. "<Title> at <Company>").
+// Each job card carries data-test-id="job-card" (digest) or
+// data-test-id="email-generic-section-JOBS_POSTING_SECTION-job-cards"
+// (generic), and contains:
+//   - a bold title:             <a|div ... class="...font-bold...">Project Manager</a|div>
 //   - a company/location line:  <p class="...text-system-gray-100...">Company · City (Remote)</p>
 //   - zero or more badges:      <p class="job-card-flavor__detail">Actively recruiting</p>
 // LinkedIn's template can change without notice, so unparseable messages are
@@ -44,12 +47,24 @@ function firstMatch(chunk: string, re: RegExp): string {
   return m ? stripTags(m[1]) : "";
 }
 
+function firstJobLinkText(chunk: string): string {
+  const re = /<a\b[^>]*\/jobs\/view\/\d+[^>]*>([\s\S]*?)<\/a>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(chunk)) !== null) {
+    const text = stripTags(m[1]);
+    if (text) return text;
+  }
+  return "";
+}
+
 /** Parse a LinkedIn alert email's HTML into lead drafts (one per job card). */
 export function parseLinkedInAlert(html: string): LeadDraft[] {
   const byId = new Map<string, LeadDraft>();
 
   // One chunk per job card (skip the header chunk before the first marker).
-  const chunks = html.split(/data-test-id="job-card"/i).slice(1);
+  const chunks = html
+    .split(/data-test-id="(?:job-card|email-generic-section-JOBS_POSTING_SECTION-job-cards)"/i)
+    .slice(1);
 
   for (const chunk of chunks) {
     const idMatch = chunk.match(/\/jobs\/view\/(\d+)/);
@@ -57,11 +72,12 @@ export function parseLinkedInAlert(html: string): LeadDraft[] {
     const id = idMatch[1];
     if (byId.has(id)) continue;
 
-    // Title: the bold anchor.
-    const title = firstMatch(
-      chunk,
-      /<a\b[^>]*font-bold[^>]*>([\s\S]*?)<\/a>/i,
-    );
+    // Title: the bold anchor (digest) or bold div inside the card link
+    // (generic); otherwise the first job link with text (the "jobs similar
+    // to…" reminder styles it text-color-brand, not bold).
+    const title =
+      firstMatch(chunk, /<(?:a|div)\b[^>]*font-bold[^>]*>([\s\S]*?)<\/(?:a|div)>/i) ||
+      firstJobLinkText(chunk);
     if (!title) continue;
 
     // "Company · City (Remote)" line.

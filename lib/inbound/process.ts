@@ -165,7 +165,8 @@ export async function processInbound(raw: Buffer, recipient: string): Promise<Sm
   const from = bareAddress(parsed.from?.value?.[0]?.address);
   const fromDomain = domainOf(from);
   const messageId = (parsed.messageId ?? "").trim() || null;
-  const auth = await authenticate(raw, { trustReceived: false });
+  // Only DKIM + ARC are used; skip the DMARC/BIMI DNS lookups.
+  const auth = await authenticate(raw, { trustReceived: false, disableDmarc: true, disableBimi: true });
 
   // Gmail's forwarding-confirmation email → show the code in Settings.
   if (from === GMAIL_CONFIRM_FROM) {

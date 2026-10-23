@@ -17,3 +17,5 @@ README.md
 coverage
 # Server-side deploy kit (shipped to the VPS separately, never baked into the image).
 deploy
+# Local mail receiver spool (may hold real emails).
+.mail-spool

@@ -59,9 +59,10 @@ const nextConfig: NextConfig = {
   // Emit a self-contained server (.next/standalone/server.js) so the Docker
   // runtime image only needs Node + the traced deps — no full node_modules.
   output: "standalone",
-  // Keep the résumé text extractors out of the bundle — they're Node-only and
-  // used only inside Server Actions.
-  serverExternalPackages: ["mammoth", "nodemailer"],
+  // Keep Node-only libraries out of the bundle: the résumé text extractors and
+  // the email libraries. mailauth bundled spends ~1 minute on a DKIM check that
+  // takes 0.4 s unbundled; mailparser goes with it.
+  serverExternalPackages: ["mammoth", "nodemailer", "mailauth", "mailparser"],
   experimental: {
     serverActions: {
       // Résumé uploads go through a Server Action (default cap: 1 MB). The app
