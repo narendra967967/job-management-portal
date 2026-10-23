@@ -29,6 +29,8 @@ import {
 import { OUTREACH_KIND_LABELS, fitScoreKey } from "@/lib/types";
 import { listNotifications, type NotificationRow } from "@/lib/notifications";
 import { getFeatureAccess, type FeatureAccess } from "@/lib/entitlements";
+import { getIntakeConfig, getOrCreateForwarding } from "@/lib/email-intake-data";
+import type { MyForwarding } from "@/lib/email-intake-model";
 import type {
   AiSettings,
   Contact,
@@ -102,6 +104,25 @@ export interface WorkspaceData {
   fitScores: Record<string, FitScore>;
   /** Persistent notifications (newest first) for the dashboard bell. */
   notifications: NotificationRow[];
+  /** Email intake: the admin switches + this user's forwarding address. */
+  intake: WorkspaceIntake;
+}
+
+export interface WorkspaceIntake {
+  gmailOAuthEnabled: boolean;
+  forwardingEnabled: boolean;
+  forwarding: MyForwarding;
+}
+
+/** The admin switches + this user's forwarding address (created on first load,
+ *  so it's ready to copy on the first visit). */
+async function loadIntake(userId: string): Promise<WorkspaceIntake> {
+  const [config, forwarding] = await Promise.all([getIntakeConfig(), getOrCreateForwarding(userId)]);
+  return {
+    gmailOAuthEnabled: config.gmailOAuthEnabled,
+    forwardingEnabled: config.forwardingEnabled,
+    forwarding,
+  };
 }
 
 /** Everything the dashboard needs for one user, in UI-ready shapes. */
@@ -378,6 +399,7 @@ export async function loadWorkspace(userId: string): Promise<WorkspaceData> {
     syncIntervalHours: settings?.syncIntervalHours ?? 24,
     gmailSync,
     features: await getFeatureAccess(userId),
+    intake: await loadIntake(userId),
     ingestErrors,
     aiPrompts: {
       summary: settings?.promptSummary ?? "",

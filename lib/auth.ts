@@ -11,11 +11,12 @@
 // (lib/password); nothing is stored in plaintext.
 
 import { betterAuth } from "better-auth";
+import { APIError, createAuthMiddleware } from "better-auth/api";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { account, session, user, verification } from "@/db/schema";
+import { account, emailIntakeConfig, session, user, verification } from "@/db/schema";
 import { hashPassword, verifyPassword } from "@/lib/password";
 import { provisionUserDefaults } from "@/lib/provision";
 import { sendAppEmail, SMTP_NOT_CONFIGURED } from "@/lib/email";
@@ -26,6 +27,17 @@ import { getSessionLengthSeconds } from "@/lib/session-length";
 // they always match. Changing Settings → Security applies on new logins after a
 // server restart.
 const SESSION_SECONDS = await getSessionLengthSeconds();
+
+/** Admin "Connect Gmail" switch (Settings → Email intake). Queried here rather
+ *  than via lib/email-intake-data, which is server-only and so can't load in the
+ *  Better Auth CLI. A missing row means the default (on). */
+async function gmailLinkingAllowed(): Promise<boolean> {
+  const [row] = await db
+    .select({ on: emailIntakeConfig.gmailOAuthEnabled })
+    .from(emailIntakeConfig)
+    .where(eq(emailIntakeConfig.id, "app"));
+  return row ? row.on : true;
+}
 
 export const auth = betterAuth({
   secret: process.env.BETTER_AUTH_SECRET,
@@ -171,7 +183,26 @@ export const auth = betterAuth({
       planExpiresAt: { type: "date", required: false, input: false },
     },
   },
+  hooks: {
+    // While the admin has Connect Gmail switched off, Google can't be linked:
+    // refuse both starting the link and finishing an OAuth round-trip that was
+    // already under way when the switch flipped.
+    before: createAuthMiddleware(async (ctx) => {
+      if (ctx.path !== "/link-social" && !ctx.path.startsWith("/callback/")) return;
+      if (!(await gmailLinkingAllowed())) {
+        throw new APIError("FORBIDDEN", { message: "Connect Gmail is turned off." });
+      }
+    }),
+  },
   databaseHooks: {
+    // Backstop for the same rule at the storage layer.
+    account: {
+      create: {
+        before: async (a) => {
+          if (a.providerId === "google" && !(await gmailLinkingAllowed())) return false;
+        },
+      },
+    },
     user: {
       create: {
         // Give every newly created user their default settings rows.

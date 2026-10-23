@@ -31,6 +31,16 @@ import {
 import { parseLinkedInAlert } from "@/lib/linkedin-parser";
 import { ingestAlertDrafts } from "@/lib/lead-ingest";
 import { isWithinQuietHours } from "@/lib/quiet-hours";
+import { isGmailOAuthEnabled } from "@/lib/email-intake-data";
+
+const SWITCHED_OFF: SyncResult = {
+  connected: false,
+  fetched: 0,
+  inserted: 0,
+  renewed: 0,
+  errors: 0,
+  message: "Connect Gmail is turned off.",
+};
 
 export interface SyncResult {
   connected: boolean;
@@ -44,6 +54,9 @@ export interface SyncResult {
 }
 
 export async function runSyncForUser(userId: string): Promise<SyncResult> {
+  // Admin switch off: no Gmail calls at all (cron, "Sync now" and auto-sync).
+  if (!(await isGmailOAuthEnabled())) return SWITCHED_OFF;
+
   // Paused by the user: skip everything (cron AND "Sync now"), but stay
   // connected — resuming picks up from the saved cursor.
   const [pause] = await db
@@ -183,6 +196,8 @@ export async function runSyncForUser(userId: string): Promise<SyncResult> {
 export async function runSyncForAllUsers(): Promise<
   { userId: string; result: SyncResult; skipped?: boolean }[]
 > {
+  if (!(await isGmailOAuthEnabled())) return [];
+
   const users = await db
     .selectDistinct({ userId: accountT.userId })
     .from(accountT)

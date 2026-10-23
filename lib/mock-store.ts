@@ -83,7 +83,8 @@ import type {
   Resume,
   Task,
 } from "@/lib/types";
-import type { GmailConfigData, WorkspaceData } from "@/lib/queries";
+import type { GmailConfigData, WorkspaceData, WorkspaceIntake } from "@/lib/queries";
+import type { MyForwardingState } from "@/actions/email-intake";
 
 export interface AppSettings {
   reminderIntervalDays: number;
@@ -132,6 +133,18 @@ let ingestErrors: IngestError[] = [];
 let aiPrompts = { summary: "", draft: "", score: "" };
 let fitScores: Record<string, FitScore> = {};
 let storedNotifications: WorkspaceData["notifications"] = [];
+let intake: WorkspaceIntake = {
+  gmailOAuthEnabled: true,
+  forwardingEnabled: true,
+  forwarding: {
+    address: "",
+    gmailCode: null,
+    gmailCodeAt: null,
+    confirmedAt: null,
+    firstReceivedAt: null,
+    lastReceivedAt: null,
+  },
+};
 let hydrated = false;
 
 const listeners = new Set<() => void>();
@@ -170,6 +183,7 @@ function apply(data: WorkspaceData) {
   aiPrompts = data.aiPrompts;
   fitScores = data.fitScores;
   storedNotifications = data.notifications;
+  intake = data.intake;
 }
 
 /** Called by WorkspaceProvider during render so the first snapshot has data.
@@ -202,6 +216,18 @@ const getOutreach = () => outreach;
 const getReminders = () => reminders;
 const getTasks = () => tasks;
 const getStoredNotifications = () => storedNotifications;
+
+const getIntake = () => intake;
+/** Admin email-intake switches + this user's forwarding address/progress. */
+export function useIntake(): WorkspaceIntake {
+  return useSyncExternalStore(subscribe, getIntake, getIntake);
+}
+/** Apply a fresh forwarding state (after polling, reset or confirm) without a
+ *  full workspace refresh. */
+export function setForwardingState(state: MyForwardingState) {
+  intake = { ...intake, forwardingEnabled: state.forwardingEnabled, forwarding: state.forwarding };
+  emit();
+}
 
 const getFeatures = () => features;
 /** Premium features the user's plan includes (mirrors the server's decision). */
