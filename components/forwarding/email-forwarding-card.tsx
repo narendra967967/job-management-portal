@@ -67,6 +67,17 @@ export function EmailForwardingCard() {
   const { confirm, dialog } = useConfirm();
   const [busy, setBusy] = useState(false);
   const [emailOpen, setEmailOpen] = useState(false);
+  // Accordion: one step open at a time — the current one, until the user picks another.
+  const [openStep, setOpenStep] = useState<number | null>(current <= 3 ? current : null);
+  useEffect(() => {
+    setOpenStep(current <= 3 ? current : null);
+  }, [current]);
+  const stepProps = (n: number) => ({
+    n,
+    current,
+    open: openStep === n,
+    onToggle: () => setOpenStep((o) => (o === n ? null : n)),
+  });
 
   const pollMs = forwardingEnabled ? POLL_MS[stage] : null;
   useEffect(() => {
@@ -132,20 +143,20 @@ export function EmailForwardingCard() {
     );
   }
 
-  // Full instructions in an accordion: the current step opens by itself,
-  // any step can be opened, finished steps turn green.
+  // Full instructions in an accordion (one step open at a time): the current
+  // step opens by itself, finished steps turn green.
   const steps = (
     <div className="space-y-2">
-      <Step n={1} current={current} title="Add your address in Gmail">
+      <Step {...stepProps(1)} title="Add your address in Gmail">
         In Gmail, open <b>Settings</b> (gear icon) → <b>See all settings</b> → <b>Forwarding and POP/IMAP</b>{" "}
         → <b>Add a forwarding address</b>, paste your address and click <b>Next</b> → <b>Proceed</b>.
       </Step>
-      <Step n={2} current={current} title="Confirm it">
+      <Step {...stepProps(2)} title="Confirm it">
         Gmail sends a confirmation to your Jobtiva address — a <b>Confirm forwarding</b> button appears{" "}
         <b>at the top of this card</b> within a few seconds. Click it to approve. Leave the forwarding option
         itself on <b>Disable forwarding</b>; the filter below forwards only job alerts.
       </Step>
-      <Step n={3} current={current} title="Create a filter for job alerts">
+      <Step {...stepProps(3)} title="Create a filter for job alerts">
         In Gmail&rsquo;s search bar, click <b>Show search options</b>. In <b>From</b>, paste:
         <span className="mt-2 flex items-stretch gap-2">
           <code className="min-w-0 flex-1 rounded-lg bg-muted/60 px-2.5 py-2 font-mono text-[11px] leading-relaxed break-all text-foreground">
@@ -343,38 +354,42 @@ function LinkifiedGoogleText({ text }: { text: string }) {
   );
 }
 
-/** One accordion step. Opens by itself when it becomes the current step;
- *  the user can open or close any step. Done = green with a tick. */
+/** One accordion step, opened/closed by the parent (one open at a time).
+ *  Done = green with a tick. */
 function Step({
   n,
   current,
+  open,
+  onToggle,
   title,
   children,
 }: {
   n: number;
   current: number;
+  open: boolean;
+  onToggle: () => void;
   title: string;
   children: React.ReactNode;
 }) {
   const done = n < current;
   const active = n === current;
-  const [open, setOpen] = useState(active);
-  // Follow progress: open the step that just became current, fold finished ones.
-  useEffect(() => {
-    setOpen(n === current);
-  }, [n, current]);
+  const panelId = `fwd-step-${n}`;
 
   return (
-    <details
-      open={open}
-      onToggle={(e) => setOpen(e.currentTarget.open)}
+    <div
       className={cn(
-        "group rounded-xl border transition-colors",
+        "rounded-xl border transition-colors",
         done && "border-status-applied-foreground/25 bg-status-applied/30",
         active && "border-primary/30 bg-primary/[0.03]",
       )}
     >
-      <summary className="flex min-h-12 cursor-pointer list-none items-center gap-3 px-3 py-2 [&::-webkit-details-marker]:hidden">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        aria-controls={panelId}
+        className="flex min-h-12 w-full items-center gap-3 rounded-xl px-3 py-2 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+      >
         <span
           className={cn(
             "flex size-6 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold",
@@ -391,12 +406,20 @@ function Step({
           {done && <span className="sr-only"> (done)</span>}
         </span>
         {done && <span className="text-[11px] font-medium text-status-applied-foreground">Done</span>}
-        <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" aria-hidden />
-      </summary>
-      <div className="px-3 pb-3 pl-12 text-xs leading-relaxed text-muted-foreground [&_b]:font-medium [&_b]:text-foreground">
-        {children}
-      </div>
-    </details>
+        <ChevronRight
+          className={cn("size-4 shrink-0 text-muted-foreground transition-transform", open && "rotate-90")}
+          aria-hidden
+        />
+      </button>
+      {open && (
+        <div
+          id={panelId}
+          className="px-3 pb-3 pl-12 text-xs leading-relaxed text-muted-foreground [&_b]:font-medium [&_b]:text-foreground"
+        >
+          {children}
+        </div>
+      )}
+    </div>
   );
 }
 
