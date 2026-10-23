@@ -1,0 +1,1 @@
+ALTER TABLE "inbound_addresses" ADD COLUMN "gmail_confirm_text" text;

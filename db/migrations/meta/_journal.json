@@ -225,6 +225,13 @@
       "when": 1792785755115,
       "tag": "0031_gmail_confirm_link",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1792787212106,
+      "tag": "0032_gmail_confirm_text",
+      "breakpoints": true
     }
   ]
 }

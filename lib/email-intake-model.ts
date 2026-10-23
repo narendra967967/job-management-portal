@@ -82,6 +82,8 @@ export interface MyForwarding {
   gmailConfirmUrl: string | null;
   /** The Gmail account that asked to forward to this address. */
   gmailConfirmFrom: string | null;
+  /** Gmail's confirmation email as plain text (shown on request until confirmed). */
+  gmailConfirmText: string | null;
   gmailCodeAt: string | null;
   confirmedAt: string | null;
   firstReceivedAt: string | null;
@@ -105,11 +107,11 @@ export type ForwardingStage =
   | "working"; // at least one alert received
 
 export function forwardingStage(
-  f: Pick<MyForwarding, "gmailCode" | "gmailConfirmUrl" | "confirmedAt" | "firstReceivedAt">,
+  f: Pick<MyForwarding, "gmailCode" | "gmailConfirmUrl" | "gmailConfirmText" | "confirmedAt" | "firstReceivedAt">,
 ): ForwardingStage {
   if (f.firstReceivedAt) return "working";
   if (f.confirmedAt) return "waiting_first_alert";
-  if (f.gmailCode || f.gmailConfirmUrl) return "code_received";
+  if (f.gmailCode || f.gmailConfirmUrl || f.gmailConfirmText) return "code_received";
   return "not_started";
 }
 

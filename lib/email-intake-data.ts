@@ -83,6 +83,7 @@ function toMyForwarding(row: typeof addressesT.$inferSelect): MyForwarding {
     gmailCode: row.gmailCode,
     gmailConfirmUrl: row.gmailConfirmUrl,
     gmailConfirmFrom: row.gmailConfirmFrom,
+    gmailConfirmText: row.gmailConfirmText,
     gmailCodeAt: iso(row.gmailCodeAt),
     confirmedAt: iso(row.confirmedAt),
     firstReceivedAt: iso(row.firstReceivedAt),
@@ -120,6 +121,7 @@ export async function resetForwarding(userId: string): Promise<MyForwarding> {
           gmailCode: null,
           gmailConfirmUrl: null,
           gmailConfirmFrom: null,
+          gmailConfirmText: null,
           gmailCodeAt: null,
           confirmedAt: null,
           firstReceivedAt: null,
@@ -139,7 +141,7 @@ export async function resetForwarding(userId: string): Promise<MyForwarding> {
 export async function markForwardingConfirmed(userId: string): Promise<void> {
   await db
     .update(addressesT)
-    .set({ confirmedAt: new Date() })
+    .set({ confirmedAt: new Date(), gmailConfirmText: null })
     .where(and(eq(addressesT.userId, userId), sql`${addressesT.confirmedAt} is null`));
 }
 

@@ -54,6 +54,23 @@ export function gmailConfirmation(parsed: ConfirmMail): {
   return { gmailCode, gmailConfirmUrl, gmailConfirmFrom: requester?.toLowerCase().slice(0, 254) ?? null };
 }
 
+/** The confirmation email as plain text for the user to read (HTML is
+ *  reduced to text with each link's address kept), capped in size. */
+export function confirmationText(parsed: ConfirmMail): string | null {
+  let text = parsed.text?.trim() ?? "";
+  if (!text && typeof parsed.html === "string") {
+    text = parsed.html
+      .replace(/<a\b[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi, (_, href: string, label: string) => `${label.replace(/<[^>]+>/g, "")} (${href.replace(/&amp;/gi, "&")})`)
+      .replace(/<(br|\/p|\/div|\/tr|\/h\d)[^>]*>/gi, "\n")
+      .replace(/<[^>]+>/g, "")
+      .replace(/&nbsp;/gi, " ")
+      .replace(/&amp;/gi, "&")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+  }
+  return text ? text.slice(0, 20_000) : null;
+}
+
 /** Content-free outline of a confirmation email we couldn't read, for the
  *  admin log: which parts it had and the shape of its links (tokens masked),
  *  e.g. "text 812 B, html none; links mail-settings.google.com/mail/vf-* ×1". */

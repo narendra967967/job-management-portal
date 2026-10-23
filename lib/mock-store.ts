@@ -141,6 +141,7 @@ let intake: WorkspaceIntake = {
     gmailCode: null,
     gmailConfirmUrl: null,
     gmailConfirmFrom: null,
+    gmailConfirmText: null,
     gmailCodeAt: null,
     confirmedAt: null,
     firstReceivedAt: null,

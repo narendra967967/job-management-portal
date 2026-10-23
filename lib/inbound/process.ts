@@ -29,7 +29,7 @@ import { getIntakeConfig, loadSenders, receivingDomain, userIdForToken } from "@
 import { domainWithin, type InboundSender, type InboundStatus } from "@/lib/email-intake-model";
 import { parseLinkedInAlert } from "@/lib/linkedin-parser";
 import { ingestAlertDrafts } from "@/lib/lead-ingest";
-import { describeConfirmationEmail, gmailConfirmation } from "@/lib/inbound/gmail-confirmation";
+import { confirmationText, describeConfirmationEmail, gmailConfirmation } from "@/lib/inbound/gmail-confirmation";
 
 export type SmtpOutcome = { code: 250 | 451 | 550; message: string };
 
@@ -172,16 +172,30 @@ export async function processInbound(raw: Buffer, recipient: string): Promise<Sm
   // Gmail's forwarding-confirmation email → show the link (or code) in Settings.
   if (from === GMAIL_CONFIRM_FROM) {
     const vouched = signedFor(auth, GMAIL_CONFIRM_DOMAIN);
-    const confirm = vouched ? gmailConfirmation(parsed) : null;
-    if (!vouched || !confirm) {
-      await log({ userId, status: "rejected", reason: vouched ? `No confirmation link or code found (${describeConfirmationEmail(parsed)})` : "Signature check failed", fromDomain, sizeBytes: raw.length });
+    if (!vouched) {
+      await log({ userId, status: "rejected", reason: "Signature check failed", fromDomain, sizeBytes: raw.length });
+      return { code: 250, message: "Accepted" };
+    }
+    // Keep the email itself (plain text) so the user can always confirm by
+    // hand; the extracted link/code is the one-click shortcut on top.
+    const confirm = gmailConfirmation(parsed);
+    const gmailConfirmText = confirmationText(parsed);
+    if (!confirm && !gmailConfirmText) {
+      await log({ userId, status: "rejected", reason: `Empty confirmation email (${describeConfirmationEmail(parsed)})`, fromDomain, sizeBytes: raw.length });
       return { code: 250, message: "Accepted" };
     }
     await db
       .update(addressesT)
-      .set({ ...confirm, gmailCodeAt: new Date() })
+      .set({
+        gmailCode: confirm?.gmailCode ?? null,
+        gmailConfirmUrl: confirm?.gmailConfirmUrl ?? null,
+        gmailConfirmFrom: confirm?.gmailConfirmFrom ?? null,
+        gmailConfirmText,
+        gmailCodeAt: new Date(),
+      })
       .where(eq(addressesT.userId, userId));
-    await log({ userId, status: "gmail_code", reason: "Gmail confirmation shown to user", fromAddress: from, fromDomain, signingDomain: vouched, sizeBytes: raw.length, messageId });
+    const how = confirm ? "link/code found" : `email shown only — ${describeConfirmationEmail(parsed)}`;
+    await log({ userId, status: "gmail_code", reason: `Gmail confirmation shown to user (${how})`, fromAddress: from, fromDomain, signingDomain: vouched, sizeBytes: raw.length, messageId });
     return { code: 250, message: "Accepted" };
   }
 
@@ -204,6 +218,7 @@ export async function processInbound(raw: Buffer, recipient: string): Promise<Sm
       lastReceivedAt: new Date(),
       firstReceivedAt: sql`coalesce(${addressesT.firstReceivedAt}, now())`,
       confirmedAt: sql`coalesce(${addressesT.confirmedAt}, now())`,
+      gmailConfirmText: null,
     })
     .where(eq(addressesT.userId, userId));
 

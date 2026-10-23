@@ -798,9 +798,12 @@ export const inboundAddresses = pgTable(
     // today a link (mail-settings.google.com/mail/vf-…), in older/other
     // formats a numeric code. gmail_code_at = when either arrived;
     // gmail_confirm_from = the Gmail account that asked to forward here.
+    // gmail_confirm_text = that one Google-signed email as plain text, so the
+    // user can read it and click the link themselves; cleared once confirmed.
     gmailCode: text("gmail_code"),
     gmailConfirmUrl: text("gmail_confirm_url"),
     gmailConfirmFrom: text("gmail_confirm_from"),
+    gmailConfirmText: text("gmail_confirm_text"),
     gmailCodeAt: timestamp("gmail_code_at", { withTimezone: true }),
     // Set when the user says they verified it in Gmail, or at the first alert.
     confirmedAt: timestamp("confirmed_at", { withTimezone: true }),

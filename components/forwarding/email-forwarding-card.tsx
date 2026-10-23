@@ -8,10 +8,11 @@
 // shows up within seconds without a reload.
 
 import { useEffect, useState } from "react";
-import { Check, Copy, ExternalLink, MailCheck, RotateCcw, ShieldCheck, Briefcase } from "lucide-react";
+import { Check, Copy, ExternalLink, Mail, MailCheck, RotateCcw, ShieldCheck, Briefcase } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useMounted } from "@/lib/use-mounted";
 import { cn } from "@/lib/utils";
 import {
@@ -51,6 +52,7 @@ export function EmailForwardingCard() {
   const mounted = useMounted(); // relative times use the clock → client-only
   const { confirm, dialog } = useConfirm();
   const [busy, setBusy] = useState(false);
+  const [emailOpen, setEmailOpen] = useState(false);
 
   const pollMs = forwardingEnabled ? POLL_MS[stage] : null;
   useEffect(() => {
@@ -167,7 +169,7 @@ export function EmailForwardingCard() {
         <div className="mt-4 rounded-xl border-2 border-primary/30 bg-primary/5 p-4">
           <p className="text-xs font-medium text-primary">Confirm forwarding in Gmail</p>
           {fwd.gmailConfirmFrom && (
-            <p className="mt-1.5 text-sm break-all">
+            <p className="mt-1.5 text-sm [overflow-wrap:anywhere]">
               <b>{fwd.gmailConfirmFrom}</b> asked to forward mail here.
             </p>
           )}
@@ -175,27 +177,37 @@ export function EmailForwardingCard() {
             Received{mounted && fwd.gmailCodeAt ? ` ${timeAgo(fwd.gmailCodeAt)}` : ""}. Only continue if
             that&rsquo;s your Gmail account.
           </p>
-          {fwd.gmailConfirmUrl && (
-            <a
-              href={fwd.gmailConfirmUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={cn(buttonVariants({ size: "sm" }), "mt-3 min-h-10 gap-1.5")}
-            >
-              <ExternalLink className="size-3.5" aria-hidden />
-              Confirm forwarding
-            </a>
-          )}
           {fwd.gmailCode && (
             <div className="mt-3 flex flex-wrap items-center gap-3">
               <span className="font-mono text-2xl font-semibold tracking-widest">{fwd.gmailCode}</span>
               <CopyButton value={fwd.gmailCode} label="Copy code" />
             </div>
           )}
+          <div className="mt-3 flex flex-wrap gap-2">
+            {fwd.gmailConfirmUrl && (
+              <a
+                href={fwd.gmailConfirmUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={cn(buttonVariants({ size: "sm" }), "min-h-10 gap-1.5")}
+              >
+                <ExternalLink className="size-3.5" aria-hidden />
+                Confirm forwarding
+              </a>
+            )}
+            {fwd.gmailConfirmText && (
+              <Button variant="outline" size="sm" onClick={() => setEmailOpen(true)} className="min-h-10 gap-1.5">
+                <Mail className="size-3.5" aria-hidden />
+                View Gmail&rsquo;s email
+              </Button>
+            )}
+          </div>
           <p className="mt-3 text-[11px] text-muted-foreground">
             {fwd.gmailConfirmUrl
               ? "Opens Google's confirmation page in a new tab. Once it says the request is confirmed, come back and tell us below."
-              : "Paste the code into Gmail (step 2 below) and click Verify, then tell us below."}
+              : fwd.gmailCode
+                ? "Paste the code into Gmail (step 2 below) and click Verify, then tell us below."
+                : "Open Gmail's email and click its confirmation link. Once Google says the request is confirmed, come back and tell us below."}
           </p>
           <Button variant="outline" size="sm" onClick={markVerified} disabled={busy} className="mt-2 min-h-10 gap-1.5">
             <Check className="size-3.5" aria-hidden />
@@ -269,7 +281,50 @@ export function EmailForwardingCard() {
         </p>
       </div>
       {dialog}
+      {/* Always mounted; open toggles (see the admin senders dialog). */}
+      <Dialog open={emailOpen} onOpenChange={setEmailOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Gmail&rsquo;s confirmation email</DialogTitle>
+          </DialogHeader>
+          <p className="text-[11px] text-muted-foreground">
+            Sent by Google to your Jobtiva address. Click the link that confirms the request, not the
+            one that cancels it.
+          </p>
+          <div className="max-h-[60vh] overflow-y-auto rounded-lg border bg-muted/30 p-3 text-xs leading-relaxed break-words whitespace-pre-wrap">
+            <LinkifiedGoogleText text={fwd.gmailConfirmText ?? ""} />
+          </div>
+        </DialogContent>
+      </Dialog>
     </section>
+  );
+}
+
+/** Plain text with only https Google links made clickable (new tab, no referrer). */
+function LinkifiedGoogleText({ text }: { text: string }) {
+  const parts = text.split(/(https?:\/\/[^\s<>"')]+)/g);
+  return (
+    <>
+      {parts.map((part, i) => {
+        if (i % 2 === 0) return part;
+        let ok = false;
+        try {
+          const u = new URL(part);
+          ok = u.protocol === "https:" && (u.hostname === "google.com" || u.hostname.endsWith(".google.com"));
+        } catch {
+          ok = false;
+        }
+        return ok ? (
+          <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="font-medium text-primary underline break-all">
+            {part}
+          </a>
+        ) : (
+          <span key={i} className="break-all">
+            {part}
+          </span>
+        );
+      })}
+    </>
   );
 }
 
