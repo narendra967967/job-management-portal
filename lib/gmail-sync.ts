@@ -9,14 +9,12 @@ import "server-only";
 
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { isJobOpen } from "@/lib/types";
 import {
   account as accountT,
   gmailConfig as gmailConfigT,
   gmailIngestErrors as errorsT,
   gmailProcessedMessages as processedT,
   gmailSyncState as syncStateT,
-  jobLeads as leadsT,
   userSettings as settingsT,
 } from "@/db/schema";
 import {
@@ -31,7 +29,7 @@ import {
   GOOGLE_NOT_CONNECTED,
 } from "@/lib/gmail";
 import { parseLinkedInAlert } from "@/lib/linkedin-parser";
-import { sourceFromUrl } from "@/lib/lead-source";
+import { ingestAlertDrafts } from "@/lib/lead-ingest";
 import { isWithinQuietHours } from "@/lib/quiet-hours";
 
 export interface SyncResult {
@@ -121,71 +119,38 @@ export async function runSyncForUser(userId: string): Promise<SyncResult> {
       if (processed.has(id)) continue;
       fetched++;
       const msg = await getMessage(accessToken, id);
-      const drafts = parseLinkedInAlert(msg.html);
+      // The same alert may already have arrived by email forwarding — both
+      // paths share this table, keyed by the RFC Message-ID as well.
+      const rfcId = msg.rfcMessageId;
+      const seenViaForwarding =
+        !!rfcId &&
+        (
+          await db
+            .select({ messageId: processedT.messageId })
+            .from(processedT)
+            .where(and(eq(processedT.userId, userId), eq(processedT.messageId, rfcId)))
+        ).length > 0;
 
-      if (drafts.length === 0) {
-        await db.insert(errorsT).values({
-          userId,
-          messageId: id,
-          reason: "No job cards parsed from alert",
-          rawExcerpt: msg.subject.slice(0, 500),
-        });
-        errorCount++;
-      } else {
-        for (const d of drafts) {
-          const [existing] = await db
-            .select({
-              id: leadsT.id,
-              status: leadsT.status,
-              tags: leadsT.tags,
-            })
-            .from(leadsT)
-            .where(
-              and(
-                eq(leadsT.userId, userId),
-                eq(leadsT.linkedinJobId, d.linkedinJobId),
-              ),
-            );
-
-          if (!existing) {
-            await db.insert(leadsT).values({
-              userId,
-              linkedinJobId: d.linkedinJobId,
-              title: d.title,
-              company: d.company,
-              location: d.location,
-              remote: d.remote,
-              tags: d.tags,
-              postedRelative: d.postedRelative,
-              canonicalJobUrl: d.canonicalJobUrl,
-              sourceMessageId: id,
-              source: sourceFromUrl(d.canonicalJobUrl),
-              origin: "system",
-            });
-            inserted++;
-          } else if (isJobOpen(existing.status)) {
-            // Re-seen active lead: resurface it (bump capture date) + tag
-            // "Re-newed", keeping its contacts/reminders. Discarded/closed
-            // leads are left untouched.
-            const mergedTags = [
-              ...new Set([...existing.tags, ...d.tags, "Re-newed"]),
-            ];
-            await db
-              .update(leadsT)
-              .set({
-                capturedAt: new Date(),
-                tags: mergedTags,
-                updatedAt: new Date(),
-              })
-              .where(eq(leadsT.id, existing.id));
-            renewed++;
-          }
+      if (!seenViaForwarding) {
+        const drafts = parseLinkedInAlert(msg.html);
+        if (drafts.length === 0) {
+          await db.insert(errorsT).values({
+            userId,
+            messageId: id,
+            reason: "No job cards parsed from alert",
+            rawExcerpt: msg.subject.slice(0, 500),
+          });
+          errorCount++;
+        } else {
+          const r = await ingestAlertDrafts(userId, drafts, id);
+          inserted += r.inserted;
+          renewed += r.renewed;
         }
       }
 
       await db
         .insert(processedT)
-        .values({ userId, messageId: id })
+        .values(rfcId ? [{ userId, messageId: id }, { userId, messageId: rfcId }] : [{ userId, messageId: id }])
         .onConflictDoNothing();
     }
 

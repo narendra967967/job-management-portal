@@ -102,6 +102,8 @@ export interface GmailMessage {
   id: string;
   subject: string;
   from: string;
+  /** RFC 5322 Message-ID header — shared dedupe key with email forwarding. */
+  rfcMessageId: string | null;
   internalDate: number; // epoch ms
   html: string;
 }
@@ -126,6 +128,7 @@ export async function getMessage(
     id,
     subject: header("subject"),
     from: header("from"),
+    rfcMessageId: header("message-id").trim() || null,
     internalDate: Number(data.internalDate ?? 0),
     html: extractHtml(data.payload) || extractPlain(data.payload),
   };
