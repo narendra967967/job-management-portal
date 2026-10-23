@@ -74,8 +74,8 @@ export default async function DashboardLayout({
             </div>
             <TopBarSearch />
             <div className="ml-auto flex items-center gap-1.5 sm:gap-2.5">
-              <PlanChip className="hidden sm:inline-flex" />
-              <TopBarStats className="hidden sm:flex" />
+              <PlanChip className="hidden xl:inline-flex" />
+              <TopBarStats className="hidden lg:flex" />
               <HeaderAddLeadButton />
               <NotesButton />
               {/* On phones the floating help bubble covers this — keep room for search. */}

@@ -171,7 +171,7 @@ export function SupportIconButton() {
       type="button"
       onClick={() => open()}
       aria-label="Help & support"
-      className="flex size-10 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+      className="flex size-11 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none lg:size-10"
     >
       <LifeBuoy className="size-5" aria-hidden />
     </button>

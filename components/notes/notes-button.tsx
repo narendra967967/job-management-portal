@@ -44,7 +44,7 @@ export function NotesButton() {
         onClick={() => setOpen(true)}
         aria-label={hasNotes ? "My notes" : "My notes (premium)"}
         title={hasNotes ? "My notes" : "Notes — premium feature"}
-        className="relative flex size-11 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:size-10"
+        className="relative flex size-11 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none lg:size-10"
       >
         <NotebookPen className="size-5" aria-hidden />
         {!hasNotes && (
