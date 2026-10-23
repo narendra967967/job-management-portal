@@ -147,6 +147,8 @@ let intake: WorkspaceIntake = {
     firstReceivedAt: null,
     lastReceivedAt: null,
   },
+  filterFrom: "",
+  acceptedSites: [],
 };
 let hydrated = false;
 

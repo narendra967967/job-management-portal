@@ -122,15 +122,24 @@ export const FORWARDING_STAGE_LABELS: Record<ForwardingStage, string> = {
   working: "Working",
 };
 
-/** The LinkedIn senders users put in their Gmail filter (matches the default allow-list). */
-export const LINKEDIN_ALERT_SENDERS = [
-  "jobalerts-noreply@linkedin.com",
-  "jobs-noreply@linkedin.com",
-  "jobs-listings@linkedin.com",
-];
+/** Value for Gmail's filter "From" box, built from the admin's ENABLED
+ *  allowed senders: exact addresses as-is, "*@domain" as "@domain" (Gmail
+ *  matches any sender on that domain). Empty when nothing is enabled. */
+export function gmailFilterFrom(senders: Pick<InboundSender, "match" | "enabled">[]): string {
+  const enabled = senders.filter((s) => s.enabled).map((s) => s.match.toLowerCase());
+  const wholeSites = enabled.filter((m) => m.startsWith("*@")).map((m) => m.slice(2));
+  const parts = enabled
+    // An address already covered by a whole-site entry adds nothing.
+    .filter((m) => m.startsWith("*@") || !wholeSites.some((d) => domainWithin(m.slice(m.lastIndexOf("@") + 1), d)))
+    .map((m) => (m.startsWith("*@") ? m.slice(1) : m));
+  return [...new Set(parts)].join(" OR ");
+}
 
-/** Value for Gmail's filter "From" box. */
-export const GMAIL_FILTER_FROM = LINKEDIN_ALERT_SENDERS.join(" OR ");
+/** The sites (domains) those enabled senders belong to, for display. */
+export function acceptedSites(senders: Pick<InboundSender, "match" | "enabled">[]): string[] {
+  const sites = senders.filter((s) => s.enabled).map((s) => senderMatchDomain(s.match));
+  return [...new Set(sites.filter((d): d is string => !!d))].sort();
+}
 
 const DOMAIN_RE = /^(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i;
 const EMAIL_RE = /^[a-z0-9._%+-]+@([a-z0-9.-]+)$/i;

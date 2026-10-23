@@ -29,8 +29,8 @@ import {
 import { OUTREACH_KIND_LABELS, fitScoreKey } from "@/lib/types";
 import { listNotifications, type NotificationRow } from "@/lib/notifications";
 import { getFeatureAccess, type FeatureAccess } from "@/lib/entitlements";
-import { getIntakeConfig, getOrCreateForwarding } from "@/lib/email-intake-data";
-import type { MyForwarding } from "@/lib/email-intake-model";
+import { getIntakeConfig, getOrCreateForwarding, loadSenders } from "@/lib/email-intake-data";
+import { acceptedSites, gmailFilterFrom, type MyForwarding } from "@/lib/email-intake-model";
 import type {
   AiSettings,
   Contact,
@@ -112,16 +112,26 @@ export interface WorkspaceIntake {
   gmailOAuthEnabled: boolean;
   forwardingEnabled: boolean;
   forwarding: MyForwarding;
+  /** Exact text for Gmail's filter "From" box (from the enabled allowed senders). */
+  filterFrom: string;
+  /** Sites those senders belong to, e.g. ["linkedin.com"]. */
+  acceptedSites: string[];
 }
 
 /** The admin switches + this user's forwarding address (created on first load,
  *  so it's ready to copy on the first visit). */
 async function loadIntake(userId: string): Promise<WorkspaceIntake> {
-  const [config, forwarding] = await Promise.all([getIntakeConfig(), getOrCreateForwarding(userId)]);
+  const [config, forwarding, senders] = await Promise.all([
+    getIntakeConfig(),
+    getOrCreateForwarding(userId),
+    loadSenders(),
+  ]);
   return {
     gmailOAuthEnabled: config.gmailOAuthEnabled,
     forwardingEnabled: config.forwardingEnabled,
     forwarding,
+    filterFrom: gmailFilterFrom(senders),
+    acceptedSites: acceptedSites(senders),
   };
 }
 

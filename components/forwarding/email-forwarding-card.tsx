@@ -22,7 +22,6 @@ import { useMounted } from "@/lib/use-mounted";
 import { cn } from "@/lib/utils";
 import {
   FORWARDING_STAGE_LABELS,
-  GMAIL_FILTER_FROM,
   forwardingStage,
   timeAgo,
   type ForwardingStage,
@@ -60,7 +59,7 @@ const CURRENT_STEP: Record<ForwardingStage, number> = {
 };
 
 export function EmailForwardingCard() {
-  const { forwardingEnabled, forwarding: fwd } = useIntake();
+  const { forwardingEnabled, forwarding: fwd, filterFrom = "", acceptedSites = [] } = useIntake();
   const stage = forwardingStage(fwd);
   const current = CURRENT_STEP[stage];
   const mounted = useMounted(); // relative times use the clock → client-only
@@ -157,12 +156,18 @@ export function EmailForwardingCard() {
         itself on <b>Disable forwarding</b>; the filter below forwards only job alerts.
       </Step>
       <Step {...stepProps(3)} title="Create a filter for job alerts">
-        In Gmail&rsquo;s search bar, click <b>Show search options</b>. In <b>From</b>, paste:
+        In Gmail&rsquo;s search bar, click <b>Show search options</b>. In <b>From</b>, paste this exact
+        text:
         <span className="mt-2 flex items-stretch gap-2">
           <code className="min-w-0 flex-1 rounded-lg bg-muted/60 px-2.5 py-2 font-mono text-[11px] leading-relaxed break-all text-foreground">
-            {GMAIL_FILTER_FROM}
+            {filterFrom}
           </code>
-          <CopyButton value={GMAIL_FILTER_FROM} label="Copy" iconOnly />
+          <CopyButton value={filterFrom} label="Copy filter text" iconOnly />
+        </span>
+        <span className="mt-1.5 block text-[11px]">
+          These are the job-alert senders Jobtiva accepts right now
+          {acceptedSites.length > 0 && <> ({acceptedSites.join(", ")})</>}. Alerts from anyone else are
+          ignored.
         </span>
         <span className="mt-2 block">
           Click <b>Create filter</b>, tick <b>Forward it to</b>, choose your Jobtiva address, then{" "}
