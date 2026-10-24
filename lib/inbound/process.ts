@@ -70,6 +70,8 @@ async function log(entry: {
   reason: string;
   fromAddress?: string | null;
   fromDomain: string;
+  /** The job site; defaults to the sender's domain. */
+  site?: string | null;
   signingDomain?: string | null;
   sizeBytes?: number;
   messageId?: string | null;
@@ -82,6 +84,7 @@ async function log(entry: {
     // Full sender only for mail we accepted from a verified job site.
     fromAddress: entry.status === "rejected" ? null : (entry.fromAddress ?? null),
     fromDomain: entry.fromDomain.slice(0, 253),
+    site: (entry.site === undefined ? entry.fromDomain : entry.site)?.slice(0, 253) ?? null,
     signingDomain: entry.signingDomain ?? null,
     sizeBytes: entry.sizeBytes ?? 0,
     messageId: entry.messageId?.slice(0, 300) ?? null,
@@ -226,7 +229,7 @@ export async function processInbound(raw: Buffer, recipient: string): Promise<Sm
   }
 
   await markReceived(userId);
-  const base = { userId, fromAddress: from, fromDomain, signingDomain: vouched, sizeBytes: raw.length, messageId };
+  const base = { userId, fromAddress: from, fromDomain, site: fromDomain, signingDomain: vouched, sizeBytes: raw.length, messageId };
   if (!(await claimMessage(userId, messageId))) {
     await log({ ...base, status: "duplicate", reason: "Already processed" });
     return { code: 250, message: "Accepted" };
@@ -264,6 +267,7 @@ type LogBase = {
   userId: string;
   fromAddress: string;
   fromDomain: string;
+  site: string;
   signingDomain: string;
   sizeBytes: number;
   messageId: string | null;
@@ -342,12 +346,12 @@ async function handForwarded(ctx: {
   const { userId, raw, parsed, from, fromDomain, auth, messageId, senders } = ctx;
   const vouched = signedFor(auth, fromDomain);
   if (!vouched) {
-    await log({ userId, status: "rejected", reason: "Hand-forwarded · signature check failed", fromDomain, sizeBytes: raw.length });
+    await log({ userId, status: "rejected", reason: "Hand-forwarded · signature check failed", fromDomain, site: null, sizeBytes: raw.length });
     return { code: 250, message: "Accepted" };
   }
   const original = await forwardedOriginal(parsed);
   if (!original) {
-    await log({ userId, status: "rejected", reason: "Hand-forwarded · original sender not found", fromDomain, sizeBytes: raw.length });
+    await log({ userId, status: "rejected", reason: "Hand-forwarded · original sender not found", fromDomain, site: null, sizeBytes: raw.length });
     return { code: 250, message: "Accepted" };
   }
   const sender = matchSender(senders, original.from);
@@ -357,7 +361,8 @@ async function handForwarded(ctx: {
   }
 
   await markReceived(userId);
-  const base = { userId, fromAddress: from, fromDomain, signingDomain: vouched, sizeBytes: raw.length, messageId };
+  // The site is the original's (e.g. timesjobs.com), not the user's own domain.
+  const base = { userId, fromAddress: from, fromDomain, site: domainOf(original.from), signingDomain: vouched, sizeBytes: raw.length, messageId };
   if (!(await claimMessage(userId, messageId))) {
     await log({ ...base, status: "duplicate", reason: "Hand-forwarded · already processed" });
     return { code: 250, message: "Accepted" };

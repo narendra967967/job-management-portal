@@ -3,6 +3,9 @@
 // (Email intake settings, Forwarding health, Inbound email log). See
 // docs/email-forwarding.md for the full spec.
 
+import { sourceFromUrl } from "@/lib/lead-source";
+import { LEAD_SOURCE_LABELS } from "@/lib/types";
+
 /** Admin switches + limits (single-row config). */
 export interface EmailIntakeConfig {
   /** Email forwarding (the main intake). */
@@ -58,6 +61,18 @@ export const INBOUND_STATUS_LABELS: Record<InboundStatus, string> = {
   queued: "Reading with AI",
 };
 
+/** Sizes offered for the inbound log's pages. */
+export const INBOUND_LOG_PAGE_SIZES = [25, 50, 100] as const;
+
+/** A friendly name for a job site's domain: "naukri.com" → "Naukri". */
+export function siteLabel(domain: string | null): string {
+  if (!domain) return "—";
+  const d = domain.toLowerCase();
+  if (d === "google.com" || d.endsWith(".google.com")) return "Gmail";
+  const source = sourceFromUrl(`https://${d}`);
+  return source === "other" ? d : LEAD_SOURCE_LABELS[source];
+}
+
 export const AI_MAX_JOBS_MIN = 1;
 export const AI_MAX_JOBS_MAX = 100;
 
@@ -70,6 +85,8 @@ export interface InboundLogEntry {
   fromAddress: string | null;
   /** Always kept (the only sender info for rejected mail). */
   fromDomain: string;
+  /** The job site's domain (the original sender's, for a hand-forward). */
+  site: string | null;
   signingDomain: string | null;
   status: InboundStatus;
   reason: string;

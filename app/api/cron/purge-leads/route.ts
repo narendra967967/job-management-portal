@@ -1,11 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { runLeadPurge } from "@/lib/lead-purge";
-import { purgeInboundLog } from "@/lib/email-intake-data";
+import { runRetention } from "@/lib/retention";
 
 // Stale-lead purge endpoint — called on a (daily) schedule by GitHub Actions.
 // Public URL, so it requires the bearer CRON_SECRET and rejects otherwise before
 // doing any work. The lead purge is a no-op unless Lead retention is enabled in
-// admin Settings → Cron; the inbound email log is always trimmed to 30 days.
+// admin Settings → Cron; Data retention (admin Settings) is always applied —
+// the inbound log, ingestion issues, processed-email ledger, lead purge
+// history and notifications are trimmed to their windows.
 
 export async function POST(request: NextRequest) {
   const secret = process.env.CRON_SECRET;
@@ -15,6 +17,6 @@ export async function POST(request: NextRequest) {
   }
 
   const result = await runLeadPurge();
-  const inboundLogPurged = await purgeInboundLog();
-  return NextResponse.json({ ok: true, ...result, inboundLogPurged });
+  const retention = await runRetention();
+  return NextResponse.json({ ok: true, ...result, retention });
 }

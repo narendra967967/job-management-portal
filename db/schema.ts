@@ -831,6 +831,9 @@ export const inboundEmailLog = pgTable(
     fromAddress: text("from_address"),
     // Always kept; the only sender detail for rejected mail.
     fromDomain: text("from_domain").notNull(),
+    // The job site the email is about (e.g. "naukri.com") — for a hand-forward,
+    // the original sender's domain, not the user's own.
+    site: text("site"),
     signingDomain: text("signing_domain"),
     status: inboundStatus("status").notNull(),
     reason: text("reason").notNull(),
@@ -855,6 +858,21 @@ export const emailIntakeConfig = pgTable("email_intake_config", {
   aiMaxJobs: integer("ai_max_jobs").notNull().default(20),
   gmailToggledAt: timestamp("gmail_toggled_at", { withTimezone: true }),
   gmailToggledBy: text("gmail_toggled_by").references(() => user.id, { onDelete: "set null" }),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date()),
+});
+
+/** How long each kind of log-like data is kept (admin Settings → Data
+ *  retention). Applied by the daily purge cron (lib/retention.ts). One row. */
+export const retentionConfig = pgTable("retention_config", {
+  id: text("id").primaryKey().default("app"),
+  inboundLogDays: integer("inbound_log_days").notNull().default(30),
+  ingestIssueDays: integer("ingest_issue_days").notNull().default(30),
+  processedLedgerDays: integer("processed_ledger_days").notNull().default(180),
+  leadPurgeLogDays: integer("lead_purge_log_days").notNull().default(365),
+  notificationDays: integer("notification_days").notNull().default(90),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .defaultNow()

@@ -9,7 +9,7 @@
 */5 * * * *   /srv/jobtiva/cron-run.sh prod ai       >> /srv/jobtiva/logs/cron.log 2>&1
 */5 * * * *   /srv/jobtiva/cron-run.sh preprod ai    >> /srv/jobtiva/logs/cron.log 2>&1
 
-# Stale-lead purge (no-op unless enabled in admin Settings) + inbound email log trim (30 days).
+# Stale-lead purge (no-op unless enabled in admin Settings) + Data retention (admin Settings).
 0 21 * * *    /srv/jobtiva/cron-run.sh prod purge    >> /srv/jobtiva/logs/cron.log 2>&1
 10 21 * * *   /srv/jobtiva/cron-run.sh preprod purge >> /srv/jobtiva/logs/cron.log 2>&1
 

@@ -18,6 +18,8 @@ import {
 } from "@/db/schema";
 import { getBranding } from "@/lib/branding";
 import { getIntakeConfig, loadSenders } from "@/lib/email-intake-data";
+import { getRetentionConfig } from "@/lib/retention";
+import type { RetentionConfig } from "@/lib/retention-model";
 import type { EmailIntakeConfig, InboundSender } from "@/lib/email-intake-model";
 
 export interface AdminSettings {
@@ -77,6 +79,7 @@ export interface AdminSettings {
     fromName: string;
     replyTo: string;
   };
+  retention: RetentionConfig;
   intake: {
     config: EmailIntakeConfig;
     senders: InboundSender[];
@@ -86,7 +89,7 @@ export interface AdminSettings {
 }
 
 export async function loadAdminSettings(adminId: string): Promise<AdminSettings> {
-  const [u, gen, sec, cron, bill, ai, smtp, branding, intakeConfig, senders, google] = await Promise.all([
+  const [u, gen, sec, cron, bill, ai, smtp, branding, intakeConfig, senders, google, retention] = await Promise.all([
     db.select({ name: user.name, email: user.email, mobile: user.mobile }).from(user).where(eq(user.id, adminId)).limit(1),
     db.select().from(appSettings).limit(1),
     db.select().from(securityConfig).limit(1),
@@ -98,6 +101,7 @@ export async function loadAdminSettings(adminId: string): Promise<AdminSettings>
     getIntakeConfig(),
     loadSenders(),
     db.select({ n: countDistinct(account.userId) }).from(account).where(eq(account.providerId, "google")),
+    getRetentionConfig(),
   ]);
   const g = gen[0];
   const s = sec[0];
@@ -170,6 +174,7 @@ export async function loadAdminSettings(adminId: string): Promise<AdminSettings>
       fromName: m?.fromName ?? "",
       replyTo: m?.replyTo ?? "",
     },
+    retention,
     intake: {
       config: { ...intakeConfig, gmailToggledBy: await toggledByName(intakeConfig.gmailToggledBy) },
       senders,

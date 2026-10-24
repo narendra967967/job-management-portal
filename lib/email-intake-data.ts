@@ -28,9 +28,6 @@ export function receivingDomain(): string {
   return (process.env.INBOUND_DOMAIN || "in.localhost").trim().toLowerCase();
 }
 
-/** Log rows older than this are purged (no email content is ever stored). */
-export const INBOUND_LOG_RETENTION_DAYS = 30;
-
 const iso = (d: Date | null | undefined) => (d ? d.toISOString() : null);
 
 /* ---------------- config ---------------- */
@@ -172,49 +169,70 @@ export async function loadSenders(): Promise<InboundSender[]> {
 
 /* ---------------- log + health (admin) ---------------- */
 
-export const INBOUND_LOG_PAGE = 200;
+export interface InboundLogQuery {
+  /** Inclusive window on received time (already converted to instants). */
+  since: Date;
+  until: Date;
+  status?: InboundStatus;
+  /** Part of the user's email address. */
+  userEmail?: string;
+  /** Free text over user, sender, site and reason. */
+  q?: string;
+  page: number;
+  size: number;
+}
 
-/** Newest first, filtered in the database (status + free text over user,
- *  sender and reason), capped at INBOUND_LOG_PAGE rows. */
-export async function listInboundLog(opts: { status?: InboundStatus; q?: string } = {}): Promise<InboundLogEntry[]> {
-  const where: SQL[] = [];
+const escapeLike = (v: string) => `%${v.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+
+/** One page of the log, newest first, filtered in the database, with the
+ *  total number of matching rows for pagination. */
+export async function listInboundLog(opts: InboundLogQuery): Promise<{ rows: InboundLogEntry[]; total: number }> {
+  const where: SQL[] = [gte(logT.receivedAt, opts.since), lt(logT.receivedAt, opts.until)];
   if (opts.status) where.push(eq(logT.status, opts.status));
+  const email = opts.userEmail?.trim().slice(0, 254);
+  if (email) where.push(ilike(userT.email, escapeLike(email)));
   const q = opts.q?.trim().slice(0, 100);
   if (q) {
-    const like = `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+    const like = escapeLike(q);
     where.push(
       or(
         ilike(userT.name, like),
         ilike(userT.email, like),
         ilike(logT.fromAddress, like),
         ilike(logT.fromDomain, like),
+        ilike(logT.site, like),
         ilike(logT.reason, like),
       )!,
     );
   }
-  const rows = await db
-    .select({
-      l: logT,
-      name: userT.name,
-      email: userT.email,
-    })
-    .from(logT)
-    .leftJoin(userT, eq(userT.id, logT.userId))
-    .where(where.length ? and(...where) : undefined)
-    .orderBy(desc(logT.receivedAt))
-    .limit(INBOUND_LOG_PAGE);
-  return rows.map(({ l, name, email }) => ({
-    id: l.id,
-    receivedAt: l.receivedAt.toISOString(),
-    user: l.userId && email ? { name: name ?? email, email } : null,
-    fromAddress: l.fromAddress,
-    fromDomain: l.fromDomain,
-    signingDomain: l.signingDomain,
-    status: l.status,
-    reason: l.reason,
-    sizeBytes: l.sizeBytes,
-    leadsCreated: l.leadsCreated,
-  }));
+  const filter = and(...where);
+  const [rows, [{ total }]] = await Promise.all([
+    db
+      .select({ l: logT, name: userT.name, email: userT.email })
+      .from(logT)
+      .leftJoin(userT, eq(userT.id, logT.userId))
+      .where(filter)
+      .orderBy(desc(logT.receivedAt))
+      .limit(opts.size)
+      .offset((opts.page - 1) * opts.size),
+    db.select({ total: count() }).from(logT).leftJoin(userT, eq(userT.id, logT.userId)).where(filter),
+  ]);
+  return {
+    total: Number(total),
+    rows: rows.map(({ l, name, email }) => ({
+      id: l.id,
+      receivedAt: l.receivedAt.toISOString(),
+      user: l.userId && email ? { name: name ?? email, email } : null,
+      fromAddress: l.fromAddress,
+      fromDomain: l.fromDomain,
+      site: l.site,
+      signingDomain: l.signingDomain,
+      status: l.status,
+      reason: l.reason,
+      sizeBytes: l.sizeBytes,
+      leadsCreated: l.leadsCreated,
+    })),
+  };
 }
 
 export async function forwardingHealth(): Promise<ForwardingHealth> {
@@ -278,9 +296,3 @@ export async function userForwardingStatuses(): Promise<Record<string, UserForwa
   );
 }
 
-/** Delete log rows past the retention window. Returns how many were removed. */
-export async function purgeInboundLog(): Promise<number> {
-  const cutoff = new Date(Date.now() - INBOUND_LOG_RETENTION_DAYS * 24 * 3600_000);
-  const res = await db.delete(logT).where(lt(logT.receivedAt, cutoff)).returning({ id: logT.id });
-  return res.length;
-}
