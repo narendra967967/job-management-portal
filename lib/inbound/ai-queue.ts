@@ -113,6 +113,18 @@ async function processJob(job: QueueRow) {
       await finish(job, "unsupported", "AI key removed before reading");
       return;
     }
+    // A rejected key or no credit won't fix itself on retry — stop and say so.
+    const status = Number(/ error (\d{3})\b/.exec(msg)?.[1] ?? 0);
+    if (status === 401 || status === 403 || status === 402) {
+      await issue(
+        job,
+        status === 402
+          ? "Your AI provider has no credit left — top it up, then forward this alert again"
+          : "Your AI provider rejected the key — check it in Settings → AI provider, then forward this alert again",
+      );
+      await finish(job, "unsupported", `AI reader stopped: provider answered ${status} (${short(msg)})`);
+      return;
+    }
     if (job.attempts >= MAX_ATTEMPTS) {
       await issue(job, "Couldn't read this email with AI — check your AI provider key and credit in Settings");
       await finish(job, "unsupported", `AI reader failed after ${job.attempts} attempts: ${short(msg)}`);
