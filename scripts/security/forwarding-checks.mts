@@ -154,6 +154,17 @@ const waitForLog = async (afterCount: number) => {
   }
   return null;
 };
+/** Run fn with an intake switch set to `value`, then put back whatever the
+ *  admin had — never assume the original (the owner's settings must survive). */
+async function withSwitch<T>(column: "forwarding_enabled" | "gmail_oauth_enabled", value: boolean, fn: () => Promise<T>): Promise<T> {
+  const [row] = await q<Record<string, boolean>>(`select ${column} as v from email_intake_config where id = 'app'`);
+  await q(`update email_intake_config set ${column} = $1 where id = 'app'`, [value]);
+  try {
+    return await fn();
+  } finally {
+    await q(`update email_intake_config set ${column} = $1 where id = 'app'`, [row.v]);
+  }
+}
 const logCount = async () => Number((await q<{ n: string }>(`select count(*) as n from inbound_email_log where user_id = $1`, [me.id]))[0].n);
 
 console.log(`\n== A. Logic (pure modules) ==`);
@@ -276,13 +287,14 @@ if (SAMPLES && existsSync(SAMPLES)) {
 
 // B15: forwarding switched off → temporary failure, senders retry.
 {
-  await q(`update email_intake_config set forwarding_enabled = false where id = 'app'`);
-  const { c } = await Smtp.connect();
-  await c.cmd("EHLO checks.example");
-  await c.cmd("MAIL FROM:<a@example.com>");
-  const r = await c.cmd(`RCPT TO:<${TO}>`);
-  c.quit();
-  await q(`update email_intake_config set forwarding_enabled = true where id = 'app'`);
+  const r = await withSwitch("forwarding_enabled", false, async () => {
+    const { c } = await Smtp.connect();
+    await c.cmd("EHLO checks.example");
+    await c.cmd("MAIL FROM:<a@example.com>");
+    const reply = await c.cmd(`RCPT TO:<${TO}>`);
+    c.quit();
+    return reply;
+  });
   check("B15", "Forwarding off → 451 (try later), nothing accepted", code(r) === 451, r);
 }
 
@@ -311,11 +323,11 @@ if (SAMPLES && existsSync(SAMPLES)) {
 
 // B21: Connect Gmail switch off → linking and syncing refuse.
 {
-  await q(`update email_intake_config set gmail_oauth_enabled = false where id = 'app'`);
-  const link = await fetch(`${APP}/api/auth/link-social`, { method: "POST", headers: { "content-type": "application/json", origin: APP }, body: JSON.stringify({ provider: "google" }) });
-  const cron = await fetch(`${APP}/api/cron/gmail-sync`, { method: "POST", headers: { authorization: `Bearer ${CRON}` } });
-  const cronBody = await cron.json().catch(() => ({}));
-  await q(`update email_intake_config set gmail_oauth_enabled = true where id = 'app'`);
+  const { link, cronBody } = await withSwitch("gmail_oauth_enabled", false, async () => {
+    const link = await fetch(`${APP}/api/auth/link-social`, { method: "POST", headers: { "content-type": "application/json", origin: APP }, body: JSON.stringify({ provider: "google" }) });
+    const cron = await fetch(`${APP}/api/cron/gmail-sync`, { method: "POST", headers: { authorization: `Bearer ${CRON}` } });
+    return { link, cronBody: await cron.json().catch(() => ({})) };
+  });
   check("B21", "Connect Gmail off: link refused (403), cron syncs nobody", link.status === 403 && Array.isArray(cronBody.results) && cronBody.results.length === 0, `${link.status}, ${JSON.stringify(cronBody).slice(0, 60)}`);
 }
 
