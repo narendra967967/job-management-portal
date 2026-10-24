@@ -46,6 +46,7 @@ export async function getIntakeConfig(): Promise<EmailIntakeConfig> {
     forwardingEnabled: row.forwardingEnabled,
     gmailOAuthEnabled: row.gmailOAuthEnabled,
     maxBytes: row.maxBytes,
+    aiMaxJobs: row.aiMaxJobs,
     receivingDomain: receivingDomain(),
     gmailToggledAt: iso(row.gmailToggledAt),
     gmailToggledBy: row.gmailToggledBy,

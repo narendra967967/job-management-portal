@@ -5,6 +5,10 @@
 */15 * * * *  /srv/jobtiva/cron-run.sh prod sync     >> /srv/jobtiva/logs/cron.log 2>&1
 */15 * * * *  /srv/jobtiva/cron-run.sh preprod sync  >> /srv/jobtiva/logs/cron.log 2>&1
 
+# Email forwarding: AI reader sweep (retries / leftovers; emails are normally read on arrival).
+*/5 * * * *   /srv/jobtiva/cron-run.sh prod ai       >> /srv/jobtiva/logs/cron.log 2>&1
+*/5 * * * *   /srv/jobtiva/cron-run.sh preprod ai    >> /srv/jobtiva/logs/cron.log 2>&1
+
 # Stale-lead purge (no-op unless enabled in admin Settings) + inbound email log trim (30 days).
 0 21 * * *    /srv/jobtiva/cron-run.sh prod purge    >> /srv/jobtiva/logs/cron.log 2>&1
 10 21 * * *   /srv/jobtiva/cron-run.sh preprod purge >> /srv/jobtiva/logs/cron.log 2>&1

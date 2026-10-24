@@ -3,9 +3,11 @@ import "server-only";
 // Email forwarding — process one received email (spec: docs/email-forwarding.md).
 //
 //   recipient check (RCPT) → size → parse MIME → Gmail confirmation (link/code)?
-//   → sender allow-list → DKIM (or Gmail's ARC seal) for the allowed signing
-//   domain → dedupe (RFC Message-ID, shared with Connect Gmail) → parser →
-//   leads → address timestamps → log (metadata only).
+//   → sender allow-list (or the user's own address: a hand-forward, read from
+//   the original inside it) → DKIM (or Gmail's ARC seal) for the signing
+//   domain → dedupe (RFC Message-ID, shared with Connect Gmail) → built-in
+//   reader → leads; no reader / no jobs + an AI key → AI queue (ai-queue.ts)
+//   → address timestamps → log (metadata only).
 //
 // SMTP outcome policy (load-safe, no bounce spam):
 //   - unknown recipient → 550 at RCPT (no body is ever received);
@@ -24,14 +26,20 @@ import {
   gmailProcessedMessages as processedT,
   inboundAddresses as addressesT,
   inboundEmailLog as logT,
+  user as userT,
 } from "@/db/schema";
 import { getIntakeConfig, loadSenders, receivingDomain, userIdForToken } from "@/lib/email-intake-data";
 import { domainWithin, type InboundSender, type InboundStatus } from "@/lib/email-intake-model";
 import { ALERT_PARSERS } from "@/lib/alert-parsers";
 import { ingestAlertDrafts } from "@/lib/lead-ingest";
+import { userHasAiKey } from "@/lib/ai";
+import { emailForAi } from "@/lib/inbound/ai-reader";
+import { enqueueAiRead } from "@/lib/inbound/ai-queue";
+import { forwardedOriginal } from "@/lib/inbound/hand-forward";
 import { confirmationText, describeConfirmationEmail, gmailConfirmation } from "@/lib/inbound/gmail-confirmation";
 
-export type SmtpOutcome = { code: 250 | 451 | 550; message: string };
+/** aiJobId: an email queued for the AI reader — the route runs it after answering. */
+export type SmtpOutcome = { code: 250 | 451 | 550; message: string; aiJobId?: string };
 
 const GMAIL_CONFIRM_FROM = "forwarding-noreply@google.com";
 const GMAIL_CONFIRM_DOMAIN = "google.com";
@@ -66,8 +74,8 @@ async function log(entry: {
   sizeBytes?: number;
   messageId?: string | null;
   leadsCreated?: number;
-}) {
-  await db.insert(logT).values({
+}): Promise<string> {
+  const [row] = await db.insert(logT).values({
     userId: entry.userId,
     status: entry.status,
     reason: entry.reason.slice(0, 400),
@@ -78,7 +86,8 @@ async function log(entry: {
     sizeBytes: entry.sizeBytes ?? 0,
     messageId: entry.messageId?.slice(0, 300) ?? null,
     leadsCreated: entry.leadsCreated ?? 0,
-  });
+  }).returning({ id: logT.id });
+  return row.id;
 }
 
 /* ---------------- RCPT stage ---------------- */
@@ -199,8 +208,13 @@ export async function processInbound(raw: Buffer, recipient: string): Promise<Sm
     return { code: 250, message: "Accepted" };
   }
 
-  const sender = matchSender(await loadSenders(), from);
+  const senders = await loadSenders();
+  const sender = matchSender(senders, from);
   if (!sender) {
+    // The user forwarding an alert by hand comes from their own address.
+    if ((await ownAddresses(userId)).has(from)) {
+      return handForwarded({ userId, raw, parsed, from, fromDomain, auth, messageId, senders });
+    }
     await log({ userId, status: "rejected", reason: "Sender not allowed", fromDomain, sizeBytes: raw.length });
     return { code: 250, message: "Accepted" };
   }
@@ -211,7 +225,19 @@ export async function processInbound(raw: Buffer, recipient: string): Promise<Sm
     return { code: 250, message: "Accepted" };
   }
 
-  // From here the sender is verified — it counts as forwarding working.
+  await markReceived(userId);
+  const base = { userId, fromAddress: from, fromDomain, signingDomain: vouched, sizeBytes: raw.length, messageId };
+  if (!(await claimMessage(userId, messageId))) {
+    await log({ ...base, status: "duplicate", reason: "Already processed" });
+    return { code: 250, message: "Accepted" };
+  }
+  return readJobs({ userId, sender, mail: parsed, subject: parsed.subject ?? "", messageId, base, label: "" });
+}
+
+/* ---------------- shared steps ---------------- */
+
+/** A verified email arrived — forwarding works. */
+async function markReceived(userId: string) {
   await db
     .update(addressesT)
     .set({
@@ -221,39 +247,128 @@ export async function processInbound(raw: Buffer, recipient: string): Promise<Sm
       gmailConfirmText: null,
     })
     .where(eq(addressesT.userId, userId));
+}
 
-  const base = { userId, fromAddress: from, fromDomain, signingDomain: vouched, sizeBytes: raw.length, messageId };
+/** Claim the RFC Message-ID (shared with Connect Gmail); false = already processed. */
+async function claimMessage(userId: string, messageId: string | null): Promise<boolean> {
+  if (!messageId) return true;
+  const claimed = await db
+    .insert(processedT)
+    .values({ userId, messageId })
+    .onConflictDoNothing()
+    .returning({ messageId: processedT.messageId });
+  return claimed.length > 0;
+}
 
-  if (messageId) {
-    const claimed = await db
-      .insert(processedT)
-      .values({ userId, messageId })
-      .onConflictDoNothing()
-      .returning({ messageId: processedT.messageId });
-    if (!claimed.length) {
-      await log({ ...base, status: "duplicate", reason: "Already processed" });
-      return { code: 250, message: "Accepted" };
+type LogBase = {
+  userId: string;
+  fromAddress: string;
+  fromDomain: string;
+  signingDomain: string;
+  sizeBytes: number;
+  messageId: string | null;
+};
+
+/** Built-in reader first; if there is none or it finds no jobs, the AI
+ *  reader (queued) when the user has an AI key; otherwise unsupported. */
+async function readJobs(ctx: {
+  userId: string;
+  sender: InboundSender;
+  mail: { html?: string | false; text?: string };
+  subject: string;
+  messageId: string | null;
+  base: LogBase;
+  /** Prefix for the log reason, e.g. "Hand-forwarded · ". */
+  label: string;
+}): Promise<SmtpOutcome> {
+  const { userId, sender, mail, base, label } = ctx;
+  const subject = ctx.subject.slice(0, 500);
+  const sourceId = ctx.messageId ?? `fwd:${Date.now()}`;
+  const html = typeof mail.html === "string" ? mail.html : "";
+  const drafts = sender.parser === "none" ? [] : ALERT_PARSERS[sender.parser](html);
+
+  if (drafts.length) {
+    const r = await ingestAlertDrafts(userId, drafts, sourceId);
+    const parts = [`${r.inserted} new`];
+    if (r.renewed) parts.push(`${r.renewed} renewed`);
+    await log({ ...base, status: "accepted", reason: `${label}${drafts.length} jobs · ${parts.join(", ")}`, leadsCreated: r.inserted });
+    return { code: 250, message: "Accepted" };
+  }
+
+  const why = sender.parser === "none" ? "no built-in reader" : "built-in reader found no jobs";
+  if (await userHasAiKey(userId)) {
+    const { body, links } = emailForAi(mail);
+    if (body && links.length) {
+      const logId = await log({ ...base, status: "queued", reason: `${label}Reading with AI (${why})` });
+      const aiJobId = await enqueueAiRead({ userId, logId, messageId: sourceId, site: sender.signingDomain, subject, body, links });
+      return { code: 250, message: "Accepted", aiJobId };
     }
   }
 
-  const subject = (parsed.subject ?? "").slice(0, 500);
-  if (sender.parser === "none") {
-    await db.insert(errorsT).values({ userId, messageId: messageId ?? "(none)", reason: "Unsupported format — no reader for this sender yet", rawExcerpt: subject });
-    await log({ ...base, status: "unsupported", reason: "No reader for this sender" });
-    return { code: 250, message: "Accepted" };
-  }
-
-  const html = typeof parsed.html === "string" ? parsed.html : "";
-  const drafts = ALERT_PARSERS[sender.parser](html);
-  if (drafts.length === 0) {
-    await db.insert(errorsT).values({ userId, messageId: messageId ?? "(none)", reason: "No job cards parsed from alert", rawExcerpt: subject });
-    await log({ ...base, status: "unsupported", reason: "No job cards found" });
-    return { code: 250, message: "Accepted" };
-  }
-
-  const r = await ingestAlertDrafts(userId, drafts, messageId ?? `fwd:${Date.now()}`);
-  const parts = [`${r.inserted} new`];
-  if (r.renewed) parts.push(`${r.renewed} renewed`);
-  await log({ ...base, status: "accepted", reason: `${drafts.length} jobs · ${parts.join(", ")}`, leadsCreated: r.inserted });
+  const issue =
+    sender.parser === "none"
+      ? "Unsupported format — no reader for this site yet. Add an AI key in Settings → AI provider and Jobtiva reads these emails with AI."
+      : "No job cards found in this alert. Add an AI key in Settings → AI provider and Jobtiva reads emails like this with AI.";
+  await db.insert(errorsT).values({ userId, messageId: sourceId, reason: issue, rawExcerpt: subject });
+  await log({ ...base, status: "unsupported", reason: `${label}${sender.parser === "none" ? "No reader for this sender" : "No job cards found"}` });
   return { code: 250, message: "Accepted" };
+}
+
+/* ---------------- hand-forwarded alerts ---------------- */
+
+/** The user's own addresses: their login email and the Gmail account that
+ *  confirmed forwarding (they can differ). */
+async function ownAddresses(userId: string): Promise<Set<string>> {
+  const [[u], [a]] = await Promise.all([
+    db.select({ email: userT.email }).from(userT).where(eq(userT.id, userId)),
+    db.select({ gmail: addressesT.gmailConfirmFrom }).from(addressesT).where(eq(addressesT.userId, userId)),
+  ]);
+  return new Set([u?.email, a?.gmail].filter((x): x is string => !!x).map((x) => x.toLowerCase()));
+}
+
+/** Trust comes from the user's own mail provider signing their email; the
+ *  original inside must be from an allowed job site. The leads land in the
+ *  user's own account — no more than adding them by hand. */
+async function handForwarded(ctx: {
+  userId: string;
+  raw: Buffer;
+  parsed: ParsedMail;
+  from: string;
+  fromDomain: string;
+  auth: AuthResult;
+  messageId: string | null;
+  senders: InboundSender[];
+}): Promise<SmtpOutcome> {
+  const { userId, raw, parsed, from, fromDomain, auth, messageId, senders } = ctx;
+  const vouched = signedFor(auth, fromDomain);
+  if (!vouched) {
+    await log({ userId, status: "rejected", reason: "Hand-forwarded · signature check failed", fromDomain, sizeBytes: raw.length });
+    return { code: 250, message: "Accepted" };
+  }
+  const original = await forwardedOriginal(parsed);
+  if (!original) {
+    await log({ userId, status: "rejected", reason: "Hand-forwarded · original sender not found", fromDomain, sizeBytes: raw.length });
+    return { code: 250, message: "Accepted" };
+  }
+  const sender = matchSender(senders, original.from);
+  if (!sender) {
+    await log({ userId, status: "rejected", reason: "Hand-forwarded from a site that isn't allowed", fromDomain: domainOf(original.from), sizeBytes: raw.length });
+    return { code: 250, message: "Accepted" };
+  }
+
+  await markReceived(userId);
+  const base = { userId, fromAddress: from, fromDomain, signingDomain: vouched, sizeBytes: raw.length, messageId };
+  if (!(await claimMessage(userId, messageId))) {
+    await log({ ...base, status: "duplicate", reason: "Hand-forwarded · already processed" });
+    return { code: 250, message: "Accepted" };
+  }
+  return readJobs({
+    userId,
+    sender,
+    mail: { html: original.html, text: original.text },
+    subject: original.subject,
+    messageId,
+    base,
+    label: "Hand-forwarded · ",
+  });
 }

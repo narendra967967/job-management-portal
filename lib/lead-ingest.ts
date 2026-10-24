@@ -13,6 +13,7 @@ import { jobLeads as leadsT } from "@/db/schema";
 import { isJobOpen } from "@/lib/types";
 import { sourceFromUrl } from "@/lib/lead-source";
 import type { LeadDraft } from "@/lib/lead-draft";
+import { mergeTags } from "@/lib/lead-tags";
 
 export async function ingestAlertDrafts(
   userId: string,
@@ -21,7 +22,8 @@ export async function ingestAlertDrafts(
 ): Promise<{ inserted: number; renewed: number }> {
   let inserted = 0;
   let renewed = 0;
-  for (const d of drafts) {
+  for (const raw of drafts) {
+    const d = { ...raw, tags: mergeTags(raw.tags) };
     const [existing] = await db
       .select({ id: leadsT.id, status: leadsT.status, tags: leadsT.tags })
       .from(leadsT)
@@ -49,7 +51,7 @@ export async function ingestAlertDrafts(
         .returning({ id: leadsT.id });
       if (res.length) inserted++;
     } else if (isJobOpen(existing.status)) {
-      const mergedTags = [...new Set([...existing.tags, ...d.tags, "Re-newed"])];
+      const mergedTags = mergeTags(existing.tags, d.tags, ["Re-newed"]);
       await db
         .update(leadsT)
         .set({ capturedAt: new Date(), tags: mergedTags, updatedAt: new Date() })

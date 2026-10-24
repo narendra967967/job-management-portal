@@ -37,7 +37,7 @@ const fail = (e: unknown, fallback: string) => ({
 
 /* ---------------- A1: forwarding settings ---------------- */
 
-export async function updateIntakeSettingsAction(input: { forwardingEnabled: boolean; maxBytes: number }): Promise<Result> {
+export async function updateIntakeSettingsAction(input: { forwardingEnabled: boolean; maxBytes: number; aiMaxJobs: number }): Promise<Result> {
   await requireAdmin();
   try {
     const v = parseInput(intakeSettingsSchema, input);

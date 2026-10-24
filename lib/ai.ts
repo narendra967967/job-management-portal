@@ -20,6 +20,13 @@ interface UserAi {
   key: string;
 }
 
+/** Optional per-call settings (defaults keep the existing behaviour). */
+export interface AiCallOptions {
+  temperature?: number;
+  /** Abort the provider request after this long. */
+  timeoutMs?: number;
+}
+
 async function getUserAi(userId: string): Promise<UserAi> {
   const [s] = await db
     .select({
@@ -44,6 +51,7 @@ async function callOpenAI(
   system: string,
   user: string,
   maxTokens: number,
+  opts: AiCallOptions = {},
 ): Promise<string> {
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
@@ -53,13 +61,14 @@ async function callOpenAI(
     },
     body: JSON.stringify({
       model: ai.model,
-      temperature: 0.4,
+      temperature: opts.temperature ?? 0.4,
       max_tokens: maxTokens,
       messages: [
         { role: "system", content: system },
         { role: "user", content: user },
       ],
     }),
+    signal: opts.timeoutMs ? AbortSignal.timeout(opts.timeoutMs) : undefined,
   });
   if (!res.ok) {
     throw new Error(`OpenAI error ${res.status}: ${(await res.text()).slice(0, 200)}`);
@@ -75,6 +84,7 @@ async function callOpenRouter(
   system: string,
   user: string,
   maxTokens: number,
+  opts: AiCallOptions = {},
 ): Promise<string> {
   const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
@@ -86,13 +96,14 @@ async function callOpenRouter(
     },
     body: JSON.stringify({
       model: ai.model,
-      temperature: 0.4,
+      temperature: opts.temperature ?? 0.4,
       max_tokens: maxTokens,
       messages: [
         { role: "system", content: system },
         { role: "user", content: user },
       ],
     }),
+    signal: opts.timeoutMs ? AbortSignal.timeout(opts.timeoutMs) : undefined,
   });
   if (!res.ok) {
     throw new Error(
@@ -108,6 +119,7 @@ async function callAnthropic(
   system: string,
   user: string,
   maxTokens: number,
+  opts: AiCallOptions = {},
 ): Promise<string> {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -119,9 +131,11 @@ async function callAnthropic(
     body: JSON.stringify({
       model: ai.model,
       max_tokens: maxTokens,
+      ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
       system,
       messages: [{ role: "user", content: user }],
     }),
+    signal: opts.timeoutMs ? AbortSignal.timeout(opts.timeoutMs) : undefined,
   });
   if (!res.ok) {
     throw new Error(`Anthropic error ${res.status}: ${(await res.text()).slice(0, 200)}`);
@@ -136,16 +150,26 @@ export async function aiComplete(
   system: string,
   user: string,
   maxTokens = 600,
+  opts: AiCallOptions = {},
 ): Promise<string> {
   const ai = await getUserAi(userId);
   switch (ai.provider) {
     case "anthropic":
-      return callAnthropic(ai, system, user, maxTokens);
+      return callAnthropic(ai, system, user, maxTokens, opts);
     case "openrouter":
-      return callOpenRouter(ai, system, user, maxTokens);
+      return callOpenRouter(ai, system, user, maxTokens, opts);
     default:
-      return callOpenAI(ai, system, user, maxTokens);
+      return callOpenAI(ai, system, user, maxTokens, opts);
   }
+}
+
+/** Whether the user has saved an AI key (no decryption, no provider call). */
+export async function userHasAiKey(userId: string): Promise<boolean> {
+  const [s] = await db
+    .select({ ciphertext: settingsT.aiKeyCiphertext })
+    .from(settingsT)
+    .where(eq(settingsT.userId, userId));
+  return !!s?.ciphertext;
 }
 
 /* ------------------------------------------------------------------ */

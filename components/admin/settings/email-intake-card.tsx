@@ -24,6 +24,8 @@ import { Field, SubHead, Toggle, SaveRow, selectCls } from "@/components/admin/s
 import {
   MAX_BYTES_MAX,
   MAX_BYTES_MIN,
+  AI_MAX_JOBS_MAX,
+  AI_MAX_JOBS_MIN,
   PARSER_LABELS,
   domainWithin,
   formatBytes,
@@ -54,6 +56,7 @@ export function EmailIntakeCard({ initial }: { initial: AdminSettings["intake"] 
   // A1 — forwarding settings (local draft, saved explicitly)
   const [forwarding, setForwarding] = useState(config.forwardingEnabled);
   const [maxMb, setMaxMb] = useState(String(config.maxBytes / (1024 * 1024)));
+  const [aiMax, setAiMax] = useState(String(config.aiMaxJobs));
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -65,9 +68,14 @@ export function EmailIntakeCard({ initial }: { initial: AdminSettings["intake"] 
       setError(`Max email size must be between ${formatBytes(MAX_BYTES_MIN)} and ${formatBytes(MAX_BYTES_MAX)}.`);
       return;
     }
+    const jobs = Number(aiMax);
+    if (!Number.isInteger(jobs) || jobs < AI_MAX_JOBS_MIN || jobs > AI_MAX_JOBS_MAX) {
+      setError(`Max jobs per email must be a whole number from ${AI_MAX_JOBS_MIN} to ${AI_MAX_JOBS_MAX}.`);
+      return;
+    }
     setError("");
     setBusy(true);
-    const res = await updateIntakeSettingsAction({ forwardingEnabled: forwarding, maxBytes: bytes });
+    const res = await updateIntakeSettingsAction({ forwardingEnabled: forwarding, maxBytes: bytes, aiMaxJobs: jobs });
     setBusy(false);
     if (!res.ok) return setError(res.error);
     setSaved(true);
@@ -163,6 +171,20 @@ export function EmailIntakeCard({ initial }: { initial: AdminSettings["intake"] 
               value={maxMb}
               onChange={(e) => {
                 setMaxMb(e.target.value);
+                if (error) setError("");
+              }}
+              className="w-32"
+            />
+          </Field>
+          <Field label="Max jobs per email (AI reader)" hint="Used when a site has no built-in reader · allowed 1–100">
+            <Input
+              type="number"
+              min={AI_MAX_JOBS_MIN}
+              max={AI_MAX_JOBS_MAX}
+              step={1}
+              value={aiMax}
+              onChange={(e) => {
+                setAiMax(e.target.value);
                 if (error) setError("");
               }}
               className="w-32"

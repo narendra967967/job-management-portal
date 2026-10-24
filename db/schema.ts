@@ -780,6 +780,7 @@ export const inboundStatus = pgEnum("inbound_status", [
   "unsupported",
   "duplicate",
   "gmail_code",
+  "queued",
 ]);
 
 export const inboundParser = pgEnum("inbound_parser", ["linkedin", "none", "naukri", "timesjobs", "glassdoor", "theladders"]);
@@ -850,6 +851,8 @@ export const emailIntakeConfig = pgTable("email_intake_config", {
   // "Connect Gmail" (Google OAuth) and everything tied to it.
   gmailOAuthEnabled: boolean("gmail_oauth_enabled").notNull().default(true),
   maxBytes: integer("max_bytes").notNull().default(2 * 1024 * 1024),
+  // Most jobs the AI reader may take from one email.
+  aiMaxJobs: integer("ai_max_jobs").notNull().default(20),
   gmailToggledAt: timestamp("gmail_toggled_at", { withTimezone: true }),
   gmailToggledBy: text("gmail_toggled_by").references(() => user.id, { onDelete: "set null" }),
   updatedAt: timestamp("updated_at", { withTimezone: true })
@@ -857,6 +860,33 @@ export const emailIntakeConfig = pgTable("email_intake_config", {
     .defaultNow()
     .$onUpdate(() => new Date()),
 });
+
+/** Emails waiting for the AI reader (no built-in reader, or it found no jobs,
+ *  and the user has an AI key). Holds only what the AI needs — the email
+ *  reduced to text with numbered link markers, and those links — and is
+ *  deleted as soon as the email is processed (or given up on). */
+export const inboundAiQueue = pgTable(
+  "inbound_ai_queue",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    // The inbound_email_log row to complete when the AI is done.
+    logId: uuid("log_id").references(() => inboundEmailLog.id, { onDelete: "set null" }),
+    messageId: text("message_id").notNull(),
+    // Allowed sender's signing domain (e.g. "naukri.com") — the site the jobs belong to.
+    site: text("site").notNull(),
+    subject: text("subject").notNull().default(""),
+    body: text("body").notNull(),
+    links: jsonb("links").$type<string[]>().notNull(),
+    attempts: integer("attempts").notNull().default(0),
+    lockedAt: timestamp("locked_at", { withTimezone: true }),
+    nextAt: timestamp("next_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("inbound_ai_queue_next_idx").on(t.nextAt)],
+);
 
 /** Allowed senders: who may send, which DKIM domain must sign, which reader
  *  turns the email into leads ("none" = accepted but logged as unsupported). */

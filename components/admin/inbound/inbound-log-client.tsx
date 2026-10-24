@@ -26,6 +26,7 @@ const STATUS_VARIANT: Record<InboundStatus, "success" | "danger" | "warning" | "
   unsupported: "warning",
   duplicate: "neutral",
   gmail_code: "neutral",
+  queued: "neutral",
 };
 
 const selectCls =

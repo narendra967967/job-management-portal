@@ -14,6 +14,8 @@ import { COUNTRY_OPTIONS } from "@/lib/geo";
 import {
   MAX_BYTES_MAX,
   MAX_BYTES_MIN,
+  AI_MAX_JOBS_MAX,
+  AI_MAX_JOBS_MIN,
   domainWithin,
   isValidDomain,
   senderMatchDomain,
@@ -335,6 +337,11 @@ export const intakeSettingsSchema = z.object({
     .int()
     .min(MAX_BYTES_MIN, `Max email size must be at least ${MAX_BYTES_MIN / 1024} KB.`)
     .max(MAX_BYTES_MAX, `Max email size can't exceed ${MAX_BYTES_MAX / (1024 * 1024)} MB.`),
+  aiMaxJobs: z.coerce
+    .number()
+    .int("Max jobs per email must be a whole number.")
+    .min(AI_MAX_JOBS_MIN, `Max jobs per email must be at least ${AI_MAX_JOBS_MIN}.`)
+    .max(AI_MAX_JOBS_MAX, `Max jobs per email can't exceed ${AI_MAX_JOBS_MAX}.`),
 });
 
 export const gmailSwitchSchema = z.object({ enabled: z.boolean() });

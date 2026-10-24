@@ -11,6 +11,8 @@ export interface EmailIntakeConfig {
   gmailOAuthEnabled: boolean;
   /** Largest accepted email, in bytes. */
   maxBytes: number;
+  /** Most jobs the AI reader may take from one email. */
+  aiMaxJobs: number;
   /** Domain users forward to — set per environment, read-only in the UI. */
   receivingDomain: string;
   gmailToggledAt: string | null;
@@ -45,7 +47,7 @@ export interface InboundSender {
   enabled: boolean;
 }
 
-export type InboundStatus = "accepted" | "rejected" | "unsupported" | "duplicate" | "gmail_code";
+export type InboundStatus = "accepted" | "rejected" | "unsupported" | "duplicate" | "gmail_code" | "queued";
 
 export const INBOUND_STATUS_LABELS: Record<InboundStatus, string> = {
   accepted: "Accepted",
@@ -53,7 +55,11 @@ export const INBOUND_STATUS_LABELS: Record<InboundStatus, string> = {
   unsupported: "Unsupported format",
   duplicate: "Duplicate",
   gmail_code: "Gmail confirmation",
+  queued: "Reading with AI",
 };
+
+export const AI_MAX_JOBS_MIN = 1;
+export const AI_MAX_JOBS_MAX = 100;
 
 /** One row of the inbound email log — metadata only, never content. */
 export interface InboundLogEntry {

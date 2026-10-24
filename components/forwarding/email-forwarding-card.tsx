@@ -298,8 +298,9 @@ export function EmailForwardingCard() {
             </>
           }
         >
-          Some organisations block automatic forwarding. Forward an alert by hand to your address, or use Add
-          with AI on the Leads page.
+          Some organisations block automatic forwarding. Forward an alert by hand to your address instead —
+          from the email you sign in with, or the Gmail you set forwarding up from — or use Add with AI on the
+          Leads page.
         </InfoTip>
         <span className="ml-auto inline-flex items-center gap-1">
           <Button variant="ghost" size="sm" onClick={resetAddress} disabled={busy} className="min-h-10 gap-1.5 text-muted-foreground">
