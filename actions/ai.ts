@@ -407,9 +407,19 @@ const LEAD_EXTRACT_SYSTEM = [
   "- remote: true ONLY if the role is explicitly remote.",
   "- jobUrl: the application / posting URL if visibly present, else \"\".",
   "- tags: up to 6 short skill or seniority keywords.",
-  "- jdText: the job description text, cleaned of boilerplate; \"\" if none.",
+  "- jdText: the job description copied WORD FOR WORD — every section (about the",
+  "  role, responsibilities, requirements, benefits…) in its original order and",
+  "  wording. Never summarize, shorten, rephrase or translate it. Leave out only",
+  "  what isn't part of the posting: site navigation, buttons (Apply, Save…), other",
+  "  job listings, ads, email headers/footers. Keep the line breaks; put headings on",
+  "  their own line and write list items as \"- \" lines. \"\" if there is none.",
   'Use "", [] or false for anything not present. Never invent values.',
 ].join("\n");
+
+// Reply budgets: the JD comes back word for word, so leave room for a long one
+// (pasted text is capped at 20,000 characters ≈ 5,000 tokens).
+const EXTRACT_TEXT_MAX_TOKENS = 8000;
+const EXTRACT_IMAGE_MAX_TOKENS = 6000;
 
 // Accepted screenshot types + size cap for the image path.
 const IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp"];
@@ -457,7 +467,10 @@ export async function extractLeadFromTextAction(
     return { ok: false, error: friendly(err) };
   }
   try {
-    const raw = await aiComplete(userId, LEAD_EXTRACT_SYSTEM, clean, 1200);
+    // Temperature 0: copying, not writing.
+    const raw = await aiComplete(userId, LEAD_EXTRACT_SYSTEM, clean, EXTRACT_TEXT_MAX_TOKENS, {
+      temperature: 0,
+    });
     return { ok: true, lead: sanitizeExtracted(raw) };
   } catch (err) {
     return extractFailure(err);
@@ -492,7 +505,7 @@ export async function extractLeadFromImageAction(
       LEAD_EXTRACT_SYSTEM,
       "Extract the job lead from this screenshot.",
       image,
-      1200,
+      EXTRACT_IMAGE_MAX_TOKENS,
     );
     return { ok: true, lead: sanitizeExtracted(raw) };
   } catch (err) {
