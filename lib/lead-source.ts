@@ -18,6 +18,8 @@ const HOST_SOURCES: [string, LeadSource][] = [
   ["foundit.in", "foundit"],
   ["monsterindia.com", "foundit"],
   ["timesjobs.com", "timesjobs"],
+  ["theladders.com", "theladders"],
+  ["ladders.co", "theladders"],
 ];
 
 export function sourceFromUrl(rawUrl: string): LeadSource {

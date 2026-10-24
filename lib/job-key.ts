@@ -6,6 +6,7 @@
 //   Naukri    → "naukri:<job id>"                (e.g. "naukri:161026010673")
 //   Glassdoor → "glassdoor:<job listing id>"
 //   TimesJobs → "timesjobs:<title>|<company>"    (its links are opaque redirects)
+//   TheLadders → "theladders:<title>|<company location>" (click-tracker links)
 //   other     → "url:<normalized URL>"
 // Pure — no server-only imports.
 

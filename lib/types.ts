@@ -67,6 +67,7 @@ export type LeadSource =
   | "instahyre"
   | "foundit"
   | "timesjobs"
+  | "theladders"
   | "other";
 
 export const LEAD_SOURCE_LABELS: Record<LeadSource, string> = {
@@ -78,6 +79,7 @@ export const LEAD_SOURCE_LABELS: Record<LeadSource, string> = {
   instahyre: "Instahyre",
   foundit: "foundit",
   timesjobs: "TimesJobs",
+  theladders: "TheLadders",
   other: "Other",
 };
 
