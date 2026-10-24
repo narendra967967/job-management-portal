@@ -20,9 +20,20 @@ function decode(s: string): string {
     .trim();
 }
 
+/** One chunk per job card. Cards start at their titled job link — Gmail strips
+ *  HTML comments when an alert is forwarded, so the <!-- Job Card --> marker is
+ *  only the fallback for emails without titled links. */
+function cardChunks(html: string): string[] {
+  const titled = [...html.matchAll(/<a\b[^>]*\btitle=(?:'[^']*'|"[^"]*")[^>]*href="https?:\/\/(?:www\.)?timesjobs\.com\/[^"]*"[^>]*>|<a\b[^>]*href="https?:\/\/(?:www\.)?timesjobs\.com\/[^"]*"[^>]*\btitle=(?:'[^']*'|"[^"]*")[^>]*>/gi)];
+  if (titled.length) {
+    return titled.map((m, i) => html.slice(m.index ?? 0, titled[i + 1]?.index ?? (m.index ?? 0) + 4000));
+  }
+  return html.split(/<!--\s*Job Card\s*-->/i).slice(1);
+}
+
 export function parseTimesJobsAlert(html: string): LeadDraft[] {
   const byKey = new Map<string, LeadDraft>();
-  for (const card of html.split(/<!--\s*Job Card\s*-->/i).slice(1)) {
+  for (const card of cardChunks(html)) {
     // The card's first link is usually the company logo; the title link is the
     // one with a title attribute (else the first link with text).
     const links = [...card.matchAll(/<a\b[^>]*href="(https?:\/\/(?:www\.)?timesjobs\.com\/[^"]+)"[^>]*>([\s\S]*?)<\/a\s*>/gi)];
