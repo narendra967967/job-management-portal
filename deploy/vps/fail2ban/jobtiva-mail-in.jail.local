@@ -1,0 +1,17 @@
+# → /etc/fail2ban/jail.d/jobtiva-mail-in.local
+# Bans abusive SMTP clients of the mail-in container (port 25).
+
+[jobtiva-mail-in]
+enabled   = true
+backend   = systemd
+filter    = jobtiva-mail-in
+# Port 25 is published by Docker, so its traffic goes through the FORWARD /
+# DOCKER-USER chain, not INPUT, and is already translated to the container's
+# port (2525) there. Ban the IP for every container port in DOCKER-USER; only
+# mail-in is published publicly (the apps and Postgres bind to 127.0.0.1).
+banaction = iptables-allports[chain="DOCKER-USER"]
+maxretry  = 10
+findtime  = 10m
+bantime   = 1h
+# Never ban localhost or Docker's own networks.
+ignoreip  = 127.0.0.1/8 ::1 172.16.0.0/12

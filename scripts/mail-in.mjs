@@ -77,6 +77,12 @@ const log = (...args) => console.log("[mail-in]", ...args);
 
 /* ---------------- small helpers ---------------- */
 
+/** "::ffff:1.2.3.4" (IPv4 seen on a dual-stack socket) → "1.2.3.4", so rate
+ *  limits and fail2ban (deploy/vps/fail2ban) see one form per client. */
+function clientIp(addr) {
+  return String(addr ?? "?").replace(/^::ffff:(?=\d+\.\d+\.\d+\.\d+$)/i, "");
+}
+
 function smtpError(code, message) {
   const err = new Error(message);
   err.responseCode = code;
@@ -265,7 +271,7 @@ const server = new SMTPServer({
   closeTimeout: 10_000,
 
   onConnect(session, callback) {
-    const ip = session.remoteAddress;
+    const ip = clientIp(session.remoteAddress);
     if (ipConnections.hit(ip) > PER_IP_CONNECTIONS_PER_MIN || (ipOpen.get(ip) ?? 0) >= PER_IP_CONCURRENT) {
       log(`throttled ip=${ip}`);
       return callback(smtpError(421, "Too many connections, try again later"));
@@ -281,7 +287,7 @@ const server = new SMTPServer({
   onClose(session) {
     clearTimeout(session.deadline);
     if (!session.counted) return;
-    const ip = session.remoteAddress;
+    const ip = clientIp(session.remoteAddress);
     const n = (ipOpen.get(ip) ?? 1) - 1;
     if (n > 0) ipOpen.set(ip, n);
     else ipOpen.delete(ip);
@@ -361,7 +367,7 @@ const server = new SMTPServer({
 
 server.on("error", (err) => {
   // Per-connection protocol/TLS errors; the IP is logged for fail2ban.
-  log(`smtp error ip=${err.remoteAddress ?? "?"} code=${err.code ?? "?"}`);
+  log(`smtp error ip=${clientIp(err.remoteAddress)} code=${err.code ?? "?"}`);
 });
 
 /* ---------------- start / stop ---------------- */

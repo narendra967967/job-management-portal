@@ -103,6 +103,13 @@ services:
       - mail-spool:/data/mail-spool
       - ./mail-tls:/tls:ro
     mem_limit: 128m
+    # Logs go to the system journal under a fixed tag, so fail2ban can watch
+    # them (deploy/vps/fail2ban) whatever the container id. `docker compose
+    # logs mail-in` still works.
+    logging:
+      driver: journald
+      options:
+        tag: mail-in
 
 volumes:
   pgdata:
