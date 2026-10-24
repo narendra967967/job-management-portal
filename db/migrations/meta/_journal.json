@@ -239,6 +239,13 @@
       "when": 1792817177030,
       "tag": "0033_reader_naukri_timesjobs",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1792817687588,
+      "tag": "0034_reader_glassdoor",
+      "breakpoints": true
     }
   ]
 }

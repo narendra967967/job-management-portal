@@ -4,6 +4,7 @@
 // same job is recognised however it arrives:
 //   LinkedIn  → the bare numeric job id          (e.g. "4465649386")
 //   Naukri    → "naukri:<job id>"                (e.g. "naukri:161026010673")
+//   Glassdoor → "glassdoor:<job listing id>"
 //   TimesJobs → "timesjobs:<title>|<company>"    (its links are opaque redirects)
 //   other     → "url:<normalized URL>"
 // Pure — no server-only imports.
@@ -16,11 +17,20 @@ export function extractNaukriJobId(url: string): string {
   return m ? m[1] : "";
 }
 
+/** Glassdoor's job listing id (jobListingId= / jl= on a Glassdoor host). */
+export function extractGlassdoorJobId(url: string): string {
+  if (!/^https?:\/\/([a-z0-9-]+\.)*glassdoor\.[a-z.]+\//i.test(url)) return "";
+  const m = url.match(/[?&](?:jobListingId|jl)=(\d{6,})/i);
+  return m ? m[1] : "";
+}
+
 export function jobKeyForUrl(rawUrl: string): string {
   const linkedIn = extractLinkedInJobId(rawUrl);
   if (linkedIn) return linkedIn;
   const naukri = extractNaukriJobId(rawUrl);
   if (naukri) return `naukri:${naukri}`;
+  const glassdoor = extractGlassdoorJobId(rawUrl);
+  if (glassdoor) return `glassdoor:${glassdoor}`;
   try {
     const u = new URL(rawUrl);
     u.hash = "";

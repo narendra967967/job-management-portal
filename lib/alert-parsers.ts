@@ -7,9 +7,11 @@ import type { LeadDraft } from "@/lib/lead-draft";
 import { parseLinkedInAlert } from "@/lib/linkedin-parser";
 import { parseNaukriAlert } from "@/lib/naukri-parser";
 import { parseTimesJobsAlert } from "@/lib/timesjobs-parser";
+import { parseGlassdoorAlert } from "@/lib/glassdoor-parser";
 
 export const ALERT_PARSERS: Record<Exclude<InboundParser, "none">, (html: string) => LeadDraft[]> = {
   linkedin: parseLinkedInAlert,
   naukri: parseNaukriAlert,
   timesjobs: parseTimesJobsAlert,
+  glassdoor: parseGlassdoorAlert,
 };

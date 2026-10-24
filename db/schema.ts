@@ -782,7 +782,7 @@ export const inboundStatus = pgEnum("inbound_status", [
   "gmail_code",
 ]);
 
-export const inboundParser = pgEnum("inbound_parser", ["linkedin", "none", "naukri", "timesjobs"]);
+export const inboundParser = pgEnum("inbound_parser", ["linkedin", "none", "naukri", "timesjobs", "glassdoor"]);
 
 /** One private forwarding address per user (`<token>@<receiving domain>`).
  *  Resetting replaces the token, so the old address stops working at once. */

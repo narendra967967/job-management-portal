@@ -20,13 +20,14 @@ export interface EmailIntakeConfig {
 export const MAX_BYTES_MIN = 256 * 1024;
 export const MAX_BYTES_MAX = 10 * 1024 * 1024;
 
-export type InboundParser = "linkedin" | "naukri" | "timesjobs" | "none";
+export type InboundParser = "linkedin" | "naukri" | "timesjobs" | "glassdoor" | "none";
 
 /** Reader choices, in dropdown order (lib/alert-parsers.ts has the code). */
 export const PARSER_LABELS: Record<InboundParser, string> = {
   linkedin: "LinkedIn job alerts",
   naukri: "Naukri job alerts",
   timesjobs: "TimesJobs job alerts",
+  glassdoor: "Glassdoor job emails",
   none: "None (logged as unsupported)",
 };
 
