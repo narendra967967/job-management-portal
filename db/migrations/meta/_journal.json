@@ -267,6 +267,13 @@
       "when": 1792852561647,
       "tag": "0037_log_site_and_retention",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1792870791577,
+      "tag": "0038_career_profile",
+      "breakpoints": true
     }
   ]
 }

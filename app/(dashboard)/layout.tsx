@@ -28,6 +28,8 @@ import { getAppName } from "@/lib/branding";
 import { loadWorkspace } from "@/lib/queries";
 import { WorkspaceProvider } from "@/lib/workspace-provider";
 import { GlassBackdrop } from "@/components/marketing/glass-backdrop";
+import { CareerProfileNotice } from "@/components/career/career-profile-notice";
+import { careerCompletionFor } from "@/lib/career-data";
 
 // Per-user, session-gated routes — never statically prerendered (no DB at build).
 export const dynamic = "force-dynamic";
@@ -46,7 +48,11 @@ export default async function DashboardLayout({
   const state = accessState(u);
   if (state === "deactivated") redirect("/deactivated");
   if (state === "expired") redirect("/renew");
-  const [workspace, appName] = await Promise.all([loadWorkspace(u.id), getAppName()]);
+  const [workspace, appName, career] = await Promise.all([
+    loadWorkspace(u.id),
+    getAppName(),
+    careerCompletionFor(u.id),
+  ]);
   return (
     // App shell: full-height flex. On mobile the header + bottom nav are
     // fixed-height flex children and only <main> scrolls, so the bottom nav is
@@ -89,6 +95,7 @@ export default async function DashboardLayout({
             </div>
           </div>
         </header>
+        {!career.complete && <CareerProfileNotice percent={career.percent} />}
 
         <main className="flex-1 overflow-y-auto px-4 pt-4 pb-6 md:px-6 md:pt-6 md:pb-8">
           {children}

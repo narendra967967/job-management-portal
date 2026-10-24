@@ -27,7 +27,7 @@ export default async function PrivacyPage() {
   ]);
   const contact = supportEmail || "our support address";
   return (
-    <LegalLayout title="Privacy policy" updated="24 October 2026">
+    <LegalLayout title="Privacy policy" updated="25 October 2026">
       <p>
         This Privacy Policy explains how {appName} (&ldquo;we&rdquo;, &ldquo;us&rdquo;) collects, uses, and
         protects your information when you use our job-search management service (the
@@ -38,6 +38,16 @@ export default async function PrivacyPage() {
       <ul>
         <li><strong>Account information</strong> — your name, email address, and password (stored only as a secure hash).</li>
         <li><strong>Content you add</strong> — job leads, contacts, notes, résumés, and messages you create in the Service.</li>
+        <li>
+          <strong>Career profile</strong> — what you choose to tell us about your career and job preferences:
+          job title, experience, skills, education, certifications, the countries you can work in, target
+          roles, preferred work mode and locations, notice period, and current and expected pay.
+        </li>
+        <li>
+          <strong>Optional questions</strong> — if you choose to answer them, your gender, disability and
+          veteran status. These are entirely optional, kept private to your account, never sent to an AI
+          provider, and never used to score or rank you. You can clear them at any time.
+        </li>
         <li>
           <strong>Job-alert emails you forward</strong> — the emails you, or a filter you set up, send to your
           private {appName} address (see &ldquo;Email forwarding&rdquo; below).
@@ -152,11 +162,11 @@ export default async function PrivacyPage() {
 
       <h2>AI processing</h2>
       <p>
-        AI features — job-description summaries, fit scores, outreach drafts and salary insights —
-        run only when you request them. For the feature you ask for, we send the relevant details to
+        AI features — job-description summaries, fit scores, outreach drafts, salary insights and résumé
+        checks — run only when you request them. For the feature you ask for, we send the relevant details to
         the AI provider configured for your account (OpenAI, Anthropic or OpenRouter, using your own
         API key if you have added one): for example the job title and company, the job description,
-        your résumé text, or a contact you added. The provider uses it only to generate the result we
+        your résumé text, the relevant parts of your career profile, or a contact you added. The provider uses it only to generate the result we
         show you. We send nothing else, and we never use this data to train AI models.
       </p>
       <p>

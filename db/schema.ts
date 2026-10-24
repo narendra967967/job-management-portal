@@ -964,3 +964,117 @@ export const guideTopics = pgTable(
     index("guide_topics_status_order_idx").on(t.status, t.sortOrder),
   ],
 );
+
+/**
+ * Career profile — what the user tells us about their career and job
+ * preferences (Settings → Career profile). One row per user; the repeatable
+ * parts live in the three tables below. Feeds the AI features (résumé ATS check,
+ * fit score, drafts) only. Name, email, phone and country stay on `user`.
+ * Shape + validation: lib/career-profile-model.ts.
+ */
+export const careerProfiles = pgTable("career_profiles", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  // Basic info
+  currentTitle: text("current_title").notNull().default(""),
+  city: text("city").notNull().default(""),
+  yearsExperience: integer("years_experience"),
+  linkedinUrl: text("linkedin_url").notNull().default(""),
+  portfolioUrl: text("portfolio_url").notNull().default(""),
+  // Professional summary (Markdown)
+  summary: text("summary").notNull().default(""),
+  // Skills
+  skills: text("skills").array().notNull().default(sql`'{}'::text[]`),
+  tools: text("tools").array().notNull().default(sql`'{}'::text[]`),
+  // Work eligibility
+  languages: text("languages").array().notNull().default(sql`'{}'::text[]`),
+  workCountries: text("work_countries").array().notNull().default(sql`'{}'::text[]`),
+  needsSponsorship: boolean("needs_sponsorship"),
+  sponsorshipCountries: text("sponsorship_countries").array().notNull().default(sql`'{}'::text[]`),
+  // Job preferences
+  targetRoles: text("target_roles").array().notNull().default(sql`'{}'::text[]`),
+  seniority: text("seniority").notNull().default(""),
+  workModes: text("work_modes").array().notNull().default(sql`'{}'::text[]`),
+  preferredLocations: text("preferred_locations").array().notNull().default(sql`'{}'::text[]`),
+  employmentTypes: text("employment_types").array().notNull().default(sql`'{}'::text[]`),
+  industries: text("industries").array().notNull().default(sql`'{}'::text[]`),
+  openToRelocate: boolean("open_to_relocate"),
+  noticePeriod: text("notice_period").notNull().default(""),
+  // Pay: amount in whole currency units; null amount = not given.
+  currentPayAmount: integer("current_pay_amount"),
+  currentPayCurrency: text("current_pay_currency"),
+  currentPayPeriod: text("current_pay_period"),
+  expectedPayAmount: integer("expected_pay_amount"),
+  expectedPayCurrency: text("expected_pay_currency"),
+  expectedPayPeriod: text("expected_pay_period"),
+  // Optional questions (self-identification; "" = not answered)
+  gender: text("gender").notNull().default(""),
+  disability: text("disability").notNull().default(""),
+  veteran: text("veteran").notNull().default(""),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date()),
+});
+
+export const workExperiences = pgTable(
+  "work_experiences",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    sortOrder: integer("sort_order").notNull().default(0),
+    title: text("title").notNull(),
+    company: text("company").notNull(),
+    location: text("location").notNull().default(""),
+    employmentType: text("employment_type").notNull().default(""),
+    startMonth: integer("start_month"),
+    startYear: integer("start_year"),
+    endMonth: integer("end_month"),
+    endYear: integer("end_year"),
+    isCurrent: boolean("is_current").notNull().default(false),
+    // Achievements, Markdown bullets.
+    description: text("description").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("work_experiences_user_order_idx").on(t.userId, t.sortOrder)],
+);
+
+export const educations = pgTable(
+  "educations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    sortOrder: integer("sort_order").notNull().default(0),
+    degree: text("degree").notNull(),
+    field: text("field").notNull().default(""),
+    institution: text("institution").notNull(),
+    startYear: integer("start_year"),
+    endYear: integer("end_year"),
+    grade: text("grade").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("educations_user_order_idx").on(t.userId, t.sortOrder)],
+);
+
+export const certifications = pgTable(
+  "certifications",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    sortOrder: integer("sort_order").notNull().default(0),
+    name: text("name").notNull(),
+    issuer: text("issuer").notNull().default(""),
+    year: integer("year"),
+    url: text("url").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("certifications_user_order_idx").on(t.userId, t.sortOrder)],
+);

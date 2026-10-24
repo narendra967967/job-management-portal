@@ -30,6 +30,7 @@ import {
   Pause,
   Play,
   BookOpen,
+  Briefcase,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
@@ -68,6 +69,7 @@ import {
 } from "@/lib/mock-store";
 import { buildGmailQuery } from "@/lib/use-gmail-settings";
 import { EmailForwardingCard } from "@/components/forwarding/email-forwarding-card";
+import { CareerProfileTab } from "@/components/career/career-profile-tab";
 import {
   COUNTRY_CODES,
   isValidEmail,
@@ -139,6 +141,7 @@ interface SettingsSection {
 
 const SECTION = {
   profile: { id: "profile", label: "Profile", icon: User, render: () => <ProfileCard /> },
+  career: { id: "career", label: "Career profile", icon: Briefcase, render: () => <CareerProfileTab /> },
   plan: { id: "plan", label: "Plan", icon: Crown, render: () => <PlanDetailsCard /> },
   forwarding: { id: "forwarding", label: "Email forwarding", icon: Forward, render: () => <EmailForwardingCard /> },
   google: { id: "google", label: "Gmail connection", icon: Mail, render: () => <GoogleCard /> },
@@ -159,7 +162,7 @@ const SECTION = {
 // Gmail switch is on (docs/email-forwarding.md §4a); forwarding is always listed.
 function settingsGroups(gmailEnabled: boolean): { label: string; items: SettingsSection[] }[] {
   return [
-    { label: "General", items: [SECTION.profile, SECTION.plan] },
+    { label: "General", items: [SECTION.profile, SECTION.career, SECTION.plan] },
     {
       label: "Email & sync",
       items: gmailEnabled
