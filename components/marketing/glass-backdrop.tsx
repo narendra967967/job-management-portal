@@ -25,23 +25,31 @@ const SCREEN_POOLS = [
   ["100%", "100%", "32rem", "26rem", "oklch(0.76 0.16 330 / 0.45)"],
 ] as const;
 
-// The signed-in app: pools in every corner so the sidebar, header and cards
-// all have colour behind them; the middle stays calmer for dense content.
+// The signed-in app: dimmer than the website — dusty, low-chroma pools on a
+// slightly greyer base, so long working sessions aren't bright. Pools sit in the
+// corners so the sidebar and header have tint; the middle stays calm.
 const APP_POOLS = [
-  ["94%", "0%", "38rem", "28rem", "oklch(0.66 0.2 277 / 0.55)"],
-  ["0%", "8%", "30rem", "26rem", "oklch(0.74 0.17 330 / 0.45)"],
-  ["58%", "52%", "36rem", "26rem", "oklch(0.8 0.13 192 / 0.45)"],
-  ["2%", "96%", "32rem", "26rem", "oklch(0.68 0.19 295 / 0.48)"],
-  ["100%", "100%", "34rem", "26rem", "oklch(0.76 0.16 330 / 0.42)"],
+  ["94%", "0%", "38rem", "28rem", "oklch(0.62 0.13 277 / 0.4)"],
+  ["0%", "8%", "30rem", "26rem", "oklch(0.68 0.1 330 / 0.3)"],
+  ["58%", "52%", "36rem", "26rem", "oklch(0.72 0.07 200 / 0.24)"],
+  ["2%", "96%", "32rem", "26rem", "oklch(0.62 0.12 295 / 0.36)"],
+  ["100%", "100%", "34rem", "26rem", "oklch(0.68 0.1 320 / 0.3)"],
 ] as const;
 
-export function GlassBackdrop({ variant = "page" }: { variant?: "page" | "screen" | "app" }) {
-  const pools = variant === "screen" ? SCREEN_POOLS : variant === "app" ? APP_POOLS : POOLS;
+const VARIANTS = {
+  page: { base: "oklch(0.975 0.008 280)", pools: POOLS },
+  screen: { base: "oklch(0.975 0.008 280)", pools: SCREEN_POOLS },
+  app: { base: "oklch(0.955 0.008 275)", pools: APP_POOLS },
+} as const;
+
+export function GlassBackdrop({ variant = "page" }: { variant?: keyof typeof VARIANTS }) {
+  const { base, pools } = VARIANTS[variant];
   return (
     <div
       aria-hidden
-      className="pointer-events-none absolute inset-0 -z-10 overflow-hidden bg-[oklch(0.975_0.008_280)]"
+      className="pointer-events-none absolute inset-0 -z-10 overflow-hidden"
       style={{
+        backgroundColor: base,
         backgroundImage: pools.map(
           ([x, y, w, h, c]) => `radial-gradient(${w} ${h} at ${x} ${y}, ${c}, transparent 70%)`,
         ).join(", "),

@@ -44,9 +44,18 @@ export default function AdminLoginPage() {
 
   return (
     <div className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4">
-      {/* Soft brand glow for depth on the dark panel. */}
-      <div aria-hidden className="pointer-events-none absolute -top-32 left-1/2 size-[32rem] -translate-x-1/2 rounded-full bg-primary/20 blur-3xl" />
-      <div aria-hidden className="pointer-events-none absolute -bottom-40 -right-24 size-96 rounded-full bg-[oklch(0.5_0.2_308_/_0.18)] blur-3xl" />
+      {/* Brand light pools on the dark panel — colour for the glass card to frost. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0"
+        style={{
+          backgroundImage: [
+            "radial-gradient(34rem 26rem at 50% 0%, oklch(0.55 0.2 277 / 0.45), transparent 70%)",
+            "radial-gradient(28rem 22rem at 100% 100%, oklch(0.5 0.18 308 / 0.35), transparent 70%)",
+            "radial-gradient(26rem 20rem at 0% 80%, oklch(0.55 0.1 200 / 0.22), transparent 70%)",
+          ].join(", "),
+        }}
+      />
       <div className="relative w-full max-w-sm">
         <div className="mb-6 flex flex-col items-center gap-3 text-center">
           {/* The mark is a gradient-on-transparent logo — seat it on a light tile
@@ -69,7 +78,7 @@ export default function AdminLoginPage() {
 
         <form
           onSubmit={submit}
-          className="space-y-4 rounded-2xl border border-slate-700 bg-slate-950/60 p-6 shadow-xl backdrop-blur"
+          className="space-y-4 rounded-3xl border border-white/10 bg-white/[0.06] p-6 shadow-2xl shadow-black/40 ring-1 ring-inset ring-white/5 backdrop-blur-xl sm:p-7"
         >
           <div className="space-y-1.5">
             <Label className="text-slate-200">Email</Label>
@@ -79,7 +88,7 @@ export default function AdminLoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="admin@jmp"
-              className="border-slate-700 bg-slate-900 text-white placeholder:text-slate-500"
+              className="h-11 border-white/10 bg-slate-950/50 text-white placeholder:text-slate-500"
             />
           </div>
 
@@ -91,13 +100,13 @@ export default function AdminLoginPage() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="border-slate-700 bg-slate-900 pr-9 text-white placeholder:text-slate-500"
+                className="h-11 border-white/10 bg-slate-950/50 pr-11 text-white placeholder:text-slate-500"
               />
               <button
                 type="button"
                 onClick={() => setShow((s) => !s)}
                 aria-label={show ? "Hide password" : "Show password"}
-                className="absolute top-1/2 right-2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+                className="absolute top-1/2 right-0 flex size-11 -translate-y-1/2 items-center justify-center text-slate-400 hover:text-slate-200"
               >
                 {show ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
               </button>
@@ -108,7 +117,7 @@ export default function AdminLoginPage() {
             <p className="rounded-lg bg-destructive/15 px-3 py-2 text-xs text-destructive">{error}</p>
           )}
 
-          <Button type="submit" disabled={busy} className="w-full justify-center gap-2">
+          <Button type="submit" disabled={busy} className="h-11 w-full justify-center gap-2">
             {busy && <Loader2 className="size-4 animate-spin" aria-hidden />}
             {busy ? "Signing in…" : "Sign in"}
           </Button>

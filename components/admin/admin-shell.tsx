@@ -31,6 +31,7 @@ import {
 import { cn } from "@/lib/utils";
 import { adminSignOut } from "@/lib/auth-admin-client";
 import { AdminNotesButton } from "@/components/admin/admin-notes-button";
+import { AdminBackdrop } from "@/components/admin/admin-backdrop";
 
 interface Item {
   href?: string;
@@ -245,9 +246,10 @@ export function AdminShell({
   }
 
   return (
-    <div className="flex h-dvh flex-col overflow-hidden bg-muted/30 md:flex-row">
-      {/* Desktop sidebar — fixed; scrolls on its own only if it overflows. */}
-      <aside className="hidden w-60 shrink-0 flex-col justify-between overflow-y-auto bg-slate-900 p-4 md:flex">
+    <div className="admin-glass relative isolate flex h-dvh flex-col overflow-hidden md:flex-row">
+      <AdminBackdrop />
+      {/* Desktop sidebar — dark glass; scrolls on its own only if it overflows. */}
+      <aside className="hidden w-60 shrink-0 flex-col justify-between overflow-y-auto border-r border-white/10 bg-slate-900/88 p-4 backdrop-blur-xl md:flex">
         <div className="flex flex-col gap-5">
           <Brand />
           <div className="flex flex-col gap-3">
@@ -266,7 +268,7 @@ export function AdminShell({
       </aside>
 
       {/* Mobile top bar + nav row */}
-      <div className="flex shrink-0 items-center justify-between bg-slate-900 px-4 py-3 md:hidden">
+      <div className="flex shrink-0 items-center justify-between bg-slate-900/90 px-4 py-3 backdrop-blur-xl md:hidden">
         <Brand />
         <button
           type="button"
@@ -277,7 +279,7 @@ export function AdminShell({
           <LogOut className="size-4" aria-hidden />
         </button>
       </div>
-      <div className="flex shrink-0 gap-1 overflow-x-auto bg-slate-900/95 px-3 pb-3 md:hidden">
+      <div className="flex shrink-0 gap-1 overflow-x-auto bg-slate-900/90 px-3 pb-3 backdrop-blur-xl md:hidden">
         {mobileLinks.map((it) => {
           const Icon = it.icon;
           const active = isActive(pathname, it.href);
@@ -299,7 +301,7 @@ export function AdminShell({
 
       {/* Main */}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="flex shrink-0 items-center gap-3 border-b bg-card px-4 py-3 md:px-6">
+        <header className="flex shrink-0 items-center gap-3 border-b border-white/70 bg-white/55 px-4 py-3 backdrop-blur-md md:px-6">
           <h1 className="text-base font-semibold md:text-lg">{title}</h1>
           <AdminNotesButton />
         </header>

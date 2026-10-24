@@ -337,6 +337,17 @@
   }
 }
 
+/* Glassmorphism — the admin panel (own class so it can diverge from the user
+   app). Same idea as .app-glass: translucent cards over AdminBackdrop. */
+.admin-glass {
+  --card: color-mix(in oklch, white 70%, transparent);
+  --border: oklch(0.88 0.012 270 / 0.85);
+  @media (prefers-reduced-transparency: reduce) {
+    --card: oklch(1 0 0);
+    --border: oklch(0.905 0.008 274);
+  }
+}
+
 /* Accessibility: honour the OS "reduce motion" setting — neutralise animations
    and transitions app-wide (incl. tw-animate-css enter/exit effects). */
 @media (prefers-reduced-motion: reduce) {
