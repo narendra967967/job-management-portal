@@ -73,6 +73,11 @@ config/infra only: DNS → TLS → `BETTER_AUTH_URL` → Nginx → Google OAuth 
   restricted-scope connections expire after 7 days until the app is verified). Gmail API enabled; only
   `gmail.readonly` requested.
 - App env: `/srv/jobtiva/env/{preprod,prod}.env` on the server, `.env.local` on the laptop.
+- **Email forwarding (2026-10-24):** `in.jobtiva.in` and `in.preprod.jobtiva.in` each have an **A** record →
+  13.205.239.50 and an **MX** record (priority 10) pointing at themselves. They only receive mail (port 25, the
+  `mail-in` container); Nginx serves them just for Let's Encrypt's check. TLS: one cert `mail-in` covering
+  both, renewed by the certbot timer, with a deploy hook copying it to `/srv/jobtiva/mail-tls`.
+  Setup and checks: `VPS.md` section 4b. These records don't touch mail for `jobtiva.in` itself.
 
 ## Cutover steps (template)
 

@@ -40,10 +40,12 @@ so a surprise shows up by email, not on the bill.
 
 | Path | What | Source |
 |---|---|---|
-| `docker-compose.yml`, `*.sh`, `crontab.txt`, `nginx/` | deploy kit | synced by CI on every deploy (`deploy/vps/`) |
+| `docker-compose.yml`, `*.sh`, `crontab.txt`, `nginx/`, `fail2ban/` | deploy kit | synced by CI on every deploy (`deploy/vps/`) |
 | `jmp-cron.sh` | cron caller | synced by CI (`scripts/cron/`) |
-| `.env` | DB passwords + `PROD_IMAGE`/`PREPROD_IMAGE` | **by hand** once, from `compose.env.example`; `deploy.sh` updates the image tags |
+| `.env` | DB passwords + `PROD_IMAGE`/`PREPROD_IMAGE`/`MAIL_IN_IMAGE` + `COMPOSE_PROFILES=mail` | **by hand** once, from `compose.env.example`; `deploy.sh` updates the image tags |
 | `env/prod.env`, `env/preprod.env` | app env | **by hand**, from `app.env.example`. **Unquoted values**, `chmod 600` |
+| `env/mail-in.env` | mail receiver env (`INBOUND_SECRET`) | **by hand**, from `mail-in.env.example`; same perms as `prod.env` |
+| `mail-tls/` | STARTTLS cert for mail-in (uid 1001) | the Certbot deploy hook (section 4b) |
 | `backups/` | nightly dumps (14 days) | `backup.sh` |
 | `logs/` | cron + backup logs | crontab |
 | `incoming/` | image tarballs during a deploy | CI (deleted after load) |
@@ -126,8 +128,8 @@ cat > /etc/docker/daemon.json <<'EOF'
 EOF
 systemctl restart docker
 
-# Firewall
-ufw default deny incoming && ufw allow OpenSSH && ufw allow 'Nginx Full' && ufw --force enable
+# Firewall (25/tcp is the email-forwarding receiver, section 4b; also open in the AWS security group)
+ufw default deny incoming && ufw allow OpenSSH && ufw allow 'Nginx Full' && ufw allow 25/tcp && ufw --force enable
 
 # Deploy user: used by you and by CI; can run docker, no sudo
 adduser --disabled-password --gecos "" deploy
@@ -337,6 +339,80 @@ Lessons worth keeping:
 
 ---
 
+## 4b. Email forwarding receiver (`mail-in`) — set up 2026-10-24
+
+Users forward job-alert emails from Gmail to `<token>@in.jobtiva.in` (prod) or
+`<token>@in.preprod.jobtiva.in` (preprod). Design and security: `docs/email-forwarding.md`.
+
+```
+Gmail ──SMTP :25 (STARTTLS)──► mail-in container (scripts/mail-in.mjs, port 2525, non-root)
+   checks the recipient with the app, spools to disk, answers at once
+   └─► dispatcher ──POST /api/inbound/email (INBOUND_SECRET, Docker network)──► app-prod / app-preprod
+```
+
+- **Runs from the prod image.** `deploy.sh prod` sets `MAIL_IN_IMAGE` to the new prod image and restarts
+  mail-in. Until prod has the feature, it's pinned by hand to `PREPROD_IMAGE`.
+- **Starts only with the profile:** `COMPOSE_PROFILES=mail` in `.env`.
+- **Routes by domain:** `in.jobtiva.in` → app-prod, `in.preprod.jobtiva.in` → app-preprod (`INBOUND_ROUTES`
+  in `docker-compose.yml`).
+
+How it was set up:
+
+1. **DNS** (HostingRaja): `A in` and `A in.preprod` → 13.205.239.50; `MX in` → `in.jobtiva.in` (priority 10),
+   `MX in.preprod` → `in.preprod.jobtiva.in` (10). See `DOMAIN.md`.
+2. **Nginx (ACME only):** `nginx/in.jobtiva.in.conf` → `/etc/nginx/sites-available/` (+ symlink). It serves
+   `/var/www/certbot` for Let's Encrypt's check and returns 404 for everything else.
+3. **Certificate** (one cert, both names, named `mail-in`):
+   ```bash
+   cp /srv/jobtiva/certbot-mail-in-hook.sh /etc/letsencrypt/mail-in-deploy-hook.sh && chmod 755 /etc/letsencrypt/mail-in-deploy-hook.sh
+   certbot certonly --webroot -w /var/www/certbot -d in.jobtiva.in -d in.preprod.jobtiva.in \
+     --cert-name mail-in --deploy-hook /etc/letsencrypt/mail-in-deploy-hook.sh
+   ```
+   The hook copies the cert to `/srv/jobtiva/mail-tls` (owner 1001, key 600) and restarts mail-in after every
+   renewal. Check: `certbot renew --cert-name mail-in --dry-run`.
+4. **Port 25:** AWS security group `jobtiva-sg` inbound SMTP 0.0.0.0/0, plus `ufw allow 25/tcp`. Docker's
+   published ports bypass ufw, so **the security group is the real gate**. (AWS restricts *outbound* 25 only;
+   we never send on 25.)
+5. **Secret + env:** one `INBOUND_SECRET` (`openssl rand -hex 32`) in `env/mail-in.env`, `env/prod.env` and
+   `env/preprod.env`; plus `INBOUND_DOMAIN=in.jobtiva.in` (prod) / `in.preprod.jobtiva.in` (preprod).
+6. **Block the internal endpoints from the internet:** in each live site config, above `location /api/support/`:
+   `location /api/inbound/ { return 404; }`. (Certbot edited the live files, so insert it rather than
+   copying the repo files over them. Backups are in `/etc/nginx/backup-<date>/`.)
+7. **Start:** in `.env`, set `MAIL_IN_IMAGE` and `COMPOSE_PROFILES=mail`, then `docker compose up -d mail-in`.
+8. **fail2ban** (as root):
+   ```bash
+   apt-get install -y fail2ban python3-systemd
+   cp /srv/jobtiva/fail2ban/jobtiva-mail-in.filter.conf /etc/fail2ban/filter.d/jobtiva-mail-in.conf
+   cp /srv/jobtiva/fail2ban/jobtiva-mail-in.jail.local /etc/fail2ban/jail.d/jobtiva-mail-in.local
+   systemctl enable --now fail2ban && systemctl restart fail2ban
+   ```
+   mail-in logs to the journal (tag `mail-in`). The jail bans after 10 "throttled"/"smtp error" lines in
+   10 min, for 1 h, in **`DOCKER-USER`**: Docker traffic never passes `INPUT`, and the jail must set
+   `chain = DOCKER-USER` itself. Unknown-address rejections are never counted (banning Gmail would break
+   forwarding for everyone).
+
+**Checks** (as `deploy` in `/srv/jobtiva`, unless noted):
+
+| What | Command |
+|---|---|
+| Running + TLS | `docker compose ps mail-in`; root: `echo QUIT \| openssl s_client -starttls smtp -connect 127.0.0.1:25 -brief` |
+| Receiver problems (it only logs problems) | `docker compose logs --tail 50 mail-in` |
+| Mail waiting to reach the app | `docker compose exec mail-in ls -l /data/mail-spool` |
+| What the app did with recent emails | `docker compose exec postgres psql -U postgres -d jmp_preprod -c "select received_at, status, reason from inbound_email_log order by received_at desc limit 10;"` |
+| Bans (root) | `fail2ban-client status jobtiva-mail-in` · unban: `fail2ban-client set jobtiva-mail-in unbanip <ip>` |
+| Bans really land in Docker's chain (root) | `iptables -S DOCKER-USER` shows `-j f2b-jobtiva-mail-in` |
+
+**Troubleshooting:**
+- No log row at all → the email never reached us (Gmail delay or throttle, DNS, port 25).
+- A row with `rejected` → its `reason` says why.
+- Gmail's "Re-send email" can be throttled. Removing and re-adding the forwarding address sends a fresh
+  confirmation.
+
+**When prod gets the feature:** `deploy.sh prod` moves mail-in onto the prod image automatically. Check
+`MAIL_IN_IMAGE` = `PROD_IMAGE` afterwards, then test a forwarding address on `in.jobtiva.in`.
+
+---
+
 ## 5. Day-2 operations
 
 All commands run as `deploy` in `/srv/jobtiva`.
@@ -351,6 +427,7 @@ All commands run as `deploy` in `/srv/jobtiva`.
 | Run a cron job now | `./cron-run.sh prod sync` |
 | Backup now | `./backup.sh` |
 | psql | `docker compose exec postgres psql -U postgres -d jmp_prod` |
+| Email forwarding receiver | `docker compose logs --tail 50 mail-in` · checks and troubleshooting in section 4b |
 
 ### Restore from a backup
 
