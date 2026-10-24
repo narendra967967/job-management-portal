@@ -319,6 +319,24 @@
   }
 }
 
+/* Glassmorphism — the signed-in app. The dashboard shell sits on GlassBackdrop
+   and this class turns its card and sidebar surfaces translucent, so the colour
+   shows through. No backdrop-filter here: the surfaces sit over a smooth
+   gradient, where blur looks identical but costs paint time on long lead lists.
+   Menus and dialogs render in portals outside the shell, so they stay solid. */
+.app-glass {
+  --card: color-mix(in oklch, white 68%, transparent);
+  --sidebar: color-mix(in oklch, white 52%, transparent);
+  --sidebar-border: color-mix(in oklch, white 80%, transparent);
+  --border: oklch(0.89 0.012 274 / 0.85);
+  @media (prefers-reduced-transparency: reduce) {
+    --card: oklch(1 0 0);
+    --sidebar: oklch(0.984 0.006 274);
+    --sidebar-border: oklch(0.905 0.008 274);
+    --border: oklch(0.905 0.008 274);
+  }
+}
+
 /* Accessibility: honour the OS "reduce motion" setting — neutralise animations
    and transitions app-wide (incl. tw-animate-css enter/exit effects). */
 @media (prefers-reduced-motion: reduce) {

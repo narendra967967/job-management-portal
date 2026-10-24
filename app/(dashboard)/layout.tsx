@@ -27,6 +27,7 @@ import { guardMaintenance } from "@/lib/maintenance";
 import { getAppName } from "@/lib/branding";
 import { loadWorkspace } from "@/lib/queries";
 import { WorkspaceProvider } from "@/lib/workspace-provider";
+import { GlassBackdrop } from "@/components/marketing/glass-backdrop";
 
 // Per-user, session-gated routes — never statically prerendered (no DB at build).
 export const dynamic = "force-dynamic";
@@ -54,7 +55,9 @@ export default async function DashboardLayout({
     <AutoSync />
     <ContactSupportProvider>
     <AddLeadProvider>
-    <div className="flex h-dvh flex-col overflow-hidden bg-background md:flex-row">
+    <div className="app-glass relative isolate flex h-dvh flex-col overflow-hidden md:flex-row">
+      {/* Fixed colour field behind the glass surfaces; <main> scrolls over it. */}
+      <GlassBackdrop variant="app" />
       {/* Desktop sidebar */}
       <aside className="hidden w-60 shrink-0 flex-col overflow-y-auto border-r border-sidebar-border bg-sidebar md:flex">
         <div className="flex h-16 shrink-0 items-center border-b border-sidebar-border px-4">
@@ -66,7 +69,7 @@ export default async function DashboardLayout({
 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {/* Top app bar */}
-        <header className="shrink-0 border-b bg-card/70 shadow-[0_1px_2px_-1px_oklch(0.51_0.24_277_/_0.12)] backdrop-blur-md">
+        <header className="shrink-0 border-b border-white/80 bg-white/55 shadow-[0_1px_2px_-1px_oklch(0.51_0.24_277_/_0.12)] backdrop-blur-md">
           <div className="flex h-16 items-center gap-2 px-4 md:gap-3 md:px-6">
             <MobileNav name={appName} />
             <div className="md:hidden">

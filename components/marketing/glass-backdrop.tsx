@@ -25,8 +25,18 @@ const SCREEN_POOLS = [
   ["100%", "100%", "32rem", "26rem", "oklch(0.76 0.16 330 / 0.45)"],
 ] as const;
 
-export function GlassBackdrop({ variant = "page" }: { variant?: "page" | "screen" }) {
-  const pools = variant === "screen" ? SCREEN_POOLS : POOLS;
+// The signed-in app: pools in every corner so the sidebar, header and cards
+// all have colour behind them; the middle stays calmer for dense content.
+const APP_POOLS = [
+  ["94%", "0%", "38rem", "28rem", "oklch(0.66 0.2 277 / 0.55)"],
+  ["0%", "8%", "30rem", "26rem", "oklch(0.74 0.17 330 / 0.45)"],
+  ["58%", "52%", "36rem", "26rem", "oklch(0.8 0.13 192 / 0.45)"],
+  ["2%", "96%", "32rem", "26rem", "oklch(0.68 0.19 295 / 0.48)"],
+  ["100%", "100%", "34rem", "26rem", "oklch(0.76 0.16 330 / 0.42)"],
+] as const;
+
+export function GlassBackdrop({ variant = "page" }: { variant?: "page" | "screen" | "app" }) {
+  const pools = variant === "screen" ? SCREEN_POOLS : variant === "app" ? APP_POOLS : POOLS;
   return (
     <div
       aria-hidden
