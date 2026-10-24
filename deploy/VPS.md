@@ -408,6 +408,16 @@ How it was set up:
 - Gmail's "Re-send email" can be throttled. Removing and re-adding the forwarding address sends a fresh
   confirmation.
 
+**AI reader sweep (cron, required):** emails read by the AI are tried once on arrival; **retries and leftovers only happen
+through the sweep** (`cron-run.sh <env> ai`, every 5 min, in `crontab.txt`). Without it, a failed AI read waits
+in `inbound_ai_queue` indefinitely. Until prod has the feature, install the crontab **without prod's AI line**
+(it would only log "not found"):
+```bash
+grep -v 'cron-run.sh prod ai' crontab.txt | crontab -     # preprod-only, until prod has 4i
+crontab crontab.txt                                     # in full, once prod has it
+```
+Run it once by hand: `./cron-run.sh preprod ai` → `ai -> 200`.
+
 **When prod gets the feature:** `deploy.sh prod` moves mail-in onto the prod image automatically. Check
 `MAIL_IN_IMAGE` = `PROD_IMAGE` afterwards, then test a forwarding address on `in.jobtiva.in`.
 
