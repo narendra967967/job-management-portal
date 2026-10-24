@@ -4,6 +4,7 @@ import { Cog } from "lucide-react";
 import { db } from "@/lib/db";
 import { appSettings } from "@/db/schema";
 import { DEFAULT_APP_NAME } from "@/lib/branding";
+import { GlassBackdrop } from "@/components/marketing/glass-backdrop";
 
 // Public maintenance screen. Only shown while maintenance mode is on; otherwise
 // it bounces back to the app. No auth, no app chrome — a standalone page.
@@ -21,47 +22,42 @@ export default async function MaintenancePage() {
   const supportEmail = s.supportEmail ?? "";
 
   return (
-    <main className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 px-4 py-10">
-      {/* soft colour wash for depth */}
-      <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -top-24 -left-24 size-96 rounded-full bg-indigo-600/20 blur-3xl" />
-        <div className="absolute -right-16 -bottom-32 size-96 rounded-full bg-fuchsia-600/20 blur-3xl" />
-        <div className="absolute top-1/3 left-1/2 size-72 -translate-x-1/2 rounded-full bg-sky-500/10 blur-3xl" />
-      </div>
+    <main className="relative isolate flex min-h-dvh items-center justify-center overflow-hidden px-4 py-10">
+      <GlassBackdrop variant="screen" />
 
-      <div className="relative z-10 w-full max-w-lg">
-        <div className="rounded-3xl border border-white/10 bg-white/5 p-8 text-center shadow-2xl backdrop-blur-xl sm:p-10">
+      <div className="w-full max-w-lg">
+        <div className="glass-strong rounded-3xl p-6 text-center sm:p-10">
           <div className="relative mx-auto mb-6 flex size-20 items-center justify-center">
-            <span className="absolute inset-0 animate-ping rounded-full bg-indigo-500/20" />
-            <span className="absolute inset-0 rounded-full border border-white/10" />
+            <span className="absolute inset-0 animate-ping rounded-full bg-primary/15" />
+            <span className="absolute inset-0 rounded-full bg-white/60 ring-1 ring-white" />
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/api/branding/logo" alt={appName} className="relative size-14 rounded-full object-cover" />
           </div>
 
-          <div className="mb-4 inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-indigo-200">
+          <div className="glass-subtle mb-4 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium text-primary">
             <Cog className="size-3.5 animate-[spin_5s_linear_infinite]" aria-hidden />
             Scheduled maintenance
           </div>
 
-          <h1 className="text-2xl font-semibold text-white sm:text-3xl">We’ll be right back</h1>
-          <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-slate-300 sm:text-base">
+          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">We’ll be right back</h1>
+          <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-muted-foreground sm:text-base">
             {appName} is offline for a short spell of maintenance while we tidy a few things up.
             It’ll be back shortly — thanks for your patience.
           </p>
 
           {supportEmail && (
-            <p className="mt-6 text-sm text-slate-400">
+            <p className="mt-6 text-sm text-muted-foreground">
               Need something urgent?{" "}
               <a
                 href={`mailto:${supportEmail}`}
-                className="font-medium text-indigo-300 underline-offset-4 hover:underline"
+                className="inline-flex min-h-11 items-center font-medium text-primary underline-offset-4 hover:underline"
               >
                 {supportEmail}
               </a>
             </p>
           )}
         </div>
-        <p className="mt-6 text-center text-xs text-slate-500">{appName}</p>
+        <p className="mt-6 text-center text-xs text-muted-foreground">{appName}</p>
       </div>
     </main>
   );

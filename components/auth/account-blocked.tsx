@@ -17,11 +17,13 @@ import {
 import { RichText } from "@/components/ui/rich-text";
 import { signOutToHome } from "@/lib/auth-client";
 import { requestReactivationAction } from "@/actions/account";
+import { GlassBackdrop } from "@/components/marketing/glass-backdrop";
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-dvh items-center justify-center overflow-hidden bg-gradient-to-br from-sidebar-accent/40 via-background to-background p-6">
-      <div className="w-full max-w-md rounded-2xl border bg-card p-8 text-center shadow-sm">{children}</div>
+    <div className="relative isolate flex min-h-dvh items-center justify-center overflow-hidden px-4 py-10 sm:px-6">
+      <GlassBackdrop variant="screen" />
+      <div className="glass-strong w-full max-w-md rounded-3xl p-6 text-center sm:p-8">{children}</div>
     </div>
   );
 }
@@ -73,11 +75,11 @@ export function DeactivatedNotice({ name }: { name: string }) {
       </p>
 
       <div className="mt-6 flex flex-col gap-2">
-        <Button className="h-10 w-full gap-2" onClick={() => setOpen(true)}>
+        <Button className="h-11 w-full gap-2" onClick={() => setOpen(true)}>
           <Mail className="size-4" aria-hidden />
           Email the admin
         </Button>
-        <Button variant="outline" className="h-10 w-full gap-2" onClick={() => signOutToHome()}>
+        <Button variant="outline" className="h-11 w-full gap-2 bg-white/60" onClick={() => signOutToHome()}>
           <LogOut className="size-4" aria-hidden />
           Log out
         </Button>
@@ -135,8 +137,8 @@ export function RenewNotice({ name }: { name: string }) {
         left off — your data is safe and waiting.
       </p>
       <div className="mt-6 flex flex-col gap-2">
-        <Button className="h-10 w-full" disabled>Renew plan</Button>
-        <Button variant="outline" className="h-10 w-full gap-2" onClick={() => signOutToHome()}>
+        <Button className="h-11 w-full" disabled>Renew plan</Button>
+        <Button variant="outline" className="h-11 w-full gap-2 bg-white/60" onClick={() => signOutToHome()}>
           <LogOut className="size-4" aria-hidden />
           Log out
         </Button>
