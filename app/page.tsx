@@ -3,9 +3,10 @@
 // /login and self-registration at /signup (shown only when the admin enables it).
 //
 // Positioning: Jobtiva is an *intentional* job-search workspace — manage the roles
-// that are right for you and apply well, not a mass-apply automation tool. The hero
-// and features stay platform-agnostic, but the FAQ names Gmail and why it is used:
-// Google's OAuth verification requires the homepage to explain the data access.
+// that are right for you and apply well, not a mass-apply automation tool. Leads
+// come in by email forwarding; the FAQ says plainly that Jobtiva only sees what
+// users forward. While "Connect Gmail" is switched on (admin), the FAQ also
+// explains its Gmail access — Google's OAuth verification requires that.
 
 import Link from "next/link";
 import {
@@ -26,20 +27,21 @@ import { Faq } from "@/components/marketing/faq";
 import { getAppName, getTagline, getSupportEmail } from "@/lib/branding";
 import { isRegistrationOpen } from "@/lib/plans";
 import { getSessionUserId } from "@/lib/current-user";
+import { isGmailOAuthEnabled, supportedSitesText } from "@/lib/email-intake-data";
 
 export const dynamic = "force-dynamic";
 
 const FEATURES = [
-  { icon: Inbox, title: "Capture every opportunity", body: "Job alerts from your inbox become tracked leads automatically — no copy-paste, nothing slips by." },
+  { icon: Inbox, title: "Capture every opportunity", body: "Forward the job alerts you already get and they become tracked leads automatically — no copy-paste, nothing slips by." },
   { icon: Gauge, title: "AI fit scoring", body: "One click summarizes a role and scores how well it fits you — so you spend time on the ones worth it." },
   { icon: LayoutGrid, title: "A pipeline you keep", body: "Move every lead through tidy stages — new, shortlisted, applied, interview, offer — on a board you actually maintain." },
   { icon: Send, title: "Apply with better content", body: "Draft tailored applications and outreach with AI, then send them yourself. Jobtiva never applies for you." },
   { icon: Bell, title: "Reminders that stick", body: "Follow-up nudges and to-dos so a role that's right for you never falls through the cracks." },
-  { icon: ShieldCheck, title: "Private by design", body: "Any account you connect is read-only, your data stays yours, and nothing leaves without you." },
+  { icon: ShieldCheck, title: "Private by design", body: "We never open your mailbox — only the alerts you choose to forward. Your data stays yours, and nothing leaves without you." },
 ];
 
 const STEPS = [
-  { n: "1", title: "Bring in opportunities", body: "Connect the accounts where your job alerts arrive — they flow in as tracked leads." },
+  { n: "1", title: "Bring in opportunities", body: "Forward your job alerts to your private address once — from then on they flow in as tracked leads." },
   { n: "2", title: "Research & score", body: "AI summarizes each role and scores the fit, so you focus on the ones that are right for you." },
   { n: "3", title: "Apply & track", body: "Draft a strong application with AI, apply yourself, set reminders, and follow each one to offer." },
 ];
@@ -52,12 +54,14 @@ const BOARD: { label: string; count: number; cards: { role: string; co: string; 
 ];
 
 export default async function LandingPage() {
-  const [appName, tagline, signupAllowed, supportEmail, sessionId] = await Promise.all([
+  const [appName, tagline, signupAllowed, supportEmail, sessionId, gmailOn, sites] = await Promise.all([
     getAppName(),
     getTagline(),
     isRegistrationOpen(),
     getSupportEmail(),
     getSessionUserId(),
+    isGmailOAuthEnabled(),
+    supportedSitesText(),
   ]);
   const loggedIn = !!sessionId;
 
@@ -68,19 +72,27 @@ export default async function LandingPage() {
     },
     {
       q: "How do job leads get in?",
-      a: "Connect the Gmail account where your job alerts arrive and they flow in as tracked leads automatically — no copy-paste. You can also add leads by hand or paste a job post. More sources are on the roadmap.",
+      a: `You get a private ${appName} address. Set up a filter in Gmail once, and the job alerts you already receive from ${sites} are forwarded there and become tracked leads within seconds — no copy-paste. You can also forward an alert by hand, add a lead yourself, or paste a job post.`,
     },
     {
-      q: `Why does ${appName} ask for access to my Gmail?`,
-      a: `Connecting Gmail is optional. If you connect it, ${appName} gets read-only access (Google's gmail.readonly permission) and uses it for one thing: finding your job-alert emails — LinkedIn alerts by default — and turning them into tracked leads. It never sends, changes or deletes email, and doesn't read anything else. You can disconnect any time from Settings. Full details are in our Privacy policy.`,
+      q: `Does ${appName} read my email?`,
+      a: `No. ${appName} never opens your mailbox. It only sees the emails you forward to your private address, accepts them only when they genuinely come from a supported job site (their digital signature is checked), and keeps just the job details — not the email itself. Stop forwarding at any time by removing the Gmail filter.`,
     },
+    ...(gmailOn
+      ? [
+          {
+            q: `Why does ${appName} offer to connect my Gmail?`,
+            a: `Connecting Gmail is optional — forwarding works without it. If you connect it, ${appName} gets read-only access (Google's gmail.readonly permission) and uses it for one thing: finding your job-alert emails — LinkedIn alerts by default — and turning them into tracked leads. It never sends, changes or deletes email, and doesn't read anything else. You can disconnect any time from Settings. Full details are in our Privacy policy.`,
+          },
+        ]
+      : []),
     {
       q: "Is my data private?",
-      a: "Yes. Gmail access is strictly read-only and limited to your job-alert emails, your data stays yours, and nothing leaves without you — it's never sold or used for advertising. You can disconnect any time from Settings.",
+      a: `Yes. Your data stays yours and nothing leaves without you — it's never sold or used for advertising. Only the job alerts you forward reach ${appName}, and from those we keep the job details, not the emails.`,
     },
     {
       q: "What does the AI actually do?",
-      a: "It summarizes each role, scores how well it fits you, and drafts tailored applications and outreach — so you spend time on the right roles and apply better. It never sends or applies on your behalf.",
+      a: "It summarizes each role, scores how well it fits you, and drafts tailored applications and outreach — so you spend time on the right roles and apply better. If you add your own AI key, it can also read job emails from sites we don't support yet. It never sends or applies on your behalf.",
     },
     {
       q: `Who is ${appName} for?`,

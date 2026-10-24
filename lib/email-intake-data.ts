@@ -22,6 +22,7 @@ import type {
   MyForwarding,
   UserForwardingStatus,
 } from "@/lib/email-intake-model";
+import { siteLabel } from "@/lib/email-intake-model";
 
 /** Domain users forward to in this environment (e.g. in.jobtiva.in). */
 export function receivingDomain(): string {
@@ -155,6 +156,15 @@ export async function userIdForToken(token: string): Promise<string | null> {
 }
 
 /* ---------------- senders ---------------- */
+
+/** The job sites forwarding accepts right now, for public copy:
+ *  "LinkedIn, Naukri and TimesJobs" (from the enabled allowed senders). */
+export async function supportedSitesText(): Promise<string> {
+  const senders = await loadSenders();
+  const names = [...new Set(senders.filter((s) => s.enabled).map((s) => siteLabel(s.signingDomain)))];
+  if (!names.length) return "your job sites";
+  return names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+}
 
 export async function loadSenders(): Promise<InboundSender[]> {
   const rows = await db.select().from(sendersT).orderBy(sendersT.createdAt, sendersT.match);

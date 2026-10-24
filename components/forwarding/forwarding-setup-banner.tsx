@@ -26,8 +26,8 @@ export function ForwardingSetupBanner() {
         </p>
         <p className="text-xs text-muted-foreground">
           {midway
-            ? "One more step in Gmail and your LinkedIn job alerts will start arriving here."
-            : "Forward LinkedIn job alerts from Gmail to your private Jobtiva address — a 2-minute, one-time setup."}
+            ? "One more step in Gmail and your job alerts will start arriving here."
+            : "Forward your job alerts from Gmail to your private Jobtiva address — a 2-minute, one-time setup."}
         </p>
       </div>
       <Link

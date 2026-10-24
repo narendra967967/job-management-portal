@@ -229,7 +229,7 @@ export default function SettingsPage() {
       <div className="flex flex-wrap items-baseline gap-x-2">
         <h1 className="text-lg font-semibold tracking-tight">Settings</h1>
         <p className="hidden text-sm text-muted-foreground sm:block">
-          Manage your profile, resumes, and Google connection.
+          Manage your profile, resumes, and how job alerts reach you.
         </p>
       </div>
 
@@ -984,7 +984,7 @@ function IngestionIssuesCard() {
       category: "bug",
       subject: "Problem with Gmail sync / ingestion",
       source: "ingestion-issues",
-      message: `<p>I'm seeing ingestion issues when my LinkedIn alerts are synced:</p><ul>${list}</ul><p>&nbsp;</p>`,
+      message: `<p>I'm seeing ingestion issues with my job alerts:</p><ul>${list}</ul><p>&nbsp;</p>`,
     });
   }
 

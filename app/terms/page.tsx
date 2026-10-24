@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { LegalLayout } from "@/components/marketing/legal-layout";
 import { getAppName, getSupportEmail } from "@/lib/branding";
+import { isGmailOAuthEnabled } from "@/lib/email-intake-data";
 
 export const dynamic = "force-dynamic";
 
@@ -10,9 +11,9 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function TermsPage() {
-  const [appName, supportEmail] = await Promise.all([getAppName(), getSupportEmail()]);
+  const [appName, supportEmail, gmailOn] = await Promise.all([getAppName(), getSupportEmail(), isGmailOAuthEnabled()]);
   return (
-    <LegalLayout title="Terms & conditions" updated="October 2026">
+    <LegalLayout title="Terms & conditions" updated="24 October 2026">
       <p>
         These Terms &amp; Conditions (&ldquo;Terms&rdquo;) govern your use of {appName} (the
         &ldquo;Service&rdquo;). By creating an account or using the Service, you agree to these Terms. If
@@ -33,12 +34,40 @@ export default async function TermsPage() {
         <li>Notify us promptly of any unauthorized use.</li>
       </ul>
 
+      <h2>Plans</h2>
+      <p>
+        Some features depend on your plan. Plan details are shown in the app; for any paid plan, the
+        price, billing period and renewal terms are shown before you buy.
+      </p>
+
+      <h2>Email forwarding</h2>
+      <ul>
+        <li>
+          Your forwarding address is personal — keep it private. If it is shared by mistake, reset it in
+          Settings; the old address stops working immediately.
+        </li>
+        <li>
+          Forward only emails you are entitled to share with us: your own job alerts. Do not forward other
+          people&rsquo;s email or sensitive personal mail.
+        </li>
+        <li>
+          We accept only emails that genuinely come from a supported job site (or that you forward yourself
+          from your own address). Anything else, and anything over our size or volume limits, is discarded
+          without notice.
+        </li>
+        <li>
+          Supported sites may change, and forwarding may be paused for maintenance or security; job alerts
+          sent during a pause may not be imported.
+        </li>
+      </ul>
+
       <h2>Acceptable use</h2>
       <p>You agree not to misuse the Service, including by:</p>
       <ul>
         <li>breaking the law or infringing others&rsquo; rights;</li>
         <li>attempting to disrupt, reverse-engineer, or gain unauthorized access to the Service;</li>
-        <li>using the Service to send spam or unsolicited messages.</li>
+        <li>using the Service to send spam or unsolicited messages;</li>
+        <li>sending email to {appName} addresses that you are not entitled to share, or sending large volumes to overload the Service.</li>
       </ul>
 
       <h2>Your content</h2>
@@ -49,9 +78,11 @@ export default async function TermsPage() {
 
       <h2>Third-party services</h2>
       <p>
-        The Service integrates with third parties you choose to connect, including Google (read-only
-        Gmail) and our AI provider. Your use of those integrations is also subject to their terms. Our
-        handling of your data is described in our{" "}
+        The Service works with third parties you choose to use, including the job sites whose alerts you
+        forward{gmailOn ? ", Google (read-only Gmail, if you connect it)" : ""} and AI providers. Your use of
+        those services is also subject to their terms. If you add your own AI key, AI features — including
+        reading job emails we can&rsquo;t read automatically — run on your account with that provider, and
+        its charges apply. Our handling of your data is described in our{" "}
         <a href="/privacy">Privacy Policy</a>.
       </p>
 
@@ -59,7 +90,9 @@ export default async function TermsPage() {
       <p>
         The Service is provided &ldquo;as is&rdquo; without warranties of any kind. We do not guarantee that
         AI outputs (summaries, scores, drafts) are accurate or complete — review them before relying on
-        them. {appName} never sends messages on your behalf; you are responsible for anything you send.
+        them. Job details come from the job sites&rsquo; emails and may be incomplete or out of date — check
+        the posting before you apply. {appName} never sends messages on your behalf; you are responsible
+        for anything you send.
       </p>
 
       <h2>Limitation of liability</h2>
@@ -70,8 +103,9 @@ export default async function TermsPage() {
 
       <h2>Termination</h2>
       <p>
-        You may stop using the Service and delete your account at any time. We may suspend or terminate
-        access if you violate these Terms.
+        You may stop using the Service and delete your account at any time; your data is then deleted as
+        described in our <a href="/privacy">Privacy Policy</a>. We may suspend or terminate access if you
+        violate these Terms.
       </p>
 
       <h2>Changes</h2>
