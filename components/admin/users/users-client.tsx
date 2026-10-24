@@ -208,7 +208,6 @@ export function UsersClient({ initialUsers, plans }: { initialUsers: AdminUserRo
           role: v.role,
           status: v.status,
           planId: v.planId,
-          expiresAt: v.expiresAt,
         })
       : await createAdminUserAction({
           name: v.name,
@@ -218,7 +217,6 @@ export function UsersClient({ initialUsers, plans }: { initialUsers: AdminUserRo
           role: v.role,
           status: v.status,
           planId: v.planId,
-          expiresAt: v.expiresAt,
         });
     if (res.ok) {
       if (editing) say(`Updated ${v.name}.`);

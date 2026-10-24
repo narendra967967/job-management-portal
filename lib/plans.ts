@@ -41,3 +41,19 @@ export async function isRegistrationOpen(): Promise<boolean> {
 export function expiryFromAccessDays(accessDays: number): Date | null {
   return accessDays > 0 ? new Date(Date.now() + accessDays * 24 * 60 * 60 * 1000) : null;
 }
+
+/** Expiry when an admin assigns a plan today. Free plans use their access days
+ *  (0 = never expires); paid plans get one calendar month for now — once payments
+ *  exist, the purchased interval (monthly / yearly) decides. */
+export async function planExpiryFromNow(planId: string | null): Promise<Date | null> {
+  if (!planId) return null;
+  const [p] = await db
+    .select({ isFree: plans.isFree, freeDurationDays: plans.freeDurationDays })
+    .from(plans)
+    .where(eq(plans.id, planId));
+  if (!p) return null;
+  if (p.isFree) return expiryFromAccessDays(p.freeDurationDays);
+  const d = new Date();
+  d.setMonth(d.getMonth() + 1);
+  return d;
+}

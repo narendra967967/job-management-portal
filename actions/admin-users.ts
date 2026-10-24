@@ -14,7 +14,7 @@ import { requireAdmin } from "@/lib/current-user";
 import { hashPassword } from "@/lib/password";
 import { validatePassword } from "@/lib/admin/password-policy-server";
 import { provisionUserDefaults } from "@/lib/provision";
-import { getDefaultPlan, expiryFromAccessDays } from "@/lib/plans";
+import { getDefaultPlan, planExpiryFromNow } from "@/lib/plans";
 import { account, plans, user } from "@/db/schema";
 
 type ActionResult = { ok: true } | { ok: false; error: string };
@@ -26,11 +26,6 @@ const emailSchema = z.string().trim().toLowerCase().email("Enter a valid email a
 const nameSchema = z.string().trim().min(1, "Name is required.").max(120);
 const mobileSchema = z.string().trim().max(24).optional().default("");
 const planIdSchema = z.string().uuid().nullable().optional();
-const expiresSchema = z
-  .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date.")
-  .nullable()
-  .optional();
 const passwordSchema = z.string().min(8, "Password must be at least 8 characters.");
 
 const createSchema = z.object({
@@ -43,7 +38,6 @@ const createSchema = z.object({
   role: roleSchema,
   status: statusSchema,
   planId: planIdSchema,
-  expiresAt: expiresSchema,
 });
 
 const updateSchema = z.object({
@@ -53,7 +47,6 @@ const updateSchema = z.object({
   role: roleSchema,
   status: statusSchema,
   planId: planIdSchema,
-  expiresAt: expiresSchema,
 });
 
 function firstError(e: z.ZodError): string {
@@ -92,18 +85,9 @@ export async function createAdminUserAction(input: unknown): Promise<CreateResul
   const existing = await db.select({ id: user.id }).from(user).where(eq(user.email, v.email));
   if (existing.length) return { ok: false, error: "A user with that email already exists." };
 
-  // Default to the sign-up plan; expiry from the plan's access days when not set.
+  // Default to the sign-up plan. Expiry always comes from the plan (no manual date).
   const planId = v.planId ?? def.id;
-  let planExpiresAt: Date | null;
-  if (v.expiresAt) {
-    planExpiresAt = new Date(v.expiresAt);
-  } else {
-    const days =
-      planId === def.id
-        ? def.freeDurationDays
-        : (await db.select({ d: plans.freeDurationDays }).from(plans).where(eq(plans.id, planId)))[0]?.d ?? 0;
-    planExpiresAt = expiryFromAccessDays(days);
-  }
+  const planExpiresAt = await planExpiryFromNow(planId);
 
   const id = randomUUID();
   await db.insert(user).values({
@@ -154,6 +138,10 @@ export async function updateAdminUserAction(input: unknown): Promise<ActionResul
   const [current] = await db.select({ planId: user.planId }).from(user).where(eq(user.id, v.id));
   if (!current) return { ok: false, error: "User not found." };
 
+  // Expiry follows the plan: a plan change restarts it from today; keeping the
+  // same plan leaves the current expiry untouched.
+  const planId = v.planId ?? null;
+  const planChanged = planId !== current.planId;
   await db
     .update(user)
     .set({
@@ -161,8 +149,8 @@ export async function updateAdminUserAction(input: unknown): Promise<ActionResul
       mobile: v.mobile || null,
       role: v.role,
       status: v.status,
-      planId: v.planId ?? null,
-      planExpiresAt: v.expiresAt ? new Date(v.expiresAt) : null,
+      planId,
+      ...(planChanged ? { planExpiresAt: await planExpiryFromNow(planId) } : {}),
     })
     .where(eq(user.id, v.id));
 

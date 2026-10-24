@@ -30,7 +30,6 @@ export interface UserFormValues {
   role: AdminUserRole;
   status: AdminUserStatus;
   planId: string | null;
-  expiresAt: string | null;
 }
 
 const selectCls =
@@ -98,7 +97,6 @@ export function UserFormDialog({
   const [role, setRole] = useState<AdminUserRole>("user");
   const [status, setStatus] = useState<AdminUserStatus>("active");
   const [planId, setPlanId] = useState<string>("");
-  const [expiresAt, setExpiresAt] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const mobileRef = useRef<HTMLInputElement>(null);
@@ -121,7 +119,6 @@ export function UserFormDialog({
     setRole(user?.role ?? "user");
     setStatus(user?.status ?? "active");
     setPlanId(user?.planId ?? "");
-    setExpiresAt(user?.expiresAt ?? "");
     setError("");
     setBusy(false);
   }, [open, user]);
@@ -141,7 +138,6 @@ export function UserFormDialog({
         role,
         status,
         planId: planId || null,
-        expiresAt: expiresAt || null,
       });
       if (!res.ok) setError(res.error ?? "Couldn't save.");
       else onOpenChange(false);
@@ -211,19 +207,14 @@ export function UserFormDialog({
             </Field>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Subscription plan">
-              <select className={selectCls} value={planId} onChange={(e) => setPlanId(e.target.value)}>
-                <option value="">No plan</option>
-                {plans.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Expiry date" hint="(blank = no expiry)">
-              <Input type="date" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} />
-            </Field>
-          </div>
+          <Field label="Subscription plan">
+            <select className={selectCls} value={planId} onChange={(e) => setPlanId(e.target.value)}>
+              <option value="">No plan</option>
+              {plans.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </Field>
 
           {error && <p className="text-xs text-destructive">{error}</p>}
         </div>
