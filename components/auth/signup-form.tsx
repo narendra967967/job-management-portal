@@ -77,17 +77,17 @@ export function SignupForm({ policy }: { policy: Policy }) {
     <form onSubmit={submit} className="space-y-4">
       <label className="block space-y-1.5">
         <span className="text-xs font-medium text-muted-foreground">Name</span>
-        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" autoComplete="name" className="h-10" maxLength={80} />
+        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" autoComplete="name" className="h-11 bg-white/70" maxLength={80} />
       </label>
 
       <label className="block space-y-1.5">
         <span className="text-xs font-medium text-muted-foreground">Email</span>
-        <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" className="h-10" />
+        <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" className="h-11 bg-white/70" />
       </label>
 
       <div className="space-y-1.5">
         <span className="text-xs font-medium text-muted-foreground">Password</span>
-        <PasswordInput value={password} onChange={setPassword} autoComplete="new-password" />
+        <PasswordInput className="h-11 bg-white/70" value={password} onChange={setPassword} autoComplete="new-password" />
         {password.length > 0 && (
           <ul className="mt-2 space-y-1">
             {rules.map((r) => {
@@ -107,7 +107,7 @@ export function SignupForm({ policy }: { policy: Policy }) {
 
       <div className="space-y-1.5">
         <span className="text-xs font-medium text-muted-foreground">Confirm password</span>
-        <PasswordInput value={confirm} onChange={setConfirm} autoComplete="new-password" />
+        <PasswordInput className="h-11 bg-white/70" value={confirm} onChange={setConfirm} autoComplete="new-password" />
         {confirm.length > 0 && confirm !== password && (
           <p className="text-[11px] text-destructive">Passwords don&apos;t match.</p>
         )}
@@ -115,14 +115,14 @@ export function SignupForm({ policy }: { policy: Policy }) {
 
       {error && <p className="text-xs text-destructive">{error}</p>}
 
-      <Button type="submit" disabled={busy} className="h-10 w-full">
+      <Button type="submit" disabled={busy} className="h-11 w-full">
         <UserPlus className="size-4" aria-hidden />
         {busy ? "Creating account…" : "Create account"}
       </Button>
 
       <p className="text-center text-xs text-muted-foreground">
         Already have an account?{" "}
-        <Link href="/login" className="font-medium text-primary hover:underline">
+        <Link href="/login" className="inline-flex min-h-11 items-center font-medium text-primary hover:underline">
           Log in
         </Link>
       </p>

@@ -56,15 +56,15 @@ export function ForgotPasswordForm() {
           onChange={(e) => setEmail(e.target.value)}
           placeholder="you@example.com"
           autoComplete="username"
-          className="h-10"
+          className="h-11 bg-white/70"
         />
       </label>
-      <Button type="submit" disabled={busy} className="h-10 w-full">
+      <Button type="submit" disabled={busy} className="h-11 w-full">
         {busy ? "Sending…" : "Send reset link"}
       </Button>
       <Link
         href="/login"
-        className="flex items-center justify-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+        className="flex min-h-11 items-center justify-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="size-4" aria-hidden />
         Back to sign in

@@ -51,7 +51,7 @@ export function LoginForm({ signupAllowed = false }: { signupAllowed?: boolean }
           onChange={(e) => setEmail(e.target.value)}
           placeholder="you@example.com"
           autoComplete="username"
-          className="h-10"
+          className="h-11 bg-white/70"
         />
       </label>
 
@@ -62,31 +62,31 @@ export function LoginForm({ signupAllowed = false }: { signupAllowed?: boolean }
           </span>
           <Link
             href="/forgot-password"
-            className="text-xs font-medium text-primary hover:underline"
+            className="-my-3 inline-flex min-h-11 items-center text-xs font-medium text-primary hover:underline"
           >
             Forgot password?
           </Link>
         </div>
-        <PasswordInput
+        <PasswordInput className="h-11 bg-white/70"
           value={password}
           onChange={setPassword}
           autoComplete="current-password"
         />
       </div>
 
-      <label className="flex items-center gap-2 text-xs text-muted-foreground select-none">
+      <label className="flex min-h-11 items-center gap-2.5 text-xs text-muted-foreground select-none">
         <input
           type="checkbox"
           checked={remember}
           onChange={(e) => setRemember(e.target.checked)}
-          className="size-3.5 rounded border-input accent-primary"
+          className="size-4 rounded border-input accent-primary"
         />
         Keep me signed in
       </label>
 
       {error && <p className="text-xs text-destructive">{error}</p>}
 
-      <Button type="submit" disabled={busy} className="h-10 w-full">
+      <Button type="submit" disabled={busy} className="h-11 w-full">
         <LogIn className="size-4" aria-hidden />
         {busy ? "Signing in…" : "Sign in"}
       </Button>
@@ -94,7 +94,7 @@ export function LoginForm({ signupAllowed = false }: { signupAllowed?: boolean }
       {signupAllowed && (
         <p className="text-center text-xs text-muted-foreground">
           New here?{" "}
-          <Link href="/signup" className="font-medium text-primary hover:underline">
+          <Link href="/signup" className="inline-flex min-h-11 items-center font-medium text-primary hover:underline">
             Create an account
           </Link>
         </p>

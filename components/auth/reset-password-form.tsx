@@ -73,7 +73,7 @@ export function ResetPasswordForm({
         </p>
         <Link
           href="/forgot-password"
-          className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          className="inline-flex min-h-11 items-center justify-center rounded-xl bg-primary px-5 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
         >
           Request a new link
         </Link>
@@ -90,7 +90,7 @@ export function ResetPasswordForm({
         </p>
         <Link
           href="/login"
-          className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          className="inline-flex min-h-11 items-center justify-center rounded-xl bg-primary px-5 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
         >
           Go to sign in
         </Link>
@@ -104,7 +104,7 @@ export function ResetPasswordForm({
         <span className="text-xs font-medium text-muted-foreground">
           New password
         </span>
-        <PasswordInput
+        <PasswordInput className="h-11 bg-white/70"
           value={password}
           onChange={setPassword}
           autoComplete="new-password"
@@ -127,7 +127,7 @@ export function ResetPasswordForm({
         <span className="text-xs font-medium text-muted-foreground">
           Confirm new password
         </span>
-        <PasswordInput
+        <PasswordInput className="h-11 bg-white/70"
           value={confirm}
           onChange={setConfirm}
           autoComplete="new-password"
@@ -136,12 +136,12 @@ export function ResetPasswordForm({
 
       {error && <p className="text-xs text-destructive">{error}</p>}
 
-      <Button type="submit" disabled={busy} className="h-10 w-full">
+      <Button type="submit" disabled={busy} className="h-11 w-full">
         {busy ? "Updating…" : "Update password"}
       </Button>
       <Link
         href="/login"
-        className="flex items-center justify-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+        className="flex min-h-11 items-center justify-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="size-4" aria-hidden />
         Back to sign in

@@ -37,13 +37,13 @@ export function PasswordInput({
           onKeyUp={(e) => setCaps(e.getModifierState?.("CapsLock") ?? false)}
           autoComplete={autoComplete}
           placeholder={placeholder}
-          className={cn("h-10 pr-10", className)}
+          className={cn("h-10 pr-11", className)}
         />
         <button
           type="button"
           onClick={() => setShow((s) => !s)}
           aria-label={show ? "Hide password" : "Show password"}
-          className="absolute top-1/2 right-1 flex size-8 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          className="absolute top-1/2 right-0 flex size-11 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
         >
           {show ? (
             <EyeOff className="size-4" aria-hidden />
