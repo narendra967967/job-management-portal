@@ -51,7 +51,9 @@ export async function getIntakeConfig(): Promise<EmailIntakeConfig> {
   };
 }
 
-/** Cheap check used by every Connect Gmail entry point. Defaults to on. */
+/** Cheap check used by every Connect Gmail entry point. A missing row means
+ *  the default (on); if the database can't be read, it fails CLOSED — Gmail
+ *  copy stays hidden and no sync starts until the switch can be confirmed. */
 export async function isGmailOAuthEnabled(): Promise<boolean> {
   try {
     const [row] = await db
@@ -60,7 +62,7 @@ export async function isGmailOAuthEnabled(): Promise<boolean> {
       .where(eq(configT.id, "app"));
     return row ? row.on : true;
   } catch {
-    return true;
+    return false;
   }
 }
 
