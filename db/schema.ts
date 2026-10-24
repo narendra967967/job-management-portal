@@ -485,6 +485,8 @@ export const plans = pgTable("plans", {
   // Premium feature switches.
   allowNotes: boolean("allow_notes").notNull().default(false),
   allowSalaryInsight: boolean("allow_salary_insight").notNull().default(false),
+  // Résumé ATS score checker (Settings → Resumes). Off by default on every plan.
+  allowAtsCheck: boolean("allow_ats_check").notNull().default(false),
   features: text("features").array().notNull().default(sql`'{}'::text[]`),
   popular: boolean("popular").notNull().default(false),
   status: planStatus("status").notNull().default("active"),
@@ -1078,3 +1080,24 @@ export const certifications = pgTable(
   },
   (t) => [index("certifications_user_order_idx").on(t.userId, t.sortOrder)],
 );
+
+/**
+ * Latest ATS check per résumé (Settings → Resumes). Hybrid score: code checks
+ * (sections, contact, measurable impact, length) + an AI keyword / role match
+ * against the user's career profile. The hashes say what the result was based
+ * on — if the résumé text or the relevant profile fields change, it's outdated.
+ * Result shape: AtsResult in lib/ats-model.ts.
+ */
+export const resumeAtsChecks = pgTable("resume_ats_checks", {
+  resumeId: uuid("resume_id")
+    .primaryKey()
+    .references(() => resumes.id, { onDelete: "cascade" }),
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  score: integer("score").notNull(),
+  result: jsonb("result").notNull(),
+  resumeHash: text("resume_hash").notNull(),
+  profileHash: text("profile_hash").notNull(),
+  checkedAt: timestamp("checked_at", { withTimezone: true }).notNull().defaultNow(),
+});

@@ -42,6 +42,7 @@ const planSchema = z.object({
   allowCustomPrompts: z.boolean(),
   allowNotes: z.boolean().optional().default(false),
   allowSalaryInsight: z.boolean().optional().default(false),
+  allowAtsCheck: z.boolean().optional().default(false),
   features: z.array(z.string().trim().max(200)).max(30).optional().default([]),
   status: z.enum(["active", "inactive"]),
 });
@@ -64,6 +65,7 @@ function clean(v: PlanData) {
     allowCustomPrompts: v.allowCustomPrompts,
     allowNotes: v.allowNotes,
     allowSalaryInsight: v.allowSalaryInsight,
+    allowAtsCheck: v.allowAtsCheck,
     features,
     status: v.status,
   };

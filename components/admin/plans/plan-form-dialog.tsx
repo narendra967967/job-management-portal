@@ -42,6 +42,7 @@ export interface PlanFormValues {
   allowCustomPrompts: boolean;
   allowNotes: boolean;
   allowSalaryInsight: boolean;
+  allowAtsCheck: boolean;
   features: string[];
   status: PlanStatus;
 }
@@ -110,6 +111,7 @@ export function PlanFormDialog({
   const [allowCustomPrompts, setAllowCustomPrompts] = useState(false);
   const [allowNotes, setAllowNotes] = useState(false);
   const [allowSalaryInsight, setAllowSalaryInsight] = useState(false);
+  const [allowAtsCheck, setAllowAtsCheck] = useState(false);
   const [features, setFeatures] = useState<string[]>([""]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -133,6 +135,7 @@ export function PlanFormDialog({
     setAllowCustomPrompts(plan?.allowCustomPrompts ?? false);
     setAllowNotes(plan?.allowNotes ?? false);
     setAllowSalaryInsight(plan?.allowSalaryInsight ?? false);
+    setAllowAtsCheck(plan?.allowAtsCheck ?? false);
     setFeatures(plan && plan.features.length ? [...plan.features] : [""]);
     setError("");
   }, [open, plan]);
@@ -193,6 +196,7 @@ export function PlanFormDialog({
       allowCustomPrompts,
       allowNotes,
       allowSalaryInsight,
+      allowAtsCheck,
       features: features.map((f) => f.trim()).filter(Boolean),
       status,
     });
@@ -370,6 +374,15 @@ export function PlanFormDialog({
                 className="size-4 cursor-pointer rounded border-input accent-primary"
               />
               AI salary insight on jobs
+            </label>
+            <label className="flex cursor-pointer items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={allowAtsCheck}
+                onChange={(e) => setAllowAtsCheck(e.target.checked)}
+                className="size-4 cursor-pointer rounded border-input accent-primary"
+              />
+              Résumé ATS score check
             </label>
           </Section>
 

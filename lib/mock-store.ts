@@ -105,7 +105,7 @@ let reminders: Reminder[] = [];
 let tasks: Task[] = [];
 let resumes: Resume[] = [];
 let defaultResumeId = "";
-let features: WorkspaceData["features"] = { notes: false, salaryInsight: false };
+let features: WorkspaceData["features"] = { notes: false, salaryInsight: false, atsCheck: false };
 let appSettings: AppSettings = {
   reminderIntervalDays: 3,
   staleLeadDays: 14,

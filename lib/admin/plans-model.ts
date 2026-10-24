@@ -55,6 +55,7 @@ export interface Plan {
   allowNotes: boolean;
   /** Premium: AI salary insight per job. */
   allowSalaryInsight: boolean;
+  allowAtsCheck: boolean;
   features: string[];
   /** Recommended highlight — at most one plan. */
   popular: boolean;

@@ -12,9 +12,10 @@ import { plans, user } from "@/db/schema";
 export interface FeatureAccess {
   notes: boolean;
   salaryInsight: boolean;
+  atsCheck: boolean;
 }
 
-export const NO_FEATURES: FeatureAccess = { notes: false, salaryInsight: false };
+export const NO_FEATURES: FeatureAccess = { notes: false, salaryInsight: false, atsCheck: false };
 
 export async function getFeatureAccess(userId: string): Promise<FeatureAccess> {
   const [u] = await db
@@ -30,12 +31,13 @@ export async function getFeatureAccess(userId: string): Promise<FeatureAccess> {
   const isAdmin = u.role === "admin";
   const expired = !!u.planExpiresAt && u.planExpiresAt.getTime() < Date.now();
 
-  let pl: { allowNotes: boolean; allowSalaryInsight: boolean } | undefined;
+  let pl: { allowNotes: boolean; allowSalaryInsight: boolean; allowAtsCheck: boolean } | undefined;
   if (u.planId && !expired) {
     [pl] = await db
       .select({
         allowNotes: plans.allowNotes,
         allowSalaryInsight: plans.allowSalaryInsight,
+        allowAtsCheck: plans.allowAtsCheck,
       })
       .from(plans)
       .where(eq(plans.id, u.planId));
@@ -44,6 +46,7 @@ export async function getFeatureAccess(userId: string): Promise<FeatureAccess> {
   return {
     notes: isAdmin || !!pl?.allowNotes,
     salaryInsight: !!pl?.allowSalaryInsight,
+    atsCheck: !!pl?.allowAtsCheck,
   };
 }
 

@@ -70,6 +70,7 @@ import {
 import { buildGmailQuery } from "@/lib/use-gmail-settings";
 import { EmailForwardingCard } from "@/components/forwarding/email-forwarding-card";
 import { CareerProfileTab } from "@/components/career/career-profile-tab";
+import { ResumeAtsStrip, useAtsOverview } from "@/components/career/resume-ats";
 import {
   COUNTRY_CODES,
   isValidEmail,
@@ -564,6 +565,9 @@ function PlanDetailsCard() {
             </span>
             <span>
               Salary insight: <span className="font-medium text-foreground">{plan.allowSalaryInsight ? "Yes" : "No"}</span>
+            </span>
+            <span>
+              ATS check: <span className="font-medium text-foreground">{plan.allowAtsCheck ? "Yes" : "No"}</span>
             </span>
           </div>
 
@@ -1677,6 +1681,10 @@ interface PendingFile {
 
 function ResumesCard() {
   const resumes = useResumes();
+  // ATS state per résumé; reloads when résumés are added/removed or get text.
+  const { overview, setOverview } = useAtsOverview(
+    resumes.map((r) => `${r.id}:${r.hasText ? 1 : 0}`).join(","),
+  );
   const { confirm, dialog: confirmDialog } = useConfirm();
   const [defaultResumeId, setDefaultResumeId] = useDefaultResumeId();
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -1933,6 +1941,17 @@ function ResumesCard() {
                 </button>
                 </div>
               </div>
+            )}
+            {editingId !== r.id && (
+              <ResumeAtsStrip
+                resumeId={r.id}
+                resumeLabel={r.label}
+                hasText={!!r.hasText}
+                overview={overview}
+                onChecked={(id, check) =>
+                  setOverview((o) => (o ? { ...o, checks: { ...o.checks, [id]: check } } : o))
+                }
+              />
             )}
           </li>
         ))}

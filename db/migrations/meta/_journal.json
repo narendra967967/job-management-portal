@@ -274,6 +274,13 @@
       "when": 1792870791577,
       "tag": "0038_career_profile",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1792871539836,
+      "tag": "0039_ats_check",
+      "breakpoints": true
     }
   ]
 }

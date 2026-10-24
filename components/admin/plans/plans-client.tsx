@@ -281,6 +281,9 @@ function PlanCard({
           <span>
             Salary insight: <span className="font-medium text-foreground">{plan.allowSalaryInsight ? "Yes" : "No"}</span>
           </span>
+          <span>
+            ATS check: <span className="font-medium text-foreground">{plan.allowAtsCheck ? "Yes" : "No"}</span>
+          </span>
           {plan.isFree && (
             <span>
               Access: <span className="font-medium text-foreground">{plan.freeDurationDays > 0 ? `${plan.freeDurationDays} days` : "No expiry"}</span>

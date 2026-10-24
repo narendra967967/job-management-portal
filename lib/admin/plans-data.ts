@@ -38,6 +38,7 @@ export async function loadPlans(): Promise<Plan[]> {
     allowCustomPrompts: r.allowCustomPrompts,
     allowNotes: r.allowNotes,
     allowSalaryInsight: r.allowSalaryInsight,
+    allowAtsCheck: r.allowAtsCheck,
     features: r.features,
     popular: r.popular,
     status: r.status,
