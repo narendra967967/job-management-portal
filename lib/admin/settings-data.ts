@@ -35,6 +35,14 @@ export interface AdminSettings {
     sessionValue: number;
     sessionUnit: string;
   };
+  /** Google reCAPTCHA v3 (lib/captcha.ts). The secret itself never leaves the server. */
+  captcha: {
+    enabled: boolean;
+    siteKey: string;
+    secretLast4: string | null;
+    /** RECAPTCHA_FORCE_OFF=true on the server overrides the switch. */
+    forcedOff: boolean;
+  };
   cron: {
     quietEnabled: boolean;
     quietFrom: string;
@@ -129,6 +137,12 @@ export async function loadAdminSettings(adminId: string): Promise<AdminSettings>
       pwRequireSpecial: s?.pwRequireSpecial ?? true,
       sessionValue: s?.sessionValue ?? 7,
       sessionUnit: s?.sessionUnit ?? "days",
+    },
+    captcha: {
+      enabled: s?.captchaEnabled ?? false,
+      siteKey: s?.captchaSiteKey ?? "",
+      secretLast4: s?.captchaSecretCiphertext ? (s.captchaSecretLast4 ?? "····") : null,
+      forcedOff: process.env.RECAPTCHA_FORCE_OFF === "true",
     },
     cron: {
       quietEnabled: c?.quietEnabled ?? false,

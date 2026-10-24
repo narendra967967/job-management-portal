@@ -7,8 +7,17 @@ import { authClient, signInEmail } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
+import { useRecaptcha } from "@/components/auth/use-recaptcha";
 
-export function LoginForm({ signupAllowed = false }: { signupAllowed?: boolean }) {
+export function LoginForm({
+  signupAllowed = false,
+  captchaSiteKey = null,
+}: {
+  signupAllowed?: boolean;
+  /** reCAPTCHA v3 site key when the check is on (lib/captcha.ts). */
+  captchaSiteKey?: string | null;
+}) {
+  const getCaptcha = useRecaptcha(captchaSiteKey);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(true);
@@ -23,7 +32,7 @@ export function LoginForm({ signupAllowed = false }: { signupAllowed?: boolean }
     }
     setError("");
     setBusy(true);
-    const res = await signInEmail(email.trim(), password, remember);
+    const res = await signInEmail(email.trim(), password, remember, await getCaptcha("login"));
     if (res?.error) {
       setError(res.error.message ?? "Incorrect email or password.");
       setBusy(false);

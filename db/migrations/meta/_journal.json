@@ -281,6 +281,13 @@
       "when": 1792871539836,
       "tag": "0039_ats_check",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1792871908884,
+      "tag": "0040_captcha",
+      "breakpoints": true
     }
   ]
 }

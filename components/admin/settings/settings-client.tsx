@@ -49,6 +49,7 @@ import { LEAD_STATUSES, LEAD_STATUS_LABELS } from "@/lib/types";
 import { Field, SaveRow, SubHead, Toggle, selectCls } from "@/components/admin/settings/form-bits";
 import { EmailIntakeCard } from "@/components/admin/settings/email-intake-card";
 import { RetentionCard } from "@/components/admin/settings/retention-card";
+import { CaptchaCard } from "@/components/admin/settings/captcha-card";
 
 interface SettingsSection {
   id: string;
@@ -66,7 +67,12 @@ const SECTION = {
   intake: { id: "intake", label: "Email intake", icon: Inbox, render: (i: AdminSettings) => <EmailIntakeCard initial={i.intake} /> },
   ai: { id: "ai", label: "AI", icon: Sparkles, render: (i: AdminSettings) => <AiCard initial={i.ai} /> },
   cron: { id: "cron", label: "Cron & schedule", icon: Clock, render: (i: AdminSettings) => <CronCard initial={i.cron} gmailEnabled={i.intake.config.gmailOAuthEnabled} /> },
-  security: { id: "security", label: "Security", icon: ShieldCheck, render: (i: AdminSettings) => <SecurityCard initial={i.security} /> },
+  security: { id: "security", label: "Security", icon: ShieldCheck, render: (i: AdminSettings) => (
+    <div className="space-y-4">
+      <SecurityCard initial={i.security} />
+      <CaptchaCard initial={i.captcha} />
+    </div>
+  ) },
   retention: { id: "retention", label: "Data retention", icon: Archive, render: (i: AdminSettings) => <RetentionCard initial={i.retention} /> },
 } satisfies Record<string, SettingsSection>;
 

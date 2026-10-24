@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { cn } from "@/lib/utils";
+import { useRecaptcha } from "@/components/auth/use-recaptcha";
 
 // Client-safe mirror of the server password policy (passed in from the page).
 type Policy = {
@@ -29,7 +30,8 @@ function buildRules(p: Policy): { label: string; test: (v: string) => boolean }[
   return r;
 }
 
-export function SignupForm({ policy }: { policy: Policy }) {
+export function SignupForm({ policy, captchaSiteKey = null }: { policy: Policy; captchaSiteKey?: string | null }) {
+  const getCaptcha = useRecaptcha(captchaSiteKey);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -67,7 +69,12 @@ export function SignupForm({ policy }: { policy: Policy }) {
     if (password !== confirm) return setError("Passwords don't match.");
 
     setBusy(true);
-    const res = await signUpAction({ name: name.trim(), email: email.trim(), password });
+    const res = await signUpAction({
+      name: name.trim(),
+      email: email.trim(),
+      password,
+      captchaToken: await getCaptcha("signup"),
+    });
     setBusy(false);
     if (res.ok) setDone(true);
     else setError(res.error);

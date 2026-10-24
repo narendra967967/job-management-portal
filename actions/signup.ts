@@ -10,6 +10,7 @@ import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { account, user } from "@/db/schema";
+import { verifyCaptcha } from "@/lib/captcha";
 import { auth } from "@/lib/auth";
 import { hashPassword } from "@/lib/password";
 import { provisionUserDefaults } from "@/lib/provision";
@@ -42,6 +43,7 @@ const schema = z.object({
   name: z.string().trim().min(1, "Enter your name.").max(80),
   email: z.string().trim().toLowerCase().email("Enter a valid email."),
   password: z.string().min(1, "Enter a password."),
+  captchaToken: z.string().max(4000).optional(),
 });
 
 export async function signUpAction(input: unknown): Promise<Result> {
@@ -53,7 +55,7 @@ export async function signUpAction(input: unknown): Promise<Result> {
 
   const p = schema.safeParse(input);
   if (!p.success) return { ok: false, error: p.error.issues[0]?.message ?? "Invalid details." };
-  const { name, email, password } = p.data;
+  const { name, email, password, captchaToken } = p.data;
 
   // Authoritative password-policy check (mirrors the live client hints).
   const pwErr = await validatePassword(password);
@@ -66,6 +68,10 @@ export async function signUpAction(input: unknown): Promise<Result> {
   if (rateLimited(ip)) {
     return { ok: false, error: "Too many sign-ups from here — please try again later." };
   }
+
+  // reCAPTCHA (no-op while it's switched off in admin Settings → Security).
+  const human = await verifyCaptcha(captchaToken, "signup", h.get("x-real-ip"));
+  if (!human.ok) return { ok: false, error: human.message };
 
   // Reject duplicates.
   const existing = await db.select({ id: user.id }).from(user).where(eq(user.email, email));

@@ -11,7 +11,8 @@ import { headers } from "next/headers";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/current-user";
 import { authAdmin } from "@/lib/auth-admin";
-import { encryptSecret } from "@/lib/crypto";
+import { decryptSecret, encryptSecret } from "@/lib/crypto";
+import { siteVerify } from "@/lib/captcha";
 import { validatePassword } from "@/lib/admin/password-policy-server";
 import { getAppName } from "@/lib/branding";
 import { LEAD_STATUSES, type LeadStatus } from "@/lib/types";
@@ -166,6 +167,58 @@ export async function removeBrandingAction(kind: unknown): Promise<Result> {
   if (!k.success) return { ok: false, error: "Invalid asset." };
   await db.delete(appAssets).where(eq(appAssets.kind, k.data));
   revalidatePath("/", "layout");
+  revalidate();
+  return { ok: true };
+}
+
+/* ---------------- reCAPTCHA ---------------- */
+
+const keySchema = z
+  .string()
+  .trim()
+  .regex(/^[\w-]{20,100}$/, "That doesn't look like a reCAPTCHA key.");
+
+/** Save the reCAPTCHA settings. Turning it on requires a live test token from
+ *  the admin's browser that Google accepts with these exact keys — so a typo
+ *  can't lock everyone (including this admin) out of signing in. */
+export async function updateCaptchaAction(input: unknown): Promise<Result> {
+  await requireAdmin();
+  const p = z
+    .object({
+      enabled: z.boolean(),
+      siteKey: z.union([keySchema, z.literal("")]),
+      secret: z.union([keySchema, z.literal("")]).optional(),
+      testToken: z.string().max(4000).optional(),
+    })
+    .safeParse(input);
+  if (!p.success) return fail(p.error);
+  const v = p.data;
+
+  const [cur] = await db
+    .select({ secret: securityConfig.captchaSecretCiphertext })
+    .from(securityConfig)
+    .where(eq(securityConfig.id, "app"));
+  const secret = v.secret || (cur?.secret ? decryptSecret(cur.secret) : "");
+
+  if (v.enabled) {
+    if (!v.siteKey || !secret) return { ok: false, error: "Add both the site key and the secret key first." };
+    if (!v.testToken) {
+      return { ok: false, error: "Couldn't load reCAPTCHA with this site key. Check the key and that this domain is added in the reCAPTCHA console." };
+    }
+    const h = await headers();
+    const r = await siteVerify(secret, v.testToken, "admin_test", h.get("x-real-ip"));
+    if (!r.ok) {
+      const codes = r.codes?.length ? ` (${r.codes.join(", ")})` : "";
+      return { ok: false, error: `Google didn't accept these keys${codes}. Check the secret key and the domains in the reCAPTCHA console.` };
+    }
+  }
+
+  const set = {
+    captchaEnabled: v.enabled,
+    captchaSiteKey: v.siteKey || null,
+    ...(v.secret ? { captchaSecretCiphertext: encryptSecret(v.secret), captchaSecretLast4: v.secret.slice(-4) } : {}),
+  };
+  await db.insert(securityConfig).values({ id: "app", ...set }).onConflictDoUpdate({ target: securityConfig.id, set });
   revalidate();
   return { ok: true };
 }

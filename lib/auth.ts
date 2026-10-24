@@ -12,6 +12,7 @@
 
 import { betterAuth } from "better-auth";
 import { APIError, createAuthMiddleware } from "better-auth/api";
+import { captchaGuard, USER_CAPTCHA_PATHS } from "@/lib/captcha";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
 import { eq } from "drizzle-orm";
@@ -199,6 +200,8 @@ export const auth = betterAuth({
     // refuse both starting the link and finishing an OAuth round-trip that was
     // already under way when the switch flipped.
     before: createAuthMiddleware(async (ctx) => {
+      // reCAPTCHA on sign-in / forgot / reset (no-op while it's switched off).
+      await captchaGuard(ctx, USER_CAPTCHA_PATHS);
       if (ctx.path !== "/link-social" && !ctx.path.startsWith("/callback/")) return;
       if (!(await gmailLinkingAllowed())) {
         throw new APIError("FORBIDDEN", { message: "Connect Gmail is turned off." });

@@ -3,9 +3,10 @@ import { LegalLayout } from "@/components/marketing/legal-layout";
 import { getAppName, getSupportEmail } from "@/lib/branding";
 import { isGmailOAuthEnabled, receivingDomain, supportedSitesText } from "@/lib/email-intake-data";
 import { getRetentionConfig } from "@/lib/retention";
+import { captchaSiteKey } from "@/lib/captcha";
 
 // The Gmail / Google Limited Use section shows only while "Connect Gmail" is
-// switched on (admin); retention periods come from admin Settings → Data
+// switched on (admin), the reCAPTCHA line only while the check is on; retention periods come from admin Settings → Data
 // retention, so the policy always states what the Service actually does.
 
 export const dynamic = "force-dynamic";
@@ -18,12 +19,13 @@ export async function generateMetadata(): Promise<Metadata> {
 const days = (n: number) => `${n} ${n === 1 ? "day" : "days"}`;
 
 export default async function PrivacyPage() {
-  const [appName, supportEmail, gmailOn, sites, retention] = await Promise.all([
+  const [appName, supportEmail, gmailOn, sites, retention, captchaKey] = await Promise.all([
     getAppName(),
     getSupportEmail(),
     isGmailOAuthEnabled(),
     supportedSitesText(),
     getRetentionConfig(),
+    captchaSiteKey(),
   ]);
   const contact = supportEmail || "our support address";
   return (
@@ -56,6 +58,17 @@ export default async function PrivacyPage() {
           <li><strong>Gmail data</strong> — if you connect Google, we read email in your Gmail account to find and parse your LinkedIn job-alert messages (see below).</li>
         )}
         <li><strong>Usage data</strong> — basic technical logs needed to operate and secure the Service.</li>
+        {captchaKey && (
+        <li>
+          <strong>Security check</strong> — the sign-in, sign-up and password pages use Google reCAPTCHA to
+          keep out automated abuse. It sends Google information about your device and how you use the page
+          (Google&rsquo;s{" "}
+          <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>{" "}
+          and{" "}
+          <a href="https://policies.google.com/terms" target="_blank" rel="noopener noreferrer">Terms</a>{" "}
+          apply).
+        </li>
+        )}
       </ul>
 
       <h2>Email forwarding</h2>

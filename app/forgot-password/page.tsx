@@ -3,6 +3,7 @@ import { ForgotPasswordForm } from "@/components/auth/forgot-password-form";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { getSessionUserId } from "@/lib/current-user";
 import { guardMaintenance } from "@/lib/maintenance";
+import { captchaSiteKey } from "@/lib/captcha";
 
 export default async function ForgotPasswordPage() {
   await guardMaintenance();
@@ -12,7 +13,7 @@ export default async function ForgotPasswordPage() {
       title="Reset password"
       subtitle="Enter your email and we'll send you a reset link."
     >
-      <ForgotPasswordForm />
+      <ForgotPasswordForm captchaSiteKey={await captchaSiteKey()} />
     </AuthShell>
   );
 }

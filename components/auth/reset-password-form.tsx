@@ -7,6 +7,7 @@ import { resetPasswordAction } from "@/actions/auth";
 import { Button } from "@/components/ui/button";
 import { PasswordInput } from "@/components/ui/password-input";
 import { cn } from "@/lib/utils";
+import { useRecaptcha } from "@/components/auth/use-recaptcha";
 
 export interface PasswordPolicy {
   minLength: number;
@@ -29,11 +30,14 @@ export function ResetPasswordForm({
   token,
   tokenError,
   policy,
+  captchaSiteKey = null,
 }: {
   token: string;
   tokenError?: string;
   policy: PasswordPolicy;
+  captchaSiteKey?: string | null;
 }) {
+  const getCaptcha = useRecaptcha(captchaSiteKey);
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState("");
@@ -56,7 +60,7 @@ export function ResetPasswordForm({
     }
     setError("");
     setBusy(true);
-    const res = await resetPasswordAction(token, password);
+    const res = await resetPasswordAction(token, password, await getCaptcha("reset_password"));
     if (!res.ok) {
       setError(res.error);
       setBusy(false);

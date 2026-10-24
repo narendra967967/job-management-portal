@@ -3,6 +3,7 @@
 // Browser-side Better Auth client (same-origin). Login is email+password;
 // Google is linked/unlinked from Settings for Gmail access only.
 
+import { captchaFetchOptions } from "@/components/auth/use-recaptcha";
 import { createAuthClient } from "better-auth/react";
 import { clearSessionPersistedState } from "@/lib/use-persistent-state";
 
@@ -13,15 +14,22 @@ export function signInEmail(
   email: string,
   password: string,
   rememberMe = true,
+  captchaToken = "",
 ) {
-  return authClient.signIn.email({ email, password, rememberMe });
+  return authClient.signIn.email({
+    email,
+    password,
+    rememberMe,
+    fetchOptions: captchaFetchOptions(captchaToken),
+  });
 }
 
 /** Request a password-reset email; the link lands on /reset-password. */
-export function requestPasswordReset(email: string) {
+export function requestPasswordReset(email: string, captchaToken = "") {
   return authClient.requestPasswordReset({
     email,
     redirectTo: "/reset-password",
+    fetchOptions: captchaFetchOptions(captchaToken),
   });
 }
 

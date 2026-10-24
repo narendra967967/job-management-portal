@@ -2,6 +2,7 @@ import { ResetPasswordForm } from "@/components/auth/reset-password-form";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { guardMaintenance } from "@/lib/maintenance";
 import { getServerPasswordPolicy } from "@/lib/admin/password-policy-server";
+import { captchaSiteKey } from "@/lib/captcha";
 
 export default async function ResetPasswordPage({
   searchParams,
@@ -10,13 +11,13 @@ export default async function ResetPasswordPage({
 }) {
   await guardMaintenance();
   const { token, error } = await searchParams;
-  const policy = await getServerPasswordPolicy();
+  const [policy, siteKey] = await Promise.all([getServerPasswordPolicy(), captchaSiteKey()]);
   return (
     <AuthShell
       title="Set a new password"
       subtitle="Choose a strong password for your account."
     >
-      <ResetPasswordForm token={token ?? ""} tokenError={error} policy={policy} />
+      <ResetPasswordForm token={token ?? ""} tokenError={error} policy={policy} captchaSiteKey={siteKey} />
     </AuthShell>
   );
 }

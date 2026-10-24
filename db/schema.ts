@@ -541,6 +541,12 @@ export const securityConfig = pgTable("security_config", {
   pwRequireSpecial: boolean("pw_require_special").notNull().default(true),
   sessionValue: integer("session_value").notNull().default(7),
   sessionUnit: text("session_unit").notNull().default("days"),
+  // Google reCAPTCHA v3 on the sign-in / password pages (lib/captcha.ts). The
+  // secret is encrypted at rest; only its last 4 characters are ever read back.
+  captchaEnabled: boolean("captcha_enabled").notNull().default(false),
+  captchaSiteKey: text("captcha_site_key"),
+  captchaSecretCiphertext: text("captcha_secret_ciphertext"),
+  captchaSecretLast4: text("captcha_secret_last4"),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .defaultNow()

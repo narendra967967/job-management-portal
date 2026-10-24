@@ -15,16 +15,18 @@ const GUIDE_FRAME_HOSTS = [
 // Content-Security-Policy. script-src still needs 'unsafe-inline' for Next.js's
 // inline bootstrap scripts (a nonce-based CSP via middleware would remove it, at
 // the cost of rendering every page dynamically). Everything else is locked to
-// our own origin: no third-party scripts, no framing of our pages, no plugins.
+// our own origin, except Google reCAPTCHA (script + its iframe) on the sign-in
+// pages: no other third-party scripts, no framing of our pages, no plugins.
+const RECAPTCHA_HOSTS = "https://www.google.com https://www.gstatic.com https://recaptcha.google.com";
 const CSP = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline'",
+  `script-src 'self' 'unsafe-inline' ${RECAPTCHA_HOSTS}`,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https:", // guide images may be any https URL
   "media-src 'self' https:", // guide <video>
   "font-src 'self' data:",
-  "connect-src 'self'", // fetch + support-chat EventSource; AI/Gmail calls are server-side
-  `frame-src ${GUIDE_FRAME_HOSTS.join(" ")}`,
+  `connect-src 'self' ${RECAPTCHA_HOSTS}`, // fetch + support-chat EventSource; AI/Gmail calls are server-side
+  `frame-src ${GUIDE_FRAME_HOSTS.join(" ")} ${RECAPTCHA_HOSTS}`,
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",

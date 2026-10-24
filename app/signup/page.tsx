@@ -5,6 +5,7 @@ import { isRegistrationOpen } from "@/lib/plans";
 import { getServerPasswordPolicy } from "@/lib/admin/password-policy-server";
 import { getSessionUserId } from "@/lib/current-user";
 import { guardMaintenance } from "@/lib/maintenance";
+import { captchaSiteKey } from "@/lib/captcha";
 
 export const dynamic = "force-dynamic";
 
@@ -15,10 +16,10 @@ export default async function SignupPage() {
   if (sessionId) redirect("/leads");
   if (!allowed) redirect("/login");
 
-  const policy = await getServerPasswordPolicy();
+  const [policy, siteKey] = await Promise.all([getServerPasswordPolicy(), captchaSiteKey()]);
   return (
     <AuthShell title="Create your account" subtitle="Start organizing your job search.">
-      <SignupForm policy={policy} />
+      <SignupForm policy={policy} captchaSiteKey={siteKey} />
     </AuthShell>
   );
 }

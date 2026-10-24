@@ -4,6 +4,8 @@
 // can be logged in, in the same browser, without clobbering each other.
 
 import { betterAuth } from "better-auth";
+import { createAuthMiddleware } from "better-auth/api";
+import { captchaGuard, ADMIN_CAPTCHA_PATHS } from "@/lib/captcha";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
 import { eq } from "drizzle-orm";
@@ -28,6 +30,12 @@ export const authAdmin = betterAuth({
     ipAddress: { ipAddressHeaders: ["x-real-ip"] },
   },
   // Production only: 5 sign-in attempts per minute per IP (see lib/auth.ts).
+  // reCAPTCHA on admin sign-in / forgot / reset (no-op while it's switched off).
+  hooks: {
+    before: createAuthMiddleware(async (ctx) => {
+      await captchaGuard(ctx, ADMIN_CAPTCHA_PATHS);
+    }),
+  },
   rateLimit: {
     customRules: { "/sign-in/email": { window: 60, max: 5 } },
   },
