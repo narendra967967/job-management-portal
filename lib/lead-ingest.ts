@@ -2,7 +2,8 @@ import "server-only";
 
 // Turn parsed job-alert drafts into leads — shared by both intake paths
 // (Connect Gmail sync and email forwarding), so they behave identically.
-// New jobs are inserted (deduped by the user's linkedin_job_id key); a job
+// New jobs are inserted (deduped by the user's job key, lib/job-key.ts, kept in
+// the linkedin_job_id column); a job
 // seen again while still open is resurfaced and tagged "Re-newed";
 // discarded/closed leads are left alone.
 
@@ -11,7 +12,7 @@ import { db } from "@/lib/db";
 import { jobLeads as leadsT } from "@/db/schema";
 import { isJobOpen } from "@/lib/types";
 import { sourceFromUrl } from "@/lib/lead-source";
-import type { LeadDraft } from "@/lib/linkedin-parser";
+import type { LeadDraft } from "@/lib/lead-draft";
 
 export async function ingestAlertDrafts(
   userId: string,
@@ -24,14 +25,14 @@ export async function ingestAlertDrafts(
     const [existing] = await db
       .select({ id: leadsT.id, status: leadsT.status, tags: leadsT.tags })
       .from(leadsT)
-      .where(and(eq(leadsT.userId, userId), eq(leadsT.linkedinJobId, d.linkedinJobId)));
+      .where(and(eq(leadsT.userId, userId), eq(leadsT.linkedinJobId, d.jobKey)));
 
     if (!existing) {
       const res = await db
         .insert(leadsT)
         .values({
           userId,
-          linkedinJobId: d.linkedinJobId,
+          linkedinJobId: d.jobKey,
           title: d.title,
           company: d.company,
           location: d.location,

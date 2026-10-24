@@ -27,7 +27,7 @@ import {
 } from "@/db/schema";
 import { getIntakeConfig, loadSenders, receivingDomain, userIdForToken } from "@/lib/email-intake-data";
 import { domainWithin, type InboundSender, type InboundStatus } from "@/lib/email-intake-model";
-import { parseLinkedInAlert } from "@/lib/linkedin-parser";
+import { ALERT_PARSERS } from "@/lib/alert-parsers";
 import { ingestAlertDrafts } from "@/lib/lead-ingest";
 import { confirmationText, describeConfirmationEmail, gmailConfirmation } from "@/lib/inbound/gmail-confirmation";
 
@@ -237,14 +237,14 @@ export async function processInbound(raw: Buffer, recipient: string): Promise<Sm
   }
 
   const subject = (parsed.subject ?? "").slice(0, 500);
-  if (sender.parser !== "linkedin") {
+  if (sender.parser === "none") {
     await db.insert(errorsT).values({ userId, messageId: messageId ?? "(none)", reason: "Unsupported format — no reader for this sender yet", rawExcerpt: subject });
     await log({ ...base, status: "unsupported", reason: "No reader for this sender" });
     return { code: 250, message: "Accepted" };
   }
 
   const html = typeof parsed.html === "string" ? parsed.html : "";
-  const drafts = parseLinkedInAlert(html);
+  const drafts = ALERT_PARSERS[sender.parser](html);
   if (drafts.length === 0) {
     await db.insert(errorsT).values({ userId, messageId: messageId ?? "(none)", reason: "No job cards parsed from alert", rawExcerpt: subject });
     await log({ ...base, status: "unsupported", reason: "No job cards found" });

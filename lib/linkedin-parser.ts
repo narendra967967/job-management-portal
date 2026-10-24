@@ -11,16 +11,9 @@
 // LinkedIn's template can change without notice, so unparseable messages are
 // routed to gmail_ingest_errors by the sync rather than dropped.
 
-export interface LeadDraft {
-  linkedinJobId: string;
-  title: string;
-  company: string;
-  location: string;
-  remote: boolean;
-  tags: string[];
-  postedRelative: string;
-  canonicalJobUrl: string;
-}
+import type { LeadDraft } from "@/lib/lead-draft";
+
+export type { LeadDraft };
 
 /** Pull the numeric LinkedIn job id out of any job URL / tracking redirect. */
 export function extractLinkedInJobId(url: string): string {
@@ -104,7 +97,7 @@ export function parseLinkedInAlert(html: string): LeadDraft[] {
     }
 
     byId.set(id, {
-      linkedinJobId: id,
+      jobKey: id, // LinkedIn's key is the bare job id (lib/job-key.ts)
       title,
       company,
       location,

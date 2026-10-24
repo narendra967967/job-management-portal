@@ -232,6 +232,13 @@
       "when": 1792787212106,
       "tag": "0032_gmail_confirm_text",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1792817177030,
+      "tag": "0033_reader_naukri_timesjobs",
+      "breakpoints": true
     }
   ]
 }

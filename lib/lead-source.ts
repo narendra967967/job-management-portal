@@ -17,6 +17,7 @@ const HOST_SOURCES: [string, LeadSource][] = [
   ["instahyre.com", "instahyre"],
   ["foundit.in", "foundit"],
   ["monsterindia.com", "foundit"],
+  ["timesjobs.com", "timesjobs"],
 ];
 
 export function sourceFromUrl(rawUrl: string): LeadSource {

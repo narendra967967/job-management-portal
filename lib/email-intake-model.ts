@@ -20,12 +20,17 @@ export interface EmailIntakeConfig {
 export const MAX_BYTES_MIN = 256 * 1024;
 export const MAX_BYTES_MAX = 10 * 1024 * 1024;
 
-export type InboundParser = "linkedin" | "none";
+export type InboundParser = "linkedin" | "naukri" | "timesjobs" | "none";
 
+/** Reader choices, in dropdown order (lib/alert-parsers.ts has the code). */
 export const PARSER_LABELS: Record<InboundParser, string> = {
   linkedin: "LinkedIn job alerts",
+  naukri: "Naukri job alerts",
+  timesjobs: "TimesJobs job alerts",
   none: "None (logged as unsupported)",
 };
+
+export const INBOUND_PARSERS = Object.keys(PARSER_LABELS) as InboundParser[];
 
 /** One allowed sender: who may send, which DKIM domain must sign, how to read it. */
 export interface InboundSender {

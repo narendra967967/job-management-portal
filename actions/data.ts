@@ -27,7 +27,7 @@ import {
   type CreateLeadInput,
   type EditLeadInput,
 } from "@/lib/schemas";
-import { extractLinkedInJobId } from "@/lib/linkedin-parser";
+import { jobKeyForUrl } from "@/lib/job-key";
 import { sourceFromUrl } from "@/lib/lead-source";
 import {
   advanceLeadStatus,
@@ -236,25 +236,12 @@ export async function deleteLeadsAction(ids: string[]) {
 }
 
 /**
- * Normalize a job URL into a stable per-user dedupe key. A LinkedIn URL yields
- * its numeric job id (so a manual add collides with the same job captured from
- * Gmail); any other URL yields a normalized `url:<host+path+query>` — host
- * lowercased, `www.`/hash/trailing-slash stripped — so the same link can't be
- * added twice by one user. Uniqueness is scoped per user by the DB constraint,
- * so different users can each save the same job.
+ * Stable per-user dedupe key for a job URL — the same key the email readers
+ * build (lib/job-key.ts), so a manual add collides with the same job captured
+ * from an alert. Uniqueness is scoped per user by the DB constraint.
  */
 function dedupeKeyForUrl(rawUrl: string): string {
-  const linkedInId = extractLinkedInJobId(rawUrl);
-  if (linkedInId) return linkedInId;
-  try {
-    const u = new URL(rawUrl);
-    u.hash = "";
-    u.hostname = u.hostname.toLowerCase().replace(/^www\./, "");
-    return `url:${u.toString().replace(/\/+$/, "")}`;
-  } catch {
-    // Not a parseable URL (schema already rejects those) — fall back to text.
-    return `url:${rawUrl.trim().toLowerCase().replace(/\/+$/, "")}`;
-  }
+  return jobKeyForUrl(rawUrl);
 }
 
 /**

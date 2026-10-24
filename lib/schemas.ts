@@ -17,6 +17,8 @@ import {
   domainWithin,
   isValidDomain,
   senderMatchDomain,
+  INBOUND_PARSERS,
+  type InboundParser,
 } from "@/lib/email-intake-model";
 import {
   CLOSE_OUTCOME_LABELS,
@@ -341,7 +343,7 @@ export const inboundSenderSchema = z
   .object({
     match: z.string().trim().toLowerCase().min(3).max(254),
     signingDomain: z.string().trim().toLowerCase().min(3).max(253),
-    parser: zEnum(["linkedin", "none"] as const, "Unknown reader."),
+    parser: zEnum(INBOUND_PARSERS as [InboundParser, ...InboundParser[]], "Unknown reader."),
     enabled: z.boolean().default(true),
   })
   .superRefine((v, ctx) => {
