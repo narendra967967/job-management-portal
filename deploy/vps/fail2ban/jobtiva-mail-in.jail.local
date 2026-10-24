@@ -9,7 +9,10 @@ filter    = jobtiva-mail-in
 # DOCKER-USER chain, not INPUT, and is already translated to the container's
 # port (2525) there. Ban the IP for every container port in DOCKER-USER; only
 # mail-in is published publicly (the apps and Postgres bind to 127.0.0.1).
-banaction = iptables-allports[chain="DOCKER-USER"]
+# Set chain on the JAIL: the default action passes the jail's chain (INPUT)
+# to the ban action, overriding any chain given inside banaction.
+banaction = iptables-allports
+chain     = DOCKER-USER
 maxretry  = 10
 findtime  = 10m
 bantime   = 1h
