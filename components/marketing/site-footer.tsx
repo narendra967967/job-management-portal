@@ -6,7 +6,7 @@ import { Logo } from "@/components/app-shell/logo";
 export function SiteFooter({ appName, tagline }: { appName: string; tagline?: string }) {
   const year = new Date().getFullYear();
   return (
-    <footer className="border-t bg-muted/30">
+    <footer className="glass-subtle mt-8 rounded-none border-x-0 border-b-0">
       <div className="mx-auto grid max-w-6xl gap-8 px-4 py-12 sm:px-6 md:grid-cols-[1.4fr_1fr_1fr]">
         <div className="max-w-xs">
           <Link href="/#home" className="flex items-center gap-2.5">
@@ -36,7 +36,7 @@ export function SiteFooter({ appName, tagline }: { appName: string; tagline?: st
           </ul>
         </div>
       </div>
-      <div className="border-t">
+      <div className="border-t border-white/70">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-2 px-4 py-5 text-xs text-muted-foreground sm:flex-row sm:px-6">
           <p>© {year} {appName}. All rights reserved.</p>
           <p>Private by design · your data stays yours.</p>

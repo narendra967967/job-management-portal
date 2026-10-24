@@ -24,6 +24,7 @@ import {
 import { SiteHeader } from "@/components/marketing/site-header";
 import { SiteFooter } from "@/components/marketing/site-footer";
 import { Faq } from "@/components/marketing/faq";
+import { GlassBackdrop } from "@/components/marketing/glass-backdrop";
 import { getAppName, getTagline, getSupportEmail } from "@/lib/branding";
 import { isRegistrationOpen } from "@/lib/plans";
 import { getSessionUserId } from "@/lib/current-user";
@@ -120,17 +121,16 @@ export default async function LandingPage() {
     );
 
   return (
-    <div className="min-h-dvh bg-background">
+    <div className="relative isolate min-h-dvh">
+      <GlassBackdrop />
       <SiteHeader appName={appName} signupAllowed={signupAllowed} loggedIn={loggedIn} />
 
       <main>
         {/* Hero */}
-        <section id="home" className="relative scroll-mt-20 overflow-hidden">
-          <div aria-hidden className="pointer-events-none absolute -top-40 -right-32 size-[36rem] rounded-full bg-primary/10 blur-3xl" />
-          <div aria-hidden className="pointer-events-none absolute -bottom-48 -left-40 size-[36rem] rounded-full bg-[oklch(0.62_0.21_330_/_0.1)] blur-3xl" />
+        <section id="home" className="relative scroll-mt-24">
           <div className="relative mx-auto grid max-w-6xl items-center gap-12 px-4 py-16 sm:px-6 lg:grid-cols-2 lg:py-24">
             <div>
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-medium text-primary">
+              <span className="glass-subtle inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium text-primary">
                 <Sparkles className="size-3.5" aria-hidden /> The intentional job-search workspace
               </span>
               <h1 className="mt-5 text-4xl font-semibold leading-[1.1] tracking-tight sm:text-5xl">
@@ -144,7 +144,7 @@ export default async function LandingPage() {
               <div className="mt-8 flex flex-wrap items-center gap-3">
                 <PrimaryCta />
                 {!loggedIn && (
-                  <Link href="/login" className="inline-flex items-center justify-center rounded-xl border px-5 py-3 text-sm font-medium transition-colors hover:bg-muted">
+                  <Link href="/login" className="glass inline-flex items-center justify-center rounded-xl px-5 py-3 text-sm font-medium transition-colors hover:bg-white/80">
                     Log in
                   </Link>
                 )}
@@ -155,24 +155,24 @@ export default async function LandingPage() {
               </p>
             </div>
 
-            {/* Hero visual — a brand-gradient frame around a faux kanban board */}
+            {/* Hero visual — a glass panel holding a faux kanban board */}
             <div className="relative">
-              <div className="rounded-3xl bg-gradient-to-br from-primary via-[oklch(0.46_0.22_294)] to-[oklch(0.5_0.2_308)] p-3 shadow-2xl shadow-primary/20 ring-1 ring-white/10">
-                <div className="rounded-2xl bg-card p-3">
+              <div className="glass rounded-3xl p-3">
+                <div className="rounded-2xl bg-white/40 p-3">
                   <div className="flex items-center justify-between px-1 pb-2.5">
                     <p className="text-sm font-semibold">Your pipeline</p>
                     <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">12 active</span>
                   </div>
                   <div className="grid grid-cols-3 gap-2">
                     {BOARD.map((col) => (
-                      <div key={col.label} className="rounded-xl bg-muted/40 p-1.5">
+                      <div key={col.label} className="rounded-xl bg-white/45 p-1.5">
                         <div className="flex items-center justify-between px-1 pb-1.5">
                           <span className="text-[11px] font-medium text-muted-foreground">{col.label}</span>
                           <span className="text-[11px] tabular-nums text-muted-foreground">{col.count}</span>
                         </div>
                         <div className="space-y-1.5">
                           {col.cards.map((c) => (
-                            <div key={c.role} className="rounded-lg border bg-card p-2">
+                            <div key={c.role} className="glass-strong rounded-lg p-2">
                               <p className="truncate text-[11px] font-medium leading-tight">{c.role}</p>
                               <p className="truncate text-[10px] text-muted-foreground">{c.co}</p>
                               {c.score && (
@@ -188,12 +188,21 @@ export default async function LandingPage() {
                   </div>
                 </div>
               </div>
+              <div className="glass-strong absolute -bottom-6 left-4 flex items-center gap-2.5 rounded-2xl px-3.5 py-2.5 sm:-left-6">
+                <span className="flex size-8 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <Inbox className="size-4" aria-hidden />
+                </span>
+                <span className="text-xs leading-tight">
+                  <span className="block font-semibold">6 new leads</span>
+                  <span className="text-muted-foreground">from today&apos;s job alerts</span>
+                </span>
+              </div>
             </div>
           </div>
         </section>
 
         {/* Features */}
-        <section id="features" className="scroll-mt-20 border-t bg-muted/20">
+        <section id="features" className="scroll-mt-24">
           <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:py-24">
             <div className="max-w-2xl">
               <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">Everything your search needs, nothing it doesn&apos;t</h2>
@@ -203,8 +212,8 @@ export default async function LandingPage() {
             </div>
             <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {FEATURES.map(({ icon: Icon, title, body }) => (
-                <div key={title} className="rounded-2xl border bg-card p-5 shadow-xs transition-all hover:-translate-y-0.5 hover:shadow-md">
-                  <span className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <div key={title} className="glass rounded-2xl p-5 transition-transform duration-200 hover:-translate-y-0.5">
+                  <span className="flex size-11 items-center justify-center rounded-xl bg-gradient-to-br from-primary/15 to-[oklch(0.62_0.21_330_/_0.14)] text-primary ring-1 ring-white/70">
                     <Icon className="size-5.5" aria-hidden />
                   </span>
                   <h3 className="mt-4 text-base font-semibold">{title}</h3>
@@ -215,21 +224,22 @@ export default async function LandingPage() {
           </div>
         </section>
 
-        {/* How it works — timeline */}
-        <section className="border-t">
+        {/* How it works — timeline on a glass panel */}
+        <section>
           <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:py-24">
             <h2 className="text-center text-3xl font-semibold tracking-tight sm:text-4xl">How it works</h2>
             <p className="mx-auto mt-4 max-w-xl text-center text-base text-muted-foreground">
               A simple, intentional loop — research, apply well, and follow through. Not spray-and-pray.
             </p>
 
+            <div className="glass mt-12 rounded-3xl px-5 py-10 sm:px-8">
             {/* Desktop: horizontal timeline */}
-            <div className="relative mt-14 hidden md:block">
+            <div className="relative hidden md:block">
               <div aria-hidden className="absolute top-5 left-[16.6%] right-[16.6%] h-0.5 bg-gradient-to-r from-primary/40 via-primary/30 to-primary/10" />
               <ol className="grid grid-cols-3 gap-8">
                 {STEPS.map((s) => (
                   <li key={s.n} className="flex flex-col items-center text-center">
-                    <span className="relative z-10 flex size-10 items-center justify-center rounded-full bg-gradient-to-br from-primary to-[oklch(0.5_0.2_308)] text-sm font-semibold text-primary-foreground shadow-sm ring-4 ring-background">
+                    <span className="relative z-10 flex size-10 items-center justify-center rounded-full bg-gradient-to-br from-primary to-[oklch(0.5_0.2_308)] text-sm font-semibold text-primary-foreground shadow-sm ring-4 ring-white/70">
                       {s.n}
                     </span>
                     <h3 className="mt-5 text-base font-semibold">{s.title}</h3>
@@ -240,27 +250,28 @@ export default async function LandingPage() {
             </div>
 
             {/* Mobile: vertical timeline */}
-            <ol className="mt-12 md:hidden">
+            <ol className="md:hidden">
               {STEPS.map((s, i) => (
                 <li key={s.n} className="flex gap-4">
                   <div className="flex flex-col items-center">
                     <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-[oklch(0.5_0.2_308)] text-sm font-semibold text-primary-foreground shadow-sm">
                       {s.n}
                     </span>
-                    {i < STEPS.length - 1 && <span aria-hidden className="my-1 w-0.5 flex-1 bg-border" />}
+                    {i < STEPS.length - 1 && <span aria-hidden className="my-1 w-0.5 flex-1 bg-primary/20" />}
                   </div>
-                  <div className="pb-8">
+                  <div className={i < STEPS.length - 1 ? "pb-8" : ""}>
                     <h3 className="text-base font-semibold">{s.title}</h3>
                     <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{s.body}</p>
                   </div>
                 </li>
               ))}
             </ol>
+            </div>
           </div>
         </section>
 
         {/* About — the philosophy */}
-        <section id="about" className="scroll-mt-20 border-t bg-muted/20">
+        <section id="about" className="scroll-mt-24">
           <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 py-16 sm:px-6 lg:grid-cols-2 lg:py-24">
             <div>
               <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">Quality beats quantity</h2>
@@ -269,7 +280,7 @@ export default async function LandingPage() {
                 {" "}{appName} is for the roles that are actually right for you — researched, tracked, and
                 applied to well.
               </p>
-              <div className="mt-5 rounded-2xl border-l-2 border-primary bg-card p-4 text-sm font-medium">
+              <div className="glass-subtle mt-5 rounded-2xl border-l-2 border-l-primary p-4 text-sm font-medium">
                 Ten thoughtful applications beat a thousand blind ones. Apply to the right 10 and land 6
                 calls — not spray 1,000 and hear nothing.
               </div>
@@ -289,7 +300,7 @@ export default async function LandingPage() {
                 ))}
               </ul>
             </div>
-            <div className="rounded-3xl border bg-card p-8 shadow-sm">
+            <div className="glass rounded-3xl p-8">
               <div className="grid grid-cols-2 gap-6">
                 {[
                   ["10 › 1000", "Quality over quantity"],
@@ -308,7 +319,7 @@ export default async function LandingPage() {
         </section>
 
         {/* FAQ */}
-        <section id="faq" className="scroll-mt-20 border-t">
+        <section id="faq" className="scroll-mt-24">
           <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:py-24">
             <h2 className="text-center text-3xl font-semibold tracking-tight sm:text-4xl">Frequently asked questions</h2>
             <p className="mx-auto mt-4 max-w-xl text-center text-base text-muted-foreground">
@@ -319,7 +330,7 @@ export default async function LandingPage() {
         </section>
 
         {/* CTA + Contact */}
-        <section id="contact" className="scroll-mt-20 border-t">
+        <section id="contact" className="scroll-mt-24">
           <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:py-24">
             <div className="overflow-hidden rounded-3xl bg-gradient-to-br from-primary via-[oklch(0.46_0.22_294)] to-[oklch(0.5_0.2_308)] px-6 py-12 text-center text-primary-foreground shadow-xl sm:px-12">
               <h2 className="mx-auto max-w-xl text-3xl font-semibold tracking-tight sm:text-4xl">
@@ -354,7 +365,7 @@ export default async function LandingPage() {
               <h3 className="text-lg font-semibold">Questions?</h3>
               <p className="text-sm text-muted-foreground">We&apos;re happy to help.</p>
               {supportEmail ? (
-                <a href={`mailto:${supportEmail}`} className="mt-1 inline-flex items-center gap-2 rounded-xl border bg-card px-4 py-2.5 text-sm font-medium transition-colors hover:bg-muted">
+                <a href={`mailto:${supportEmail}`} className="glass mt-1 inline-flex min-h-11 items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors hover:bg-white/80">
                   <Mail className="size-4 text-primary" aria-hidden /> {supportEmail}
                 </a>
               ) : (

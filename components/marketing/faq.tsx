@@ -14,7 +14,7 @@ export function Faq({ items }: { items: { q: string; a: string }[] }) {
   const toggle = (i: number) => setOpenIdx((cur) => (cur === i ? null : i));
 
   return (
-    <div className="mx-auto mt-12 max-w-3xl divide-y overflow-hidden rounded-2xl border bg-card">
+    <div className="glass mx-auto mt-12 max-w-3xl divide-y divide-white/70 overflow-hidden rounded-2xl">
       {items.map((it, i) => {
         const isOpen = openIdx === i;
         return (
@@ -23,7 +23,7 @@ export function Faq({ items }: { items: { q: string; a: string }[] }) {
               type="button"
               onClick={() => toggle(i)}
               aria-expanded={isOpen}
-              className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left transition-colors hover:bg-muted/40"
+              className="flex min-h-11 w-full items-center justify-between gap-4 px-5 py-4 text-left transition-colors hover:bg-white/45"
             >
               <span className="text-sm font-medium">{it.q}</span>
               <ChevronDown
