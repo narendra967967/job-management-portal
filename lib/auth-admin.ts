@@ -24,6 +24,12 @@ export const authAdmin = betterAuth({
   basePath: "/api/admin-auth",
   advanced: {
     cookiePrefix: "jmp-admin",
+    // Rate-limit by Nginx's X-Real-IP only (see lib/auth.ts).
+    ipAddress: { ipAddressHeaders: ["x-real-ip"] },
+  },
+  // Production only: 5 sign-in attempts per minute per IP (see lib/auth.ts).
+  rateLimit: {
+    customRules: { "/sign-in/email": { window: 60, max: 5 } },
   },
   database: drizzleAdapter(db, {
     provider: "pg",

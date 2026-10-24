@@ -59,9 +59,10 @@ export async function signUpAction(input: unknown): Promise<Result> {
   const pwErr = await validatePassword(password);
   if (pwErr) return { ok: false, error: pwErr };
 
-  // Rate limit by client IP.
+  // Rate limit by client IP — Nginx's X-Real-IP, which the client can't set
+  // (X-Forwarded-For can carry made-up values).
   const h = await headers();
-  const ip = (h.get("x-forwarded-for")?.split(",")[0] ?? h.get("x-real-ip") ?? "unknown").trim();
+  const ip = (h.get("x-real-ip") ?? h.get("x-forwarded-for")?.split(",").pop() ?? "unknown").trim();
   if (rateLimited(ip)) {
     return { ok: false, error: "Too many sign-ups from here — please try again later." };
   }

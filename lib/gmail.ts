@@ -64,6 +64,8 @@ export async function revokeGoogleAccess(userId: string): Promise<void> {
       method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({ token }),
+      // Switch-off revokes users one by one: a slow Google answer mustn't stall the rest.
+      signal: AbortSignal.timeout(10_000),
     });
   } catch {
     // Already invalid/expired or not connected — nothing left to revoke.

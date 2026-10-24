@@ -152,6 +152,17 @@ export const auth = betterAuth({
       }
     },
   },
+  advanced: {
+    // Client IP for rate limiting / session tracking: only Nginx's X-Real-IP
+    // ($remote_addr, overwritten on every request). X-Forwarded-For can carry
+    // values the client made up, which would let it dodge the login limit.
+    ipAddress: { ipAddressHeaders: ["x-real-ip"] },
+  },
+  // Production only (the library's default). Sign-in is stricter than its
+  // built-in 3 per 10 s (≈26k guesses/day/IP): 5 per minute per IP.
+  rateLimit: {
+    customRules: { "/sign-in/email": { window: 60, max: 5 } },
+  },
   account: {
     // Google access/refresh tokens are encrypted at rest (keyed by
     // BETTER_AUTH_SECRET). Read them only through auth.api.getAccessToken

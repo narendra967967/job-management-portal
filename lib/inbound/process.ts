@@ -29,13 +29,14 @@ import {
   user as userT,
 } from "@/db/schema";
 import { getIntakeConfig, loadSenders, receivingDomain, userIdForToken } from "@/lib/email-intake-data";
-import { domainWithin, type InboundSender, type InboundStatus } from "@/lib/email-intake-model";
+import type { InboundSender, InboundStatus } from "@/lib/email-intake-model";
 import { ALERT_PARSERS } from "@/lib/alert-parsers";
 import { ingestAlertDrafts } from "@/lib/lead-ingest";
 import { userHasAiKey } from "@/lib/ai";
 import { emailForAi } from "@/lib/inbound/ai-reader";
 import { enqueueAiRead } from "@/lib/inbound/ai-queue";
 import { forwardedOriginal } from "@/lib/inbound/hand-forward";
+import { matchSender, signedFor } from "@/lib/inbound/trust";
 import { confirmationText, describeConfirmationEmail, gmailConfirmation } from "@/lib/inbound/gmail-confirmation";
 
 /** aiJobId: an email queued for the AI reader — the route runs it after answering. */
@@ -108,45 +109,7 @@ export async function checkRecipient(recipient: string, mailFrom: string): Promi
   return { code: 250, message: "OK" };
 }
 
-/* ---------------- DKIM / ARC ---------------- */
-
 type AuthResult = Awaited<ReturnType<typeof authenticate>>;
-
-/** Does a passing DKIM signature — or Gmail's passing ARC seal recording one —
- *  vouch for `domain`? Returns the vouching signing domain, or null. */
-function signedFor(auth: AuthResult, domain: string): string | null {
-  for (const r of auth.dkim?.results ?? []) {
-    if (r.status?.result === "pass" && r.signingDomain && domainWithin(r.signingDomain, domain)) {
-      return r.signingDomain.toLowerCase();
-    }
-  }
-  // Forwarding can break the original signature; Gmail's ARC seal then
-  // records what it verified on arrival. Trust it only when the chain passes
-  // and the seal is Google's.
-  const arc = auth.arc as
-    | {
-        status?: { result?: string };
-        signature?: { signingDomain?: string };
-        authenticationResults?: { dkim?: { result?: string; header?: { d?: string; i?: string } }[] };
-      }
-    | undefined;
-  if (arc?.status?.result === "pass" && arc.signature?.signingDomain && domainWithin(arc.signature.signingDomain, "google.com")) {
-    for (const d of arc.authenticationResults?.dkim ?? []) {
-      const dom = (d.header?.d ?? d.header?.i ?? "").replace(/^.*@/, "").toLowerCase();
-      if (d.result === "pass" && dom && domainWithin(dom, domain)) return dom;
-    }
-  }
-  return null;
-}
-
-function matchSender(senders: InboundSender[], from: string): InboundSender | null {
-  const dom = domainOf(from);
-  for (const s of senders) {
-    if (!s.enabled) continue;
-    if (s.match.startsWith("*@") ? domainWithin(dom, s.match.slice(2)) : s.match === from) return s;
-  }
-  return null;
-}
 
 /* ---------------- DATA stage ---------------- */
 
