@@ -4,11 +4,11 @@
 // matching your profile"). Each card follows an HTML comment <!-- Job Card -->
 // and reads: title (link with a title attribute) · company · experience ·
 // location · "Apply Now". Job links are opaque redirects (mredirect.html?_qe=…)
-// with no stable job id, so the dedupe key is title + company (lib/job-key.ts);
-// TimesJobs titles usually carry a requisition number, e.g. "(50912)".
+// with no stable job id, so the dedupe key is title + company + location
+// (jobKeyForPosting — the same rule the AI reader uses).
 
 import type { LeadDraft } from "@/lib/lead-draft";
-import { jobKeyForTitle } from "@/lib/job-key";
+import { jobKeyForPosting } from "@/lib/job-key";
 
 function decode(s: string): string {
   return s
@@ -57,7 +57,7 @@ export function parseTimesJobsAlert(html: string): LeadDraft[] {
     const experience = expIdx >= 0 ? pieces[expIdx] : "";
     const location = expIdx >= 0 ? (pieces[expIdx + 1] ?? "") : (pieces[1] ?? "");
 
-    const jobKey = jobKeyForTitle("timesjobs", rawTitle, company);
+    const jobKey = jobKeyForPosting("timesjobs", { title, company, location, url });
     if (byKey.has(jobKey)) continue;
     byKey.set(jobKey, {
       jobKey,

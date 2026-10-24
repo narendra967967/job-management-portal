@@ -5,8 +5,9 @@
 //   LinkedIn  → the bare numeric job id          (e.g. "4465649386")
 //   Naukri    → "naukri:<job id>"                (e.g. "naukri:161026010673")
 //   Glassdoor → "glassdoor:<job listing id>"
-//   TimesJobs → "timesjobs:<title>|<company>"    (its links are opaque redirects)
-//   TheLadders → "theladders:<title>|<company location>" (click-tracker links)
+//   sites with tracker links (TimesJobs, TheLadders, …) → "<site>:<title>|<company location>"
+//     — built by jobKeyForPosting, the ONE rule shared by built-in readers and
+//     the AI reader, so both recognise the same posting
 //   other     → "url:<normalized URL>"
 // Pure — no server-only imports.
 
@@ -47,4 +48,20 @@ export function jobKeyForUrl(rawUrl: string): string {
 export function jobKeyForTitle(site: string, title: string, company: string): string {
   const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
   return `${site}:${norm(title)}|${norm(company)}`.slice(0, 300);
+}
+
+/** The key for one job posting from an email, whoever read it (built-in
+ *  reader or AI): the link's site id when it has one, else site + title +
+ *  company + location. `site` is the sender's domain or its first label
+ *  ("timesjobs.com" / "timesjobs"). Employer boilerplate in front of titles
+ *  ("Career Opportunities: …") is ignored. */
+export function jobKeyForPosting(
+  site: string,
+  p: { title: string; company: string; location: string; url: string },
+): string {
+  const fromUrl = jobKeyForUrl(p.url);
+  if (!fromUrl.startsWith("url:")) return fromUrl;
+  const prefix = site.split(".")[0] || "site";
+  const title = p.title.replace(/^\s*career opportunities\s*:\s*/i, "");
+  return jobKeyForTitle(prefix, title, `${p.company} ${p.location}`);
 }

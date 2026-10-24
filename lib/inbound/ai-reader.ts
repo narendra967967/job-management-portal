@@ -12,7 +12,7 @@
 
 import { z } from "zod";
 import type { LeadDraft } from "@/lib/lead-draft";
-import { jobKeyForTitle, jobKeyForUrl } from "@/lib/job-key";
+import { jobKeyForPosting } from "@/lib/job-key";
 
 const MAX_BODY_CHARS = 24_000;
 const MAX_LINKS = 200;
@@ -129,8 +129,6 @@ export function draftsFromAiReply(
   if (!parsed.success) throw new Error(AI_BAD_REPLY);
 
   const clean = (s: string, max: number) => s.replace(/\s+/g, " ").trim().slice(0, max);
-  // "naukri.com" → "naukri", the same prefix the built-in readers use.
-  const prefix = opts.site.split(".")[0] || "site";
   const byKey = new Map<string, LeadDraft>();
   for (const raw of parsed.data.jobs) {
     const job = aiJob.safeParse(raw);
@@ -140,9 +138,8 @@ export function draftsFromAiReply(
     if (!title || !url) continue;
     const company = clean(job.data.company, 200);
     const location = clean(job.data.location, 200);
-    const urlKey = jobKeyForUrl(url);
-    // Tracker links change per email; for those the posting itself is the key.
-    const jobKey = urlKey.startsWith("url:") ? jobKeyForTitle(prefix, title, `${company} ${location}`) : urlKey;
+    // The same rule the built-in readers use, so both recognise one posting.
+    const jobKey = jobKeyForPosting(opts.site, { title, company, location, url });
     if (byKey.has(jobKey)) continue;
     byKey.set(jobKey, {
       jobKey,

@@ -10,7 +10,7 @@
 // same title in several cities.
 
 import type { LeadDraft } from "@/lib/lead-draft";
-import { jobKeyForTitle } from "@/lib/job-key";
+import { jobKeyForPosting } from "@/lib/job-key";
 
 function decode(s: string): string {
   return s
@@ -43,7 +43,7 @@ export function parseTheLaddersAlert(html: string): LeadDraft[] {
       .filter(Boolean);
     const location = loc.join(", ");
 
-    const jobKey = jobKeyForTitle("theladders", title, `${company} ${location}`);
+    const jobKey = jobKeyForPosting("theladders", { title, company, location, url: href ? decode(href) : "" });
     if (byKey.has(jobKey)) continue;
     byKey.set(jobKey, {
       jobKey,

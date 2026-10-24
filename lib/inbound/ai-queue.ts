@@ -69,11 +69,16 @@ export async function runAiJob(id: string): Promise<void> {
 
 const short = (msg: string) => msg.replace(/\s+/g, " ").slice(0, 120);
 
+const HAND_LABEL = "Hand-forwarded · ";
+
 async function finish(job: QueueRow, status: InboundStatus, reason: string, leadsCreated = 0) {
   if (job.logId) {
+    // Keep the "Hand-forwarded · " label the row was queued with.
+    const [row] = await db.select({ reason: logT.reason }).from(logT).where(eq(logT.id, job.logId));
+    const label = row?.reason.startsWith(HAND_LABEL) ? HAND_LABEL : "";
     await db
       .update(logT)
-      .set({ status, reason: reason.slice(0, 400), leadsCreated })
+      .set({ status, reason: `${label}${reason}`.slice(0, 400), leadsCreated })
       .where(eq(logT.id, job.logId));
   }
   await db.delete(queueT).where(eq(queueT.id, job.id));
@@ -136,9 +141,11 @@ async function processJob(job: QueueRow) {
       .set({ lockedAt: null, nextAt: new Date(Date.now() + job.attempts * 2 * 60_000) })
       .where(eq(queueT.id, job.id));
     if (job.logId) {
+      const [row] = await db.select({ reason: logT.reason }).from(logT).where(eq(logT.id, job.logId));
+      const label = row?.reason.startsWith(HAND_LABEL) ? HAND_LABEL : "";
       await db
         .update(logT)
-        .set({ reason: `Reading with AI · attempt ${job.attempts} failed (${short(msg)}), retrying` })
+        .set({ reason: `${label}Reading with AI · attempt ${job.attempts} failed (${short(msg)}), retrying` })
         .where(eq(logT.id, job.logId));
     }
   }
