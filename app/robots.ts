@@ -1,6 +1,10 @@
 import type { MetadataRoute } from "next";
 import { absoluteUrl, isIndexable } from "@/lib/site-url";
 
+// Per request, never at build time: the Docker build has no BETTER_AUTH_URL,
+// so a build-time robots.txt saw "localhost" and blocked the live site.
+export const dynamic = "force-dynamic";
+
 // Crawl the public site. Private areas (dashboard, admin, account pages) are
 // NOT listed here — that would publish their paths; they carry a noindex meta
 // tag instead, which crawlers can only see if they're allowed to fetch them.
