@@ -15,10 +15,16 @@ import { hashPassword } from "@/lib/password";
 import { validatePassword } from "@/lib/admin/password-policy-server";
 import { provisionUserDefaults } from "@/lib/provision";
 import { getDefaultPlan, planExpiryFromNow } from "@/lib/plans";
-import { account, plans, user } from "@/db/schema";
-import { deleteUserCompletely } from "@/lib/account-deletion";
+import { account, plans, supportTickets, user } from "@/db/schema";
+import {
+  DELETION_CATEGORY,
+  deleteUserCompletely,
+  fmtDay,
+  lastCancelledDeletion,
+  openDeletionRequest,
+} from "@/lib/account-deletion";
 
-type ActionResult = { ok: true } | { ok: false; error: string };
+type ActionResult = { ok: true } | { ok: false; error: string; code?: "CANCELLED_REQUEST" };
 type CreateResult = { ok: true; emailed: boolean } | { ok: false; error: string };
 
 const roleSchema = z.enum(["user", "admin"]);
@@ -219,12 +225,52 @@ export async function renewAdminUserAction(id: string, days: unknown): Promise<A
   return { ok: true };
 }
 
-export async function deleteAdminUserAction(id: string): Promise<ActionResult> {
+export async function deleteAdminUserAction(id: string, confirmCancelled = false): Promise<ActionResult> {
   const adminId = await requireAdmin();
   if (id === adminId) return { ok: false, error: "You can't delete your own account." };
+  // A user who asked to be deleted and then changed their mind: make the admin
+  // confirm on purpose (checked now, not when the page loaded).
+  if (!confirmCancelled && !(await openDeletionRequest(id))) {
+    const cancelled = await lastCancelledDeletion(id);
+    if (cancelled) {
+      return {
+        ok: false,
+        code: "CANCELLED_REQUEST",
+        error: `This user cancelled their account deletion request on ${fmtDay(cancelled)}.`,
+      };
+    }
+  }
   // Everything goes: app data (FK cascades), résumé files on disk, tickets
   // (a deletion-request ticket stays, anonymised) — lib/account-deletion.ts.
   const res = await deleteUserCompletely(id);
+  if (!res.ok) return res;
+  revalidatePath("/jmp-admin/users");
+  revalidatePath("/jmp-admin/tickets");
+  return { ok: true };
+}
+
+/** "Delete this user" on an Account deletion ticket. Re-checks the request at
+ *  the moment of deletion: never acts on a cancelled or already-closed one. */
+export async function deleteUserForRequestAction(ticketId: unknown): Promise<ActionResult> {
+  const adminId = await requireAdmin();
+  if (typeof ticketId !== "string" || !/^[0-9a-f-]{36}$/i.test(ticketId)) return { ok: false, error: "Ticket not found." };
+  const [t] = await db
+    .select({
+      userId: supportTickets.userId,
+      category: supportTickets.category,
+      status: supportTickets.status,
+      cancelledAt: supportTickets.cancelledAt,
+    })
+    .from(supportTickets)
+    .where(eq(supportTickets.id, ticketId));
+  if (!t || t.category !== DELETION_CATEGORY) return { ok: false, error: "This isn't an account deletion request." };
+  if (t.cancelledAt) {
+    return { ok: false, error: `The user cancelled this request on ${fmtDay(t.cancelledAt)} — their account was not deleted.` };
+  }
+  if (!t.userId) return { ok: false, error: "This account has already been deleted." };
+  if (t.status === "resolved") return { ok: false, error: "This request is already closed — reopen it first if the user still wants deletion." };
+  if (t.userId === adminId) return { ok: false, error: "You can't delete your own account." };
+  const res = await deleteUserCompletely(t.userId);
   if (!res.ok) return res;
   revalidatePath("/jmp-admin/users");
   revalidatePath("/jmp-admin/tickets");

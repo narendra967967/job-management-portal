@@ -91,6 +91,8 @@ export interface Ticket extends TicketReceipts {
   category: string;
   source: string;
   status: TicketStatus;
+  /** Account-deletion requests: when the user cancelled it (null = not cancelled). */
+  cancelledAt: string | null;
   createdAt: string;
   updatedAt: string;
   replies: TicketReply[];

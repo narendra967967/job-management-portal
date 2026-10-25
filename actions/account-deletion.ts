@@ -86,8 +86,22 @@ export async function cancelDeletionRequestAction(): Promise<Result> {
   if (!t) return { ok: false, error: "There's no deletion request to cancel." };
   await db.transaction(async (tx) => {
     await tx.insert(ticketReplies).values({ ticketId: t.id, author: "user", body: "<p>I've cancelled my account deletion request.</p>" });
-    await tx.update(supportTickets).set({ status: "resolved" }).where(eq(supportTickets.id, t.id));
+    await tx
+      .update(supportTickets)
+      .set({ status: "resolved", cancelledAt: new Date(), subject: "Account deletion request (cancelled by user)" })
+      .where(eq(supportTickets.id, t.id));
   });
+
+  sendAppEmail({
+    to: u.email,
+    subject: "Thanks for staying with us",
+    heading: "Thanks for staying",
+    lines: [
+      `Hi ${u.name || "there"}, you've cancelled your account deletion request (${ticketRef(t.number)}) — your account and all your data stay exactly as they are.`,
+      "We're glad you're staying. If something wasn't working for you, just reply from Help & support — we'd love to make it better.",
+    ],
+  }).catch((e) => console.error("[account-deletion] thank-you email failed:", e instanceof Error ? e.message : e));
+
   revalidatePath("/settings");
   return { ok: true };
 }

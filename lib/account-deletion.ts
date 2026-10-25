@@ -13,7 +13,7 @@ import "server-only";
 //  - the user's support tickets — except a deletion-request ticket, which is
 //    kept anonymised as the record that the request was handled.
 
-import { and, eq, inArray, ne } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, isNull, ne } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { resumes, supportTickets, ticketReplies, user } from "@/db/schema";
 import { deleteResumeFile } from "@/lib/storage";
@@ -22,7 +22,7 @@ import { sendAppEmail } from "@/lib/email";
 export const DELETION_CATEGORY = "deletion";
 export const DELETION_SOURCE = "account-deletion";
 
-/** The user's open (not yet resolved) deletion request, if any. */
+/** The user's open deletion request (not resolved, not cancelled), if any. */
 export async function openDeletionRequest(userId: string) {
   const [t] = await db
     .select({ id: supportTickets.id, number: supportTickets.number, createdAt: supportTickets.createdAt })
@@ -32,10 +32,30 @@ export async function openDeletionRequest(userId: string) {
         eq(supportTickets.userId, userId),
         eq(supportTickets.category, DELETION_CATEGORY),
         ne(supportTickets.status, "resolved"),
+        isNull(supportTickets.cancelledAt),
       ),
     );
   return t ?? null;
 }
+
+/** When the user last cancelled a deletion request (null = never). */
+export async function lastCancelledDeletion(userId: string): Promise<Date | null> {
+  const [t] = await db
+    .select({ at: supportTickets.cancelledAt })
+    .from(supportTickets)
+    .where(
+      and(
+        eq(supportTickets.userId, userId),
+        eq(supportTickets.category, DELETION_CATEGORY),
+        isNotNull(supportTickets.cancelledAt),
+      ),
+    )
+    .orderBy(desc(supportTickets.cancelledAt))
+    .limit(1);
+  return t?.at ?? null;
+}
+
+export const fmtDay = (d: Date) => d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 
 /** Remove the account and everything in it. Irreversible. */
 export async function deleteUserCompletely(userId: string): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -49,7 +69,7 @@ export async function deleteUserCompletely(userId: string): Promise<{ ok: true }
   ]);
   const keep = tickets.filter((t) => t.category === DELETION_CATEGORY).map((t) => t.id);
   const drop = tickets.filter((t) => t.category !== DELETION_CATEGORY).map((t) => t.id);
-  const when = new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+  const when = fmtDay(new Date());
 
   await db.transaction(async (tx) => {
     if (drop.length) await tx.delete(supportTickets).where(inArray(supportTickets.id, drop)); // replies cascade

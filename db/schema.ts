@@ -632,6 +632,9 @@ export const supportTickets = pgTable(
     // Where it came from: "reactivation", "contact", or a page path.
     source: text("source").notNull().default("contact"),
     status: ticketStatus("status").notNull().default("open"),
+    // Account-deletion requests only: set when the user cancels the request.
+    // The admin delete re-checks it, so a cancelled request is never acted on.
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
     // Read/delivery receipts (chat ticks + unread counts). "last_*_at >= a message's
     // created_at" means that party has delivered/read that message.
     lastReadByUserAt: timestamp("last_read_by_user_at", { withTimezone: true }),

@@ -107,6 +107,8 @@ export function UsersClient({ initialUsers, plans }: { initialUsers: AdminUserRo
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<AdminUserRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<AdminUserRow | null>(null);
+  // Set when the server says this user cancelled a deletion request.
+  const [cancelledTarget, setCancelledTarget] = useState<{ user: AdminUserRow; note: string } | null>(null);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [resetTarget, setResetTarget] = useState<AdminUserRow | null>(null);
   const [fwdResetTarget, setFwdResetTarget] = useState<AdminUserRow | null>(null);
@@ -232,21 +234,25 @@ export function UsersClient({ initialUsers, plans }: { initialUsers: AdminUserRo
     return res;
   }
 
-  async function doDelete(u: AdminUserRow) {
-    const res = await deleteAdminUserAction(u.id);
+  async function doDelete(u: AdminUserRow, confirmCancelled = false) {
+    const res = await deleteAdminUserAction(u.id, confirmCancelled);
     if (res.ok) {
       say(`Deleted ${u.name}.`);
       router.refresh();
+    } else if (res.code === "CANCELLED_REQUEST") {
+      setCancelledTarget({ user: u, note: res.error });
     } else sayErr(res.error);
   }
 
   async function doBulkDelete() {
     const ids = [...selected];
     const results = await Promise.all(ids.map((id) => deleteAdminUserAction(id)));
-    const failed = results.filter((r) => !r.ok).length;
+    const skipped = results.filter((r) => !r.ok && r.code === "CANCELLED_REQUEST").length;
+    const failed = results.filter((r) => !r.ok).length - skipped;
     clearSelection();
     router.refresh();
-    if (failed) sayErr(`${failed} of ${ids.length} couldn't be deleted.`);
+    if (skipped) sayErr(`${skipped} skipped — they cancelled their deletion request. Delete them one by one if you're sure.`);
+    else if (failed) sayErr(`${failed} of ${ids.length} couldn't be deleted.`);
     else say(`Deleted ${ids.length} user(s).`);
   }
 
@@ -456,6 +462,16 @@ export function UsersClient({ initialUsers, plans }: { initialUsers: AdminUserRo
         confirmLabel="Delete permanently"
         destructive
         onConfirm={() => { if (deleteTarget) void doDelete(deleteTarget); }}
+      />
+
+      <ConfirmDialog
+        open={cancelledTarget !== null}
+        onOpenChange={(o) => !o && setCancelledTarget(null)}
+        title={`Delete ${cancelledTarget?.user.name ?? "user"} anyway?`}
+        description={`${cancelledTarget?.note ?? ""} They chose to keep their account. Delete it only if you have another reason.`}
+        confirmLabel="Delete anyway"
+        destructive
+        onConfirm={() => { if (cancelledTarget) void doDelete(cancelledTarget.user, true); setCancelledTarget(null); }}
       />
 
       <ConfirmDialog
