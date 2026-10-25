@@ -1107,3 +1107,23 @@ export const resumeAtsChecks = pgTable("resume_ats_checks", {
   profileHash: text("profile_hash").notNull(),
   checkedAt: timestamp("checked_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/**
+ * One-time email codes that confirm a destructive account action (reset leads,
+ * request account deletion). One live code per user + purpose; only a hash is
+ * stored. Short-lived and attempt-limited — see lib/action-codes.ts.
+ */
+export const actionCodes = pgTable(
+  "action_codes",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    purpose: text("purpose").notNull(),
+    codeHash: text("code_hash").notNull(),
+    attempts: integer("attempts").notNull().default(0),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("action_codes_user_purpose_uq").on(t.userId, t.purpose)],
+);

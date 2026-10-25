@@ -71,6 +71,7 @@ import {
 import { buildGmailQuery } from "@/lib/use-gmail-settings";
 import { EmailForwardingCard } from "@/components/forwarding/email-forwarding-card";
 import { EmailLogCard } from "@/components/forwarding/email-log-card";
+import { DangerZoneCard } from "@/components/account/danger-zone";
 import { CareerProfileTab } from "@/components/career/career-profile-tab";
 import { ResumeAtsStrip, useAtsOverview } from "@/components/career/resume-ats";
 import {
@@ -156,7 +157,17 @@ const SECTION = {
   followups: { id: "followups", label: "Follow-ups", icon: Bell, render: () => <FollowUpsCard /> },
   resumes: { id: "resumes", label: "Resumes", icon: FileText, render: () => <ResumesCard /> },
   help: { id: "help", label: "Help & support", icon: LifeBuoy, render: () => <HelpSupportCard /> },
-  account: { id: "account", label: "Account", icon: ShieldCheck, render: () => <AccountCard /> },
+  account: {
+    id: "account",
+    label: "Account",
+    icon: ShieldCheck,
+    render: () => (
+      <div className="space-y-4">
+        <AccountCard />
+        <DangerZoneCard />
+      </div>
+    ),
+  },
 } satisfies Record<string, SettingsSection>;
 
 // Grouped and ordered by how central each area is to capturing and acting on
