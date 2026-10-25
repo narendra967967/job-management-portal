@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { LegalLayout } from "@/components/marketing/legal-layout";
 import { getAppName, getSupportEmail } from "@/lib/branding";
-import { isGmailOAuthEnabled, receivingDomain, supportedSitesText } from "@/lib/email-intake-data";
+import { isGmailOAuthEnabled, receivingDomain, supportedSiteExamples } from "@/lib/email-intake-data";
 import { getRetentionConfig } from "@/lib/retention";
 import { captchaSiteKey } from "@/lib/captcha";
 
@@ -23,7 +23,7 @@ export default async function PrivacyPage() {
     getAppName(),
     getSupportEmail(),
     isGmailOAuthEnabled(),
-    supportedSitesText(),
+    supportedSiteExamples(),
     getRetentionConfig(),
     captchaSiteKey(),
   ]);
@@ -88,8 +88,8 @@ export default async function PrivacyPage() {
       </p>
       <ul>
         <li>
-          <strong>What we accept:</strong> emails that genuinely come from a supported job site — currently{" "}
-          {sites}. We check the sender&rsquo;s digital signature (DKIM, or the forwarding seal Gmail adds);
+          <strong>What we accept:</strong> emails that genuinely come from a supported job site (for example{" "}
+          {sites}). We check the sender&rsquo;s digital signature (DKIM, or the forwarding seal Gmail adds);
           anything else is discarded. Job alerts you forward by hand from your own email address are
           accepted the same way.
         </li>

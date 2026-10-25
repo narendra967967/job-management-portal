@@ -33,7 +33,7 @@ import { GlassBackdrop } from "@/components/marketing/glass-backdrop";
 import { getAppName, getTagline, getSupportEmail } from "@/lib/branding";
 import { isRegistrationOpen } from "@/lib/plans";
 import { getSessionUserId } from "@/lib/current-user";
-import { isGmailOAuthEnabled, supportedSitesText } from "@/lib/email-intake-data";
+import { isGmailOAuthEnabled, supportedSiteExamples } from "@/lib/email-intake-data";
 
 export const dynamic = "force-dynamic";
 
@@ -59,12 +59,12 @@ export default async function LandingPage() {
     getSupportEmail(),
     getSessionUserId(),
     isGmailOAuthEnabled(),
-    supportedSitesText(),
+    supportedSiteExamples(),
   ]);
   const loggedIn = !!sessionId;
 
   const FEATURES = [
-    { icon: Inbox, title: "Capture every opportunity", body: `Forward the job alerts you already get from ${sites}. They become tracked leads automatically — repeats refresh the lead instead of duplicating it.` },
+    { icon: Inbox, title: "Capture every opportunity", body: `Forward the job alerts you already get from job sites like ${sites}, and many more. They become tracked leads automatically — repeats refresh the lead instead of duplicating it.` },
     { icon: ImagePlus, title: "Add any job in seconds", body: "Paste a job post or drop a screenshot and AI fills in the details, keeping the description word for word. Or add it by hand." },
     { icon: LayoutGrid, title: "A pipeline you keep", body: "Move every lead from new to shortlisted, applied, interview and offer — star your top choices and see it all on a board or a list." },
     { icon: Gauge, title: "Know what fits", body: "AI summarizes each role and scores how well it fits your résumé, with salary insights on supported plans." },
@@ -82,11 +82,11 @@ export default async function LandingPage() {
     },
     {
       q: "How do job leads get in?",
-      a: `You get a private ${appName} address. Set up a filter in Gmail once, and the job alerts you already receive from ${sites} are forwarded there and become tracked leads within seconds — no copy-paste. You can also forward an alert by hand, add a job yourself, or paste a job post or a screenshot and let AI fill in the details.`,
+      a: `You get a private ${appName} address. Set up a filter in Gmail once, and the job alerts you already receive — from job sites like ${sites}, and many more — are forwarded there and become tracked leads within seconds — no copy-paste. You can also forward an alert by hand, add a job yourself, or paste a job post or a screenshot and let AI fill in the details.`,
     },
     {
       q: "Which job sites are supported?",
-      a: `Job alerts from ${sites} become leads automatically. With your own AI key, ${appName} can also read alerts from supported sites it doesn't read on its own — and any job from anywhere can be added by pasting it or a screenshot.`,
+      a: `Alerts from many popular job sites — for example ${sites} — become leads automatically, and more sites keep being added. With your own AI key, ${appName} can also read alerts it can't read on its own yet, and any job from anywhere can be added by pasting it or a screenshot.`,
     },
     {
       q: `Does ${appName} read my email?`,
@@ -172,7 +172,7 @@ export default async function LandingPage() {
               </div>
               <p className="mt-5 flex items-center gap-2 text-xs text-muted-foreground">
                 <Inbox className="size-4 shrink-0 text-primary" aria-hidden />
-                Works with job alerts from {sites}.
+                Works with job alerts from sites like {sites}, and many more.
               </p>
               <p className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
                 <ShieldCheck className="size-4 shrink-0 text-primary" aria-hidden />

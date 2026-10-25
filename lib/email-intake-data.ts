@@ -160,12 +160,18 @@ export async function userIdForToken(token: string): Promise<string | null> {
 
 /* ---------------- senders ---------------- */
 
-/** The job sites forwarding accepts right now, for public copy:
- *  "LinkedIn, Naukri and TimesJobs" (from the enabled allowed senders). */
-export async function supportedSitesText(): Promise<string> {
+/** A few job sites forwarding works with, as EXAMPLES for public copy —
+ *  "LinkedIn, Naukri and TimesJobs" (first enabled allowed senders, up to 3).
+ *  Copy must present them as examples ("sites like … and many more"), never
+ *  as the complete list: more sites are added over time. */
+export async function supportedSiteExamples(max = 3): Promise<string> {
   const senders = await loadSenders();
-  const names = [...new Set(senders.filter((s) => s.enabled).map((s) => siteLabel(s.signingDomain)))];
-  if (!names.length) return "your job sites";
+  const names = [
+    ...new Set(
+      senders.filter((s) => s.enabled).map((s) => siteLabel(s.signingDomain).replace(/ Jobs$/, "")),
+    ),
+  ].slice(0, max);
+  if (!names.length) return "LinkedIn and Naukri";
   return names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 }
 
