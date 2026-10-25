@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { getAppName, getBranding, getTagline } from "@/lib/branding";
-import { siteUrl } from "@/lib/site-url";
+import { isIndexable, siteUrl } from "@/lib/site-url";
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
@@ -23,6 +23,8 @@ export async function generateMetadata(): Promise<Metadata> {
     title: { default: fallbackTitle, template: `%s · ${appName}` },
     description,
     applicationName: appName,
+    // Belt and braces for non-production hosts (robots.txt already blocks them).
+    ...(isIndexable() ? {} : { robots: { index: false, follow: false } }),
     openGraph: { type: "website", siteName: appName, title: fallbackTitle, description, locale: "en_IN" },
     twitter: { card: "summary_large_image", title: fallbackTitle, description },
     icons: branding.hasFavicon

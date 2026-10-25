@@ -8,3 +8,16 @@ export function siteUrl(): string {
 export function absoluteUrl(path = "/"): string {
   return `${siteUrl()}${path.startsWith("/") ? path : `/${path}`}`;
 }
+
+/** Whether search engines may index this deployment. Only the real site: any
+ *  preprod / staging / dev / test host or localhost stays out of search, so a
+ *  test copy never competes with (or leaks next to) the production site. */
+export function isIndexable(): boolean {
+  let host: string;
+  try {
+    host = new URL(siteUrl()).hostname;
+  } catch {
+    return false;
+  }
+  return !/(^|\.)(preprod|staging|stage|dev|test|qa|uat)[.-]|^localhost$|^127\.|\.local$|\.test$/i.test(host);
+}
