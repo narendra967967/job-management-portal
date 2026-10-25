@@ -35,46 +35,46 @@ export default async function PrivacyPage() {
   return (
     <LegalLayout title="Privacy policy" updated="25 October 2026">
       <p>
-        This Privacy Policy explains how {appName} (&ldquo;we&rdquo;, &ldquo;us&rdquo;) collects, uses, and
-        protects your information when you use our job-search management service (the
-        &ldquo;Service&rdquo;). By using the Service you agree to this policy.
+        This Privacy Policy explains what information {appName} (&ldquo;we&rdquo;, &ldquo;us&rdquo;) collects
+        when you use our job search tracker (the &ldquo;Service&rdquo;), how we use it and how we keep it
+        safe. By using the Service, you agree to this policy.
       </p>
 
       <h2>Information we collect</h2>
       <ul>
-        <li><strong>Account information</strong> — your name, email address, and password (never stored in readable form).</li>
-        <li><strong>Content you add</strong> — job leads, contacts, notes, outreach messages, and résumés (the file and the text we extract from it).</li>
+        <li><strong>Account information:</strong> your name, email address, and password (never stored in readable form).</li>
+        <li><strong>Content you add:</strong> job leads, contacts, notes, outreach messages, and résumés (the file and the text we extract from it).</li>
         <li>
-          <strong>Jobs you add with AI</strong> — the job post text or screenshot you paste into &ldquo;Add
+          <strong>Jobs you add with AI:</strong> the job post text or screenshot you paste into &ldquo;Add
           with AI&rdquo;. It is sent to your AI provider to fill in the form; we keep only the job details you
           save, not the screenshot.
         </li>
         <li>
-          <strong>Career profile</strong> — what you choose to tell us about your career and job preferences:
+          <strong>Career profile:</strong> what you choose to tell us about your career and job preferences:
           job title, experience, skills, education, certifications, the countries you can work in, target
           roles, preferred work mode and locations, notice period, and current and expected pay.
         </li>
         <li>
-          <strong>Optional questions</strong> — if you choose to answer them, your gender, disability and
+          <strong>Optional questions:</strong> if you choose to answer them, your gender, disability and
           veteran status. These are entirely optional, kept private to your account, never sent to an AI
           provider, and never used to score or rank you. You can clear them at any time.
         </li>
         <li>
-          <strong>Job-alert emails you forward</strong> — the emails you, or a filter you set up, send to your
+          <strong>Job-alert emails you forward:</strong> the emails you, or a filter you set up, send to your
           private {appName} address (see &ldquo;Email forwarding&rdquo; below).
         </li>
         {gmailOn && (
-          <li><strong>Gmail data</strong> — if you connect Google, we read email in your Gmail account to find and parse your LinkedIn job-alert messages (see below).</li>
+          <li><strong>Gmail data:</strong> if you connect Google, we read email in your Gmail account to find and parse your LinkedIn job-alert messages (see below).</li>
         )}
-        <li><strong>Usage data</strong> — basic technical logs needed to operate and secure the Service.</li>
+        <li><strong>Usage data:</strong> basic technical logs needed to operate and secure the Service.</li>
         <li>
-          <strong>Confirmation codes</strong> — when you reset your leads or ask to delete your account, we
+          <strong>Confirmation codes:</strong> when you reset your leads or ask to delete your account, we
           email you a one-time code. It works once, expires shortly, and is never stored in readable
           form.
         </li>
         {captchaKey && (
         <li>
-          <strong>Security check</strong> — the sign-in, sign-up and password pages use Google reCAPTCHA to
+          <strong>Security check:</strong> the sign-in, sign-up and password pages use Google reCAPTCHA to
           keep out automated abuse. It sends Google information about your device and how you use the page
           (Google&rsquo;s{" "}
           <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>{" "}
@@ -97,8 +97,8 @@ export default async function PrivacyPage() {
           Job alerts you forward by hand are checked the same way.
         </li>
         <li>
-          <strong>What we keep:</strong> from each accepted email, the job details — title, company,
-          location, the job&rsquo;s link and short tags such as salary or experience — saved as leads in
+          <strong>What we keep:</strong> from each accepted email, the job details (title, company,
+          location, the job&rsquo;s link and short tags such as salary or experience), saved as leads in
           your account, plus the email&rsquo;s message ID so the same email is never imported twice. If an
           email can&rsquo;t be read, we keep its subject line as an ingestion issue so the problem can be
           fixed.
@@ -133,8 +133,8 @@ export default async function PrivacyPage() {
           </p>
           <ul>
             <li>
-              <strong>What we read:</strong> only messages that match your job-alert search — by default
-              LinkedIn job-alert emails, adjustable under Settings → Gmail. We do not open other email.
+              <strong>What we read:</strong> only messages that match your job-alert search. By default
+              that means LinkedIn job-alert emails, and you can change it under Settings → Gmail. We do not open other email.
             </li>
             <li>
               <strong>What we keep:</strong> from each matching message, the job title, company, location
@@ -157,7 +157,7 @@ export default async function PrivacyPage() {
             <li>is used only to provide and improve the features you see in {appName};</li>
             <li>
               is transferred to others only as needed to provide those features (for example, to an AI
-              provider when you request an AI feature — see below), to comply with the law, or as part of
+              provider when you request an AI feature, as described below), to comply with the law, or as part of
               a merger or acquisition with your prior notice;
             </li>
             <li>is never sold and never used for advertising;</li>
@@ -192,14 +192,14 @@ export default async function PrivacyPage() {
         (OpenAI, Anthropic or OpenRouter). For each feature we send only what it needs:
       </p>
       <ul>
-        <li><strong>Summaries, fit scores and outreach drafts</strong> — the job&rsquo;s title, company and description, your résumé text, and a contact you added.</li>
-        <li><strong>Salary insights</strong> — the job&rsquo;s title, company, location and description, your résumé text, and the country in your profile.</li>
+        <li><strong>Summaries, fit scores and outreach drafts:</strong> the job&rsquo;s title, company and description, your résumé text, and a contact you added.</li>
+        <li><strong>Salary insights:</strong> the job&rsquo;s title, company, location and description, your résumé text, and the country in your profile.</li>
         <li>
-          <strong>Résumé ATS check</strong> — the résumé&rsquo;s text and the matching parts of your career
+          <strong>Résumé ATS check:</strong> the résumé&rsquo;s text and the matching parts of your career
           profile (target roles, skills and tools, current title, years of experience, seniority and
           industries). Your answers to the optional questions are never sent.
         </li>
-        <li><strong>Add with AI</strong> — the job post text or screenshot you paste.</li>
+        <li><strong>Add with AI:</strong> the job post text or screenshot you paste.</li>
       </ul>
       <p>
         The provider uses this only to produce the result we show you, under its own terms and charges.
@@ -208,15 +208,16 @@ export default async function PrivacyPage() {
       <p>
         <strong>Reading forwarded emails with AI:</strong> if you have added your own AI key and a
         forwarded email comes from a supported site we can&rsquo;t read automatically, we send that
-        email&rsquo;s text to your AI provider to pick out the jobs — without attachments or images. This uses your key, so your provider&rsquo;s terms and charges apply. The text is held only
-        until it has been read, then deleted.
+        email&rsquo;s text (without attachments or images) to your AI provider to pick out the jobs.
+        This uses your key, so your provider&rsquo;s terms and charges apply. We keep the text only until it
+        has been read, then delete it.
       </p>
 
       <h2>How we store and protect your data</h2>
       <p>
-        Your data is stored on secure servers in India. We protect it with industry-standard measures —
-        restricted access, encrypted connections and encrypted backups — and passwords, keys and other
-        credentials are never stored in readable form. Backups expire within 30 days. Sensitive actions,
+        Your data is stored on secure servers in India. We protect it with industry-standard measures,
+        including restricted access, encrypted connections and encrypted backups, and we never store
+        passwords, keys or other credentials in readable form. Backups expire within 30 days. Sensitive actions,
         such as resetting your leads or requesting account deletion, are confirmed with a one-time code
         sent to your email. No method of storage is perfectly secure, but we work to keep your information
         safe.
@@ -225,9 +226,9 @@ export default async function PrivacyPage() {
       <h2>Sharing</h2>
       <p>
         We do <strong>not</strong> sell your personal information. We share data only with the service
-        providers needed to run {appName} — such as {gmailOn ? "Google (for Gmail access you authorize), " : ""}
-        the AI provider you use, and our hosting and email providers — and only as required to deliver
-        the Service or comply with the law.
+        providers we need to run {appName}, such as {gmailOn ? "Google (for Gmail access you authorize), " : ""}
+        the AI provider you use and our hosting and email providers, and only as far as needed to
+        deliver the Service or comply with the law.
       </p>
 
       <h2>Your choices and rights</h2>
@@ -257,9 +258,9 @@ export default async function PrivacyPage() {
         {days(retention.notificationDays)}.
         {gmailOn ? " Disconnecting Google stops all further reading of your mailbox." : ""} Confirmation
         codes expire shortly and are then deleted. When you reset your leads they are deleted
-        straight away. When you ask us to delete your account, we delete your data — including résumé
-        files and all data from your job-alert emails — within 30 days and email you when it&rsquo;s done;
-        copies in backups expire within a further 30 days. We keep only an anonymised record that your
+        straight away. When you ask us to delete your account, we delete your data, including résumé
+        files and everything taken from your job-alert emails, within 30 days and email you when
+        it&rsquo;s done. Copies in backups expire within a further 30 days. We keep only an anonymised record that your
         request was handled, and limited records that the law requires.
       </p>
 
