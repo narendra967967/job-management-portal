@@ -61,6 +61,41 @@ export const INBOUND_STATUS_LABELS: Record<InboundStatus, string> = {
   queued: "Reading with AI",
 };
 
+/** One row of the user-side Email log — no admin-only technical detail. */
+export interface MyEmailLogRow {
+  id: string;
+  receivedAt: string;
+  /** Job site name ("LinkedIn"), or "—". */
+  site: string;
+  /** Full sender for accepted job-site mail, else just the sender's domain. */
+  sender: string;
+  status: InboundStatus;
+  reason: string;
+  leadsCreated: number;
+}
+
+/** The log's reason in plain words for the user. Drops technical notes in
+ *  brackets ("Reading with AI (no reader)") and rewords the terse ones. */
+export function userReason(status: InboundStatus, reason: string): string {
+  const r = reason.replace(/\s*\([^)]*\)/g, "").trim();
+  const plain: Record<string, string> = {
+    "Signature check failed": "Couldn't confirm it really came from the job site",
+    "Sender not allowed": "Not from a supported job site",
+    "Too large": "The email was too large",
+    "Malformed email": "The email couldn't be read",
+    "Already processed": "Already received earlier",
+    "Unknown address": "Sent to an address that isn't yours",
+    "Empty confirmation email": "Gmail's confirmation email had no link",
+    "No reader for this sender": "No jobs could be read from this email",
+    "No job cards found": "No jobs found in this email",
+  };
+  if (status === "gmail_code") return "Gmail forwarding confirmation";
+  const parts = r.split(" · ");
+  const last = parts[parts.length - 1];
+  if (plain[last]) parts[parts.length - 1] = plain[last];
+  return parts.join(" · ");
+}
+
 /** Sizes offered for the inbound log's pages. */
 export const INBOUND_LOG_PAGE_SIZES = [25, 50, 100] as const;
 

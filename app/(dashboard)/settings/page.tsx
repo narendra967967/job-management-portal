@@ -31,6 +31,7 @@ import {
   Play,
   BookOpen,
   Briefcase,
+  Inbox,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
@@ -69,6 +70,7 @@ import {
 } from "@/lib/mock-store";
 import { buildGmailQuery } from "@/lib/use-gmail-settings";
 import { EmailForwardingCard } from "@/components/forwarding/email-forwarding-card";
+import { EmailLogCard } from "@/components/forwarding/email-log-card";
 import { CareerProfileTab } from "@/components/career/career-profile-tab";
 import { ResumeAtsStrip, useAtsOverview } from "@/components/career/resume-ats";
 import {
@@ -147,6 +149,7 @@ const SECTION = {
   forwarding: { id: "forwarding", label: "Email forwarding", icon: Forward, render: () => <EmailForwardingCard /> },
   google: { id: "google", label: "Gmail connection", icon: Mail, render: () => <GoogleCard /> },
   schedule: { id: "schedule", label: "Sync schedule", icon: RefreshCw, render: () => <SyncScheduleCard /> },
+  emaillog: { id: "emaillog", label: "Email log", icon: Inbox, render: () => <EmailLogCard /> },
   issues: { id: "issues", label: "Ingestion issues", icon: AlertTriangle, render: () => <IngestionIssuesCard /> },
   ai: { id: "ai", label: "AI provider", icon: Sparkles, render: () => <AiProviderCard /> },
   prompts: { id: "prompts", label: "AI prompts", icon: Wand2, render: () => <AiPromptsCard /> },
@@ -167,8 +170,8 @@ function settingsGroups(gmailEnabled: boolean): { label: string; items: Settings
     {
       label: "Email & sync",
       items: gmailEnabled
-        ? [SECTION.forwarding, SECTION.google, SECTION.schedule, SECTION.issues]
-        : [SECTION.forwarding, SECTION.issues],
+        ? [SECTION.forwarding, SECTION.emaillog, SECTION.google, SECTION.schedule, SECTION.issues]
+        : [SECTION.forwarding, SECTION.emaillog, SECTION.issues],
     },
     { label: "AI", items: [SECTION.ai, SECTION.prompts] },
     { label: "Outreach", items: [SECTION.followups, SECTION.resumes] },
@@ -989,7 +992,7 @@ function IngestionIssuesCard() {
     const list = errors.slice(0, 8).map((e) => `<li>${esc(e.reason)}</li>`).join("");
     openSupport({
       category: "bug",
-      subject: "Problem with Gmail sync / ingestion",
+      subject: "Problem with job-alert ingestion",
       source: "ingestion-issues",
       message: `<p>I'm seeing ingestion issues with my job alerts:</p><ul>${list}</ul><p>&nbsp;</p>`,
     });

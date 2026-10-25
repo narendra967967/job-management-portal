@@ -187,6 +187,8 @@ export interface InboundLogQuery {
   since: Date;
   until: Date;
   status?: InboundStatus;
+  /** Only this user's rows (user-side Email log). */
+  userId?: string;
   /** Part of the user's email address. */
   userEmail?: string;
   /** Free text over user, sender, site and reason. */
@@ -202,6 +204,7 @@ const escapeLike = (v: string) => `%${v.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
 export async function listInboundLog(opts: InboundLogQuery): Promise<{ rows: InboundLogEntry[]; total: number }> {
   const where: SQL[] = [gte(logT.receivedAt, opts.since), lt(logT.receivedAt, opts.until)];
   if (opts.status) where.push(eq(logT.status, opts.status));
+  if (opts.userId) where.push(eq(logT.userId, opts.userId));
   const email = opts.userEmail?.trim().slice(0, 254);
   if (email) where.push(ilike(userT.email, escapeLike(email)));
   const q = opts.q?.trim().slice(0, 100);
