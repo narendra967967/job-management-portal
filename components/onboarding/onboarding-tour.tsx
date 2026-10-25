@@ -205,6 +205,10 @@ export function OnboardingTour({ autoStart }: { autoStart: boolean }) {
         prevBtnText: "Back",
         doneBtnText: "Done",
         allowClose: true,
+        // Only × / Skip / Esc end the tour: a stray tap on the dimmed page does
+        // nothing, and the highlighted element can't be clicked through.
+        overlayClickBehavior: "none",
+        disableActiveInteraction: true,
         overlayColor: "#1e1b4b",
         overlayOpacity: 0.55,
         stagePadding: 6,
