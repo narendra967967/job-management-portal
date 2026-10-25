@@ -653,6 +653,7 @@ export function LeadsBrowser({ scope = "all" }: { scope?: LeadsScope }) {
     <div className="space-y-4">
       {/* Metric row — each box also filters the list. Hidden on mobile. */}
       <div
+        data-tour="status-tiles"
         className={cn(
           "hidden gap-2.5 sm:grid sm:grid-cols-3",
           scope !== "archive" && "lg:grid-cols-5",
@@ -1383,6 +1384,7 @@ function LeadCard({
       <div
         role="button"
         tabIndex={0}
+        data-tour="lead-card"
         onClick={onOpen}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {

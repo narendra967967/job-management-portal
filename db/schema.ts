@@ -366,6 +366,9 @@ export const userSettings = pgTable("user_settings", {
   promptSummary: text("prompt_summary"),
   promptDraft: text("prompt_draft"),
   promptScore: text("prompt_score"),
+  // Onboarding tour version this user finished or skipped (null = never seen).
+  // Bump TOUR_VERSION (lib/tour.ts) to show a new tour once to everyone.
+  tourVersion: integer("tour_version"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

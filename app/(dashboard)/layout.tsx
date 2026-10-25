@@ -31,6 +31,9 @@ import { WorkspaceProvider } from "@/lib/workspace-provider";
 import { GlassBackdrop } from "@/components/marketing/glass-backdrop";
 import { CareerProfileNotice } from "@/components/career/career-profile-notice";
 import { careerCompletionFor } from "@/lib/career-data";
+import { Suspense } from "react";
+import { OnboardingTour } from "@/components/onboarding/onboarding-tour";
+import { tourDue } from "@/lib/tour";
 
 // Per-user, session-gated routes — never statically prerendered (no DB at build).
 export const dynamic = "force-dynamic";
@@ -52,10 +55,11 @@ export default async function DashboardLayout({
   const state = accessState(u);
   if (state === "deactivated") redirect("/deactivated");
   if (state === "expired") redirect("/renew");
-  const [workspace, appName, career] = await Promise.all([
+  const [workspace, appName, career, showTour] = await Promise.all([
     loadWorkspace(u.id),
     getAppName(),
     careerCompletionFor(u.id),
+    tourDue(u.id),
   ]);
   return (
     // App shell: full-height flex. On mobile the header + bottom nav are
@@ -115,6 +119,10 @@ export default async function DashboardLayout({
       {/* Floating help launcher + panel (bottom-right, all dashboard pages). */}
       <SupportWidget />
       <Toaster />
+      {/* First-login walkthrough + "Take the tour" (?tour=1 on /leads). */}
+      <Suspense fallback={null}>
+        <OnboardingTour autoStart={showTour} />
+      </Suspense>
     </AddLeadProvider>
     </ContactSupportProvider>
     </WorkspaceProvider>

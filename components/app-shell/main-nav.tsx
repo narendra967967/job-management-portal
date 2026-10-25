@@ -20,7 +20,7 @@ import {
   ChevronDown,
   type LucideIcon,
 } from "lucide-react";
-import { BookOpen, LifeBuoy } from "lucide-react";
+import { BookOpen, Compass, LifeBuoy } from "lucide-react";
 import { Logo } from "@/components/app-shell/logo";
 import { SidebarAddLeadButton } from "@/components/leads/add-lead-dialog";
 import { SupportNavButton, useContactSupport } from "@/components/support/contact-support";
@@ -102,6 +102,7 @@ function NavLink({
   return (
     <Link
       href={href}
+      data-tour={`nav${href.replace(/\//g, "-")}`}
       className={cn(
         "relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
         active
@@ -130,7 +131,7 @@ function NavGroup({
   onToggle: () => void;
 }) {
   return (
-    <div>
+    <div data-tour={`group-${label.toLowerCase().replace(/[^a-z]+/g, "-")}`}>
       <button
         type="button"
         onClick={onToggle}
@@ -204,6 +205,7 @@ export function SidebarFooter() {
   const guidesActive = isActive(pathname, "/guides");
   return (
     <div className="mt-auto border-t p-3">
+      <div data-tour="help">
       <SupportNavButton className="mb-1" />
       <Link
         href="/guides"
@@ -217,8 +219,18 @@ export function SidebarFooter() {
         <BookOpen className="size-5 shrink-0" aria-hidden />
         How-to guides
       </Link>
+      {/* Restart the onboarding tour (components/onboarding/onboarding-tour.tsx). */}
+      <Link
+        href="/leads?tour=1"
+        className="relative mb-1 flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground"
+      >
+        <Compass className="size-5 shrink-0" aria-hidden />
+        Take the tour
+      </Link>
+      </div>
       <Link
         href="/settings"
+        data-tour="nav-settings"
         className={cn(
           "relative mb-1 flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
           active
@@ -323,6 +335,7 @@ export function MobileNav({ name }: { name?: string }) {
         type="button"
         aria-label="Open menu"
         aria-expanded={open}
+        data-tour="menu"
         onClick={() => setOpen(true)}
         className="inline-flex size-11 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
       >
@@ -378,7 +391,7 @@ export function MobileNav({ name }: { name?: string }) {
 export function BottomNav() {
   const pathname = usePathname();
   return (
-    <nav className="grid shrink-0 grid-cols-5 border-t bg-card pb-[env(safe-area-inset-bottom)] md:hidden">
+    <nav data-tour="bottom-nav" className="grid shrink-0 grid-cols-5 border-t bg-card pb-[env(safe-area-inset-bottom)] md:hidden">
       {BOTTOM_NAV.map(({ href, label, icon: Icon }) => {
         const active = isActive(pathname, href);
         return (

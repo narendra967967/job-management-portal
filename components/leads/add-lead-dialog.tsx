@@ -111,7 +111,7 @@ export function SidebarAddLeadButton() {
 export function HeaderAddLeadButton() {
   const { open } = useAddLead();
   return (
-    <Button onClick={open} size="sm" className="hidden h-11 gap-1.5 sm:inline-flex lg:h-7">
+    <Button onClick={open} size="sm" data-tour="add-lead" className="hidden h-11 gap-1.5 sm:inline-flex lg:h-7">
       <Plus className="size-4" aria-hidden />
       Add lead
     </Button>
@@ -131,6 +131,7 @@ export function AddLeadFab() {
       type="button"
       onClick={open}
       aria-label="Add lead"
+      data-tour="add-lead-fab"
       className="fixed right-4 bottom-[calc(env(safe-area-inset-bottom)+9rem)] z-40 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform active:scale-95 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none md:hidden"
     >
       <Plus className="size-6" aria-hidden />

@@ -30,7 +30,7 @@ export default function LeadsPage() {
           Job alerts you forward, and leads you add.
         </p>
         {/* View toggle — laptop only */}
-        <div className="ml-auto hidden rounded-lg border bg-card p-0.5 lg:inline-flex">
+        <div data-tour="view-toggle" className="ml-auto hidden rounded-lg border bg-card p-0.5 lg:inline-flex">
           <ViewButton
             active={view === "list"}
             onClick={() => setView("list")}
