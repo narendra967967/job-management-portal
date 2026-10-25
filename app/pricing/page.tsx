@@ -15,15 +15,17 @@ import { freeStartLabel, isRegistrationOpen } from "@/lib/plans";
 import { getPricingPlans, getUserPlanId } from "@/lib/pricing";
 import { getSessionUserId } from "@/lib/current-user";
 import { absoluteUrl, siteUrl } from "@/lib/site-url";
+import { orList } from "@/lib/plan-highlights";
 import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
 
-const DESCRIPTION =
-  "Simple pricing for a focused job search. Start with a free trial, then pick Premium or Pro for unlimited leads, AI drafts, résumé ATS checks and more.";
-
 export async function generateMetadata(): Promise<Metadata> {
-  const appName = await getAppName();
+  const [appName, freeStart, plans] = await Promise.all([getAppName(), freeStartLabel(), getPricingPlans()]);
+  const paid = plans.filter((p) => !p.isFree).map((p) => p.name);
+  const DESCRIPTION = `Simple pricing for a focused job search. ${freeStart.trialDays > 0 ? `Start with a ${freeStart.label}` : "Start free"}${
+    paid.length ? `, then move up to ${orList(paid)} when you need more leads and AI tools` : ""
+  }.`;
   const title = `Pricing: Plans and Free Trial | ${appName}`;
   return {
     title: { absolute: title },

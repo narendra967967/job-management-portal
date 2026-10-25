@@ -2,8 +2,10 @@ import "server-only";
 
 // Public read side of the /pricing page. Only active plans the admin has marked
 // "Show on pricing page" are listed, and only public fields leave the server
-// (no subscriber counts or internal flags).
+// (no subscriber counts or internal flags). Card bullets are worded from the
+// limits and switches (lib/plan-highlights.ts), not the admin Features text.
 
+import { cache } from "react";
 import { and, asc, desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { plans, user } from "@/db/schema";
@@ -23,7 +25,6 @@ export interface PublicPlan {
   yearlyPrice: number;
   currency: Currency;
   popular: boolean;
-  features: string[];
   /** null = unlimited. */
   limitActiveLeads: number | null;
   limitResumes: number | null;
@@ -51,7 +52,7 @@ function toText(html: string): string {
 }
 
 /** Plans for the public pricing page: free first, then by monthly price. Build-safe. */
-export async function getPricingPlans(): Promise<PublicPlan[]> {
+export const getPricingPlans = cache(async (): Promise<PublicPlan[]> => {
   try {
     const rows = await db
       .select()
@@ -69,7 +70,6 @@ export async function getPricingPlans(): Promise<PublicPlan[]> {
       yearlyPrice: r.yearlyPrice,
       currency: (r.currency === "USD" ? "USD" : "INR") as Currency,
       popular: r.popular,
-      features: r.features,
       limitActiveLeads: r.limitActiveLeads,
       limitResumes: r.limitResumes,
       limitAiAddMonthly: r.limitAiAddMonthly,
@@ -85,7 +85,7 @@ export async function getPricingPlans(): Promise<PublicPlan[]> {
     // DB unavailable (e.g. `next build`).
     return [];
   }
-}
+});
 
 /** The signed-in user's plan id, to mark "Your plan" on the page. */
 export async function getUserPlanId(userId: string | null): Promise<string | null> {

@@ -1,7 +1,8 @@
 "use client";
 
 // Public pricing: Monthly/Yearly switch (opens on Yearly), one glass card per
-// plan and a feature comparison built from each plan's limits and switches, so
+// plan and a feature comparison. Card bullets and the table both come from each
+// plan's limits and switches (lib/plan-highlights.ts), never hand-typed text, so
 // the page always matches what the app enforces (lib/entitlements.ts).
 // Payments aren't built yet: signed-out visitors start the free trial; signed-in
 // users manage their plan from Settings → Plan.
@@ -11,6 +12,7 @@ import Link from "next/link";
 import { ArrowRight, Check, Minus } from "lucide-react";
 import { ACCENTS, formatMoney } from "@/lib/admin/plans-model";
 import type { PublicPlan } from "@/lib/pricing";
+import { planHighlights } from "@/lib/plan-highlights";
 import { cn } from "@/lib/utils";
 
 type Interval = "monthly" | "yearly";
@@ -36,7 +38,7 @@ const ROWS: { label: string; value: (p: PublicPlan) => string | boolean }[] = [
   { label: "Résumés", value: (p) => limit(p.limitResumes) },
   { label: "Add with AI", value: (p) => limit(p.limitAiAddMonthly, "/month") },
   { label: "AI outreach drafts", value: (p) => p.allowAiDrafts },
-  { label: "AI reads alerts from more job sites", value: (p) => p.allowAiEmailReading },
+  { label: "AI reading of alerts from more job sites", value: (p) => p.allowAiEmailReading },
   { label: "Personal notes", value: (p) => p.allowNotes },
   { label: "Salary insight", value: (p) => p.allowSalaryInsight },
   { label: "Résumé ATS check", value: (p) => p.allowAtsCheck },
@@ -97,8 +99,17 @@ export function PricingPlans({
 
       {/* Flex-wrap (not grid) so an odd last card centres on tablets. */}
       <div className={cn("mx-auto mt-10 flex flex-wrap justify-center gap-5", plans.length >= 3 ? "max-w-6xl" : "max-w-4xl")}>
-        {plans.map((p) => (
-          <PlanCard key={p.id} plan={p} interval={interval} cta={cta} trial={trial} current={p.id === currentPlanId} threeUp={plans.length >= 3} />
+        {plans.map((p, i) => (
+          <PlanCard
+            key={p.id}
+            plan={p}
+            prev={plans[i - 1]}
+            interval={interval}
+            cta={cta}
+            trial={trial}
+            current={p.id === currentPlanId}
+            threeUp={plans.length >= 3}
+          />
         ))}
       </div>
 
@@ -149,6 +160,7 @@ export function PricingPlans({
 
 function PlanCard({
   plan: p,
+  prev,
   interval,
   cta,
   trial,
@@ -156,6 +168,8 @@ function PlanCard({
   threeUp,
 }: {
   plan: PublicPlan;
+  /** The next cheaper plan, for "Everything in …, plus:". */
+  prev?: PublicPlan;
   interval: Interval;
   cta: PricingCta;
   trial: boolean;
@@ -166,6 +180,7 @@ function PlanCard({
   const accent = ACCENTS[p.accent];
   const iv = shownInterval(p, interval);
   const saving = savingsPct(p);
+  const { intro, items } = planHighlights(p, prev);
 
   let price: string;
   let per: string;
@@ -230,15 +245,18 @@ function PlanCard({
         {label} {!current && <ArrowRight className="size-4" aria-hidden />}
       </Link>
 
-      {p.features.length > 0 && (
-        <ul className="mt-6 space-y-2.5 border-t border-white/70 pt-5">
-          {p.features.map((f) => (
-            <li key={f} className="flex items-start gap-2.5 text-sm">
-              <Check className={cn("mt-0.5 size-4 shrink-0", accent.check)} aria-hidden />
-              <span>{f}</span>
-            </li>
-          ))}
-        </ul>
+      {items.length > 0 && (
+        <div className="mt-6 border-t border-white/70 pt-5">
+          {intro && <p className="mb-3 text-sm font-medium">{intro}</p>}
+          <ul className="space-y-2.5">
+            {items.map((f) => (
+              <li key={f} className="flex items-start gap-2.5 text-sm">
+                <Check className={cn("mt-0.5 size-4 shrink-0", accent.check)} aria-hidden />
+                <span>{f}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </div>
   );

@@ -33,6 +33,8 @@ import { GlassBackdrop } from "@/components/marketing/glass-backdrop";
 import { BackToTop } from "@/components/marketing/back-to-top";
 import { getAppName, getTagline, getSupportEmail } from "@/lib/branding";
 import { freeStartLabel, isRegistrationOpen } from "@/lib/plans";
+import { getPricingPlans } from "@/lib/pricing";
+import { upgradeSentence } from "@/lib/plan-highlights";
 import { getSessionUserId } from "@/lib/current-user";
 import { isGmailOAuthEnabled, supportedSiteExamples } from "@/lib/email-intake-data";
 import { absoluteUrl, siteUrl } from "@/lib/site-url";
@@ -71,7 +73,7 @@ const BOARD: { label: string; count: number; cards: { role: string; co: string; 
 ];
 
 export default async function LandingPage() {
-  const [appName, tagline, signupAllowed, supportEmail, sessionId, gmailOn, sites, freeStart] = await Promise.all([
+  const [appName, tagline, signupAllowed, supportEmail, sessionId, gmailOn, sites, freeStart, pricingPlans] = await Promise.all([
     getAppName(),
     getTagline(),
     isRegistrationOpen(),
@@ -80,7 +82,9 @@ export default async function LandingPage() {
     isGmailOAuthEnabled(),
     supportedSiteExamples(),
     freeStartLabel(),
+    getPricingPlans(),
   ]);
+  const upgrade = upgradeSentence(pricingPlans);
   const trial = freeStart.trialDays > 0;
   const loggedIn = !!sessionId;
 
@@ -149,8 +153,8 @@ export default async function LandingPage() {
     {
       q: trial ? `Is there a free trial?` : `Is ${appName} free?`,
       a: trial
-        ? `Yes. Every new account starts with a ${freeStart.label}, no payment needed. After that, Premium gives you unlimited leads, AI outreach drafts and AI reading of alerts from more job sites, and Pro adds everything else, including the résumé ATS check, salary insight and custom AI prompts.`
-        : "Yes, you can start on the free plan. Paid plans add premium features such as salary estimates, the résumé ATS check and personal notes, along with higher limits.",
+        ? `Yes. Every new account starts with a ${freeStart.label}, no payment needed.${upgrade ? ` When you need more, ${upgrade}` : ""}`
+        : `Yes, you can start on the free plan.${upgrade ? ` When you need more, ${upgrade}` : ""}`,
     },
   ];
 
