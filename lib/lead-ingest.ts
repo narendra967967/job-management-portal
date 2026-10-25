@@ -14,14 +14,20 @@ import { isJobOpen } from "@/lib/types";
 import { sourceFromUrl } from "@/lib/lead-source";
 import type { LeadDraft } from "@/lib/lead-draft";
 import { mergeTags } from "@/lib/lead-tags";
+import { leadRoomLeft } from "@/lib/entitlements";
+import { notifyLeadLimitReached } from "@/lib/plan-notices";
 
 export async function ingestAlertDrafts(
   userId: string,
   drafts: LeadDraft[],
   sourceMessageId: string,
-): Promise<{ inserted: number; renewed: number }> {
+): Promise<{ inserted: number; renewed: number; overLimit: number }> {
   let inserted = 0;
   let renewed = 0;
+  // New jobs beyond the plan's active-lead limit aren't added (repeats of jobs
+  // already on the list still refresh them).
+  let room = await leadRoomLeft(userId);
+  let overLimit = 0;
   for (const raw of drafts) {
     const d = { ...raw, tags: mergeTags(raw.tags) };
     const [existing] = await db
@@ -30,6 +36,10 @@ export async function ingestAlertDrafts(
       .where(and(eq(leadsT.userId, userId), eq(leadsT.linkedinJobId, d.jobKey)));
 
     if (!existing) {
+      if (room !== null && room <= 0) {
+        overLimit++;
+        continue;
+      }
       const res = await db
         .insert(leadsT)
         .values({
@@ -49,7 +59,10 @@ export async function ingestAlertDrafts(
         // A concurrent delivery of the same alert may have just inserted it.
         .onConflictDoNothing()
         .returning({ id: leadsT.id });
-      if (res.length) inserted++;
+      if (res.length) {
+        inserted++;
+        if (room !== null) room--;
+      }
     } else if (isJobOpen(existing.status)) {
       const mergedTags = mergeTags(existing.tags, d.tags, ["Re-newed"]);
       await db
@@ -59,5 +72,6 @@ export async function ingestAlertDrafts(
       renewed++;
     }
   }
-  return { inserted, renewed };
+  if (overLimit > 0) await notifyLeadLimitReached(userId, overLimit);
+  return { inserted, renewed, overLimit };
 }

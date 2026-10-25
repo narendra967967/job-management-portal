@@ -67,6 +67,7 @@ import {
   useAiPrompts,
   updateAiPrompts,
   useIntake,
+  useFeatures,
 } from "@/lib/mock-store";
 import { buildGmailQuery } from "@/lib/use-gmail-settings";
 import { EmailForwardingCard } from "@/components/forwarding/email-forwarding-card";
@@ -474,6 +475,33 @@ function ProfileCard() {
   );
 }
 
+/** "32 of 50" with a bar; "Unlimited" when there's no limit. */
+function UsageMeter({ label, used, limit }: { label: string; used: number; limit: number | null }) {
+  const pct = limit ? Math.min(100, Math.round((used / limit) * 100)) : 0;
+  const full = limit != null && used >= limit;
+  return (
+    <div className="rounded-xl border bg-white/40 p-3">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="mt-0.5 text-sm font-medium tabular-nums">
+        {limit == null ? (
+          <>
+            {used} <span className="font-normal text-muted-foreground">· Unlimited</span>
+          </>
+        ) : (
+          <>
+            {used} <span className="font-normal text-muted-foreground">of {limit}</span>
+          </>
+        )}
+      </p>
+      {limit != null && (
+        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted" role="progressbar" aria-valuenow={used} aria-valuemin={0} aria-valuemax={limit} aria-label={label}>
+          <div className={cn("h-full rounded-full", full ? "bg-destructive" : pct >= 80 ? "bg-status-shortlisted-foreground" : "bg-primary")} style={{ width: `${pct}%` }} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ---------------- Google connection ---------------- */
 
 function PlanDetailsCard() {
@@ -566,24 +594,39 @@ function PlanDetailsCard() {
             </ul>
           )}
 
-          {/* Limits */}
-          <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-            <span>
-              Résumés: <span className="font-medium text-foreground">{plan.limitResumes === null ? "Unlimited" : plan.limitResumes}</span>
-            </span>
-            <span>
-              Custom AI prompts: <span className="font-medium text-foreground">{plan.allowCustomPrompts ? "Yes" : "No"}</span>
-            </span>
-            <span>
-              Notes: <span className="font-medium text-foreground">{plan.allowNotes ? "Yes" : "No"}</span>
-            </span>
-            <span>
-              Salary insight: <span className="font-medium text-foreground">{plan.allowSalaryInsight ? "Yes" : "No"}</span>
-            </span>
-            <span>
-              ATS check: <span className="font-medium text-foreground">{plan.allowAtsCheck ? "Yes" : "No"}</span>
-            </span>
+          {/* Usage against the plan's limits */}
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <UsageMeter label="Active leads" used={plan.usage.activeLeads} limit={plan.limitActiveLeads} />
+            <UsageMeter label="Résumés" used={plan.usage.resumes} limit={plan.limitResumes} />
+            <UsageMeter label="Add with AI this month" used={plan.usage.aiAddThisMonth} limit={plan.limitAiAddMonthly} />
           </div>
+
+          {/* What the plan includes */}
+          <ul className="mt-4 grid gap-x-4 gap-y-1.5 text-sm sm:grid-cols-2">
+            {(
+              [
+                ["AI outreach drafts", plan.allowAiDrafts],
+                ["AI reads alerts from more job sites", plan.allowAiEmailReading],
+                ["Personal notes", plan.allowNotes],
+                ["Salary insight", plan.allowSalaryInsight],
+                ["Résumé ATS check", plan.allowAtsCheck],
+                ["Custom AI prompts", plan.allowCustomPrompts],
+                ["Priority support", plan.prioritySupport],
+              ] as const
+            ).map(([label, on]) => (
+              <li key={label} className={cn("flex items-center gap-2", !on && "text-muted-foreground")}>
+                {on ? (
+                  <Check className="size-4 shrink-0 text-status-applied-foreground" aria-hidden />
+                ) : (
+                  <X className="size-4 shrink-0 text-muted-foreground/60" aria-hidden />
+                )}
+                <span>
+                  {label}
+                  <span className="sr-only">{on ? " (included)" : " (not included)"}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
 
           {/* Upgrade — only when a higher-priced active plan exists */}
           {plan.upgradeAvailable ? (
@@ -1280,7 +1323,32 @@ Own the payments acceptance experience at scale — reliability, cross-functiona
 Candidate resume (PM — Payments focus):
 Product manager, 6 yrs in fintech/payments. Led acceptance & checkout at a mid-size PSP. Strong cross-functional leadership; some large-scale reliability exposure.`;
 
+/** Custom prompts are a plan feature: plans without it see what it does + Plan link. */
 function AiPromptsCard() {
+  const { customPrompts } = useFeatures();
+  if (customPrompts) return <AiPromptsEditor />;
+  return (
+    <section className="rounded-2xl border bg-card p-4 md:p-5">
+      <h2 className="flex items-center gap-1.5 text-sm font-medium">
+        <Crown className="size-4 text-primary" aria-hidden />
+        AI prompts
+      </h2>
+      <p className="mt-1.5 text-sm text-muted-foreground">
+        Write your own instructions for AI summaries, fit scores and outreach drafts, so the AI works
+        the way you like. Custom prompts are included in higher plans. Until then, {"Jobtiva's"} built-in
+        prompts are used.
+      </p>
+      <Link
+        href="/settings?tab=plan"
+        className="mt-4 inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 sm:min-h-9"
+      >
+        See plans
+      </Link>
+    </section>
+  );
+}
+
+function AiPromptsEditor() {
   const prompts = useAiPrompts();
   const [summary, setSummary] = useState(prompts.summary);
   const [draft, setDraft] = useState(prompts.draft);

@@ -33,6 +33,7 @@ import type { InboundSender, InboundStatus } from "@/lib/email-intake-model";
 import { ALERT_PARSERS } from "@/lib/alert-parsers";
 import { ingestAlertDrafts } from "@/lib/lead-ingest";
 import { userHasAiKey } from "@/lib/ai";
+import { getFeatureAccess } from "@/lib/entitlements";
 import { emailForAi } from "@/lib/inbound/ai-reader";
 import { enqueueAiRead } from "@/lib/inbound/ai-queue";
 import { forwardedOriginal } from "@/lib/inbound/hand-forward";
@@ -258,12 +259,15 @@ async function readJobs(ctx: {
     const r = await ingestAlertDrafts(userId, drafts, sourceId);
     const parts = [`${r.inserted} new`];
     if (r.renewed) parts.push(`${r.renewed} renewed`);
+    if (r.overLimit) parts.push(`${r.overLimit} not added (plan limit)`);
     await log({ ...base, status: "accepted", reason: `${label}${drafts.length} jobs · ${parts.join(", ")}`, leadsCreated: r.inserted });
     return { code: 250, message: "Accepted" };
   }
 
   const why = sender.parser === "none" ? "no built-in reader" : "built-in reader found no jobs";
-  if (await userHasAiKey(userId)) {
+  // Reading these with AI is a plan feature, and runs on the user's own key.
+  const aiAllowed = (await getFeatureAccess(userId)).aiEmailReading;
+  if (aiAllowed && (await userHasAiKey(userId))) {
     const { body, links } = emailForAi(mail);
     if (body && links.length) {
       const logId = await log({ ...base, status: "queued", reason: `${label}Reading with AI (${why})` });
@@ -272,10 +276,13 @@ async function readJobs(ctx: {
     }
   }
 
+  const fix = aiAllowed
+    ? "Add an AI key in Settings → AI provider and Jobtiva reads emails like this with AI."
+    : "Upgrade to a plan with AI email reading (and add your AI key) and Jobtiva reads emails like this with AI.";
   const issue =
     sender.parser === "none"
-      ? "Unsupported format — no reader for this site yet. Add an AI key in Settings → AI provider and Jobtiva reads these emails with AI."
-      : "No job cards found in this alert. Add an AI key in Settings → AI provider and Jobtiva reads emails like this with AI.";
+      ? `Unsupported format — no reader for this site yet. ${fix}`
+      : `No job cards found in this alert. ${fix}`;
   await db.insert(errorsT).values({ userId, messageId: sourceId, reason: issue, rawExcerpt: subject });
   await log({ ...base, status: "unsupported", reason: `${label}${sender.parser === "none" ? "No reader for this sender" : "No job cards found"}` });
   return { code: 250, message: "Accepted" };

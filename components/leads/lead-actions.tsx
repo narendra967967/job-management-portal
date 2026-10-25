@@ -14,6 +14,8 @@ import {
   CircleDot,
   Archive,
   Flag,
+  Lock,
+  PenLine,
 } from "lucide-react";
 import {
   CLOSE_OUTCOME_LABELS,
@@ -40,7 +42,9 @@ import {
   useContactsForLead,
   useOutreachForLead,
   useFitScore,
+  useFeatures,
 } from "@/lib/mock-store";
+import { PremiumLockedDialog } from "@/components/premium/premium-locked-dialog";
 import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
@@ -612,6 +616,10 @@ function DraftOutreachDialog({
   const [contactId, setContactId] = useState(contacts[0]?.id ?? "");
   const [resumeId, setResumeId] = useState(initialResumeId);
   const [draft, setDraft] = useState("");
+  // Writing the message by hand (always available; AI drafts depend on the plan).
+  const [writing, setWriting] = useState(false);
+  const [locked, setLocked] = useState(false);
+  const { aiDrafts } = useFeatures();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -632,10 +640,15 @@ function DraftOutreachDialog({
     setContactId(contacts[0]?.id ?? "");
     setResumeId(initialResumeId);
     setDraft("");
+    setWriting(false);
     setError("");
   }
 
   async function generate() {
+    if (!aiDrafts) {
+      setLocked(true);
+      return;
+    }
     if (!contactId) {
       setError("Add a contact to this lead first.");
       return;
@@ -682,12 +695,12 @@ function DraftOutreachDialog({
       title="Draft outreach"
       description={`${lead.company} · ${lead.title}`}
       footer={
-        draft ? (
+        draft || writing ? (
           <>
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button onClick={markSentClick}>
+            <Button onClick={markSentClick} disabled={!draft.trim()}>
               <Send className="size-4" aria-hidden />
               Mark as sent
             </Button>
@@ -795,21 +808,31 @@ function DraftOutreachDialog({
             </div>
           </div>
 
-          <Button
-            variant="outline"
-            onClick={generate}
-            disabled={busy}
-            className="border-ai/40 text-ai hover:bg-ai-muted/50"
-          >
-            <Sparkles className="size-4" aria-hidden />
-            {busy ? "Drafting…" : "Draft with AI"}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              onClick={generate}
+              disabled={busy}
+              className="border-ai/40 text-ai hover:bg-ai-muted/50"
+            >
+              {aiDrafts ? <Sparkles className="size-4" aria-hidden /> : <Lock className="size-4" aria-hidden />}
+              {busy ? "Drafting…" : "Draft with AI"}
+            </Button>
+            {!draft && !writing && (
+              <Button variant="outline" onClick={() => setWriting(true)}>
+                <PenLine className="size-4" aria-hidden />
+                Write it yourself
+              </Button>
+            )}
+          </div>
 
-          {draft && (
+          {(draft || writing) && (
             <div>
               <Textarea
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
+                placeholder="Write your message…"
+                aria-label="Message"
                 className="min-h-40"
               />
               <p className="mt-2 flex items-start gap-1.5 text-xs text-ai">
@@ -821,6 +844,13 @@ function DraftOutreachDialog({
           )}
           {error && <p className="text-xs text-destructive">{error}</p>}
         </div>
+      )}
+      {locked && (
+        <PremiumLockedDialog
+          feature="AI outreach drafts"
+          description="Get a tailored first draft for referral asks, recruiter messages and follow-ups, written from the job and your résumé. You can always write the message yourself."
+          onClose={() => setLocked(false)}
+        />
       )}
     </ActionDialog>
   );

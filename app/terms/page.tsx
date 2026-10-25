@@ -53,8 +53,10 @@ export default async function TermsPage() {
 
       <h2>Plans</h2>
       <p>
-        Some features depend on your plan. For example, salary insights, the résumé ATS check and
-        personal notes are available only on plans that include them. Plan details are shown in the app;
+        New accounts start with a free trial. When it ends, you need a paid plan to keep using the
+        Service. Some features depend on your plan. For example, salary insights, the résumé ATS check
+        and personal notes are available only on plans that include them, and some plans limit how many
+        active leads or résumés you can keep. Plan details are shown in the app;
         for any paid plan, the price, billing period and renewal terms are shown before you buy. If your
         plan expires, access to the Service pauses until it is renewed; your data is kept in the meantime.
       </p>

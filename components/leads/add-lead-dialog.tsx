@@ -45,6 +45,7 @@ import { createLead } from "@/lib/mock-store";
 import {
   extractLeadFromImageAction,
   extractLeadFromTextAction,
+  getAiAddAllowanceAction,
   type ExtractedLead,
 } from "@/actions/ai";
 import { prepareScreenshot } from "@/lib/screenshot-tiles";
@@ -577,6 +578,17 @@ function AiExtractPanel({
   const [busy, setBusy] = useState(false);
   const [canReadClipboard, setCanReadClipboard] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
+  // Monthly "Add with AI" allowance on limited plans (null limit = unlimited).
+  const [allowance, setAllowance] = useState<{ limit: number | null; left: number | null } | null>(null);
+  const refreshAllowance = useCallback(() => {
+    getAiAddAllowanceAction()
+      .then(setAllowance)
+      .catch(() => setAllowance(null));
+  }, []);
+  useEffect(() => {
+    refreshAllowance();
+  }, [refreshAllowance]);
+  const outOfUses = allowance?.left === 0;
 
   // Revoke the object URL when the preview changes or the panel unmounts.
   useEffect(() => {
@@ -692,6 +704,7 @@ function AiExtractPanel({
       }
     } finally {
       setBusy(false);
+      refreshAllowance();
     }
   }
 
@@ -778,9 +791,16 @@ function AiExtractPanel({
         />
       </div>
 
+      {allowance?.limit != null && (
+        <p className={cn("text-xs", outOfUses ? "text-destructive" : "text-muted-foreground")}>
+          {outOfUses
+            ? `You've used all ${allowance.limit} "Add with AI" uses this month. Add the job by hand, or upgrade for unlimited use.`
+            : `${allowance.left} of ${allowance.limit} "Add with AI" uses left this month.`}
+        </p>
+      )}
       <Button
         onClick={extract}
-        disabled={busy}
+        disabled={busy || outOfUses}
         className="w-full gap-2 border-transparent bg-ai text-ai-foreground hover:bg-ai/90 sm:w-auto"
       >
         {busy ? (

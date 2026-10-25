@@ -32,6 +32,7 @@ import {
 } from "@/lib/schemas";
 import { z } from "zod";
 import { RESUME_MAX_BYTES, type AiProvider } from "@/lib/types";
+import { getFeatureAccess, getPlanLimits, PREMIUM_REQUIRED } from "@/lib/entitlements";
 import { extractResumeText } from "@/lib/resume-extract";
 
 /** Ensure a user_settings row exists, then merge `set` into it. */
@@ -140,6 +141,9 @@ export async function updateAiPromptsAction(input: {
 }) {
   const userId = await getCurrentUserId();
   const { summary, draft, score } = parseInput(aiPromptsSchema, input);
+  if (!(await getFeatureAccess(userId)).customPrompts && (summary.trim() || draft.trim() || score.trim())) {
+    throw new Error(PREMIUM_REQUIRED);
+  }
   await upsertSettings(userId, {
     promptSummary: summary.trim() || null,
     promptDraft: draft.trim() || null,
@@ -236,6 +240,17 @@ export async function uploadResumeAction(
     formData.get("label"),
   );
   if (!(file instanceof File)) return { ok: false, error: "No file provided." };
+  // Plan limit on stored résumés.
+  const { resumes: maxResumes } = await getPlanLimits(userId);
+  if (maxResumes != null) {
+    const have = (await db.select({ id: resumesT.id }).from(resumesT).where(eq(resumesT.userId, userId))).length;
+    if (have >= maxResumes) {
+      return {
+        ok: false,
+        error: `Your plan allows ${maxResumes} résumé${maxResumes === 1 ? "" : "s"}. Delete one first, or upgrade your plan to add more.`,
+      };
+    }
+  }
   if (file.size > RESUME_MAX_BYTES) {
     return { ok: false, error: "File must be under 5 MB." };
   }

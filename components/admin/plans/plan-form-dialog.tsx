@@ -43,6 +43,11 @@ export interface PlanFormValues {
   allowNotes: boolean;
   allowSalaryInsight: boolean;
   allowAtsCheck: boolean;
+  limitActiveLeads: number | null;
+  limitAiAddMonthly: number | null;
+  allowAiDrafts: boolean;
+  allowAiEmailReading: boolean;
+  prioritySupport: boolean;
   features: string[];
   status: PlanStatus;
 }
@@ -112,6 +117,13 @@ export function PlanFormDialog({
   const [allowNotes, setAllowNotes] = useState(false);
   const [allowSalaryInsight, setAllowSalaryInsight] = useState(false);
   const [allowAtsCheck, setAllowAtsCheck] = useState(false);
+  const [leadsUnlimited, setLeadsUnlimited] = useState(true);
+  const [limitActiveLeads, setLimitActiveLeads] = useState("50");
+  const [aiAddUnlimited, setAiAddUnlimited] = useState(true);
+  const [limitAiAddMonthly, setLimitAiAddMonthly] = useState("10");
+  const [allowAiDrafts, setAllowAiDrafts] = useState(false);
+  const [allowAiEmailReading, setAllowAiEmailReading] = useState(false);
+  const [prioritySupport, setPrioritySupport] = useState(false);
   const [features, setFeatures] = useState<string[]>([""]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -136,6 +148,13 @@ export function PlanFormDialog({
     setAllowNotes(plan?.allowNotes ?? false);
     setAllowSalaryInsight(plan?.allowSalaryInsight ?? false);
     setAllowAtsCheck(plan?.allowAtsCheck ?? false);
+    setLeadsUnlimited(plan ? plan.limitActiveLeads === null : true);
+    setLimitActiveLeads(String(plan?.limitActiveLeads ?? 50));
+    setAiAddUnlimited(plan ? plan.limitAiAddMonthly === null : true);
+    setLimitAiAddMonthly(String(plan?.limitAiAddMonthly ?? 10));
+    setAllowAiDrafts(plan?.allowAiDrafts ?? false);
+    setAllowAiEmailReading(plan?.allowAiEmailReading ?? false);
+    setPrioritySupport(plan?.prioritySupport ?? false);
     setFeatures(plan && plan.features.length ? [...plan.features] : [""]);
     setError("");
   }, [open, plan]);
@@ -178,6 +197,15 @@ export function PlanFormDialog({
         return setError("Enter a résumé upload limit, or tick Unlimited.");
       resumesLimit = Math.round(n);
     }
+    const parseLimit = (unlimited: boolean, raw: string): number | null | "bad" => {
+      if (unlimited) return null;
+      const n = Number(raw);
+      return raw.trim() === "" || !Number.isFinite(n) || n < 0 ? "bad" : Math.round(n);
+    };
+    const leadsLimit = parseLimit(leadsUnlimited, limitActiveLeads);
+    if (leadsLimit === "bad") return setError("Enter an active-leads limit, or tick Unlimited.");
+    const aiAddLimit = parseLimit(aiAddUnlimited, limitAiAddMonthly);
+    if (aiAddLimit === "bad") return setError("Enter a monthly Add with AI limit, or tick Unlimited.");
 
     setError("");
     setBusy(true);
@@ -197,6 +225,11 @@ export function PlanFormDialog({
       allowNotes,
       allowSalaryInsight,
       allowAtsCheck,
+      limitActiveLeads: leadsLimit,
+      limitAiAddMonthly: aiAddLimit,
+      allowAiDrafts,
+      allowAiEmailReading,
+      prioritySupport,
       features: features.map((f) => f.trim()).filter(Boolean),
       status,
     });
@@ -326,6 +359,20 @@ export function PlanFormDialog({
 
           {/* Limits */}
           <Section title="Limits">
+            <LimitField
+              label="Active leads"
+              value={limitActiveLeads}
+              onValue={setLimitActiveLeads}
+              unlimited={leadsUnlimited}
+              onUnlimited={setLeadsUnlimited}
+            />
+            <LimitField
+              label="Add with AI per month"
+              value={limitAiAddMonthly}
+              onValue={setLimitAiAddMonthly}
+              unlimited={aiAddUnlimited}
+              onUnlimited={setAiAddUnlimited}
+            />
             <Field label="Résumé uploads">
               <div className="flex items-center gap-3">
                 <Input
@@ -384,6 +431,9 @@ export function PlanFormDialog({
               />
               Résumé ATS score check
             </label>
+            <PlanSwitch checked={allowAiDrafts} onChange={setAllowAiDrafts} label="AI outreach drafts" />
+            <PlanSwitch checked={allowAiEmailReading} onChange={setAllowAiEmailReading} label="AI reads alerts from sites without a built-in reader" />
+            <PlanSwitch checked={prioritySupport} onChange={setPrioritySupport} label="Priority support" />
           </Section>
 
           {/* Features */}
@@ -420,5 +470,42 @@ export function PlanFormDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function PlanSwitch({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
+  return (
+    <label className="flex cursor-pointer items-center gap-2 text-sm">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="size-4 cursor-pointer rounded border-input accent-primary"
+      />
+      {label}
+    </label>
+  );
+}
+
+function LimitField({
+  label,
+  value,
+  onValue,
+  unlimited,
+  onUnlimited,
+}: {
+  label: string;
+  value: string;
+  onValue: (v: string) => void;
+  unlimited: boolean;
+  onUnlimited: (v: boolean) => void;
+}) {
+  return (
+    <Field label={label}>
+      <div className="flex items-center gap-3">
+        <Input type="number" min={0} step={1} value={value} onChange={(e) => onValue(e.target.value)} disabled={unlimited} className="w-28" />
+        <PlanSwitch checked={unlimited} onChange={onUnlimited} label="Unlimited" />
+      </div>
+    </Field>
   );
 }

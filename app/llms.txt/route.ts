@@ -1,6 +1,7 @@
 import { getAppName } from "@/lib/branding";
 import { supportedSiteExamples } from "@/lib/email-intake-data";
 import { absoluteUrl } from "@/lib/site-url";
+import { freeStartLabel } from "@/lib/plans";
 
 // /llms.txt — a plain summary of the product for AI assistants and answer
 // engines (llmstxt.org format). Public facts only; no infrastructure details.
@@ -8,9 +9,10 @@ import { absoluteUrl } from "@/lib/site-url";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const [appName, sites] = await Promise.all([
+  const [appName, sites, freeStart] = await Promise.all([
     getAppName(),
     supportedSiteExamples().catch(() => "LinkedIn and Naukri"),
+    freeStartLabel().catch(() => ({ label: "free trial", trialDays: 14 })),
   ]);
 
   const body = `# ${appName}
@@ -38,7 +40,7 @@ Job seekers who prefer to apply carefully to fewer, well-matched roles rather th
 - Privacy: it never connects to the user's mailbox; it only receives the job alerts they forward and keeps the job details, not the emails. Data is not sold or used for advertising.
 - AI runs on the user's own API key from OpenAI, Anthropic or OpenRouter.
 - Users can see every email that reached their address, export their leads, reset them, or request account deletion from Settings.
-- A Free plan is available; paid plans add premium features such as salary estimates, the résumé ATS check and personal notes.
+- Plans: new accounts start with a ${freeStart.label}. Premium adds unlimited leads, AI outreach drafts and AI reading of alerts from more job sites; Pro adds everything else, including the résumé ATS check, salary estimates and custom AI prompts.
 
 ## Pages
 

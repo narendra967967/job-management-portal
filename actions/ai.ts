@@ -9,6 +9,7 @@ import { and, eq } from "drizzle-orm";
 import { advanceLeadStatus, type AutoStatusChange } from "@/lib/auto-status";
 import { db } from "@/lib/db";
 import { getCurrentUserId } from "@/lib/current-user";
+import { aiAddAllowance, getFeatureAccess, PREMIUM_REQUIRED, recordUsage } from "@/lib/entitlements";
 import {
   aiComplete,
   aiCompleteVision,
@@ -72,7 +73,8 @@ async function effectivePrompt(userId: string, kind: PromptKind): Promise<string
     .from(settingsT)
     .where(eq(settingsT.userId, userId));
   const ownPrompt = (kind === "summary" ? own?.summary : kind === "draft" ? own?.draft : own?.score)?.trim();
-  if (ownPrompt) return ownPrompt;
+  // A saved custom prompt applies only while the plan includes custom prompts.
+  if (ownPrompt && (await getFeatureAccess(userId)).customPrompts) return ownPrompt;
 
   const [admin] = await db
     .select({
@@ -231,6 +233,7 @@ export async function draftOutreachAction(input: {
   resumeLabel: string;
 }): Promise<{ ok: true; draft: string } | { ok: false; error: string }> {
   const userId = await getCurrentUserId();
+  if (!(await getFeatureAccess(userId)).aiDrafts) return { ok: false, error: PREMIUM_REQUIRED };
   try {
     input = parseInput(draftInputSchema, input) as typeof input;
   } catch (err) {
@@ -474,11 +477,20 @@ function extractFailure(err: unknown): { ok: false; error: string } {
   return { ok: false, error: friendly(err) };
 }
 
+/** Add with AI: refuse once the plan's monthly allowance is used up. */
+async function aiAddBlocked(userId: string): Promise<string | null> {
+  const a = await aiAddAllowance(userId);
+  if (a.left === null || a.left > 0) return null;
+  return `You've used all ${a.limit} "Add with AI" uses for this month. Add the job by hand, or upgrade your plan for unlimited use.`;
+}
+
 /** Extract lead fields from a pasted paragraph / job description. */
 export async function extractLeadFromTextAction(
   text: string,
 ): Promise<{ ok: true; lead: ExtractedLead } | { ok: false; error: string }> {
   const userId = await getCurrentUserId();
+  const blocked = await aiAddBlocked(userId);
+  if (blocked) return { ok: false, error: blocked };
   let clean: string;
   try {
     clean = parseInput(leadExtractTextSchema, text);
@@ -490,7 +502,9 @@ export async function extractLeadFromTextAction(
     const raw = await aiComplete(userId, LEAD_EXTRACT_SYSTEM, clean, EXTRACT_TEXT_MAX_TOKENS, {
       temperature: 0,
     });
-    return { ok: true, lead: sanitizeExtracted(raw) };
+    const lead = sanitizeExtracted(raw);
+    await recordUsage(userId, "ai_add");
+    return { ok: true, lead };
   } catch (err) {
     return extractFailure(err);
   }
@@ -501,6 +515,8 @@ export async function extractLeadFromImageAction(
   formData: FormData,
 ): Promise<{ ok: true; lead: ExtractedLead } | { ok: false; error: string }> {
   const userId = await getCurrentUserId();
+  const blocked = await aiAddBlocked(userId);
+  if (blocked) return { ok: false, error: blocked };
 
   const files = formData.getAll("image").filter((f): f is File => f instanceof File && f.size > 0);
   if (files.length === 0) {
@@ -535,7 +551,9 @@ export async function extractLeadFromImageAction(
       images,
       EXTRACT_IMAGE_MAX_TOKENS,
     );
-    return { ok: true, lead: sanitizeExtracted(raw) };
+    const lead = sanitizeExtracted(raw);
+    await recordUsage(userId, "ai_add");
+    return { ok: true, lead };
   } catch (err) {
     return extractFailure(err);
   }
@@ -562,4 +580,9 @@ export async function previewPromptAction(
   } catch (err) {
     return { ok: false, error: friendly(err) };
   }
+}
+
+/** "Add with AI" uses left this month, for the Add lead dialog (limit null = unlimited). */
+export async function getAiAddAllowanceAction(): Promise<{ limit: number | null; used: number; left: number | null }> {
+  return aiAddAllowance(await getCurrentUserId());
 }

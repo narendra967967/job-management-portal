@@ -309,6 +309,13 @@
       "when": 1792928792005,
       "tag": "0043_onboarding_tour",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1792929682602,
+      "tag": "0044_plan_limits",
+      "breakpoints": true
     }
   ]
 }

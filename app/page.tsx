@@ -32,7 +32,7 @@ import { Faq } from "@/components/marketing/faq";
 import { GlassBackdrop } from "@/components/marketing/glass-backdrop";
 import { BackToTop } from "@/components/marketing/back-to-top";
 import { getAppName, getTagline, getSupportEmail } from "@/lib/branding";
-import { isRegistrationOpen } from "@/lib/plans";
+import { freeStartLabel, isRegistrationOpen } from "@/lib/plans";
 import { getSessionUserId } from "@/lib/current-user";
 import { isGmailOAuthEnabled, supportedSiteExamples } from "@/lib/email-intake-data";
 import { absoluteUrl, siteUrl } from "@/lib/site-url";
@@ -71,7 +71,7 @@ const BOARD: { label: string; count: number; cards: { role: string; co: string; 
 ];
 
 export default async function LandingPage() {
-  const [appName, tagline, signupAllowed, supportEmail, sessionId, gmailOn, sites] = await Promise.all([
+  const [appName, tagline, signupAllowed, supportEmail, sessionId, gmailOn, sites, freeStart] = await Promise.all([
     getAppName(),
     getTagline(),
     isRegistrationOpen(),
@@ -79,7 +79,9 @@ export default async function LandingPage() {
     getSessionUserId(),
     isGmailOAuthEnabled(),
     supportedSiteExamples(),
+    freeStartLabel(),
   ]);
+  const trial = freeStart.trialDays > 0;
   const loggedIn = !!sessionId;
 
   const FEATURES = [
@@ -145,8 +147,10 @@ export default async function LandingPage() {
       a: "Yes. In Settings → Account, Reset leads clears all your leads so you can start a fresh search, and you can download a copy first. You can also ask us to delete your account and all its data. Both actions are confirmed with a code sent to your email.",
     },
     {
-      q: `Is ${appName} free?`,
-      a: "Yes, you can start on the Free plan. Paid plans add premium features such as salary estimates, the résumé ATS check and personal notes, along with higher limits.",
+      q: trial ? `Is there a free trial?` : `Is ${appName} free?`,
+      a: trial
+        ? `Yes. Every new account starts with a ${freeStart.label}, no payment needed. After that, Premium gives you unlimited leads, AI outreach drafts and AI reading of alerts from more job sites, and Pro adds everything else, including the résumé ATS check, salary insight and custom AI prompts.`
+        : "Yes, you can start on the free plan. Paid plans add premium features such as salary estimates, the résumé ATS check and personal notes, along with higher limits.",
     },
   ];
 
@@ -178,7 +182,7 @@ export default async function LandingPage() {
         operatingSystem: "Web",
         description: DESCRIPTION,
         featureList: FEATURES.map((f) => f.title),
-        offers: { "@type": "Offer", price: "0", priceCurrency: "INR", description: "Free plan" },
+        offers: { "@type": "Offer", price: "0", priceCurrency: "INR", description: trial ? `${freeStart.trialDays}-day free trial` : "Free plan" },
         publisher: { "@id": `${url}/#organization` },
       },
       {
@@ -199,7 +203,7 @@ export default async function LandingPage() {
       </Link>
     ) : signupAllowed ? (
       <Link href="/signup" className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-medium text-primary-foreground shadow-sm transition-all hover:bg-primary/90 active:translate-y-px">
-        Get started free <ArrowRight className="size-4" aria-hidden />
+        {trial ? "Start free trial" : "Get started free"} <ArrowRight className="size-4" aria-hidden />
       </Link>
     ) : (
       <Link href="/login" className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-medium text-primary-foreground shadow-sm transition-all hover:bg-primary/90 active:translate-y-px">
@@ -433,7 +437,7 @@ export default async function LandingPage() {
               </h2>
               <p className="mx-auto mt-3 max-w-md text-sm text-primary-foreground/80">
                 {signupAllowed
-                  ? `Create a free ${appName} account and bring your job search into one organized place.`
+                  ? `Start your ${freeStart.label} and bring your job search into one organized place.`
                   : `Sign in to ${appName} to pick up where you left off.`}
               </p>
               <div className="mt-7 flex flex-wrap justify-center gap-3">
@@ -445,7 +449,7 @@ export default async function LandingPage() {
                   <>
                     {signupAllowed && (
                       <Link href="/signup" className="inline-flex items-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-medium text-primary shadow-sm transition-transform hover:scale-[1.02]">
-                        Get started free <ArrowRight className="size-4" aria-hidden />
+                        {trial ? "Start free trial" : "Get started free"} <ArrowRight className="size-4" aria-hidden />
                       </Link>
                     )}
                     <Link href="/login" className="inline-flex items-center gap-2 rounded-xl bg-white/10 px-5 py-3 text-sm font-medium text-primary-foreground ring-1 ring-inset ring-white/25 transition-colors hover:bg-white/15">

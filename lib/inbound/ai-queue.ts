@@ -110,6 +110,7 @@ async function processJob(job: QueueRow) {
     const r = await ingestAlertDrafts(job.userId, drafts, job.messageId);
     const parts = [`${r.inserted} new`];
     if (r.renewed) parts.push(`${r.renewed} renewed`);
+    if (r.overLimit) parts.push(`${r.overLimit} not added (plan limit)`);
     await finish(job, "accepted", `AI found ${found}, kept ${drafts.length} · ${parts.join(", ")}`, r.inserted);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

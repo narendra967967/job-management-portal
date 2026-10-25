@@ -57,3 +57,11 @@ export async function planExpiryFromNow(planId: string | null): Promise<Date | n
   d.setMonth(d.getMonth() + 1);
   return d;
 }
+
+/** How a new account starts, for public copy: "14-day free trial" when the
+ *  default plan expires, else "free plan". Follows admin Plans & Pricing. */
+export async function freeStartLabel(): Promise<{ label: string; trialDays: number }> {
+  const def = await getDefaultPlan();
+  const days = def?.freeDurationDays ?? 0;
+  return { label: days > 0 ? `${days}-day free trial` : "free plan", trialDays: days };
+}

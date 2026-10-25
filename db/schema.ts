@@ -490,6 +490,17 @@ export const plans = pgTable("plans", {
   allowSalaryInsight: boolean("allow_salary_insight").notNull().default(false),
   // Résumé ATS score checker (Settings → Resumes). Off by default on every plan.
   allowAtsCheck: boolean("allow_ats_check").notNull().default(false),
+  // Open (not archived) leads a user may hold; null = unlimited. Enforced on
+  // manual add and alert intake (lib/entitlements.ts).
+  limitActiveLeads: integer("limit_active_leads"),
+  // "Add with AI" extractions per calendar month; null = unlimited.
+  limitAiAddMonthly: integer("limit_ai_add_monthly"),
+  // AI outreach / application drafts.
+  allowAiDrafts: boolean("allow_ai_drafts").notNull().default(false),
+  // AI reads forwarded alerts from supported sites that have no built-in reader.
+  allowAiEmailReading: boolean("allow_ai_email_reading").notNull().default(false),
+  // Tickets from users on this plan are flagged Priority in the admin inbox.
+  prioritySupport: boolean("priority_support").notNull().default(false),
   features: text("features").array().notNull().default(sql`'{}'::text[]`),
   popular: boolean("popular").notNull().default(false),
   status: planStatus("status").notNull().default("active"),
@@ -1132,4 +1143,19 @@ export const actionCodes = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("action_codes_user_purpose_uq").on(t.userId, t.purpose)],
+);
+
+/** Monthly usage counters for plan-limited features (e.g. "Add with AI" on the
+ *  Free plan). One row per user + feature + month ("YYYY-MM", UTC). */
+export const featureUsage = pgTable(
+  "feature_usage",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    feature: text("feature").notNull(),
+    month: text("month").notNull(),
+    count: integer("count").notNull().default(0),
+  },
+  (t) => [uniqueIndex("feature_usage_user_feature_month_uq").on(t.userId, t.feature, t.month)],
 );

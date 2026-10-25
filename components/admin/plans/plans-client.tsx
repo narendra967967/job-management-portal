@@ -284,6 +284,21 @@ function PlanCard({
           <span>
             ATS check: <span className="font-medium text-foreground">{plan.allowAtsCheck ? "Yes" : "No"}</span>
           </span>
+          <span>
+            Active leads: <span className="font-medium text-foreground">{plan.limitActiveLeads === null ? "Unlimited" : plan.limitActiveLeads}</span>
+          </span>
+          <span>
+            Add with AI: <span className="font-medium text-foreground">{plan.limitAiAddMonthly === null ? "Unlimited" : `${plan.limitAiAddMonthly}/month`}</span>
+          </span>
+          <span>
+            AI drafts: <span className="font-medium text-foreground">{plan.allowAiDrafts ? "Yes" : "No"}</span>
+          </span>
+          <span>
+            AI email reading: <span className="font-medium text-foreground">{plan.allowAiEmailReading ? "Yes" : "No"}</span>
+          </span>
+          <span>
+            Priority support: <span className="font-medium text-foreground">{plan.prioritySupport ? "Yes" : "No"}</span>
+          </span>
           {plan.isFree && (
             <span>
               Access: <span className="font-medium text-foreground">{plan.freeDurationDays > 0 ? `${plan.freeDurationDays} days` : "No expiry"}</span>

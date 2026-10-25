@@ -56,6 +56,11 @@ export interface Plan {
   /** Premium: AI salary insight per job. */
   allowSalaryInsight: boolean;
   allowAtsCheck: boolean;
+  limitActiveLeads: number | null;
+  limitAiAddMonthly: number | null;
+  allowAiDrafts: boolean;
+  allowAiEmailReading: boolean;
+  prioritySupport: boolean;
   features: string[];
   /** Recommended highlight — at most one plan. */
   popular: boolean;

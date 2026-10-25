@@ -35,7 +35,7 @@ export default async function OpengraphImage() {
             Job alerts become leads. AI scores the fit, checks your résumé and helps you apply better.
           </div>
         </div>
-        <div style={{ display: "flex", fontSize: 26, opacity: 0.75 }}>Free plan · No auto-applying · Private by design</div>
+        <div style={{ display: "flex", fontSize: 26, opacity: 0.75 }}>Free trial · No auto-applying · Private by design</div>
       </div>
     ),
     size,

@@ -43,6 +43,11 @@ const planSchema = z.object({
   allowNotes: z.boolean().optional().default(false),
   allowSalaryInsight: z.boolean().optional().default(false),
   allowAtsCheck: z.boolean().optional().default(false),
+  limitActiveLeads: z.coerce.number().int().min(0).max(1_000_000).nullable().optional().default(null),
+  limitAiAddMonthly: z.coerce.number().int().min(0).max(100_000).nullable().optional().default(null),
+  allowAiDrafts: z.boolean().optional().default(false),
+  allowAiEmailReading: z.boolean().optional().default(false),
+  prioritySupport: z.boolean().optional().default(false),
   features: z.array(z.string().trim().max(200)).max(30).optional().default([]),
   status: z.enum(["active", "inactive"]),
 });
@@ -66,6 +71,11 @@ function clean(v: PlanData) {
     allowNotes: v.allowNotes,
     allowSalaryInsight: v.allowSalaryInsight,
     allowAtsCheck: v.allowAtsCheck,
+    limitActiveLeads: v.limitActiveLeads,
+    limitAiAddMonthly: v.limitAiAddMonthly,
+    allowAiDrafts: v.allowAiDrafts,
+    allowAiEmailReading: v.allowAiEmailReading,
+    prioritySupport: v.prioritySupport,
     features,
     status: v.status,
   };

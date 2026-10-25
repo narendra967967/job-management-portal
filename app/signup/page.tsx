@@ -9,8 +9,8 @@ import { captchaSiteKey } from "@/lib/captcha";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Create your free account",
-  description: "Sign up free and track every job application in one place, with AI to score roles, check your résumé and write better applications.",
+  title: "Start your free trial",
+  description: "Start your free trial and track every job application in one place, with AI to score roles, check your résumé and write better applications.",
   alternates: { canonical: "/signup" },
 };
 

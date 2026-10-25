@@ -8,7 +8,8 @@
 import { and, eq, gt } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/current-user";
-import { plans, user } from "@/db/schema";
+import { plans, resumes, user } from "@/db/schema";
+import { activeLeadCount, usageThisMonth } from "@/lib/entitlements";
 
 export interface MyPlanDetails {
   name: string;
@@ -22,6 +23,13 @@ export interface MyPlanDetails {
   allowNotes: boolean;
   allowSalaryInsight: boolean;
   allowAtsCheck: boolean;
+  limitActiveLeads: number | null;
+  limitAiAddMonthly: number | null;
+  allowAiDrafts: boolean;
+  allowAiEmailReading: boolean;
+  prioritySupport: boolean;
+  /** What the user has used against the limits right now. */
+  usage: { activeLeads: number; resumes: number; aiAddThisMonth: number };
   features: string[];
   freeDurationDays: number;
   /** ISO string, or null when the plan never expires. */
@@ -62,6 +70,16 @@ export async function getMyPlanAction(): Promise<MyPlanDetails | null> {
     allowNotes: pl.allowNotes,
     allowSalaryInsight: pl.allowSalaryInsight,
     allowAtsCheck: pl.allowAtsCheck,
+    limitActiveLeads: pl.limitActiveLeads,
+    limitAiAddMonthly: pl.limitAiAddMonthly,
+    allowAiDrafts: pl.allowAiDrafts,
+    allowAiEmailReading: pl.allowAiEmailReading,
+    prioritySupport: pl.prioritySupport,
+    usage: {
+      activeLeads: await activeLeadCount(u.id),
+      resumes: (await db.select({ id: resumes.id }).from(resumes).where(eq(resumes.userId, u.id))).length,
+      aiAddThisMonth: await usageThisMonth(u.id, "ai_add"),
+    },
     features: pl.features,
     freeDurationDays: pl.freeDurationDays,
     expiresAt: row.planExpiresAt ? row.planExpiresAt.toISOString() : null,

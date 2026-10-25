@@ -133,8 +133,9 @@ function hasUnseenUserReply(t: Ticket): boolean {
   return t.replies.some((r) => r.author === "user" && new Date(r.createdAt).getTime() > read);
 }
 
-export function TicketsClient({ initial }: { initial: Ticket[] }) {
+export function TicketsClient({ initial, priorityUserIds = [] }: { initial: Ticket[]; priorityUserIds?: string[] }) {
   const router = useRouter();
+  const priority = useMemo(() => new Set(priorityUserIds), [priorityUserIds]);
   // Live mirror of the server data: SSE events patch it in place so the inbox and
   // open thread update without a refresh. Re-seeded whenever the server sends new
   // props (e.g. after a status change or delete triggers router.refresh()).
@@ -474,6 +475,11 @@ export function TicketsClient({ initial }: { initial: Ticket[] }) {
                         />
                       )}
                       <span className="min-w-0 truncate">{t.subject}</span>
+                      {t.userId && priority.has(t.userId) && (
+                        <span className="shrink-0 rounded-full bg-status-shortlisted px-1.5 py-0.5 text-[10px] font-semibold text-status-shortlisted-foreground">
+                          Priority
+                        </span>
+                      )}
                     </p>
                     <p className="text-xs text-muted-foreground sm:hidden">{t.name || t.email}</p>
                     {hasUnseenUserReply(t) ? (

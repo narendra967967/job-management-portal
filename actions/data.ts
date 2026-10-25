@@ -8,6 +8,7 @@
 // touches multiple rows, wrapped in a transaction.
 
 import { isUniqueViolation } from "@/lib/db-errors";
+import { activeLeadCount, getPlanLimits, leadLimitMessage } from "@/lib/entitlements";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { getCurrentUserId } from "@/lib/current-user";
@@ -282,6 +283,12 @@ export async function createLeadAction(input: {
     data = parseInput(createLeadSchema, input);
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Invalid input." };
+  }
+
+  // Plan limit on open leads (new leads are always open).
+  const { activeLeads } = await getPlanLimits(userId);
+  if (activeLeads != null && (await activeLeadCount(userId)) >= activeLeads) {
+    return { ok: false, error: leadLimitMessage(activeLeads) };
   }
 
   // The job URL (required) is the per-user dedupe key.
