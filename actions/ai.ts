@@ -412,7 +412,8 @@ const LEAD_EXTRACT_SYSTEM = [
   "  wording. Never summarize, shorten, rephrase or translate it. Leave out only",
   "  what isn't part of the posting: site navigation, buttons (Apply, Save…), other",
   "  job listings, ads, email headers/footers. Keep the line breaks; put headings on",
-  "  their own line and write list items as \"- \" lines. \"\" if there is none.",
+  "  their own line and write list items as \"- \" lines. Plain text only — no",
+  "  bold (**), headings (#) or other Markdown. \"\" if there is none.",
   "  On job-board pages (LinkedIn etc.) the posting is the \"About the job\" text;",
   "  leave out the site's extras — AI/premium tips, applicant statistics, company",
   "  insights and hiring trends, \"About the company\", \"More jobs\"/similar jobs.",
@@ -433,6 +434,16 @@ const IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp"];
 const IMAGE_MAX_BYTES = 5 * 1024 * 1024; // 5 MB each
 const IMAGE_MAX_COUNT = 14; // keep in step with MAX_SLICES
 
+/** Strip Markdown emphasis / heading markers the model sometimes adds to the
+ *  JD; keep the wording, line breaks and "- " bullets. */
+function plainJd(s: string): string {
+  return s
+    .split("\n")
+    .map((l) => l.replace(/^#{1,6}\s+/, "").replace(/\*{2,}|__/g, ""))
+    .join("\n")
+    .trim();
+}
+
 /** Coerce the model's JSON into a safe ExtractedLead (bad shapes → empties). */
 function sanitizeExtracted(raw: string): ExtractedLead {
   const json = raw.replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
@@ -448,7 +459,7 @@ function sanitizeExtracted(raw: string): ExtractedLead {
     remote: p.remote === true || String(p.remote).toLowerCase() === "true",
     jobUrl: str(p.jobUrl).slice(0, 2048),
     tags,
-    jdText: str(p.jdText).slice(0, 50000),
+    jdText: plainJd(str(p.jdText)).slice(0, 50000),
   };
 }
 

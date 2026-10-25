@@ -23,6 +23,7 @@ import type {
   UserForwardingStatus,
 } from "@/lib/email-intake-model";
 import { siteLabel } from "@/lib/email-intake-model";
+import { isUniqueViolation } from "@/lib/db-errors";
 
 /** Domain users forward to in this environment (e.g. in.jobtiva.in). */
 export function receivingDomain(): string {
@@ -133,7 +134,7 @@ export async function resetForwarding(userId: string): Promise<MyForwarding> {
         .returning();
       return toMyForwarding(row);
     } catch (e) {
-      if ((e as { code?: string })?.code !== "23505") throw e; // retry only on token clash
+      if (!isUniqueViolation(e)) throw e; // retry only on token clash
     }
   }
   throw new Error("Couldn't reset the forwarding address.");

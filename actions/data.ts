@@ -7,6 +7,7 @@
 // Every write is scoped to the current user (getCurrentUserId) and, where it
 // touches multiple rows, wrapped in a transaction.
 
+import { isUniqueViolation } from "@/lib/db-errors";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { getCurrentUserId } from "@/lib/current-user";
@@ -336,14 +337,13 @@ export async function createLeadAction(input: {
     });
     return { ok: true, id };
   } catch (e) {
-    const code = (e as { code?: string })?.code;
-    const msg = e instanceof Error ? e.message : String(e);
-    if (code === "23505" || msg.includes("job_leads_user_linkedin_job_id_uq")) {
+    if (isUniqueViolation(e)) {
       return {
         ok: false,
-        error: "This job looks like it's already in your leads.",
+        error: "This job is already in your leads — search for it on the Leads page.",
       };
     }
+    console.error("[leads] create failed:", e instanceof Error ? e.message : e);
     return { ok: false, error: "Couldn't save the lead. Please try again." };
   }
 }
@@ -401,12 +401,11 @@ export async function updateLeadAction(
     });
     return { ok: true };
   } catch (e) {
-    const code = (e as { code?: string })?.code;
     const msg = e instanceof Error ? e.message : String(e);
     if (msg === "LEAD_NOT_FOUND") {
       return { ok: false, error: "Lead not found." };
     }
-    if (code === "23505" || msg.includes("job_leads_user_linkedin_job_id_uq")) {
+    if (isUniqueViolation(e)) {
       return {
         ok: false,
         error: "That job URL is already used by another of your leads.",
