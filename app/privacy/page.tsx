@@ -213,7 +213,16 @@ export default async function PrivacyPage() {
         <li>Access or update your information from Settings.</li>
         <li>Stop forwarding at any time by removing your Gmail filter; reset your address in Settings.</li>
         {gmailOn && <li>Disconnect Google at any time to revoke Gmail access.</li>}
-        <li>Request deletion of your account and associated data by contacting us.</li>
+        <li>See every email that reached your forwarding address in Settings → Email log.</li>
+        <li>
+          Delete all your leads and everything attached to them at any time (Settings → Account → Reset
+          leads), after downloading a copy if you wish.
+        </li>
+        <li>
+          Request deletion of your account and all associated data from Settings → Account, or by contacting
+          us. When it&rsquo;s done we delete everything, including stored résumé files, and email you; we keep
+          only an anonymised record that the request was handled.
+        </li>
       </ul>
 
       <h2>Data retention</h2>
