@@ -173,7 +173,7 @@ export async function userHasAiKey(userId: string): Promise<boolean> {
 }
 
 /* ------------------------------------------------------------------ */
-/* Vision — one text+image prompt (used by AI lead extraction)         */
+/* Vision — one text prompt + image(s) (used by AI lead extraction)    */
 /* ------------------------------------------------------------------ */
 
 /** A base64-encoded image to send to a vision model. */
@@ -189,7 +189,7 @@ async function callOpenAIVision(
   base: string,
   system: string,
   userText: string,
-  image: VisionImage,
+  images: VisionImage[],
   maxTokens: number,
 ): Promise<string> {
   const res = await fetch(base, {
@@ -214,12 +214,14 @@ async function callOpenAIVision(
           role: "user",
           content: [
             { type: "text", text: userText },
-            {
+            // "high": read at full resolution — screenshots are mostly small text.
+            ...images.map((image) => ({
               type: "image_url",
               image_url: {
                 url: `data:${image.mimeType};base64,${image.base64}`,
+                detail: "high",
               },
-            },
+            })),
           ],
         },
       ],
@@ -236,7 +238,7 @@ async function callAnthropicVision(
   ai: UserAi,
   system: string,
   userText: string,
-  image: VisionImage,
+  images: VisionImage[],
   maxTokens: number,
 ): Promise<string> {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -254,14 +256,14 @@ async function callAnthropicVision(
         {
           role: "user",
           content: [
-            {
+            ...images.map((image) => ({
               type: "image",
               source: {
                 type: "base64",
                 media_type: image.mimeType,
                 data: image.base64,
               },
-            },
+            })),
             { type: "text", text: userText },
           ],
         },
@@ -276,7 +278,9 @@ async function callAnthropicVision(
 }
 
 /**
- * Run one system + (text + image) prompt against the user's provider. Requires
+ * Run one system + (text + images) prompt against the user's provider. Several
+ * images are sent in order in one message (e.g. slices of a long screenshot).
+ * Requires
  * the configured model to be vision-capable (e.g. gpt-4o/-mini, Claude 5, or a
  * vision model on OpenRouter); a non-vision model surfaces the provider's error.
  */
@@ -284,20 +288,20 @@ export async function aiCompleteVision(
   userId: string,
   system: string,
   userText: string,
-  image: VisionImage,
+  images: VisionImage[],
   maxTokens = 800,
 ): Promise<string> {
   const ai = await getUserAi(userId);
   switch (ai.provider) {
     case "anthropic":
-      return callAnthropicVision(ai, system, userText, image, maxTokens);
+      return callAnthropicVision(ai, system, userText, images, maxTokens);
     case "openrouter":
       return callOpenAIVision(
         ai,
         "https://openrouter.ai/api/v1/chat/completions",
         system,
         userText,
-        image,
+        images,
         maxTokens,
       );
     default:
@@ -306,7 +310,7 @@ export async function aiCompleteVision(
         "https://api.openai.com/v1/chat/completions",
         system,
         userText,
-        image,
+        images,
         maxTokens,
       );
   }

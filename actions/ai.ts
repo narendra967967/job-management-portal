@@ -413,6 +413,12 @@ const LEAD_EXTRACT_SYSTEM = [
   "  what isn't part of the posting: site navigation, buttons (Apply, Save…), other",
   "  job listings, ads, email headers/footers. Keep the line breaks; put headings on",
   "  their own line and write list items as \"- \" lines. \"\" if there is none.",
+  "  On job-board pages (LinkedIn etc.) the posting is the \"About the job\" text;",
+  "  leave out the site's extras — AI/premium tips, applicant statistics, company",
+  "  insights and hiring trends, \"About the company\", \"More jobs\"/similar jobs.",
+  "- Copy only text you can actually read. If some text is too small or blurry to",
+  "  read, leave it out. NEVER fill in typical or plausible job-description wording",
+  "  that isn't visibly there — a shorter, true jdText is always better.",
   'Use "", [] or false for anything not present. Never invent values.',
 ].join("\n");
 
@@ -421,9 +427,11 @@ const LEAD_EXTRACT_SYSTEM = [
 const EXTRACT_TEXT_MAX_TOKENS = 8000;
 const EXTRACT_IMAGE_MAX_TOKENS = 6000;
 
-// Accepted screenshot types + size cap for the image path.
+// Accepted screenshot types + size caps for the image path. A long screenshot
+// arrives as several slices (lib/screenshot-tiles.ts), top to bottom.
 const IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp"];
-const IMAGE_MAX_BYTES = 5 * 1024 * 1024; // 5 MB
+const IMAGE_MAX_BYTES = 5 * 1024 * 1024; // 5 MB each
+const IMAGE_MAX_COUNT = 14; // keep in step with MAX_SLICES
 
 /** Coerce the model's JSON into a safe ExtractedLead (bad shapes → empties). */
 function sanitizeExtracted(raw: string): ExtractedLead {
@@ -483,28 +491,37 @@ export async function extractLeadFromImageAction(
 ): Promise<{ ok: true; lead: ExtractedLead } | { ok: false; error: string }> {
   const userId = await getCurrentUserId();
 
-  const file = formData.get("image");
-  if (!(file instanceof File) || file.size === 0) {
+  const files = formData.getAll("image").filter((f): f is File => f instanceof File && f.size > 0);
+  if (files.length === 0) {
     return { ok: false, error: "Add an image to extract from." };
   }
-  if (!IMAGE_TYPES.includes(file.type)) {
+  if (files.length > IMAGE_MAX_COUNT) {
+    return { ok: false, error: "That screenshot is too long — crop it to the job post." };
+  }
+  if (files.some((f) => !IMAGE_TYPES.includes(f.type))) {
     return { ok: false, error: "Use a PNG, JPEG, or WebP image." };
   }
-  if (file.size > IMAGE_MAX_BYTES) {
+  if (files.some((f) => f.size > IMAGE_MAX_BYTES)) {
     return { ok: false, error: "Image is too large (max 5 MB)." };
   }
 
-  const image: VisionImage = {
-    base64: Buffer.from(await file.arrayBuffer()).toString("base64"),
-    mimeType: file.type,
-  };
+  const images: VisionImage[] = await Promise.all(
+    files.map(async (f) => ({
+      base64: Buffer.from(await f.arrayBuffer()).toString("base64"),
+      mimeType: f.type,
+    })),
+  );
+  const prompt =
+    images.length === 1
+      ? "Extract the job lead from this screenshot."
+      : `These ${images.length} images are consecutive slices of ONE long screenshot, in order from top to bottom. Neighbouring slices overlap a little — include overlapping lines only once. Extract the job lead from the whole screenshot.`;
 
   try {
     const raw = await aiCompleteVision(
       userId,
       LEAD_EXTRACT_SYSTEM,
-      "Extract the job lead from this screenshot.",
-      image,
+      prompt,
+      images,
       EXTRACT_IMAGE_MAX_TOKENS,
     );
     return { ok: true, lead: sanitizeExtracted(raw) };

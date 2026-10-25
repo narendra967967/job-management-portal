@@ -47,6 +47,7 @@ import {
   extractLeadFromTextAction,
   type ExtractedLead,
 } from "@/actions/ai";
+import { prepareScreenshot } from "@/lib/screenshot-tiles";
 import { ActionDialog, Field } from "@/components/leads/action-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -668,8 +669,9 @@ function AiExtractPanel({
         | { ok: true; lead: ExtractedLead }
         | { ok: false; error: string };
       if (file) {
+        // Long screenshots go up as readable slices (lib/screenshot-tiles.ts).
         const fd = new FormData();
-        fd.append("image", file);
+        for (const part of await prepareScreenshot(file)) fd.append("image", part);
         res = await extractLeadFromImageAction(fd);
       } else if (text.trim()) {
         res = await extractLeadFromTextAction(text);
