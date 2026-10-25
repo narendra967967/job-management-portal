@@ -121,6 +121,12 @@ export async function renderAppEmail(opts: AppEmailOptions): Promise<{ html: str
  * whether that's fatal).
  */
 export async function sendAppEmail(opts: AppEmailOptions): Promise<void> {
+  // Development only: reserved test domains (ui-test@jobtiva.test…) can't
+  // receive mail — log instead of bouncing through the real SMTP account.
+  if (process.env.NODE_ENV !== "production" && /\.(test|localhost|example|invalid)$/i.test(opts.to)) {
+    console.info(`[email] dev: skipped "${opts.subject}" to ${opts.to}`);
+    return;
+  }
   const { html, text } = await renderAppEmail(opts);
   await sendMail({ to: opts.to, subject: opts.subject, html, text });
 }

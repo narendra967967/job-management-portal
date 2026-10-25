@@ -16,6 +16,7 @@ import { validatePassword } from "@/lib/admin/password-policy-server";
 import { provisionUserDefaults } from "@/lib/provision";
 import { getDefaultPlan, planExpiryFromNow } from "@/lib/plans";
 import { account, plans, user } from "@/db/schema";
+import { deleteUserCompletely } from "@/lib/account-deletion";
 
 type ActionResult = { ok: true } | { ok: false; error: string };
 type CreateResult = { ok: true; emailed: boolean } | { ok: false; error: string };
@@ -221,8 +222,11 @@ export async function renewAdminUserAction(id: string, days: unknown): Promise<A
 export async function deleteAdminUserAction(id: string): Promise<ActionResult> {
   const adminId = await requireAdmin();
   if (id === adminId) return { ok: false, error: "You can't delete your own account." };
-  // Cascades to the user's app data + auth rows via FK on delete.
-  await db.delete(user).where(eq(user.id, id));
+  // Everything goes: app data (FK cascades), résumé files on disk, tickets
+  // (a deletion-request ticket stays, anonymised) — lib/account-deletion.ts.
+  const res = await deleteUserCompletely(id);
+  if (!res.ok) return res;
   revalidatePath("/jmp-admin/users");
+  revalidatePath("/jmp-admin/tickets");
   return { ok: true };
 }

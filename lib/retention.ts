@@ -6,6 +6,7 @@ import "server-only";
 import { lt } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
+  actionCodes,
   gmailIngestErrors,
   gmailProcessedMessages,
   inboundEmailLog,
@@ -31,6 +32,8 @@ const cutoff = (days: number) => new Date(Date.now() - days * 24 * 60 * 60_000);
 /** Delete everything past its window. Returns rows removed per type. */
 export async function runRetention(): Promise<Record<RetentionKey, number>> {
   const c = await getRetentionConfig();
+  // Expired one-time confirmation codes (lib/action-codes.ts) — no setting needed.
+  await db.delete(actionCodes).where(lt(actionCodes.expiresAt, new Date()));
   const removed = async (q: Promise<{ id?: unknown }[]>) => (await q).length;
   return {
     inboundLogDays: await removed(

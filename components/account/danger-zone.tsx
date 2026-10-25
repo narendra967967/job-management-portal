@@ -1,12 +1,25 @@
 "use client";
 
-// Settings → Account → Danger zone. "Reset leads": modal 1 explains what the
-// reset is for and exactly what goes / stays (live counts + CSV backup);
-// modal 2 asks for RESET and an emailed code, then runs the reset
-// (actions/account-reset.ts).
+// Settings → Account → Danger zone.
+//  - "Reset leads": modal 1 explains what the reset is for and exactly what
+//    goes / stays (live counts + CSV backup); modal 2 asks for RESET and an
+//    emailed code, then runs the reset (actions/account-reset.ts).
+//  - "Delete account": a request (support ticket) confirmed by an emailed code;
+//    the admin deletes the account. Cancellable until then
+//    (actions/account-deletion.ts).
 
 import { useEffect, useState } from "react";
-import { CheckCircle2, Download, Loader2, MailCheck, RotateCcw, TriangleAlert, XCircle } from "lucide-react";
+import { CheckCircle2, Clock, Download, Loader2, MailCheck, RotateCcw, Trash2, TriangleAlert, XCircle } from "lucide-react";
+import { formatDateTime } from "@/lib/utils";
+import { useConfirm } from "@/components/ui/confirm-dialog";
+import {
+  cancelDeletionRequestAction,
+  getDeletionRequestAction,
+  requestDeletionAction,
+  sendDeletionCodeAction,
+  type DeletionRequestState,
+} from "@/actions/account-deletion";
+import { Textarea } from "@/components/ui/textarea";
 import { useProfile } from "@/lib/mock-store";
 import {
   exportLeadsCsvAction,
@@ -48,6 +61,8 @@ export function DangerZoneCard() {
           Reset leads…
         </Button>
       </div>
+
+      <DeleteAccountRow />
 
       <ResetExplainDialog
         open={explainOpen}
@@ -321,6 +336,240 @@ function ResetConfirmDialog({ open, onOpenChange }: { open: boolean; onOpenChang
             <Button variant="destructive" onClick={reset} disabled={code.length !== 6 || busy}>
               {busy && <Loader2 className="size-4 animate-spin" aria-hidden />}
               {busy ? "Resetting…" : "Reset my leads"}
+            </Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/* ---------------- delete account (request) ---------------- */
+
+function DeleteAccountRow() {
+  const [state, setState] = useState<DeletionRequestState | null | undefined>(undefined);
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const { confirm, dialog } = useConfirm();
+
+  const load = () =>
+    getDeletionRequestAction()
+      .then(setState)
+      .catch(() => setState(null));
+  useEffect(() => {
+    void load();
+  }, []);
+
+  async function cancel() {
+    const ok = await confirm({
+      title: "Cancel your deletion request?",
+      description: "Your account stays as it is. You can ask again any time.",
+      confirmLabel: "Cancel request",
+    });
+    if (!ok) return;
+    setBusy(true);
+    const res = await cancelDeletionRequestAction().catch(() => ({ ok: false as const, error: "Something went wrong." }));
+    setBusy(false);
+    if (!res.ok) return toast.error("Couldn't cancel", res.error);
+    toast.success("Deletion request cancelled");
+    void load();
+  }
+
+  return (
+    <div className="mt-3 flex flex-col gap-3 rounded-xl border bg-white/40 p-3 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <p className="text-sm font-medium">Delete account</p>
+        {state ? (
+          <p className="mt-0.5 flex items-start gap-1.5 text-xs text-muted-foreground">
+            <Clock className="mt-px size-3.5 shrink-0 text-status-shortlisted-foreground" aria-hidden />
+            <span>
+              Deletion requested on {formatDateTime(state.requestedAt)} ({state.ref}). We&apos;ll email you when it&apos;s done.
+            </span>
+          </p>
+        ) : (
+          <p className="mt-0.5 text-xs text-muted-foreground">Ask us to permanently delete your account and all its data.</p>
+        )}
+      </div>
+      {state === undefined ? (
+        <div className="h-11 w-40 animate-pulse rounded-lg bg-muted/40 sm:h-8" aria-hidden />
+      ) : state ? (
+        <Button variant="outline" onClick={cancel} disabled={busy} className="shrink-0 bg-white/50">
+          {busy && <Loader2 className="size-4 animate-spin" aria-hidden />}
+          Cancel request
+        </Button>
+      ) : (
+        <Button variant="destructive" onClick={() => setOpen(true)} className="shrink-0">
+          <Trash2 className="size-4" aria-hidden />
+          Request deletion…
+        </Button>
+      )}
+      <DeleteAccountDialog
+        open={open}
+        onOpenChange={setOpen}
+        onDone={() => {
+          setOpen(false);
+          void load();
+        }}
+      />
+      {dialog}
+    </div>
+  );
+}
+
+function DeleteAccountDialog({
+  open,
+  onOpenChange,
+  onDone,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  onDone: () => void;
+}) {
+  const { email } = useProfile();
+  const [reason, setReason] = useState("");
+  const [understood, setUnderstood] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [cooldown, setCooldown] = useState(0);
+
+  useEffect(() => {
+    if (!open) return;
+    setReason("");
+    setUnderstood(false);
+    setSent(false);
+    setCode("");
+    setError("");
+    setCooldown(0);
+  }, [open]);
+
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const t = setTimeout(() => setCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [cooldown]);
+
+  async function sendCode() {
+    setBusy(true);
+    setError("");
+    const res = await sendDeletionCodeAction().catch(() => ({ ok: false as const, error: "Couldn't send the code. Try again." }));
+    setBusy(false);
+    if (!res.ok) return setError(res.error);
+    setSent(true);
+    setCode("");
+    setCooldown(60);
+  }
+
+  async function submit() {
+    setBusy(true);
+    setError("");
+    const res = await requestDeletionAction(code, reason).catch(() => ({ ok: false as const, error: "Something went wrong. Try again." }));
+    setBusy(false);
+    if (!res.ok) return setError(res.error);
+    toast.success("Deletion request sent", "We'll email you when your account has been deleted.");
+    onDone();
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !busy && onOpenChange(o)}>
+      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Request account deletion?</DialogTitle>
+          <DialogDescription>
+            We&apos;ll permanently delete your account and everything in it. This can&apos;t be undone.
+          </DialogDescription>
+        </DialogHeader>
+
+        {!sent ? (
+          <div className="space-y-4 text-sm">
+            <ul className="space-y-1.5 text-xs">
+              {[
+                "All leads, contacts, outreach, reminders and to-dos",
+                "Résumés, profile and career profile",
+                "Settings, AI key, email forwarding address and Gmail connection",
+                "Your login — you won't be able to sign in again",
+              ].map((g) => (
+                <li key={g} className="flex gap-1.5">
+                  <XCircle className="mt-px size-3.5 shrink-0 text-destructive" aria-hidden />
+                  {g}
+                </li>
+              ))}
+            </ul>
+            <div className="rounded-xl border bg-white/50 p-3 text-xs text-muted-foreground">
+              <p className="font-medium text-foreground">Before you go</p>
+              <ul className="mt-1.5 list-disc space-y-1 pl-4">
+                <li>Only want a clean start? Use Reset leads instead — your account stays.</li>
+                <li>Want to keep your leads? Download them first from Reset leads.</li>
+                <li>Your request goes to our team; you can keep using your account and cancel until it&apos;s done.</li>
+              </ul>
+            </div>
+            <label className="block space-y-1.5">
+              <span className="text-xs font-medium text-muted-foreground">Why are you leaving? (optional)</span>
+              <Textarea value={reason} onChange={(e) => setReason(e.target.value.slice(0, 1000))} rows={3} placeholder="Anything we could do better?" />
+            </label>
+            <label className="flex min-h-11 items-start gap-2.5 text-sm sm:min-h-0">
+              <input
+                type="checkbox"
+                checked={understood}
+                onChange={(e) => setUnderstood(e.target.checked)}
+                className="mt-0.5 size-4 shrink-0 rounded border-input accent-destructive"
+              />
+              I understand my account and all its data will be deleted for good.
+            </label>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">
+              We emailed a 6-digit code to <span className="font-medium text-foreground">{email}</span>. It expires in 10 minutes.
+            </p>
+            <label className="block space-y-1.5">
+              <span className="text-xs font-medium text-muted-foreground">Code from the email</span>
+              <Input
+                value={code}
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                className="h-11 text-center text-lg tracking-[0.4em] tabular-nums sm:h-10"
+                placeholder="••••••"
+              />
+            </label>
+            <p className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <MailCheck className="size-3.5" aria-hidden />
+                Check spam if it hasn&apos;t arrived.
+              </span>
+              <button
+                type="button"
+                onClick={sendCode}
+                disabled={cooldown > 0 || busy}
+                className="inline-flex min-h-11 items-center font-medium text-primary hover:underline disabled:text-muted-foreground disabled:no-underline sm:min-h-0"
+              >
+                {cooldown > 0 ? `Resend in ${cooldown}s` : "Resend code"}
+              </button>
+            </p>
+          </div>
+        )}
+
+        {error && (
+          <p className="text-xs text-destructive" role="alert">
+            {error}
+          </p>
+        )}
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>
+            Cancel
+          </Button>
+          {!sent ? (
+            <Button variant="destructive" onClick={sendCode} disabled={!understood || busy}>
+              {busy && <Loader2 className="size-4 animate-spin" aria-hidden />}
+              Send code
+            </Button>
+          ) : (
+            <Button variant="destructive" onClick={submit} disabled={code.length !== 6 || busy}>
+              {busy && <Loader2 className="size-4 animate-spin" aria-hidden />}
+              {busy ? "Sending…" : "Send deletion request"}
             </Button>
           )}
         </DialogFooter>

@@ -20,6 +20,7 @@ import {
   Check,
   CheckCheck,
   AlertCircle,
+  UserX,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/admin/ui/card";
 import { Button } from "@/components/admin/ui/button";
@@ -37,6 +38,7 @@ import {
   markAdminTicketReadAction,
   markAdminTicketDeliveredAction,
 } from "@/actions/admin-tickets";
+import { deleteAdminUserAction } from "@/actions/admin-users";
 import { useSupportStream } from "@/lib/use-support-stream";
 import {
   TICKET_STATUS_LABELS,
@@ -146,6 +148,8 @@ export function TicketsClient({ initial }: { initial: Ticket[] }) {
   const [reply, setReply] = useState("");
   const [busy, setBusy] = useState(false);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  // Account-deletion tickets: the user to delete (confirmed in a dialog).
+  const [deleteUser, setDeleteUser] = useState<{ id: string; name: string } | null>(null);
   const [flash, setFlash] = useState("");
   const [flashErr, setFlashErr] = useState(false);
   const chatScrollRef = useRef<HTMLDivElement>(null);
@@ -302,6 +306,16 @@ export function TicketsClient({ initial }: { initial: Ticket[] }) {
       setSelected(new Set());
       router.refresh();
     } else say(res.error, true);
+  }
+
+  async function confirmDeleteUser() {
+    if (!deleteUser) return;
+    const res = await deleteAdminUserAction(deleteUser.id);
+    if (res.ok) {
+      say(`Deleted ${deleteUser.name}'s account and data — they've been emailed.`);
+      setDeleteUser(null);
+      router.refresh();
+    } else say(res.error ?? "Couldn't delete the user.", true);
   }
 
   async function sendReply(id: string) {
@@ -518,6 +532,14 @@ export function TicketsClient({ initial }: { initial: Ticket[] }) {
                     <span className="rounded-full border bg-background px-2 py-0.5">{active.source}</span>
                     <span className="flex items-center gap-1"><Clock className="size-3 shrink-0" aria-hidden /> <ClientTime iso={active.createdAt} /></span>
                   </div>
+                  {active.category === "deletion" && active.userId && active.status !== "resolved" && (
+                    <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2">
+                      <span className="text-xs">Account deletion request</span>
+                      <Button variant="destructive" size="sm" onClick={() => setDeleteUser({ id: active.userId!, name: active.name || "this user" })}>
+                        <UserX className="size-3.5" aria-hidden /> Delete this user
+                      </Button>
+                    </div>
+                  )}
                 </div>
 
                 {/* Status control */}
@@ -625,6 +647,16 @@ export function TicketsClient({ initial }: { initial: Ticket[] }) {
           )}
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={deleteUser !== null}
+        onOpenChange={(o) => !o && setDeleteUser(null)}
+        title={`Delete ${deleteUser?.name ?? "user"}'s account?`}
+        description="Permanently removes the account and all its data, including résumé files. This ticket is kept, anonymised, as the record. The user gets a confirmation email. This can't be undone."
+        confirmLabel="Delete account"
+        destructive
+        onConfirm={() => void confirmDeleteUser()}
+      />
 
       <ConfirmDialog
         open={bulkDeleteOpen}

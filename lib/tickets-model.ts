@@ -9,8 +9,10 @@ export const TICKET_STATUS_LABELS: Record<TicketStatus, string> = {
   resolved: "Resolved",
 };
 
-export type TicketCategory = "question" | "bug" | "billing" | "account" | "other";
+export type TicketCategory = "question" | "bug" | "billing" | "account" | "other" | "deletion";
 
+/** Categories a user can pick in the contact forms. "deletion" is only created
+ *  by Settings → Account → Request account deletion. */
 export const TICKET_CATEGORIES: TicketCategory[] = ["question", "bug", "billing", "account", "other"];
 
 export const TICKET_CATEGORY_LABELS: Record<TicketCategory, string> = {
@@ -19,6 +21,7 @@ export const TICKET_CATEGORY_LABELS: Record<TicketCategory, string> = {
   billing: "Billing",
   account: "Account",
   other: "Other",
+  deletion: "Account deletion",
 };
 
 export type TicketAuthor = "user" | "admin";
