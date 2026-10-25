@@ -22,6 +22,7 @@ export function SiteFooter({ appName, tagline }: { appName: string; tagline?: st
           <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Product</p>
           <ul className="mt-3 space-y-2 text-sm">
             <li><Link href="/#features" className="text-muted-foreground hover:text-foreground">Features</Link></li>
+            <li><Link href="/pricing" className="text-muted-foreground hover:text-foreground">Pricing</Link></li>
             <li><Link href="/#about" className="text-muted-foreground hover:text-foreground">About</Link></li>
             <li><Link href="/#contact" className="text-muted-foreground hover:text-foreground">Contact</Link></li>
             <li><Link href="/login" className="text-muted-foreground hover:text-foreground">Log in</Link></li>

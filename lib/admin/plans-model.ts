@@ -64,6 +64,8 @@ export interface Plan {
   features: string[];
   /** Recommended highlight — at most one plan. */
   popular: boolean;
+  /** Listed on the public /pricing page (when active). */
+  showOnPricing: boolean;
   status: PlanStatus;
   subscribers: number;
   everSubscribed: number;

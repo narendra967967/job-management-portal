@@ -235,6 +235,7 @@ function PlanCard({
             </div>
             <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-white/80">
               <span className="rounded-full bg-white/15 px-1.5 py-0.5">{active ? "Active" : "Draft"}</span>
+              {active && plan.showOnPricing && <span className="rounded-full bg-white/15 px-1.5 py-0.5">On pricing page</span>}
               <code>{plan.code}</code>
             </div>
           </div>

@@ -45,6 +45,7 @@ Job seekers who prefer to apply carefully to fewer, well-matched roles rather th
 ## Pages
 
 - [Home](${absoluteUrl("/")}): product overview and FAQ
+- [Pricing](${absoluteUrl("/pricing")}): plans, prices and what each includes
 - [Sign up](${absoluteUrl("/signup")}): create a free account
 - [Privacy policy](${absoluteUrl("/privacy")})
 - [Terms & conditions](${absoluteUrl("/terms")})

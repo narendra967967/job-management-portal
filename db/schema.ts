@@ -503,6 +503,8 @@ export const plans = pgTable("plans", {
   prioritySupport: boolean("priority_support").notNull().default(false),
   features: text("features").array().notNull().default(sql`'{}'::text[]`),
   popular: boolean("popular").notNull().default(false),
+  // Listed on the public /pricing page (active plans only). Keeps test plans private.
+  showOnPricing: boolean("show_on_pricing").notNull().default(false),
   status: planStatus("status").notNull().default("active"),
   // Running count of users who have ever been on this plan — gates deletion.
   everSubscribed: integer("ever_subscribed").notNull().default(0),

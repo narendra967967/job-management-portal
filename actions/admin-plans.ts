@@ -20,6 +20,7 @@ function fail(e: z.ZodError): Result {
 }
 function revalidate() {
   revalidatePath("/jmp-admin/plans");
+  revalidatePath("/pricing");
 }
 
 const planSchema = z.object({
@@ -49,6 +50,7 @@ const planSchema = z.object({
   allowAiEmailReading: z.boolean().optional().default(false),
   prioritySupport: z.boolean().optional().default(false),
   features: z.array(z.string().trim().max(200)).max(30).optional().default([]),
+  showOnPricing: z.boolean().optional().default(false),
   status: z.enum(["active", "inactive"]),
 });
 
@@ -77,6 +79,7 @@ function clean(v: PlanData) {
     allowAiEmailReading: v.allowAiEmailReading,
     prioritySupport: v.prioritySupport,
     features,
+    showOnPricing: v.showOnPricing,
     status: v.status,
   };
 }

@@ -316,6 +316,13 @@
       "when": 1792929682602,
       "tag": "0044_plan_limits",
       "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1792948183996,
+      "tag": "0045_pricing_page",
+      "breakpoints": true
     }
   ]
 }

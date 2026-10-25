@@ -46,6 +46,7 @@ export async function loadPlans(): Promise<Plan[]> {
     prioritySupport: r.prioritySupport,
     features: r.features,
     popular: r.popular,
+    showOnPricing: r.showOnPricing,
     status: r.status,
     subscribers: subByPlan.get(r.id) ?? 0,
     everSubscribed: r.everSubscribed,

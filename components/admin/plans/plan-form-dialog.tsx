@@ -49,6 +49,7 @@ export interface PlanFormValues {
   allowAiEmailReading: boolean;
   prioritySupport: boolean;
   features: string[];
+  showOnPricing: boolean;
   status: PlanStatus;
 }
 
@@ -125,6 +126,7 @@ export function PlanFormDialog({
   const [allowAiEmailReading, setAllowAiEmailReading] = useState(false);
   const [prioritySupport, setPrioritySupport] = useState(false);
   const [features, setFeatures] = useState<string[]>([""]);
+  const [showOnPricing, setShowOnPricing] = useState(true);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -156,6 +158,7 @@ export function PlanFormDialog({
     setAllowAiEmailReading(plan?.allowAiEmailReading ?? false);
     setPrioritySupport(plan?.prioritySupport ?? false);
     setFeatures(plan && plan.features.length ? [...plan.features] : [""]);
+    setShowOnPricing(plan?.showOnPricing ?? true);
     setError("");
   }, [open, plan]);
 
@@ -231,6 +234,7 @@ export function PlanFormDialog({
       allowAiEmailReading,
       prioritySupport,
       features: features.map((f) => f.trim()).filter(Boolean),
+      showOnPricing,
       status,
     });
     setBusy(false);
@@ -451,6 +455,10 @@ export function PlanFormDialog({
             <Button type="button" variant="outline" size="sm" onClick={addFeature}>
               <Plus /> Add feature
             </Button>
+          </Section>
+
+          <Section title="Pricing page">
+            <PlanSwitch checked={showOnPricing} onChange={setShowOnPricing} label="Show on the public pricing page (when active)" />
           </Section>
 
         </div>
