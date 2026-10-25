@@ -13,7 +13,11 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
   const appName = await getAppName();
-  return { title: `Privacy policy · ${appName}` };
+  return {
+    title: "Privacy policy",
+    description: `How ${appName} collects, uses and protects your data, what the AI features send, how long data is kept and how to delete your account.`,
+    alternates: { canonical: "/privacy" },
+  };
 }
 
 const days = (n: number) => `${n} ${n === 1 ? "day" : "days"}`;

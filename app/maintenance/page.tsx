@@ -9,7 +9,7 @@ import { GlassBackdrop } from "@/components/marketing/glass-backdrop";
 // Public maintenance screen. Only shown while maintenance mode is on; otherwise
 // it bounces back to the app. No auth, no app chrome — a standalone page.
 
-export const metadata: Metadata = { title: "We’ll be right back" };
+export const metadata: Metadata = { title: "We’ll be right back", robots: { index: false, follow: false } };
 
 // Must render per-request: the redirect + content depend on the live maintenance
 // flag, and a static prerender would bake the build-time decision.

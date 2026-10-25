@@ -2,6 +2,9 @@ import { redirect } from "next/navigation";
 import { getSessionUser, accessState } from "@/lib/current-user";
 import { guardMaintenance } from "@/lib/maintenance";
 import { DeactivatedNotice } from "@/components/auth/account-blocked";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = { title: "Account deactivated", robots: { index: false, follow: false } };
 
 export default async function DeactivatedPage() {
   await guardMaintenance();

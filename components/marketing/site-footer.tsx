@@ -39,7 +39,7 @@ export function SiteFooter({ appName, tagline }: { appName: string; tagline?: st
       <div className="border-t border-white/70">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-2 px-4 py-5 text-xs text-muted-foreground sm:flex-row sm:px-6">
           <p>© {year} {appName}. All rights reserved.</p>
-          <p>Private by design · your data stays yours.</p>
+          <p>Private by design. Your data stays yours.</p>
         </div>
       </div>
     </footer>

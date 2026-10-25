@@ -2,7 +2,7 @@
 // Contact are scroll sections with a smooth-scroll nav; the login page lives at
 // /login and self-registration at /signup (shown only when the admin enables it).
 //
-// Positioning: Jobtiva is an *intentional* job-search workspace — manage the roles
+// Positioning: Jobtiva is a job search tracker for focused job seekers — manage the roles
 // that are right for you and apply well, not a mass-apply automation tool. Leads
 // come in by email forwarding; the FAQ says plainly that Jobtiva only sees what
 // users forward. While "Connect Gmail" is switched on (admin), the FAQ also
@@ -34,14 +34,32 @@ import { getAppName, getTagline, getSupportEmail } from "@/lib/branding";
 import { isRegistrationOpen } from "@/lib/plans";
 import { getSessionUserId } from "@/lib/current-user";
 import { isGmailOAuthEnabled, supportedSiteExamples } from "@/lib/email-intake-data";
+import { absoluteUrl, siteUrl } from "@/lib/site-url";
+import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
 
+// Search snippet (≈155 chars) — also the structured-data description.
+const DESCRIPTION =
+  "Track job applications in one place. Turn job alerts into leads, score each role against your résumé, check it for ATS and write better applications with AI.";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const appName = await getAppName();
+  const title = `${appName}: Job Application Tracker with AI`;
+  return {
+    title: { absolute: title },
+    description: DESCRIPTION,
+    alternates: { canonical: "/" },
+    openGraph: { type: "website", url: "/", title, description: DESCRIPTION, siteName: appName },
+    twitter: { card: "summary_large_image", title, description: DESCRIPTION },
+  };
+}
+
 const STEPS = [
-  { n: "1", title: "Set up once", body: "Forward your job alerts to your private address, add your résumé and a short career profile." },
-  { n: "2", title: "Leads flow in", body: "Alerts become tracked leads within seconds. Paste or screenshot any other job to add it too." },
-  { n: "3", title: "Research & score", body: "AI summarizes each role, scores the fit and checks your résumé — so you focus on the right ones." },
-  { n: "4", title: "Apply & follow through", body: "Draft with AI, apply yourself, and let reminders keep every role moving towards an offer." },
+  { n: "1", title: "Set up in a few minutes", body: "Create one Gmail filter that forwards your job alerts to your private address. Then add your résumé and a short career profile." },
+  { n: "2", title: "New jobs arrive on their own", body: "Each alert turns into a lead within seconds. Found a job somewhere else? Paste the post or add a screenshot." },
+  { n: "3", title: "Review and shortlist", body: "Read the AI summary, check the fit score and tighten your résumé before you apply." },
+  { n: "4", title: "Apply and follow up", body: "Write your message, apply on the company's site and let reminders tell you when to follow up." },
 ];
 
 // Faux kanban board shown in the hero.
@@ -64,67 +82,114 @@ export default async function LandingPage() {
   const loggedIn = !!sessionId;
 
   const FEATURES = [
-    { icon: Inbox, title: "Capture every opportunity", body: `Forward the job alerts you already get from job sites like ${sites}, and many more. They become tracked leads automatically — repeats refresh the lead instead of duplicating it.` },
-    { icon: ImagePlus, title: "Add any job in seconds", body: "Paste a job post or drop a screenshot and AI fills in the details, keeping the description word for word. Or add it by hand." },
-    { icon: LayoutGrid, title: "A pipeline you keep", body: "Move every lead from new to shortlisted, applied, interview and offer — star your top choices and see it all on a board or a list." },
-    { icon: Gauge, title: "Know what fits", body: "AI summarizes each role and scores how well it fits your résumé, with salary insights on supported plans." },
-    { icon: FileCheck2, title: "Résumé ATS check", body: "See how each résumé would fare in an applicant tracking system — a score, missing keywords and specific fixes. On supported plans." },
-    { icon: UserRound, title: "Your career profile", body: "Tell us your target roles, skills and preferences once. The AI uses them for scoring, résumé checks and drafts." },
-    { icon: Send, title: "Apply with better content", body: `Draft tailored applications and outreach with AI, then send them yourself. ${appName} never applies for you.` },
-    { icon: Bell, title: "Follow-ups that stick", body: "Reminders, to-dos and the recruiters you're talking to, kept with each role — so nothing falls through the cracks." },
-    { icon: ShieldCheck, title: "Private and in your control", body: "We never open your mailbox. See every email that arrived, export or reset your leads, or delete your account — any time." },
+    { icon: Inbox, title: "Turn job alerts into leads", body: `Forward the job alerts you already get from sites like ${sites}, and many more. Each job lands in your list as a lead, and if the same job turns up again, ${appName} refreshes it instead of adding a copy.` },
+    { icon: ImagePlus, title: "Add a job from a post or screenshot", body: "Paste a job post or drop in a screenshot. AI fills in the title, company and location, and keeps the job description exactly as written. You can add jobs by hand too." },
+    { icon: LayoutGrid, title: "A job tracker you'll actually keep up", body: "Move each job from New to Shortlisted, Applied, Interview and Offer. Star your top choices and switch between a board and a list whenever you like." },
+    { icon: Gauge, title: "See which jobs fit you", body: "AI reads each job description and scores how well it matches your résumé. On supported plans, you also get a salary estimate for the role." },
+    { icon: FileCheck2, title: "Résumé ATS checker", body: "Find out how your résumé is likely to do in an applicant tracking system. You get a score out of 100, the keywords you're missing and a short list of fixes. Available on supported plans." },
+    { icon: UserRound, title: "One career profile, used everywhere", body: `Add your target roles, skills and job preferences once. ${appName} uses them when it scores jobs, checks your résumé and drafts messages.` },
+    { icon: Send, title: "Write better applications", body: `Draft tailored messages to recruiters and referrals with AI, then edit and send them yourself. ${appName} never applies or sends anything for you.` },
+    { icon: Bell, title: "Never miss a follow-up", body: "Set reminders, keep a to-do list and save the recruiters you're talking to with each job, so no application goes quiet by accident." },
+    { icon: ShieldCheck, title: "Your data, your call", body: "We never open your mailbox. You can see every email that reached your address, export your leads, start over or delete your account whenever you want." },
   ];
 
+  // Plain-text Q&A: rendered in the FAQ and published as FAQPage structured data.
   const FAQ_ITEMS = [
     {
-      q: `Will ${appName} apply to jobs for me?`,
-      a: `No — and that's on purpose. ${appName} helps you find the right roles, research them, and draft strong applications with AI, but you always review and apply yourself. You stay in control of exactly where you apply.`,
+      q: `What is ${appName}?`,
+      a: `${appName} is a job search tracker. It collects the job alerts you forward from your email, organizes them as leads and gives you AI tools to score each role, check your résumé and write better applications. You stay in control and apply to every job yourself.`,
     },
     {
-      q: "How do job leads get in?",
-      a: `You get a private ${appName} address. Set up a filter in Gmail once, and the job alerts you already receive — from job sites like ${sites}, and many more — are forwarded there and become tracked leads within seconds — no copy-paste. You can also forward an alert by hand, add a job yourself, or paste a job post or a screenshot and let AI fill in the details.`,
+      q: `Does ${appName} apply to jobs for me?`,
+      a: `No. ${appName} is not an auto-apply tool. It helps you pick the right roles and prepare strong applications, but you review everything and apply yourself.`,
     },
     {
-      q: "Which job sites are supported?",
-      a: `Alerts from many popular job sites — for example ${sites} — become leads automatically, and more sites keep being added. With your own AI key, ${appName} can also read alerts it can't read on its own yet, and any job from anywhere can be added by pasting it or a screenshot.`,
+      q: `How do jobs get into ${appName}?`,
+      a: `Most people set up one Gmail filter. It forwards job alerts from sites like ${sites}, and many more, to a private ${appName} address, and each job appears as a lead within seconds. You can also forward an alert by hand, add a job yourself or paste a job post or screenshot.`,
+    },
+    {
+      q: `Which job sites does ${appName} work with?`,
+      a: `It reads job alerts from many popular job sites, for example ${sites}, and more are added over time. If a site isn't supported yet, your own AI key can read its alerts, and you can always add a job by pasting it.`,
     },
     {
       q: `Does ${appName} read my email?`,
-      a: `No. ${appName} never opens your mailbox. It only sees the emails you forward to your private address, accepts them only when they really come from a supported job site, and keeps just the job details — not the email itself. Stop forwarding at any time by removing the Gmail filter.`,
+      a: `No. ${appName} never connects to your mailbox. It only sees the emails you forward to your private address, checks that they really come from a job site and keeps the job details, not the email. To stop, just remove the Gmail filter.`,
     },
     ...(gmailOn
       ? [
           {
             q: `Why does ${appName} offer to connect my Gmail?`,
-            a: `Connecting Gmail is optional — forwarding works without it. If you connect it, ${appName} gets read-only access (Google's gmail.readonly permission) and uses it for one thing: finding your job-alert emails — LinkedIn alerts by default — and turning them into tracked leads. It never sends, changes or deletes email, and doesn't read anything else. You can disconnect any time from Settings. Full details are in our Privacy policy.`,
+            a: `Connecting Gmail is optional; forwarding works without it. If you connect it, ${appName} gets read-only access (Google's gmail.readonly permission) and uses it for one thing: finding your job-alert emails, LinkedIn alerts by default, and turning them into leads. It never sends, changes or deletes email and doesn't read anything else. You can disconnect it any time in Settings. Our Privacy Policy has the full details.`,
           },
         ]
       : []),
     {
       q: "Is my data private?",
-      a: `Yes. Your data stays yours and nothing leaves without you — it's never sold or used for advertising. Only the job alerts you forward reach ${appName}, and from those we keep the job details, not the emails.`,
+      a: `Yes. We don't sell your data or use it for advertising, and only the job alerts you forward ever reach ${appName}. You can export your leads, start over or delete your account at any time.`,
     },
     {
-      q: "What does the AI actually do?",
-      a: `It summarizes each role, scores how well it fits your résumé, drafts tailored applications and outreach, fills in a job from a pasted post or screenshot, and — on supported plans — estimates salaries and checks your résumé. The AI runs on your own API key from OpenAI, Anthropic or OpenRouter, so you pay your provider directly and choose the model. It never sends or applies on your behalf.`,
+      q: `How does ${appName} use AI?`,
+      a: "AI summarizes job descriptions, scores how well each role fits your résumé, drafts applications and outreach, and fills in job details from a pasted post or screenshot. On supported plans it also estimates salaries and checks your résumé for ATS. It runs on your own API key from OpenAI, Anthropic or OpenRouter, so you choose the model and pay your provider directly.",
     },
     {
-      q: "What is the résumé ATS check?",
-      a: "Many employers screen résumés with an applicant tracking system (ATS) before a person reads them. The check scores each of your résumés out of 100 — standard sections, contact details, measurable impact and length, plus how well its keywords match the roles in your career profile — and lists what to fix. It's available on supported plans.",
+      q: "What is an ATS résumé check?",
+      a: `Many employers use an applicant tracking system (ATS) to filter résumés before a recruiter sees them. ${appName}'s check scores each résumé out of 100, looking at standard sections, contact details, measurable results, length and how well its keywords match your target roles. Then it tells you what to fix. It's included in supported plans.`,
     },
     {
       q: `Who is ${appName} for?`,
-      a: "Anyone running a focused job search who'd rather apply well to the right handful of roles than blast a thousand — especially busy, mid-career professionals.",
+      a: "Job seekers who would rather apply carefully to fewer, better-matched roles. It suits busy, mid-career professionals especially well, but anyone running a serious job search can use it.",
     },
     {
-      q: "Can I start over, or delete my account?",
-      a: "Yes, both from Settings → Account. Reset leads clears every lead and what's attached to it for a fresh start — you can download a copy first. Or ask us to delete your account and all its data; we email you when it's done, and you can cancel until then. Both are confirmed with a code sent to your email.",
+      q: "Can I start over or delete my account?",
+      a: "Yes. In Settings → Account, Reset leads clears all your leads so you can start a fresh search, and you can download a copy first. You can also ask us to delete your account and all its data. Both actions are confirmed with a code sent to your email.",
     },
     {
-      q: "Is there a free plan?",
-      a: "Yes — new accounts start on the Free plan. Paid plans add premium features such as salary insights, the résumé ATS check and personal notes, plus higher limits.",
+      q: `Is ${appName} free?`,
+      a: "Yes, you can start on the Free plan. Paid plans add premium features such as salary estimates, the résumé ATS check and personal notes, along with higher limits.",
     },
   ];
+
+  // Structured data for search engines and AI assistants (schema.org).
+  const url = siteUrl();
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": `${url}/#organization`,
+        name: appName,
+        url,
+        logo: absoluteUrl("/api/branding/logo"),
+        ...(supportEmail ? { email: supportEmail } : {}),
+      },
+      {
+        "@type": "WebSite",
+        "@id": `${url}/#website`,
+        name: appName,
+        url,
+        publisher: { "@id": `${url}/#organization` },
+      },
+      {
+        "@type": "SoftwareApplication",
+        name: appName,
+        url,
+        applicationCategory: "BusinessApplication",
+        operatingSystem: "Web",
+        description: DESCRIPTION,
+        featureList: FEATURES.map((f) => f.title),
+        offers: { "@type": "Offer", price: "0", priceCurrency: "INR", description: "Free plan" },
+        publisher: { "@id": `${url}/#organization` },
+      },
+      {
+        "@type": "FAQPage",
+        mainEntity: FAQ_ITEMS.map((f) => ({
+          "@type": "Question",
+          name: f.q,
+          acceptedAnswer: { "@type": "Answer", text: f.a },
+        })),
+      },
+    ],
+  };
 
   const PrimaryCta = () =>
     loggedIn ? (
@@ -143,6 +208,11 @@ export default async function LandingPage() {
 
   return (
     <div className="relative isolate min-h-dvh">
+      <script
+        type="application/ld+json"
+        // JSON-LD; "<" escaped so the payload can't close the script tag.
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
+      />
       <GlassBackdrop />
       <SiteHeader appName={appName} signupAllowed={signupAllowed} loggedIn={loggedIn} />
 
@@ -152,15 +222,15 @@ export default async function LandingPage() {
           <div className="relative mx-auto grid max-w-6xl items-center gap-12 px-4 py-16 sm:px-6 lg:grid-cols-2 lg:py-24">
             <div>
               <span className="glass-subtle inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium text-primary">
-                <Sparkles className="size-3.5" aria-hidden /> The intentional job-search workspace
+                <Sparkles className="size-3.5" aria-hidden /> Job search tracker with AI
               </span>
               <h1 className="mt-5 text-4xl font-semibold leading-[1.1] tracking-tight sm:text-5xl">
-                Run your entire job search in one calm place.
+                Track every job application in one organized place
               </h1>
               <p className="mt-5 max-w-lg text-base leading-relaxed text-muted-foreground sm:text-lg">
-                {appName} brings every role worth your time into one place — research it, apply with
-                AI-crafted content, and track each one to offer. Quality over quantity, and you always
-                know exactly where you&apos;ve applied.
+                {appName} turns the job alerts in your inbox into a tidy list of leads. Score each role
+                against your résumé, write better applications with AI and follow up on time. You apply
+                yourself, and only to the jobs that actually fit.
               </p>
               <div className="mt-8 flex flex-wrap items-center gap-3">
                 <PrimaryCta />
@@ -176,7 +246,7 @@ export default async function LandingPage() {
               </p>
               <p className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
                 <ShieldCheck className="size-4 shrink-0 text-primary" aria-hidden />
-                Private by design · your data stays yours.
+                Private by design. Your data stays yours.
               </p>
             </div>
 
@@ -230,9 +300,9 @@ export default async function LandingPage() {
         <section id="features" className="scroll-mt-24">
           <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:py-24">
             <div className="max-w-2xl">
-              <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">Everything your search needs, nothing it doesn&apos;t</h2>
+              <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">Everything you need to run a focused job search</h2>
               <p className="mt-4 text-base text-muted-foreground">
-                From the first job alert to the final follow-up — {appName} keeps the whole process in one organized workspace, with you in control at every step.
+                From the first job alert to the last follow-up, {appName} keeps your whole search in one workspace, and you stay in charge of every step.
               </p>
             </div>
             <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -252,9 +322,9 @@ export default async function LandingPage() {
         {/* How it works — timeline on a glass panel */}
         <section>
           <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:py-24">
-            <h2 className="text-center text-3xl font-semibold tracking-tight sm:text-4xl">How it works</h2>
+            <h2 className="text-center text-3xl font-semibold tracking-tight sm:text-4xl">How {appName} works</h2>
             <p className="mx-auto mt-4 max-w-xl text-center text-base text-muted-foreground">
-              Set it up once, then a simple, intentional loop — research, apply well, and follow through. Not spray-and-pray.
+              Set it up once. After that it&apos;s a simple routine: review new jobs, apply to the right ones and follow up.
             </p>
 
             <div className="glass mt-12 rounded-3xl px-5 py-10 sm:px-8">
@@ -299,22 +369,21 @@ export default async function LandingPage() {
         <section id="about" className="scroll-mt-24">
           <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 py-16 sm:px-6 lg:grid-cols-2 lg:py-24">
             <div>
-              <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">Quality beats quantity</h2>
+              <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">Why quality beats quantity in a job search</h2>
               <p className="mt-4 text-base leading-relaxed text-muted-foreground">
-                Job searching isn&apos;t about blasting a thousand applications and hoping something lands.
-                {" "}{appName} is for the roles that are actually right for you — researched, tracked, and
-                applied to well.
+                Sending hundreds of applications rarely works. Recruiters spot generic applications quickly,
+                and you soon lose track of where you applied. {appName} is built for the opposite approach: a
+                short list of roles that suit you, each one researched and applied to properly.
               </p>
               <div className="glass-subtle mt-5 rounded-2xl border-l-2 border-l-primary p-4 text-sm font-medium">
-                Ten thoughtful applications beat a thousand blind ones. Apply to the right 10 and land 6
-                calls — not spray 1,000 and hear nothing.
+                Ten well-chosen applications usually get more replies than a thousand rushed ones.
               </div>
               <ul className="mt-6 space-y-3">
                 {[
-                  "Every role that's right for you, in one place",
-                  "AI helps you apply better — you decide where",
-                  "Track, get reminded, and always know where you stand",
-                  "Private by design — your data stays yours",
+                  "All the jobs worth your time in one list",
+                  "AI helps you write better; you decide where to apply",
+                  "Reminders keep every application moving",
+                  "Private by design, and nothing is ever sent for you",
                 ].map((p) => (
                   <li key={p} className="flex items-start gap-2.5 text-sm">
                     <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
@@ -330,8 +399,8 @@ export default async function LandingPage() {
                 {[
                   ["10 › 1000", "Quality over quantity"],
                   ["You decide", "Where to apply"],
-                  ["Your key", "Your AI provider"],
-                  ["Zero", "Auto-applications"],
+                  ["Your key", "Your choice of AI provider"],
+                  ["Zero", "Applications sent for you"],
                 ].map(([big, small]) => (
                   <div key={small}>
                     <p className="text-2xl font-semibold tracking-tight text-primary">{big}</p>
@@ -348,7 +417,7 @@ export default async function LandingPage() {
           <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:py-24">
             <h2 className="text-center text-3xl font-semibold tracking-tight sm:text-4xl">Frequently asked questions</h2>
             <p className="mx-auto mt-4 max-w-xl text-center text-base text-muted-foreground">
-              The short version: you stay in control, and your data stays yours.
+              Quick answers about how {appName} works, what happens to your data and how the AI fits in.
             </p>
             <Faq items={FAQ_ITEMS} />
           </div>
@@ -359,12 +428,12 @@ export default async function LandingPage() {
           <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:py-24">
             <div className="overflow-hidden rounded-3xl bg-gradient-to-br from-primary via-[oklch(0.46_0.22_294)] to-[oklch(0.5_0.2_308)] px-6 py-12 text-center text-primary-foreground shadow-xl sm:px-12">
               <h2 className="mx-auto max-w-xl text-3xl font-semibold tracking-tight sm:text-4xl">
-                Search smarter, not harder.
+                Start your focused job search today
               </h2>
               <p className="mx-auto mt-3 max-w-md text-sm text-primary-foreground/80">
                 {signupAllowed
-                  ? `Create your ${appName} account and bring your whole search into one intentional place.`
-                  : `Sign in to your ${appName} workspace to pick up where you left off.`}
+                  ? `Create a free ${appName} account and bring your job search into one organized place.`
+                  : `Sign in to ${appName} to pick up where you left off.`}
               </p>
               <div className="mt-7 flex flex-wrap justify-center gap-3">
                 {loggedIn ? (

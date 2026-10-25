@@ -8,7 +8,7 @@ import { getAppName } from "@/lib/branding";
 // App-wide 404 — any unknown URL (public site, dashboard or admin). Standalone
 // glass page in the website's style; no session lookups.
 
-export const metadata: Metadata = { title: "Page not found" };
+export const metadata: Metadata = { title: "Page not found", robots: { index: false, follow: false } };
 
 export default async function NotFound() {
   const appName = await getAppName();

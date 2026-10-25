@@ -6,6 +6,13 @@ import { auth } from "@/lib/auth";
 import { guardMaintenance } from "@/lib/maintenance";
 import { isRegistrationOpen } from "@/lib/plans";
 import { captchaSiteKey } from "@/lib/captcha";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Log in",
+  description: "Log in to your job search workspace.",
+  alternates: { canonical: "/login" },
+};
 
 export default async function LoginPage() {
   await guardMaintenance();

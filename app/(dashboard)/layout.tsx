@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { Logo } from "@/components/app-shell/logo";
 import {
   SidebarNav,
@@ -33,6 +34,9 @@ import { careerCompletionFor } from "@/lib/career-data";
 
 // Per-user, session-gated routes — never statically prerendered (no DB at build).
 export const dynamic = "force-dynamic";
+
+// Private workspace: keep it out of search results.
+export const metadata: Metadata = { robots: { index: false, follow: false } };
 
 export default async function DashboardLayout({
   children,

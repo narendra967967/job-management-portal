@@ -8,7 +8,11 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
   const appName = await getAppName();
-  return { title: `Terms & conditions · ${appName}` };
+  return {
+    title: "Terms & conditions",
+    description: `The terms for using ${appName}: your account, plans, email forwarding, AI features, acceptable use and how to close your account.`,
+    alternates: { canonical: "/terms" },
+  };
 }
 
 export default async function TermsPage() {
