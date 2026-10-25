@@ -66,9 +66,8 @@ export default async function TermsPage() {
           people&rsquo;s email or sensitive personal mail.
         </li>
         <li>
-          We accept only emails that genuinely come from a supported job site (or that you forward yourself
-          from your own address). Anything else, and anything over our size or volume limits, is discarded
-          without notice.
+          We accept only genuine job alerts from supported job sites, including ones you forward by hand.
+          Anything else, or anything over our limits, is discarded without notice.
         </li>
         <li>
           Supported sites may change, and forwarding may be paused for maintenance or security; job alerts

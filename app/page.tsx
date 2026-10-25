@@ -90,7 +90,7 @@ export default async function LandingPage() {
     },
     {
       q: `Does ${appName} read my email?`,
-      a: `No. ${appName} never opens your mailbox. It only sees the emails you forward to your private address, accepts them only when they genuinely come from a supported job site (their digital signature is checked), and keeps just the job details — not the email itself. Stop forwarding at any time by removing the Gmail filter.`,
+      a: `No. ${appName} never opens your mailbox. It only sees the emails you forward to your private address, accepts them only when they really come from a supported job site, and keeps just the job details — not the email itself. Stop forwarding at any time by removing the Gmail filter.`,
     },
     ...(gmailOn
       ? [

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { LegalLayout } from "@/components/marketing/legal-layout";
 import { getAppName, getSupportEmail } from "@/lib/branding";
-import { isGmailOAuthEnabled, receivingDomain, supportedSiteExamples } from "@/lib/email-intake-data";
+import { isGmailOAuthEnabled, supportedSiteExamples } from "@/lib/email-intake-data";
 import { getRetentionConfig } from "@/lib/retention";
 import { captchaSiteKey } from "@/lib/captcha";
 
@@ -38,7 +38,7 @@ export default async function PrivacyPage() {
 
       <h2>Information we collect</h2>
       <ul>
-        <li><strong>Account information</strong> — your name, email address, and password (stored only as a secure hash).</li>
+        <li><strong>Account information</strong> — your name, email address, and password (never stored in readable form).</li>
         <li><strong>Content you add</strong> — job leads, contacts, notes, outreach messages, and résumés (the file and the text we extract from it).</li>
         <li>
           <strong>Jobs you add with AI</strong> — the job post text or screenshot you paste into &ldquo;Add
@@ -65,8 +65,8 @@ export default async function PrivacyPage() {
         <li><strong>Usage data</strong> — basic technical logs needed to operate and secure the Service.</li>
         <li>
           <strong>Confirmation codes</strong> — when you reset your leads or ask to delete your account, we
-          email you a one-time code. We store only a scrambled (hashed) form of it, and it expires after 10
-          minutes.
+          email you a one-time code. It works once, expires shortly, and is never stored in readable
+          form.
         </li>
         {captchaKey && (
         <li>
@@ -83,26 +83,25 @@ export default async function PrivacyPage() {
 
       <h2>Email forwarding</h2>
       <p>
-        You get a private address (ending in <code>@{receivingDomain()}</code>). {appName} never accesses
-        your mailbox: it only receives what you choose to send to that address.
+        You get a private forwarding address that&rsquo;s unique to you. {appName} never accesses your
+        mailbox: it only receives what you choose to send to that address.
       </p>
       <ul>
         <li>
           <strong>What we accept:</strong> emails that genuinely come from a supported job site (for example{" "}
-          {sites}). We check the sender&rsquo;s digital signature (DKIM, or the forwarding seal Gmail adds);
-          anything else is discarded. Job alerts you forward by hand from your own email address are
-          accepted the same way.
+          {sites}). We check that each email really comes from the job site; anything else is discarded.
+          Job alerts you forward by hand are checked the same way.
         </li>
         <li>
           <strong>What we keep:</strong> from each accepted email, the job details — title, company,
           location, the job&rsquo;s link and short tags such as salary or experience — saved as leads in
           your account, plus the email&rsquo;s message ID so the same email is never imported twice. If an
-          email can&rsquo;t be read, we keep its subject line (up to 500 characters) as an ingestion issue so
-          the problem can be fixed.
+          email can&rsquo;t be read, we keep its subject line as an ingestion issue so the problem can be
+          fixed.
         </li>
         <li>
-          <strong>What we don&rsquo;t keep:</strong> the email itself. While an email is being processed it
-          is held briefly — at most 24 hours if delivery has to be retried — and then deleted.
+          <strong>What we don&rsquo;t keep:</strong> the email itself. It is held only briefly while it is
+          processed, then deleted.
         </li>
         <li>
           <strong>Delivery log:</strong> for each email we record when it arrived, the job site and sender
@@ -136,8 +135,8 @@ export default async function PrivacyPage() {
             <li>
               <strong>What we keep:</strong> from each matching message, the job title, company, location
               and posting link, saved as a lead, plus the Gmail message ID so the same email is never
-              imported twice. If a message can&rsquo;t be parsed, we keep its subject line (up to 500
-              characters) so the problem can be fixed. We do not store the full content of your emails.
+              imported twice. If a message can&rsquo;t be parsed, we keep its subject line so the problem
+              can be fixed. We do not store the full content of your emails.
             </li>
             <li>
               <strong>What we never do:</strong> send, modify, label, or delete anything in your mailbox.
@@ -205,21 +204,18 @@ export default async function PrivacyPage() {
       <p>
         <strong>Reading forwarded emails with AI:</strong> if you have added your own AI key and a
         forwarded email comes from a supported site we can&rsquo;t read automatically, we send that
-        email&rsquo;s text to your AI provider to pick out the jobs — with its links replaced by numbers,
-        and without attachments or images. This uses your key, so your provider&rsquo;s terms and charges apply. The text is held only
+        email&rsquo;s text to your AI provider to pick out the jobs — without attachments or images. This uses your key, so your provider&rsquo;s terms and charges apply. The text is held only
         until it has been read, then deleted.
       </p>
 
       <h2>How we store and protect your data</h2>
       <p>
-        Your data — including forwarded emails while they are processed — is handled on servers we
-        operate in India (Amazon Web Services, Mumbai region), with access controls and encryption in
-        transit (HTTPS, and encrypted delivery for forwarded email when the sending server supports
-        it). Passwords are stored only as secure hashes; API keys{gmailOn ? " and Google tokens" : ""} are
-        encrypted at rest. Encrypted backups are kept for up to 30 days. No method of storage is
-        perfectly secure, but we take reasonable measures to protect your information. Sensitive actions
-        (resetting your leads, requesting account deletion) are confirmed with a one-time code sent to
-        your email.
+        Your data is stored on secure servers in India. We protect it with industry-standard measures —
+        restricted access, encrypted connections and encrypted backups — and passwords, keys and other
+        credentials are never stored in readable form. Backups expire within 30 days. Sensitive actions,
+        such as resetting your leads or requesting account deletion, are confirmed with a one-time code
+        sent to your email. No method of storage is perfectly secure, but we work to keep your information
+        safe.
       </p>
 
       <h2>Sharing</h2>
@@ -256,7 +252,7 @@ export default async function PrivacyPage() {
         an email twice after {days(retention.processedLedgerDays)}, and notifications after{" "}
         {days(retention.notificationDays)}.
         {gmailOn ? " Disconnecting Google stops all further reading of your mailbox." : ""} Confirmation
-        codes expire after 10 minutes and are deleted daily. When you reset your leads they are deleted
+        codes expire shortly and are then deleted. When you reset your leads they are deleted
         straight away. When you ask us to delete your account, we delete your data — including résumé
         files and all data from your job-alert emails — within 30 days and email you when it&rsquo;s done;
         copies in backups expire within a further 30 days. We keep only an anonymised record that your
