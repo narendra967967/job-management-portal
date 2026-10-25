@@ -7,6 +7,7 @@ import { getSessionUserId } from "@/lib/current-user";
 import { SiteHeader } from "@/components/marketing/site-header";
 import { SiteFooter } from "@/components/marketing/site-footer";
 import { GlassBackdrop } from "@/components/marketing/glass-backdrop";
+import { BackToTop } from "@/components/marketing/back-to-top";
 
 const prose =
   "mt-8 text-sm leading-relaxed text-muted-foreground " +
@@ -45,6 +46,7 @@ export async function LegalLayout({
         </div>
       </main>
       <SiteFooter appName={appName} tagline={tagline.text} />
+      <BackToTop />
     </div>
   );
 }

@@ -30,6 +30,7 @@ import { SiteHeader } from "@/components/marketing/site-header";
 import { SiteFooter } from "@/components/marketing/site-footer";
 import { Faq } from "@/components/marketing/faq";
 import { GlassBackdrop } from "@/components/marketing/glass-backdrop";
+import { BackToTop } from "@/components/marketing/back-to-top";
 import { getAppName, getTagline, getSupportEmail } from "@/lib/branding";
 import { isRegistrationOpen } from "@/lib/plans";
 import { getSessionUserId } from "@/lib/current-user";
@@ -471,6 +472,7 @@ export default async function LandingPage() {
       </main>
 
       <SiteFooter appName={appName} tagline={tagline.text} />
+      <BackToTop />
     </div>
   );
 }
