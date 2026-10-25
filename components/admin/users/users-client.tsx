@@ -21,6 +21,7 @@ import {
   ChevronRight,
   X,
   Forward,
+  CalendarPlus,
 } from "lucide-react";
 import { Button } from "@/components/admin/ui/button";
 import { Input } from "@/components/admin/ui/input";
@@ -52,6 +53,7 @@ import {
   deleteAdminUserAction,
   setAdminUserStatusAction,
   resetAdminUserPasswordAction,
+  renewAdminUserAction,
 } from "@/actions/admin-users";
 import { cn } from "@/lib/utils";
 import { useMounted } from "@/lib/use-mounted";
@@ -110,6 +112,9 @@ export function UsersClient({ initialUsers, plans }: { initialUsers: AdminUserRo
   const [fwdResetTarget, setFwdResetTarget] = useState<AdminUserRow | null>(null);
   const [resetPw, setResetPw] = useState("");
   const [resetBusy, setResetBusy] = useState(false);
+  const [renewTarget, setRenewTarget] = useState<AdminUserRow | null>(null);
+  const [renewDays, setRenewDays] = useState("30");
+  const [renewBusy, setRenewBusy] = useState(false);
 
   function say(msg: string) {
     setFlashErr(false);
@@ -256,6 +261,17 @@ export function UsersClient({ initialUsers, plans }: { initialUsers: AdminUserRo
     } else sayErr(res.error);
   }
 
+  async function doRenew() {
+    if (!renewTarget) return;
+    setRenewBusy(true);
+    const res = await renewAdminUserAction(renewTarget.id, renewDays);
+    setRenewBusy(false);
+    if (res.ok) {
+      say(`Renewed ${renewTarget.name} for ${renewDays} days.`);
+      setRenewTarget(null);
+    } else sayErr(res.error);
+  }
+
   const selCount = selected.size;
 
   return (
@@ -385,6 +401,9 @@ export function UsersClient({ initialUsers, plans }: { initialUsers: AdminUserRo
                     </DropdownMenuTrigger>
                     <DropdownMenuContent>
                       <DropdownMenuItem onClick={() => { setEditing(u); setFormOpen(true); }}><Pencil /> Edit</DropdownMenuItem>
+                      {u.planName && u.expiresAt && (
+                        <DropdownMenuItem onClick={() => { setRenewTarget(u); setRenewDays("30"); }}><CalendarPlus /> Renew</DropdownMenuItem>
+                      )}
                       <DropdownMenuItem onClick={() => { setResetTarget(u); setResetPw(""); }}><KeyRound /> Reset password</DropdownMenuItem>
                       <DropdownMenuItem onClick={() => setFwdResetTarget(u)}><Forward /> Reset forwarding address</DropdownMenuItem>
                       <DropdownMenuItem onClick={() => toggleStatus(u)}>
@@ -459,6 +478,16 @@ export function UsersClient({ initialUsers, plans }: { initialUsers: AdminUserRo
         onConfirm={() => void doBulkDelete()}
       />
 
+      {/* Renew */}
+      <RenewDialog
+        target={renewTarget}
+        days={renewDays}
+        onDays={setRenewDays}
+        busy={renewBusy}
+        onClose={() => setRenewTarget(null)}
+        onConfirm={() => void doRenew()}
+      />
+
       {/* Reset password */}
       <Dialog open={resetTarget !== null} onOpenChange={(o) => !o && setResetTarget(null)}>
         <DialogContent className="sm:max-w-md">
@@ -487,6 +516,92 @@ export function UsersClient({ initialUsers, plans }: { initialUsers: AdminUserRo
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+const RENEW_PRESETS = [30, 90, 180, 365];
+const DAY_MS = 24 * 60 * 60 * 1000;
+const fmtDate = (t: number) => new Date(t).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+
+/** Renew a user's plan by N days — from their current expiry if it's ahead, else from today. */
+function RenewDialog({
+  target,
+  days,
+  onDays,
+  busy,
+  onClose,
+  onConfirm,
+}: {
+  target: AdminUserRow | null;
+  days: string;
+  onDays: (v: string) => void;
+  busy: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  const n = Number(days);
+  const valid = Number.isInteger(n) && n >= 1 && n <= 3650;
+  // Row expiry is a date (YYYY-MM-DD); end of that day is close enough for a preview.
+  const current = target?.expiresAt ? new Date(`${target.expiresAt}T23:59:59`).getTime() : null;
+  const base = Math.max(Date.now(), current ?? 0);
+  return (
+    <Dialog open={target !== null} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Renew plan</DialogTitle>
+          <DialogDescription>For {target?.name}{target?.planName ? ` · ${target.planName}` : ""}</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="renew-days">Renew for (days)</Label>
+            <Input
+              id="renew-days"
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={3650}
+              value={days}
+              onChange={(e) => onDays(e.target.value.replace(/\D/g, "").slice(0, 4))}
+              aria-invalid={!valid}
+              className="w-32"
+            />
+            <div className="flex flex-wrap gap-1.5">
+              {RENEW_PRESETS.map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => onDays(String(p))}
+                  className={cn(
+                    "min-h-9 rounded-md border px-2.5 text-xs font-medium transition-colors",
+                    days === String(p) ? "border-primary bg-primary/10 text-primary" : "hover:bg-muted",
+                  )}
+                >
+                  {p} days
+                </button>
+              ))}
+            </div>
+            {!valid && <p className="text-xs text-destructive">Enter 1 to 3650 days.</p>}
+          </div>
+          <dl className="grid grid-cols-2 gap-2 rounded-lg border bg-muted/30 p-3 text-xs">
+            <div>
+              <dt className="text-muted-foreground">Current expiry</dt>
+              <dd className="font-medium">
+                {current ? fmtDate(current) : "—"}
+                {current && current < Date.now() && <span className="ml-1 text-destructive">(expired)</span>}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">New expiry</dt>
+              <dd className="font-medium text-primary">{valid ? fmtDate(base + n * DAY_MS) : "—"}</dd>
+            </div>
+          </dl>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button disabled={!valid || busy} onClick={onConfirm}>{busy ? "Renewing…" : "Renew"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

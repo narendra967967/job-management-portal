@@ -185,6 +185,39 @@ export async function resetAdminUserPasswordAction(id: string, password: unknown
   return { ok: true };
 }
 
+/** Max days one renewal can add (10 years). */
+const RENEW_MAX_DAYS = 3650;
+
+/** Extend a user's plan access by `days`, counted from their current expiry
+ *  if it's still ahead, otherwise from now. For manual renewals until payments
+ *  exist. Plans that never expire can't be renewed (nothing to extend). */
+export async function renewAdminUserAction(id: string, days: unknown): Promise<ActionResult> {
+  await requireAdmin();
+  const d = z.coerce
+    .number()
+    .int("Enter whole days.")
+    .min(1, "Renew for at least 1 day.")
+    .max(RENEW_MAX_DAYS, `Renew for at most ${RENEW_MAX_DAYS} days.`)
+    .safeParse(days);
+  if (!d.success) return { ok: false, error: firstError(d.error) };
+
+  const [u] = await db
+    .select({ planId: user.planId, planExpiresAt: user.planExpiresAt })
+    .from(user)
+    .where(eq(user.id, id));
+  if (!u) return { ok: false, error: "User not found." };
+  if (!u.planId) return { ok: false, error: "Assign a plan before renewing." };
+  if (!u.planExpiresAt) return { ok: false, error: "This user's plan never expires." };
+
+  const base = Math.max(Date.now(), u.planExpiresAt.getTime());
+  await db
+    .update(user)
+    .set({ planExpiresAt: new Date(base + d.data * 24 * 60 * 60 * 1000) })
+    .where(eq(user.id, id));
+  revalidatePath("/jmp-admin/users");
+  return { ok: true };
+}
+
 export async function deleteAdminUserAction(id: string): Promise<ActionResult> {
   const adminId = await requireAdmin();
   if (id === adminId) return { ok: false, error: "You can't delete your own account." };
