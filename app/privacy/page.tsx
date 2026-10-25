@@ -39,7 +39,12 @@ export default async function PrivacyPage() {
       <h2>Information we collect</h2>
       <ul>
         <li><strong>Account information</strong> — your name, email address, and password (stored only as a secure hash).</li>
-        <li><strong>Content you add</strong> — job leads, contacts, notes, résumés, and messages you create in the Service.</li>
+        <li><strong>Content you add</strong> — job leads, contacts, notes, outreach messages, and résumés (the file and the text we extract from it).</li>
+        <li>
+          <strong>Jobs you add with AI</strong> — the job post text or screenshot you paste into &ldquo;Add
+          with AI&rdquo;. It is sent to your AI provider to fill in the form; we keep only the job details you
+          save, not the screenshot.
+        </li>
         <li>
           <strong>Career profile</strong> — what you choose to tell us about your career and job preferences:
           job title, experience, skills, education, certifications, the countries you can work in, target
@@ -58,6 +63,11 @@ export default async function PrivacyPage() {
           <li><strong>Gmail data</strong> — if you connect Google, we read email in your Gmail account to find and parse your LinkedIn job-alert messages (see below).</li>
         )}
         <li><strong>Usage data</strong> — basic technical logs needed to operate and secure the Service.</li>
+        <li>
+          <strong>Confirmation codes</strong> — when you reset your leads or ask to delete your account, we
+          email you a one-time code. We store only a scrambled (hashed) form of it, and it expires after 10
+          minutes.
+        </li>
         {captchaKey && (
         <li>
           <strong>Security check</strong> — the sign-in, sign-up and password pages use Google reCAPTCHA to
@@ -175,12 +185,22 @@ export default async function PrivacyPage() {
 
       <h2>AI processing</h2>
       <p>
-        AI features — job-description summaries, fit scores, outreach drafts, salary insights and résumé
-        checks — run only when you request them. For the feature you ask for, we send the relevant details to
-        the AI provider configured for your account (OpenAI, Anthropic or OpenRouter, using your own
-        API key if you have added one): for example the job title and company, the job description,
-        your résumé text, the relevant parts of your career profile, or a contact you added. The provider uses it only to generate the result we
-        show you. We send nothing else, and we never use this data to train AI models.
+        AI features run only when you request them, on the AI provider and API key you add in Settings
+        (OpenAI, Anthropic or OpenRouter). For each feature we send only what it needs:
+      </p>
+      <ul>
+        <li><strong>Summaries, fit scores and outreach drafts</strong> — the job&rsquo;s title, company and description, your résumé text, and a contact you added.</li>
+        <li><strong>Salary insights</strong> — the job&rsquo;s title, company, location and description, your résumé text, and the country in your profile.</li>
+        <li>
+          <strong>Résumé ATS check</strong> — the résumé&rsquo;s text and the matching parts of your career
+          profile (target roles, skills and tools, current title, years of experience, seniority and
+          industries). Your answers to the optional questions are never sent.
+        </li>
+        <li><strong>Add with AI</strong> — the job post text or screenshot you paste.</li>
+      </ul>
+      <p>
+        The provider uses this only to produce the result we show you, under its own terms and charges.
+        We send nothing else, and we never use your data to train AI models.
       </p>
       <p>
         <strong>Reading forwarded emails with AI:</strong> if you have added your own AI key and a
@@ -197,7 +217,9 @@ export default async function PrivacyPage() {
         transit (HTTPS, and encrypted delivery for forwarded email when the sending server supports
         it). Passwords are stored only as secure hashes; API keys{gmailOn ? " and Google tokens" : ""} are
         encrypted at rest. Encrypted backups are kept for up to 30 days. No method of storage is
-        perfectly secure, but we take reasonable measures to protect your information.
+        perfectly secure, but we take reasonable measures to protect your information. Sensitive actions
+        (resetting your leads, requesting account deletion) are confirmed with a one-time code sent to
+        your email.
       </p>
 
       <h2>Sharing</h2>
@@ -233,10 +255,12 @@ export default async function PrivacyPage() {
         ingestion issues after {days(retention.ingestIssueDays)}, the message IDs used to avoid importing
         an email twice after {days(retention.processedLedgerDays)}, and notifications after{" "}
         {days(retention.notificationDays)}.
-        {gmailOn ? " Disconnecting Google stops all further reading of your mailbox." : ""} When you ask
-        us to delete your account, we delete your data, including all data from your job-alert emails,
-        within 30 days; copies in backups expire within a further 30 days. We keep only limited records
-        that the law requires.
+        {gmailOn ? " Disconnecting Google stops all further reading of your mailbox." : ""} Confirmation
+        codes expire after 10 minutes and are deleted daily. When you reset your leads they are deleted
+        straight away. When you ask us to delete your account, we delete your data — including résumé
+        files and all data from your job-alert emails — within 30 days and email you when it&rsquo;s done;
+        copies in backups expire within a further 30 days. We keep only an anonymised record that your
+        request was handled, and limited records that the law requires.
       </p>
 
       <h2>Changes to this policy</h2>

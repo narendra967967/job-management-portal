@@ -7,6 +7,8 @@
 // come in by email forwarding; the FAQ says plainly that Jobtiva only sees what
 // users forward. While "Connect Gmail" is switched on (admin), the FAQ also
 // explains its Gmail access — Google's OAuth verification requires that.
+// AI features run on the user's OWN key (OpenAI / Anthropic / OpenRouter) — the
+// copy must never imply built-in AI. Premium features say "on supported plans".
 
 import Link from "next/link";
 import {
@@ -20,6 +22,9 @@ import {
   Sparkles,
   Mail,
   Check,
+  ImagePlus,
+  FileCheck2,
+  UserRound,
 } from "lucide-react";
 import { SiteHeader } from "@/components/marketing/site-header";
 import { SiteFooter } from "@/components/marketing/site-footer";
@@ -32,19 +37,11 @@ import { isGmailOAuthEnabled, supportedSitesText } from "@/lib/email-intake-data
 
 export const dynamic = "force-dynamic";
 
-const FEATURES = [
-  { icon: Inbox, title: "Capture every opportunity", body: "Forward the job alerts you already get and they become tracked leads automatically — no copy-paste, nothing slips by." },
-  { icon: Gauge, title: "AI fit scoring", body: "One click summarizes a role and scores how well it fits you — so you spend time on the ones worth it." },
-  { icon: LayoutGrid, title: "A pipeline you keep", body: "Move every lead through tidy stages — new, shortlisted, applied, interview, offer — on a board you actually maintain." },
-  { icon: Send, title: "Apply with better content", body: "Draft tailored applications and outreach with AI, then send them yourself. Jobtiva never applies for you." },
-  { icon: Bell, title: "Reminders that stick", body: "Follow-up nudges and to-dos so a role that's right for you never falls through the cracks." },
-  { icon: ShieldCheck, title: "Private by design", body: "We never open your mailbox — only the alerts you choose to forward. Your data stays yours, and nothing leaves without you." },
-];
-
 const STEPS = [
-  { n: "1", title: "Bring in opportunities", body: "Forward your job alerts to your private address once — from then on they flow in as tracked leads." },
-  { n: "2", title: "Research & score", body: "AI summarizes each role and scores the fit, so you focus on the ones that are right for you." },
-  { n: "3", title: "Apply & track", body: "Draft a strong application with AI, apply yourself, set reminders, and follow each one to offer." },
+  { n: "1", title: "Set up once", body: "Forward your job alerts to your private address, add your résumé and a short career profile." },
+  { n: "2", title: "Leads flow in", body: "Alerts become tracked leads within seconds. Paste or screenshot any other job to add it too." },
+  { n: "3", title: "Research & score", body: "AI summarizes each role, scores the fit and checks your résumé — so you focus on the right ones." },
+  { n: "4", title: "Apply & follow through", body: "Draft with AI, apply yourself, and let reminders keep every role moving towards an offer." },
 ];
 
 // Faux kanban board shown in the hero.
@@ -66,6 +63,18 @@ export default async function LandingPage() {
   ]);
   const loggedIn = !!sessionId;
 
+  const FEATURES = [
+    { icon: Inbox, title: "Capture every opportunity", body: `Forward the job alerts you already get from ${sites}. They become tracked leads automatically — repeats refresh the lead instead of duplicating it.` },
+    { icon: ImagePlus, title: "Add any job in seconds", body: "Paste a job post or drop a screenshot and AI fills in the details, keeping the description word for word. Or add it by hand." },
+    { icon: LayoutGrid, title: "A pipeline you keep", body: "Move every lead from new to shortlisted, applied, interview and offer — star your top choices and see it all on a board or a list." },
+    { icon: Gauge, title: "Know what fits", body: "AI summarizes each role and scores how well it fits your résumé, with salary insights on supported plans." },
+    { icon: FileCheck2, title: "Résumé ATS check", body: "See how each résumé would fare in an applicant tracking system — a score, missing keywords and specific fixes. On supported plans." },
+    { icon: UserRound, title: "Your career profile", body: "Tell us your target roles, skills and preferences once. The AI uses them for scoring, résumé checks and drafts." },
+    { icon: Send, title: "Apply with better content", body: `Draft tailored applications and outreach with AI, then send them yourself. ${appName} never applies for you.` },
+    { icon: Bell, title: "Follow-ups that stick", body: "Reminders, to-dos and the recruiters you're talking to, kept with each role — so nothing falls through the cracks." },
+    { icon: ShieldCheck, title: "Private and in your control", body: "We never open your mailbox. See every email that arrived, export or reset your leads, or delete your account — any time." },
+  ];
+
   const FAQ_ITEMS = [
     {
       q: `Will ${appName} apply to jobs for me?`,
@@ -73,7 +82,11 @@ export default async function LandingPage() {
     },
     {
       q: "How do job leads get in?",
-      a: `You get a private ${appName} address. Set up a filter in Gmail once, and the job alerts you already receive from ${sites} are forwarded there and become tracked leads within seconds — no copy-paste. You can also forward an alert by hand, add a lead yourself, or paste a job post.`,
+      a: `You get a private ${appName} address. Set up a filter in Gmail once, and the job alerts you already receive from ${sites} are forwarded there and become tracked leads within seconds — no copy-paste. You can also forward an alert by hand, add a job yourself, or paste a job post or a screenshot and let AI fill in the details.`,
+    },
+    {
+      q: "Which job sites are supported?",
+      a: `Job alerts from ${sites} become leads automatically. With your own AI key, ${appName} can also read alerts from supported sites it doesn't read on its own — and any job from anywhere can be added by pasting it or a screenshot.`,
     },
     {
       q: `Does ${appName} read my email?`,
@@ -93,15 +106,23 @@ export default async function LandingPage() {
     },
     {
       q: "What does the AI actually do?",
-      a: "It summarizes each role, scores how well it fits you, and drafts tailored applications and outreach — so you spend time on the right roles and apply better. If you add your own AI key, it can also read job emails from sites we don't support yet. It never sends or applies on your behalf.",
+      a: `It summarizes each role, scores how well it fits your résumé, drafts tailored applications and outreach, fills in a job from a pasted post or screenshot, and — on supported plans — estimates salaries and checks your résumé. The AI runs on your own API key from OpenAI, Anthropic or OpenRouter, so you pay your provider directly and choose the model. It never sends or applies on your behalf.`,
+    },
+    {
+      q: "What is the résumé ATS check?",
+      a: "Many employers screen résumés with an applicant tracking system (ATS) before a person reads them. The check scores each of your résumés out of 100 — standard sections, contact details, measurable impact and length, plus how well its keywords match the roles in your career profile — and lists what to fix. It's available on supported plans.",
     },
     {
       q: `Who is ${appName} for?`,
       a: "Anyone running a focused job search who'd rather apply well to the right handful of roles than blast a thousand — especially busy, mid-career professionals.",
     },
     {
+      q: "Can I start over, or delete my account?",
+      a: "Yes, both from Settings → Account. Reset leads clears every lead and what's attached to it for a fresh start — you can download a copy first. Or ask us to delete your account and all its data; we email you when it's done, and you can cancel until then. Both are confirmed with a code sent to your email.",
+    },
+    {
       q: "Is there a free plan?",
-      a: "Yes — new accounts start on the Free plan. Paid plans add higher limits and extra automation as your search scales.",
+      a: "Yes — new accounts start on the Free plan. Paid plans add premium features such as salary insights, the résumé ATS check and personal notes, plus higher limits.",
     },
   ];
 
@@ -150,6 +171,10 @@ export default async function LandingPage() {
                 )}
               </div>
               <p className="mt-5 flex items-center gap-2 text-xs text-muted-foreground">
+                <Inbox className="size-4 shrink-0 text-primary" aria-hidden />
+                Works with job alerts from {sites}.
+              </p>
+              <p className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
                 <ShieldCheck className="size-4 shrink-0 text-primary" aria-hidden />
                 Private by design · your data stays yours.
               </p>
@@ -229,14 +254,14 @@ export default async function LandingPage() {
           <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:py-24">
             <h2 className="text-center text-3xl font-semibold tracking-tight sm:text-4xl">How it works</h2>
             <p className="mx-auto mt-4 max-w-xl text-center text-base text-muted-foreground">
-              A simple, intentional loop — research, apply well, and follow through. Not spray-and-pray.
+              Set it up once, then a simple, intentional loop — research, apply well, and follow through. Not spray-and-pray.
             </p>
 
             <div className="glass mt-12 rounded-3xl px-5 py-10 sm:px-8">
-            {/* Desktop: horizontal timeline */}
-            <div className="relative hidden md:block">
-              <div aria-hidden className="absolute top-5 left-[16.6%] right-[16.6%] h-0.5 bg-gradient-to-r from-primary/40 via-primary/30 to-primary/10" />
-              <ol className="grid grid-cols-3 gap-8">
+            {/* Large screens: horizontal timeline (4 steps need the width) */}
+            <div className="relative hidden lg:block">
+              <div aria-hidden className="absolute top-5 left-[12.5%] right-[12.5%] h-0.5 bg-gradient-to-r from-primary/40 via-primary/30 to-primary/10" />
+              <ol className="grid grid-cols-4 gap-6">
                 {STEPS.map((s) => (
                   <li key={s.n} className="flex flex-col items-center text-center">
                     <span className="relative z-10 flex size-10 items-center justify-center rounded-full bg-gradient-to-br from-primary to-[oklch(0.5_0.2_308)] text-sm font-semibold text-primary-foreground shadow-sm ring-4 ring-white/70">
@@ -249,8 +274,8 @@ export default async function LandingPage() {
               </ol>
             </div>
 
-            {/* Mobile: vertical timeline */}
-            <ol className="md:hidden">
+            {/* Phones and tablets: vertical timeline */}
+            <ol className="lg:hidden">
               {STEPS.map((s, i) => (
                 <li key={s.n} className="flex gap-4">
                   <div className="flex flex-col items-center">
@@ -305,7 +330,7 @@ export default async function LandingPage() {
                 {[
                   ["10 › 1000", "Quality over quantity"],
                   ["You decide", "Where to apply"],
-                  ["One click", "AI fit scoring"],
+                  ["Your key", "Your AI provider"],
                   ["Zero", "Auto-applications"],
                 ].map(([big, small]) => (
                   <div key={small}>
