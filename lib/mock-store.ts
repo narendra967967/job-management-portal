@@ -8,9 +8,12 @@
 //     UI reflects the persisted truth. All jobs↔reminders↔tasks cascade logic
 //     lives server-side in actions/data.ts now.
 //
-// Single-user by design (CLAUDE.md), so a module-level singleton is fine.
+// Multi-user safety: the module-level state below is BROWSER-only (one tab =
+// one signed-in user). On the server it is never written — each request renders
+// from its own data via ServerWorkspaceContext (see useWs / WorkspaceProvider),
+// so one user's render can never read another user's workspace.
 
-import { useSyncExternalStore } from "react";
+import { createContext, createElement, useContext, useSyncExternalStore } from "react";
 import {
   addContactAction,
   addReminderManualAction,
@@ -169,45 +172,95 @@ function subscribe(l: () => void) {
   return () => listeners.delete(l);
 }
 
-function apply(data: WorkspaceData) {
-  leads = data.leads;
-  details = data.details;
-  contacts = data.contacts;
-  outreach = data.outreach;
-  reminders = data.reminders;
-  tasks = data.tasks;
-  resumes = data.resumes;
-  defaultResumeId =
-    data.defaultResumeId ?? data.resumes.find((r) => r.isDefault)?.id ?? "";
-  appSettings = {
-    reminderIntervalDays: data.reminderIntervalDays,
-    staleLeadDays: data.staleLeadDays,
-    autoStatus: data.autoStatus,
-    maxFollowUps: data.maxFollowUps,
+/** The store's shape, derived from the server workspace (one place for the
+ *  mapping, used by both the browser store and per-request server renders). */
+function stateFrom(data: WorkspaceData) {
+  return {
+    leads: data.leads,
+    details: data.details,
+    contacts: data.contacts,
+    outreach: data.outreach,
+    reminders: data.reminders,
+    tasks: data.tasks,
+    resumes: data.resumes,
+    defaultResumeId:
+      data.defaultResumeId ?? data.resumes.find((r) => r.isDefault)?.id ?? "",
+    appSettings: {
+      reminderIntervalDays: data.reminderIntervalDays,
+      staleLeadDays: data.staleLeadDays,
+      autoStatus: data.autoStatus,
+      maxFollowUps: data.maxFollowUps,
+    } as AppSettings,
+    profile: data.profile,
+    google: data.google,
+    aiSettings: data.aiSettings,
+    gmailConfig: data.gmailConfig,
+    syncIntervalHours: data.syncIntervalHours,
+    gmailSync: data.gmailSync,
+    features: data.features,
+    ingestErrors: data.ingestErrors,
+    aiPrompts: data.aiPrompts,
+    fitScores: data.fitScores,
+    storedNotifications: data.notifications,
+    intake: data.intake,
   };
-  profile = data.profile;
-  google = data.google;
-  aiSettings = data.aiSettings;
-  gmailConfig = data.gmailConfig;
-  syncIntervalHours = data.syncIntervalHours;
-  gmailSync = data.gmailSync;
-  features = data.features;
-  ingestErrors = data.ingestErrors;
-  aiPrompts = data.aiPrompts;
-  fitScores = data.fitScores;
-  storedNotifications = data.notifications;
-  intake = data.intake;
+}
+type StoreState = ReturnType<typeof stateFrom>;
+
+function apply(data: WorkspaceData) {
+  const st = stateFrom(data);
+  leads = st.leads;
+  details = st.details;
+  contacts = st.contacts;
+  outreach = st.outreach;
+  reminders = st.reminders;
+  tasks = st.tasks;
+  resumes = st.resumes;
+  defaultResumeId = st.defaultResumeId;
+  appSettings = st.appSettings;
+  profile = st.profile;
+  google = st.google;
+  aiSettings = st.aiSettings;
+  gmailConfig = st.gmailConfig;
+  syncIntervalHours = st.syncIntervalHours;
+  gmailSync = st.gmailSync;
+  features = st.features;
+  ingestErrors = st.ingestErrors;
+  aiPrompts = st.aiPrompts;
+  fitScores = st.fitScores;
+  storedNotifications = st.storedNotifications;
+  intake = st.intake;
 }
 
-/** Called by WorkspaceProvider during render so the first snapshot has data.
- *  On the server we apply fresh per request (single-user, so no real request
- *  concurrency to worry about); on the client we hydrate once so navigations /
- *  post-mutation refreshes aren't clobbered by the stale initial payload. */
+/** Per-request workspace for server renders (and the browser's hydration pass,
+ *  which must match the server HTML). Provided by WorkspaceProvider. */
+const ServerWorkspaceContext = createContext<StoreState | null>(null);
+const stateCache = new WeakMap<WorkspaceData, StoreState>();
+
+/** Wraps the dashboard so every render reads THIS request's workspace. */
+export function ServerWorkspace({ data, children }: { data: WorkspaceData; children: React.ReactNode }) {
+  let st = stateCache.get(data);
+  if (!st) {
+    st = stateFrom(data);
+    stateCache.set(data, st);
+  }
+  return createElement(ServerWorkspaceContext.Provider, { value: st }, children);
+}
+
+/** Read one slice: the live browser store after hydration, the request's own
+ *  data on the server and during hydration. */
+function useWs<K extends keyof StoreState>(key: K, get: () => StoreState[K]): StoreState[K] {
+  const srv = useContext(ServerWorkspaceContext);
+  return useSyncExternalStore(subscribe, get, () => (srv ? srv[key] : get()));
+}
+
+/** Called by WorkspaceProvider during render. Browser only: fill the store once
+ *  (later navigations / refreshes must not be clobbered by the stale initial
+ *  payload). On the server the shared module state is never written — server
+ *  renders read their own request's data through ServerWorkspace. */
 export function hydrateWorkspace(data: WorkspaceData) {
-  if (typeof window === "undefined") {
-    apply(data);
-    hydrated = true;
-  } else if (!hydrated) {
+  if (typeof window === "undefined") return;
+  if (!hydrated) {
     apply(data);
     hydrated = true;
   }
@@ -219,6 +272,10 @@ async function refresh() {
   apply(data);
   emit();
 }
+
+/** Pull fresh data for changes made outside this tab — leads from forwarded
+ *  emails or the AI reader, other devices. Used by WorkspaceRefresher. */
+export const refreshWorkspace = refresh;
 
 /* ---------------- reads ---------------- */
 
@@ -233,7 +290,7 @@ const getStoredNotifications = () => storedNotifications;
 const getIntake = () => intake;
 /** Admin email-intake switches + this user's forwarding address/progress. */
 export function useIntake(): WorkspaceIntake {
-  return useSyncExternalStore(subscribe, getIntake, getIntake);
+  return useWs("intake", getIntake);
 }
 /** Apply a fresh forwarding state (after polling, reset or confirm) without a
  *  full workspace refresh. */
@@ -245,41 +302,41 @@ export function setForwardingState(state: MyForwardingState) {
 const getFeatures = () => features;
 /** Premium features the user's plan includes (mirrors the server's decision). */
 export function useFeatures(): WorkspaceData["features"] {
-  return useSyncExternalStore(subscribe, getFeatures, getFeatures);
+  return useWs("features", getFeatures);
 }
 
 export function useLeads(): JobLead[] {
-  return useSyncExternalStore(subscribe, getLeads, getLeads);
+  return useWs("leads", getLeads);
 }
 function useStoredNotifications(): WorkspaceData["notifications"] {
-  return useSyncExternalStore(subscribe, getStoredNotifications, getStoredNotifications);
+  return useWs("storedNotifications", getStoredNotifications);
 }
 export function useLead(id: string): JobLead | undefined {
   return useLeads().find((l) => l.id === id);
 }
 export function useLeadDetail(id: string): JobLeadDetail | undefined {
-  return useSyncExternalStore(subscribe, getDetails, getDetails)[id];
+  return useWs("details", getDetails)[id];
 }
 export function useContacts(): Contact[] {
-  return useSyncExternalStore(subscribe, getContacts, getContacts);
+  return useWs("contacts", getContacts);
 }
 export function useContactsForLead(leadId: string): Contact[] {
   return useContacts().filter((c) => c.leadId === leadId);
 }
 export function useOutreach(): OutreachMessage[] {
-  return useSyncExternalStore(subscribe, getOutreach, getOutreach);
+  return useWs("outreach", getOutreach);
 }
 export function useOutreachForLead(leadId: string): OutreachMessage[] {
   return useOutreach().filter((m) => m.leadId === leadId);
 }
 export function useReminders(): Reminder[] {
-  return useSyncExternalStore(subscribe, getReminders, getReminders);
+  return useWs("reminders", getReminders);
 }
 export function useRemindersForLead(leadId: string): Reminder[] {
   return useReminders().filter((r) => r.leadId === leadId);
 }
 export function useTasks(): Task[] {
-  return useSyncExternalStore(subscribe, getTasks, getTasks);
+  return useWs("tasks", getTasks);
 }
 
 /** Current lead by id (non-hook), for use inside other selectors. */
@@ -595,16 +652,12 @@ const getAiSettings = () => aiSettings;
 const getGmailConfig = () => gmailConfig;
 
 export function useResumes(): Resume[] {
-  return useSyncExternalStore(subscribe, getResumes, getResumes);
+  return useWs("resumes", getResumes);
 }
 
 /** [id, setDefault] — matches the old localStorage hook's shape. */
 export function useDefaultResumeId(): [string, (id: string) => void] {
-  const id = useSyncExternalStore(
-    subscribe,
-    getDefaultResumeId,
-    getDefaultResumeId,
-  );
+  const id = useWs("defaultResumeId", getDefaultResumeId);
   const setDefault = (next: string) => {
     void (async () => {
       await setDefaultResumeAction(next);
@@ -618,11 +671,7 @@ export function useAppSettings(): [
   AppSettings,
   (patch: Partial<AppSettings>) => void,
 ] {
-  const settings = useSyncExternalStore(
-    subscribe,
-    getAppSettings,
-    getAppSettings,
-  );
+  const settings = useWs("appSettings", getAppSettings);
   const update = (patch: Partial<AppSettings>) => {
     const next = { ...settings, ...patch };
     void (async () => {
@@ -637,7 +686,7 @@ export function useGmailSettings(): [
   GmailConfigData,
   (patch: Partial<GmailConfigData>) => void,
 ] {
-  const cfg = useSyncExternalStore(subscribe, getGmailConfig, getGmailConfig);
+  const cfg = useWs("gmailConfig", getGmailConfig);
   const update = (patch: Partial<GmailConfigData>) => {
     const next = { ...cfg, ...patch };
     void (async () => {
@@ -654,13 +703,13 @@ export function useGmailSettings(): [
 }
 
 export function useProfile(): Profile {
-  return useSyncExternalStore(subscribe, getProfile, getProfile);
+  return useWs("profile", getProfile);
 }
 export function useGoogle(): GoogleConnection {
-  return useSyncExternalStore(subscribe, getGoogle, getGoogle);
+  return useWs("google", getGoogle);
 }
 export function useAiSettings(): AiSettings {
-  return useSyncExternalStore(subscribe, getAiSettings, getAiSettings);
+  return useWs("aiSettings", getAiSettings);
 }
 
 export async function updateProfile(input: { name: string; mobile: string; country: string }) {
@@ -754,7 +803,7 @@ const getGmailSync = () => gmailSync;
 const getIngestErrors = () => ingestErrors;
 
 export function useSyncInterval(): [number, (hours: number) => void] {
-  const hours = useSyncExternalStore(subscribe, getSyncInterval, getSyncInterval);
+  const hours = useWs("syncIntervalHours", getSyncInterval);
   const set = (h: number) => {
     void (async () => {
       await updateSyncIntervalAction(h);
@@ -765,11 +814,11 @@ export function useSyncInterval(): [number, (hours: number) => void] {
 }
 
 export function useGmailSync(): GmailSyncStatus {
-  return useSyncExternalStore(subscribe, getGmailSync, getGmailSync);
+  return useWs("gmailSync", getGmailSync);
 }
 
 export function useIngestErrors(): IngestError[] {
-  return useSyncExternalStore(subscribe, getIngestErrors, getIngestErrors);
+  return useWs("ingestErrors", getIngestErrors);
 }
 
 export async function clearIngestErrors() {
@@ -779,7 +828,7 @@ export async function clearIngestErrors() {
 
 const getAiPrompts = () => aiPrompts;
 export function useAiPrompts(): { summary: string; draft: string; score: string } {
-  return useSyncExternalStore(subscribe, getAiPrompts, getAiPrompts);
+  return useWs("aiPrompts", getAiPrompts);
 }
 export async function updateAiPrompts(input: {
   summary: string;
@@ -798,14 +847,14 @@ export function useFitScore(
   leadId: string,
   resumeId: string,
 ): FitScore | null {
-  const all = useSyncExternalStore(subscribe, getFitScores, getFitScores);
+  const all = useWs("fitScores", getFitScores);
   return all[fitScoreKey(leadId, resumeId)] ?? null;
 }
 
 /** The whole fit-scores map (keyed by fitScoreKey) — for sorting a column by
  *  score without a hook per card. */
 export function useAllFitScores(): Record<string, FitScore> {
-  return useSyncExternalStore(subscribe, getFitScores, getFitScores);
+  return useWs("fitScores", getFitScores);
 }
 
 /** Compute/refresh the AI fit score for a (lead, resume) pair. */
