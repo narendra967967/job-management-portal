@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 716" width="640" height="716" role="img" aria-labelledby="t">
+  <title id="t">How job alert forwarding works</title>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#6366f1"/>
+    </marker>
+    <style>
+      text { font-family: Arial, Helvetica, sans-serif; fill: #1e1b4b; }
+      .t { font-size: 27px; font-weight: 700; }
+      .s { font-size: 23px; fill: #4b5563; }
+      .box { fill: #eef2ff; stroke: #a5b4fc; stroke-width: 2; }
+      .mail { fill: #ffffff; stroke: #6366f1; stroke-width: 3; }
+      .end { fill: #dcfce7; stroke: #22c55e; stroke-width: 2; }
+      .c { stroke: #6366f1; stroke-width: 3; fill: none; marker-end: url(#a); }
+    </style>
+  </defs>
+  <rect width="640" height="716" fill="#ffffff"/>
+
+  <rect class="box" x="20" y="14" width="600" height="110" rx="18"/>
+  <text class="t" x="320" y="58" text-anchor="middle">A job site sends an alert</text>
+  <text class="s" x="320" y="94" text-anchor="middle">The same alerts you already get today</text>
+  <path class="c" d="M320 124 V174"/>
+
+  <rect class="mail" x="20" y="176" width="600" height="146" rx="18"/>
+  <text class="t" x="320" y="220" text-anchor="middle">Your Gmail filter spots it</text>
+  <text class="s" x="320" y="256" text-anchor="middle">It forwards job alerts only.</text>
+  <text class="s" x="320" y="290" text-anchor="middle">The original stays in your inbox.</text>
+  <path class="c" d="M320 322 V372"/>
+
+  <rect class="box" x="20" y="374" width="600" height="110" rx="18"/>
+  <text class="t" x="320" y="418" text-anchor="middle">It reaches your private address</text>
+  <text class="s" x="320" y="454" text-anchor="middle">Jobtiva reads the jobs in the alert</text>
+  <path class="c" d="M320 484 V534"/>
+
+  <rect class="end" x="20" y="536" width="600" height="166" rx="18"/>
+  <text class="t" x="320" y="580" text-anchor="middle">New leads appear</text>
+  <text class="s" x="320" y="616" text-anchor="middle">Each job becomes a lead on your</text>
+  <text class="s" x="320" y="650" text-anchor="middle">Leads page. If a job comes in again,</text>
+  <text class="s" x="320" y="684" text-anchor="middle">the existing lead is refreshed.</text>
+</svg>
