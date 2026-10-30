@@ -89,7 +89,7 @@ import {
   DEFAULT_SCORE_PROMPT,
 } from "@/lib/ai-prompts";
 import { signOutToHome, connectGoogle, changePassword } from "@/lib/auth-client";
-import { previewPromptAction } from "@/actions/ai";
+import { previewPromptAction, testAiKeyAction } from "@/actions/ai";
 import { getMyPlanAction, type MyPlanDetails } from "@/actions/plan";
 import { planGradientClass } from "@/lib/plan-accent";
 import { PasswordInput } from "@/components/ui/password-input";
@@ -1125,6 +1125,8 @@ function AiProviderCard() {
   const [editingKey, setEditingKey] = useState(!ai.keyConfigured);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; text: string } | null>(null);
 
   useEffect(() => {
     setProvider(ai.provider);
@@ -1134,11 +1136,28 @@ function AiProviderCard() {
 
   function pickProvider(p: AiProvider) {
     setProvider(p);
+    setTestResult(null);
     updateAiSettings({ provider: p, model });
   }
 
   function saveModel() {
+    setTestResult(null);
     updateAiSettings({ provider, model });
+  }
+
+  async function testKey() {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      // Test what's on screen: the model box only saves when it loses focus.
+      await updateAiSettings({ provider, model });
+      const res = await testAiKeyAction();
+      setTestResult(res.ok ? { ok: true, text: `Your key works with ${res.model}.` } : { ok: false, text: res.error });
+    } catch {
+      setTestResult({ ok: false, text: "We couldn't run the test. Try again in a moment." });
+    } finally {
+      setTesting(false);
+    }
   }
 
   function saveKey() {
@@ -1151,6 +1170,7 @@ function AiProviderCard() {
     saveAiKey(key);
     setKeyInput("");
     setEditingKey(false);
+    setTestResult(null);
     setSaved(true);
     setTimeout(() => setSaved(false), 1500);
   }
@@ -1170,6 +1190,7 @@ function AiProviderCard() {
     removeAiKey();
     setKeyInput("");
     setEditingKey(true);
+    setTestResult(null);
   }
 
   return (
@@ -1239,7 +1260,10 @@ function AiProviderCard() {
               <KeyRound className="size-4 text-muted-foreground" aria-hidden />
               {AI_PROVIDER_KEY_PREFIX[provider]}-••••••••{ai.keyLast4}
             </span>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Button variant="outline" onClick={testKey} disabled={testing}>
+                {testing ? "Testing…" : "Test key"}
+              </Button>
               <Button variant="outline" onClick={() => setEditingKey(true)}>
                 Replace
               </Button>
@@ -1279,6 +1303,17 @@ function AiProviderCard() {
         {saved && (
           <p className="mt-2 text-xs text-status-applied-foreground">
             API key saved
+          </p>
+        )}
+        {testResult && (
+          <p
+            role="status"
+            className={cn(
+              "mt-2 text-xs",
+              testResult.ok ? "text-status-applied-foreground" : "text-destructive",
+            )}
+          >
+            {testResult.text}
           </p>
         )}
       </div>

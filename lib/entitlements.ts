@@ -80,7 +80,7 @@ export async function getPlanLimits(userId: string): Promise<PlanLimits> {
 
 /** Message shown when a premium action is attempted without access. */
 export const PREMIUM_REQUIRED =
-  "This is a premium feature. Upgrade your plan to use it.";
+  "This isn't included in your plan. Upgrade your plan to use it.";
 
 /** Throw unless the user's plan includes `feature`. */
 export async function requireFeature(

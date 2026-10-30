@@ -108,7 +108,7 @@ export function ResumeAtsStrip({
             className="inline-flex min-h-11 items-center gap-1 rounded-md px-1 font-medium text-primary hover:underline sm:min-h-8"
           >
             <Lock className="size-3.5" aria-hidden />
-            Premium — see what it does
+            On higher plans — see what it does
           </button>
         </div>
         {locked && <PremiumLockedDialog feature="Résumé ATS check" description={LOCKED_COPY} onClose={() => setLocked(false)} />}

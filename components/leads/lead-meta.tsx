@@ -70,7 +70,7 @@ export function LeadCardMenu({
           <DropdownMenuItem onClick={() => setSalaryOpen(true)}>
             <Wallet className="size-4" aria-hidden />
             Salary insight
-            {!hasSalary && <Lock className="ml-auto size-3.5 opacity-60" aria-label="Premium" />}
+            {!hasSalary && <Lock className="ml-auto size-3.5 opacity-60" aria-label="Not on your plan" />}
           </DropdownMenuItem>
           <DropdownMenuItem
             onClick={() => window.open(lead.canonicalJobUrl, "_blank", "noopener")}

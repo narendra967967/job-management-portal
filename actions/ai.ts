@@ -41,6 +41,7 @@ import {
   userSettings as settingsT,
 } from "@/db/schema";
 import {
+  AI_PROVIDER_DEFAULT_MODEL,
   CONNECTION_TYPE_LABELS,
   OUTREACH_KIND_LABELS,
   type ConnectionType,
@@ -54,6 +55,35 @@ function friendly(err: unknown): string {
   const msg = err instanceof Error ? err.message : String(err);
   if (msg === AI_NOT_CONFIGURED) return NO_KEY_MSG;
   return msg || "AI request failed.";
+}
+
+/** Settings → AI provider: one tiny call with the saved key and model, so a bad
+ *  key shows up here and not later inside an AI feature. Provider error bodies
+ *  are never shown; they can echo account details. */
+export async function testAiKeyAction(): Promise<
+  { ok: true; model: string } | { ok: false; error: string }
+> {
+  const userId = await getCurrentUserId();
+  try {
+    await aiComplete(userId, "Reply with the single word OK.", "Test", 16, { timeoutMs: 20_000 });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg === AI_NOT_CONFIGURED) return { ok: false, error: NO_KEY_MSG };
+    if (/ error (401|403)\b/.test(msg)) {
+      return { ok: false, error: "Your key was rejected. Check that the provider matches the key and that you copied all of it." };
+    }
+    if (/ error 402\b/.test(msg)) return { ok: false, error: "Your provider says you're out of credit. Add credit in your provider's account." };
+    if (/ error 429\b/.test(msg)) return { ok: false, error: "Your provider is busy or you've hit a limit. Try again in a moment." };
+    if (/ error (400|404)\b/.test(msg)) return { ok: false, error: "Your provider didn't accept this model. Clear the Model box to use the suggested one." };
+    if (err instanceof Error && err.name === "TimeoutError") return { ok: false, error: "Your provider took too long to answer. Try again in a moment." };
+    console.error("[ai] key test failed:", msg.slice(0, 200));
+    return { ok: false, error: "We couldn't reach your provider. Try again in a moment." };
+  }
+  const [s] = await db
+    .select({ provider: settingsT.aiProvider, model: settingsT.aiModel })
+    .from(settingsT)
+    .where(eq(settingsT.userId, userId));
+  return { ok: true, model: s?.model?.trim() || AI_PROVIDER_DEFAULT_MODEL[s?.provider ?? "openai"] };
 }
 
 type PromptKind = "summary" | "draft" | "score";

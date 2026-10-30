@@ -31,7 +31,7 @@ export function PremiumLockedDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Lock className="size-4 text-primary" aria-hidden />
-            {feature} is a premium feature
+            {feature} isn&apos;t on your plan
           </DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>

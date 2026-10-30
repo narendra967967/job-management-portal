@@ -399,9 +399,9 @@ export function SalaryInsightSection({ lead }: { lead: JobLead }) {
         <h2 className="flex items-center gap-1.5 text-sm font-medium">
           <Wallet className="size-4 text-primary" aria-hidden />
           Salary insight
-          <span className="rounded-md bg-top-choice/15 px-1.5 py-0.5 text-[10px] font-semibold text-top-choice-foreground">
-            Premium
-          </span>
+          {!allowed && <span className="rounded-md bg-top-choice/15 px-1.5 py-0.5 text-[10px] font-semibold text-top-choice-foreground">
+            On higher plans
+          </span>}
         </h2>
         {allowed ? (
           <GenerateButton busy={busy} hasInsight={!!insight} onClick={() => void run()} />
