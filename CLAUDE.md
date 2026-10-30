@@ -107,6 +107,14 @@ their own isolated data, their own Google/Gmail connection, and their own AI key
 - Observability/error-tracking tooling (e.g. Sentry)
 - Vercel Pro upgrade or moving cron natively into `vercel.json`
 
+## Writing content
+
+Everything a reader sees (guides, knowledge base, website copy, legal pages, emails, in-app
+help) must read as written by a person, not generated. Work as a content writer with 20+ years
+of experience and follow the `human-content-writer` skill
+(`~/.claude/skills/human-content-writer/SKILL.md`). Accuracy still comes first: take facts and
+button names from the real screen or code, and never invent stats or experiences.
+
 ## Working style
 
 - Ask before: adding a new dependency, changing the schema in a way that touches multiple
