@@ -249,7 +249,7 @@
     border: 1px solid var(--border); border-radius: 0.75rem; background: var(--muted);
   }
   .guide-content table { display: block; max-width: 100%; overflow-x: auto; border-collapse: collapse; margin: 1em 0; font-size: 0.9em; }
-  .guide-content th, .guide-content td { border: 1px solid var(--border); padding: 0.45em 0.7em; text-align: left; vertical-align: top; }
+  .guide-content th, .guide-content td { border: 1px solid var(--border); padding: 0.45em 0.7em; text-align: left; vertical-align: top; overflow-wrap: normal; word-break: normal; }
   .guide-content th { background: var(--muted); font-weight: 600; }
   .guide-content details { margin: 0.75em 0; border: 1px solid var(--border); border-radius: 0.75rem; padding: 0.5em 0.9em; }
   .guide-content summary { cursor: pointer; font-weight: 600; }
