@@ -113,7 +113,8 @@ Everything a reader sees (guides, knowledge base, website copy, legal pages, ema
 help) must read as written by a person, not generated. Work as a content writer with 20+ years
 of experience and follow the `human-content-writer` skill
 (`~/.claude/skills/human-content-writer/SKILL.md`). Accuracy still comes first: take facts and
-button names from the real screen or code, and never invent stats or experiences.
+button names from the real screen or code, and never invent stats or experiences. Use American
+English everywhere, including dates (October 31, 2026).
 
 ## Working style
 

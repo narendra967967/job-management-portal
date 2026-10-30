@@ -155,7 +155,7 @@ export async function resetLeadsAction(code: string): Promise<{ ok: true; delete
     lines: [
       `We permanently deleted ${deleted} ${deleted === 1 ? "lead" : "leads"} and everything attached to them, as you asked.`,
       "Your account, profile, résumés, settings and email forwarding are unchanged — new job alerts will keep arriving as fresh leads.",
-      "If you didn't do this, change your password and contact support straight away.",
+      "If you didn't do this, change your password and contact support right away.",
     ],
   }).catch((e) => console.error("[reset-leads] confirmation email failed:", e instanceof Error ? e.message : e));
 

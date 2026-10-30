@@ -170,7 +170,7 @@ export function EmailForwardingCard() {
           ignored.
         </span>
         <span className="mt-2 block">
-          Click <b>Create filter</b>, tick <b>Forward it to</b>, choose your Jobtiva address, then{" "}
+          Click <b>Create filter</b>, check <b>Forward it to</b>, choose your Jobtiva address, then{" "}
           <b>Create filter</b>. Gmail keeps the original email in your inbox.
         </span>
       </Step>
@@ -298,7 +298,7 @@ export function EmailForwardingCard() {
             </>
           }
         >
-          Some organisations block automatic forwarding. Forward an alert by hand to your address instead —
+          Some organizations block automatic forwarding. Forward an alert by hand to your address instead —
           from the email you sign in with, or the Gmail you set forwarding up from — or use Add with AI on the
           Leads page.
         </InfoTip>

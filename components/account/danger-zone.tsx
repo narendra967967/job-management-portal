@@ -371,7 +371,7 @@ function DeleteAccountRow() {
     const res = await cancelDeletionRequestAction().catch(() => ({ ok: false as const, error: "Something went wrong." }));
     setBusy(false);
     if (!res.ok) return toast.error("Couldn't cancel", res.error);
-    toast.success("Deletion request cancelled");
+    toast.success("Deletion request canceled");
     void load();
   }
 

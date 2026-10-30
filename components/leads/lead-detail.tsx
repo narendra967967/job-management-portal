@@ -254,7 +254,7 @@ export function LeadDetailContent({
             <div className="min-w-0 text-sm">
               <p className="font-semibold">Discarded</p>
               <p className="text-xs opacity-80">
-                Moved to Archive and pending follow-ups were cancelled. Reopen it
+                Moved to Archive and pending follow-ups were canceled. Reopen it
                 from the status menu.
               </p>
             </div>

@@ -236,7 +236,7 @@ export async function deleteAdminUserAction(id: string, confirmCancelled = false
       return {
         ok: false,
         code: "CANCELLED_REQUEST",
-        error: `This user cancelled their account deletion request on ${fmtDay(cancelled)}.`,
+        error: `This user canceled their account deletion request on ${fmtDay(cancelled)}.`,
       };
     }
   }
@@ -265,7 +265,7 @@ export async function deleteUserForRequestAction(ticketId: unknown): Promise<Act
     .where(eq(supportTickets.id, ticketId));
   if (!t || t.category !== DELETION_CATEGORY) return { ok: false, error: "This isn't an account deletion request." };
   if (t.cancelledAt) {
-    return { ok: false, error: `The user cancelled this request on ${fmtDay(t.cancelledAt)} — their account was not deleted.` };
+    return { ok: false, error: `The user canceled this request on ${fmtDay(t.cancelledAt)} — their account was not deleted.` };
   }
   if (!t.userId) return { ok: false, error: "This account has already been deleted." };
   if (t.status === "resolved") return { ok: false, error: "This request is already closed — reopen it first if the user still wants deletion." };

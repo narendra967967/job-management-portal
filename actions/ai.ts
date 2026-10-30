@@ -587,7 +587,7 @@ export async function extractLeadFromImageAction(
   const prompt =
     images.length === 1
       ? "Extract the job lead from this screenshot."
-      : `These ${images.length} images are consecutive slices of ONE long screenshot, in order from top to bottom. Neighbouring slices overlap a little — include overlapping lines only once. Extract the job lead from the whole screenshot.`;
+      : `These ${images.length} images are consecutive slices of ONE long screenshot, in order from top to bottom. Neighboring slices overlap a little — include overlapping lines only once. Extract the job lead from the whole screenshot.`;
 
   try {
     const raw = await aiCompleteVision(

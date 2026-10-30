@@ -544,7 +544,7 @@ export function TicketsClient({ initial, priorityUserIds = [] }: { initial: Tick
                   </div>
                   {active.category === "deletion" && active.cancelledAt && (
                     <div className="mt-2.5 rounded-lg border bg-muted/40 px-3 py-2 text-xs">
-                      Cancelled by the user on <ClientTime iso={active.cancelledAt} /> — don&apos;t delete this account.
+                      Canceled by the user on <ClientTime iso={active.cancelledAt} /> — don&apos;t delete this account.
                     </div>
                   )}
                   {active.category === "deletion" && !active.cancelledAt && active.userId && active.status !== "resolved" && (
@@ -667,7 +667,7 @@ export function TicketsClient({ initial, priorityUserIds = [] }: { initial: Tick
         open={deleteUser !== null}
         onOpenChange={(o) => !o && setDeleteUser(null)}
         title={`Delete ${deleteUser?.name ?? "user"}'s account?`}
-        description="Permanently removes the account and all its data, including résumé files. This ticket is kept, anonymised, as the record. The user gets a confirmation email. This can't be undone."
+        description="Permanently removes the account and all its data, including résumé files. This ticket is kept, anonymized, as the record. The user gets a confirmation email. This can't be undone."
         confirmLabel="Delete account"
         destructive
         onConfirm={() => void confirmDeleteUser()}

@@ -23,7 +23,7 @@ export default async function TermsPage() {
     captchaSiteKey(),
   ]);
   return (
-    <LegalLayout title="Terms & conditions" updated="25 October 2026">
+    <LegalLayout title="Terms & conditions" updated="October 25, 2026">
       <p>
         These Terms &amp; Conditions (&ldquo;Terms&rdquo;) apply to your use of {appName} (the
         &ldquo;Service&rdquo;). By creating an account or using the Service, you agree to them. If you

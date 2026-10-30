@@ -255,7 +255,7 @@ export default async function LandingPage() {
               </p>
               <p className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
                 <ShieldCheck className="size-4 shrink-0 text-primary" aria-hidden />
-                Private by design. Your data stays yours.
+                Your data is never sold or used for advertising.
               </p>
             </div>
 
@@ -309,9 +309,9 @@ export default async function LandingPage() {
         <section id="features" className="scroll-mt-24">
           <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:py-24">
             <div className="max-w-2xl">
-              <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">Everything you need to run a focused job search</h2>
+              <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">Less job search admin, better applications</h2>
               <p className="mt-4 text-base text-muted-foreground">
-                From the first job alert to the last follow-up, {appName} keeps your whole search in one workspace, and you stay in charge of every step.
+                {appName} does the tracking, sorting and reminding, so your time goes into the applications themselves.
               </p>
             </div>
             <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -385,14 +385,14 @@ export default async function LandingPage() {
                 short list of roles that suit you, each one researched and applied to properly.
               </p>
               <div className="glass-subtle mt-5 rounded-2xl border-l-2 border-l-primary p-4 text-sm font-medium">
-                Ten well-chosen applications usually get more replies than a thousand rushed ones.
+                We&apos;d rather you send ten applications you&apos;re proud of than a hundred you can&apos;t remember.
               </div>
               <ul className="mt-6 space-y-3">
                 {[
                   "All the jobs worth your time in one list",
                   "AI helps you write better; you decide where to apply",
                   "Reminders keep every application moving",
-                  "Private by design, and nothing is ever sent for you",
+                  "Nothing gets sent unless you send it yourself",
                 ].map((p) => (
                   <li key={p} className="flex items-start gap-2.5 text-sm">
                     <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
@@ -406,7 +406,7 @@ export default async function LandingPage() {
             <div className="glass rounded-3xl p-8">
               <div className="grid grid-cols-2 gap-6">
                 {[
-                  ["10 › 1000", "Quality over quantity"],
+                  ["One list", "Every job you're tracking"],
                   ["You decide", "Where to apply"],
                   ["Your key", "Your choice of AI provider"],
                   ["Zero", "Applications sent for you"],
@@ -437,7 +437,7 @@ export default async function LandingPage() {
           <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:py-24">
             <div className="overflow-hidden rounded-3xl bg-gradient-to-br from-primary via-[oklch(0.46_0.22_294)] to-[oklch(0.5_0.2_308)] px-6 py-12 text-center text-primary-foreground shadow-xl sm:px-12">
               <h2 className="mx-auto max-w-xl text-3xl font-semibold tracking-tight sm:text-4xl">
-                Start your focused job search today
+                Set it up once and let the job alerts come to you
               </h2>
               <p className="mx-auto mt-3 max-w-md text-sm text-primary-foreground/80">
                 {signupAllowed

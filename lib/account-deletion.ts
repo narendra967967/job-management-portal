@@ -55,7 +55,7 @@ export async function lastCancelledDeletion(userId: string): Promise<Date | null
   return t?.at ?? null;
 }
 
-export const fmtDay = (d: Date) => d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+export const fmtDay = (d: Date) => d.toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" });
 
 /** Remove the account and everything in it. Irreversible. */
 export async function deleteUserCompletely(userId: string): Promise<{ ok: true } | { ok: false; error: string }> {

@@ -355,7 +355,7 @@ export function LeadsKanban() {
     if (target === "discarded") {
       const ok = await confirm({
         title: "Discard this lead?",
-        description: `"${lead.title}" moves to Archive and any pending follow-ups are cancelled. You can reopen it later.`,
+        description: `"${lead.title}" moves to Archive and any pending follow-ups are canceled. You can reopen it later.`,
         confirmLabel: "Discard",
         destructive: true,
       });

@@ -251,7 +251,7 @@ export function UsersClient({ initialUsers, plans }: { initialUsers: AdminUserRo
     const failed = results.filter((r) => !r.ok).length - skipped;
     clearSelection();
     router.refresh();
-    if (skipped) sayErr(`${skipped} skipped — they cancelled their deletion request. Delete them one by one if you're sure.`);
+    if (skipped) sayErr(`${skipped} skipped — they canceled their deletion request. Delete them one by one if you're sure.`);
     else if (failed) sayErr(`${failed} of ${ids.length} couldn't be deleted.`);
     else say(`Deleted ${ids.length} user(s).`);
   }
@@ -537,7 +537,7 @@ export function UsersClient({ initialUsers, plans }: { initialUsers: AdminUserRo
 
 const RENEW_PRESETS = [30, 90, 180, 365];
 const DAY_MS = 24 * 60 * 60 * 1000;
-const fmtDate = (t: number) => new Date(t).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+const fmtDate = (t: number) => new Date(t).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" });
 
 /** Renew a user's plan by N days — from their current expiry if it's ahead, else from today. */
 function RenewDialog({

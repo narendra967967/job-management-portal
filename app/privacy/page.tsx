@@ -33,7 +33,7 @@ export default async function PrivacyPage() {
   ]);
   const contact = supportEmail || "our support address";
   return (
-    <LegalLayout title="Privacy policy" updated="25 October 2026">
+    <LegalLayout title="Privacy policy" updated="October 31, 2026">
       <p>
         This Privacy Policy explains what information {appName} (&ldquo;we&rdquo;, &ldquo;us&rdquo;) collects
         when you use our job search tracker (the &ldquo;Service&rdquo;), how we use it and how we keep it
@@ -163,9 +163,9 @@ export default async function PrivacyPage() {
             <li>is never sold and never used for advertising;</li>
             <li>
               is never read by a person unless you ask us to (for example, in a support request), it is
-              needed for security or to comply with the law, or it has been aggregated and anonymised;
+              needed for security or to comply with the law, or it has been aggregated and anonymized;
             </li>
-            <li>is never used to develop, improve, or train generalised AI or machine-learning models.</li>
+            <li>is never used to develop, improve, or train generalized AI or machine-learning models.</li>
           </ul>
           <p>
             Your Google tokens are stored encrypted. Disconnecting Google in Settings revokes our access
@@ -209,6 +209,8 @@ export default async function PrivacyPage() {
           industries).
         </li>
         <li><strong>Add with AI:</strong> the job post text or screenshot you paste.</li>
+        <li><strong>Structure with AI:</strong> the hiring-team or referral text you paste to add a contact.</li>
+        <li><strong>Testing a prompt or your key:</strong> the prompt and sample text you test. Testing your key sends only a short test message.</li>
       </ul>
       <p>Your pay details and your answers to the optional questions are never sent.</p>
       <p>
@@ -254,7 +256,7 @@ export default async function PrivacyPage() {
         <li>
           Request deletion of your account and all associated data from Settings → Account, or by contacting
           us. When it&rsquo;s done we delete everything, including stored résumé files, and email you; we keep
-          only an anonymised record that the request was handled.
+          only an anonymized record that the request was handled.
         </li>
       </ul>
 
@@ -268,9 +270,9 @@ export default async function PrivacyPage() {
         {days(retention.notificationDays)}.
         {gmailOn ? " Disconnecting Google stops all further reading of your mailbox." : ""} Confirmation
         codes expire shortly and are then deleted. When you reset your leads they are deleted
-        straight away. When you ask us to delete your account, we delete your data, including résumé
+        right away. When you ask us to delete your account, we delete your data, including résumé
         files and everything taken from your job-alert emails, within 30 days and email you when
-        it&rsquo;s done. Copies in backups expire within a further 30 days. We keep only an anonymised record that your
+        it&rsquo;s done. Copies in backups expire within a further 30 days. We keep only an anonymized record that your
         request was handled, and limited records that the law requires.
       </p>
 

@@ -48,7 +48,7 @@ reCAPTCHA setting entirely (lib/captcha.ts). Do one environment at a time.
 
 6. **Sign in as admin** and open Settings → Security. A yellow note says the
    check is turned off on the server. Fix the keys (or untick reCAPTCHA).
-   Saving with the box ticked runs a live test first — it only saves if Google
+   Saving with the box checked runs a live test first — it only saves if Google
    accepts the keys.
 
 7. **Remove the switch** and recreate the container again, so the admin setting

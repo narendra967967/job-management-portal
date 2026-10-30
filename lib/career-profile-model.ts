@@ -370,7 +370,7 @@ export const experienceSchema = z
     isCurrent: z.boolean(),
     description: text(LIMITS.description),
   })
-  .refine((e) => e.isCurrent || e.endYear != null, { message: "Add the end year, or tick “I currently work here”.", path: ["endYear"] })
+  .refine((e) => e.isCurrent || e.endYear != null, { message: "Add the end year, or check “I currently work here”.", path: ["endYear"] })
   .refine((e) => e.isCurrent || ym(e.endYear, e.endMonth) >= ym(e.startYear, e.startMonth), {
     message: "The end date is before the start date.",
     path: ["endYear"],

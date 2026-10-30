@@ -164,7 +164,7 @@ export function LeadActions({
                     await confirm({
                       title: "Discard this lead?",
                       description:
-                        "It moves to Archive and any pending follow-ups are cancelled. You can reopen it later.",
+                        "It moves to Archive and any pending follow-ups are canceled. You can reopen it later.",
                       confirmLabel: "Discard",
                       destructive: true,
                     })

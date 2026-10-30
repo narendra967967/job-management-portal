@@ -197,7 +197,7 @@ export function PlanFormDialog({
     if (!resumesUnlimited) {
       const n = Number(limitResumes);
       if (limitResumes.trim() === "" || !Number.isFinite(n) || n < 0)
-        return setError("Enter a résumé upload limit, or tick Unlimited.");
+        return setError("Enter a résumé upload limit, or check Unlimited.");
       resumesLimit = Math.round(n);
     }
     const parseLimit = (unlimited: boolean, raw: string): number | null | "bad" => {
@@ -206,9 +206,9 @@ export function PlanFormDialog({
       return raw.trim() === "" || !Number.isFinite(n) || n < 0 ? "bad" : Math.round(n);
     };
     const leadsLimit = parseLimit(leadsUnlimited, limitActiveLeads);
-    if (leadsLimit === "bad") return setError("Enter an active-leads limit, or tick Unlimited.");
+    if (leadsLimit === "bad") return setError("Enter an active-leads limit, or check Unlimited.");
     const aiAddLimit = parseLimit(aiAddUnlimited, limitAiAddMonthly);
-    if (aiAddLimit === "bad") return setError("Enter a monthly Add with AI limit, or tick Unlimited.");
+    if (aiAddLimit === "bad") return setError("Enter a monthly Add with AI limit, or check Unlimited.");
 
     setError("");
     setBusy(true);
@@ -271,7 +271,7 @@ export function PlanFormDialog({
           </Section>
 
           {/* Appearance */}
-          <Section title="Header colour">
+          <Section title="Header color">
             <div className="flex flex-wrap gap-2">
               {ACCENT_KEYS.map((k) => (
                 <button

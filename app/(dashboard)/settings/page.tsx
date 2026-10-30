@@ -2114,7 +2114,7 @@ function ResumesCard() {
           <DialogHeader>
             <DialogTitle>Name this resume</DialogTitle>
             <DialogDescription>
-              A short name to recognise it by. The text is extracted on upload
+              A short name to recognize it by. The text is extracted on upload
               for AI scoring.
             </DialogDescription>
           </DialogHeader>
