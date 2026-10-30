@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 806" width="640" height="806" role="img" aria-labelledby="t">
+  <title id="t">How outreach and follow-ups work</title>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#6366f1"/>
+    </marker>
+    <style>
+      text { font-family: Arial, Helvetica, sans-serif; fill: #1e1b4b; }
+      .t { font-size: 25px; font-weight: 700; }
+      .s { font-size: 21px; fill: #4b5563; }
+      .l { font-size: 21px; font-weight: 700; fill: #4338ca; }
+      .box { fill: #eef2ff; stroke: #a5b4fc; stroke-width: 2; }
+      .you { fill: #ffffff; stroke: #6366f1; stroke-width: 3; }
+      .end { fill: #dcfce7; stroke: #22c55e; stroke-width: 2; }
+      .c { stroke: #6366f1; stroke-width: 3; fill: none; marker-end: url(#a); }
+    </style>
+  </defs>
+  <rect width="640" height="806" fill="#ffffff"/>
+
+  <rect class="box" x="10" y="10" width="620" height="96" rx="16"/>
+  <text class="t" x="320" y="50" text-anchor="middle">Draft your message</text>
+  <text class="s" x="320" y="84" text-anchor="middle">With AI, or write it yourself</text>
+  <path class="c" d="M320 106 V146"/>
+
+  <rect class="you" x="10" y="148" width="620" height="96" rx="16"/>
+  <text class="t" x="320" y="188" text-anchor="middle">Send it yourself, then mark it as sent</text>
+  <text class="s" x="320" y="222" text-anchor="middle">Jobtiva never sends anything for you</text>
+  <path class="c" d="M320 244 V284"/>
+
+  <rect class="box" x="10" y="286" width="620" height="96" rx="16"/>
+  <text class="t" x="320" y="326" text-anchor="middle">A follow-up reminder is scheduled</text>
+  <text class="s" x="320" y="360" text-anchor="middle">3 days later, unless you change it</text>
+  <path class="c" d="M320 382 V422"/>
+
+  <rect class="you" x="10" y="424" width="620" height="96" rx="16"/>
+  <text class="t" x="320" y="464" text-anchor="middle">When it's due, record what happened</text>
+  <text class="s" x="320" y="498" text-anchor="middle">From To-do, Reminders or the lead</text>
+
+  <path class="c" d="M165 520 V580"/>
+  <path class="c" d="M475 520 V580"/>
+  <text class="l" x="165" y="560" text-anchor="middle" dx="-80">Followed up</text>
+  <text class="l" x="475" y="560" text-anchor="middle" dx="72">Anything else</text>
+
+  <rect class="box" x="10" y="582" width="300" height="208" rx="16"/>
+  <text class="t" x="160" y="622" text-anchor="middle">Reminder sent</text>
+  <text class="s" x="160" y="660" text-anchor="middle">The next follow-up is</text>
+  <text class="s" x="160" y="690" text-anchor="middle">scheduled, until you</text>
+  <text class="s" x="160" y="720" text-anchor="middle">reach your limit</text>
+
+  <rect class="end" x="330" y="582" width="300" height="208" rx="16"/>
+  <text class="t" x="480" y="622" text-anchor="middle">Response received</text>
+  <text class="t" x="480" y="656" text-anchor="middle">Not responded</text>
+  <text class="t" x="480" y="690" text-anchor="middle">Closed</text>
+  <text class="s" x="480" y="734" text-anchor="middle">No more reminders</text>
+  <text class="s" x="480" y="764" text-anchor="middle">are added</text>
+</svg>

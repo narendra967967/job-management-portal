@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 692" width="640" height="692" role="img" aria-labelledby="t">
+  <title id="t">The stages of a job lead</title>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#6366f1"/>
+    </marker>
+    <marker id="g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#9ca3af"/>
+    </marker>
+    <style>
+      text { font-family: Arial, Helvetica, sans-serif; fill: #1e1b4b; }
+      .t { font-size: 26px; font-weight: 700; }
+      .s { font-size: 21px; fill: #4b5563; }
+      .h { font-size: 22px; font-weight: 700; fill: #6b7280; }
+      .open { fill: #eef2ff; stroke: #a5b4fc; stroke-width: 2; }
+      .win { fill: #dcfce7; stroke: #22c55e; stroke-width: 2; }
+      .end { fill: #f3f4f6; stroke: #d1d5db; stroke-width: 2; }
+      .c { stroke: #6366f1; stroke-width: 3; fill: none; marker-end: url(#a); }
+      .e { stroke: #9ca3af; stroke-width: 3; fill: none; stroke-dasharray: 7 5; marker-end: url(#g); }
+    </style>
+  </defs>
+  <rect width="640" height="692" fill="#ffffff"/>
+
+  <rect class="open" x="10" y="10" width="360" height="100" rx="16"/>
+  <text class="t" x="190" y="50" text-anchor="middle">New</text>
+  <text class="s" x="190" y="84" text-anchor="middle">Just arrived, not reviewed</text>
+  <path class="c" d="M190 110 V150"/>
+
+  <rect class="open" x="10" y="152" width="360" height="100" rx="16"/>
+  <text class="t" x="190" y="192" text-anchor="middle">Shortlisted</text>
+  <text class="s" x="190" y="226" text-anchor="middle">Worth your time</text>
+  <path class="c" d="M190 252 V292"/>
+
+  <rect class="open" x="10" y="294" width="360" height="100" rx="16"/>
+  <text class="t" x="190" y="334" text-anchor="middle">Applied</text>
+  <text class="s" x="190" y="368" text-anchor="middle">Application is in</text>
+  <path class="c" d="M190 394 V434"/>
+
+  <rect class="open" x="10" y="436" width="360" height="100" rx="16"/>
+  <text class="t" x="190" y="476" text-anchor="middle">Interview</text>
+  <text class="s" x="190" y="510" text-anchor="middle">Talking to the company</text>
+  <path class="c" d="M190 536 V576"/>
+
+  <rect class="win" x="10" y="578" width="360" height="100" rx="16"/>
+  <text class="t" x="190" y="618" text-anchor="middle">Offer Received</text>
+  <text class="s" x="190" y="652" text-anchor="middle">Time to decide</text>
+
+  <path class="e" d="M370 302 H418"/>
+  <text class="h" x="430" y="226">At any stage</text>
+  <rect class="end" x="420" y="244" width="210" height="116" rx="16"/>
+  <text class="t" x="525" y="288" text-anchor="middle">Closed</text>
+  <text class="s" x="525" y="322" text-anchor="middle">With an outcome</text>
+  <rect class="end" x="420" y="376" width="210" height="116" rx="16"/>
+  <text class="t" x="525" y="420" text-anchor="middle">Discarded</text>
+  <text class="s" x="525" y="454" text-anchor="middle">Not for you</text>
+  <path class="e" d="M370 434 H418"/>
+  <text class="s" x="525" y="536" text-anchor="middle">Both move</text>
+  <text class="s" x="525" y="564" text-anchor="middle">to Archive</text>
+</svg>
