@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowRight, Briefcase } from "lucide-react";
 
 // Slim strip under the dashboard header while the career profile is incomplete
-// (the résumé ATS check needs it). Rendered by the dashboard layout; disappears
+// (fit scores and drafts use it, and the résumé ATS check needs it). Rendered by the dashboard layout; disappears
 // once every required item is done.
 export function CareerProfileNotice({ percent }: { percent: number }) {
   return (
@@ -13,7 +13,7 @@ export function CareerProfileNotice({ percent }: { percent: number }) {
       <Briefcase className="size-4 shrink-0" aria-hidden />
       <span className="min-w-0 flex-1 truncate">
         <span className="font-medium">Career profile {percent}% complete</span>
-        <span className="hidden sm:inline"> — finish it to unlock the résumé ATS check.</span>
+        <span className="hidden sm:inline"> — finish it for sharper fit scores and drafts.</span>
       </span>
       <span className="inline-flex shrink-0 items-center gap-1 font-medium">
         Complete

@@ -8,6 +8,7 @@
 import { and, eq } from "drizzle-orm";
 import { advanceLeadStatus, type AutoStatusChange } from "@/lib/auto-status";
 import { db } from "@/lib/db";
+import { careerBriefFor } from "@/lib/career-data";
 import { getCurrentUserId } from "@/lib/current-user";
 import { aiAddAllowance, getFeatureAccess, PREMIUM_REQUIRED, recordUsage } from "@/lib/entitlements";
 import {
@@ -226,11 +227,14 @@ export async function structureContactAction(
 
 /* ---------------- Draft outreach (FR-4.1 / FR-4.2) ------------------------- */
 
+// Enough for the draft to pick out real experience without a huge prompt.
+const DRAFT_RESUME_CHARS = 8000;
+
 export async function draftOutreachAction(input: {
   leadId: string;
   contactId: string;
   kind: OutreachKind;
-  resumeLabel: string;
+  resumeId?: string;
 }): Promise<{ ok: true; draft: string } | { ok: false; error: string }> {
   const userId = await getCurrentUserId();
   if (!(await getFeatureAccess(userId)).aiDrafts) return { ok: false, error: PREMIUM_REQUIRED };
@@ -263,12 +267,22 @@ export async function draftOutreachAction(input: {
 
   const jd = detail?.aiSummary || detail?.jdText || "(no job description saved yet)";
 
+  const [resume] = input.resumeId
+    ? await db
+        .select({ label: resumesT.label, text: resumesT.resumeText })
+        .from(resumesT)
+        .where(and(eq(resumesT.id, input.resumeId), eq(resumesT.userId, userId)))
+    : [];
+  const resumeText = resume?.text?.trim();
+  const career = await careerBriefFor(userId, { includeSummary: true });
+
   const context = [
     `Message type: ${OUTREACH_KIND_LABELS[input.kind]}`,
     `Recipient: ${contact.name}${contact.title ? `, ${contact.title}` : ""} (${CONNECTION_TYPE_LABELS[contact.connectionType]})`,
     `Role: ${lead.title} at ${lead.company}`,
-    `My resume: ${input.resumeLabel}`,
     `Job context: ${jd}`,
+    ...(resumeText ? [`My resume (${resume.label}):\n${resumeText.slice(0, DRAFT_RESUME_CHARS)}`] : []),
+    ...(career ? [`My career profile:\n${career}`] : []),
   ].join("\n");
 
   try {
@@ -329,6 +343,7 @@ export async function scoreFitAction(
   }
 
   try {
+    const career = await careerBriefFor(userId);
     const base = await effectivePrompt(userId, "score");
     // Enforce a parseable output regardless of the (possibly custom) prompt.
     const system = `${base}\n\nReply with ONLY minified JSON: {"score": <integer 0-100>, "rationale": "<one sentence>"}. No other text.`;
@@ -336,6 +351,7 @@ export async function scoreFitAction(
       `Role: ${lead.title} at ${lead.company}`,
       `Job description / summary:\n${jd}`,
       `Candidate resume (${resume.label}):\n${resumeText}`,
+      ...(career ? [`Candidate's career profile (their stated goals and skills; the resume is the evidence):\n${career}`] : []),
     ].join("\n\n");
 
     const raw = await aiComplete(userId, system, context, 300);

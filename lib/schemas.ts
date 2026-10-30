@@ -149,7 +149,7 @@ export const draftInputSchema = z.object({
     Object.keys(OUTREACH_KIND_LABELS),
     "Unknown outreach type.",
   ),
-  resumeLabel: z.string().trim().max(200),
+  resumeId: zId.optional(),
 });
 
 /** Test an unsaved prompt against sample input (no DB write). */

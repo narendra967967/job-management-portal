@@ -10,6 +10,9 @@ import {
   EMPTY_PROFILE,
   careerCompletion,
   CURRENCY_OPTIONS,
+  labelOf,
+  SENIORITY_OPTIONS,
+  WORK_MODE_OPTIONS,
   type CareerProfile,
   type Currency,
   type Pay,
@@ -91,5 +94,29 @@ export async function careerCompletionFor(userId: string): Promise<{ percent: nu
     return { percent, complete };
   } catch {
     return { percent: 100, complete: true };
+  }
+}
+
+/** The career profile as AI context for fit scores and drafts, or "" when it's
+ *  empty or unreadable (AI features must still work without it). Only job-fit
+ *  fields: never pay, eligibility or the optional questions. */
+export async function careerBriefFor(userId: string, opts: { includeSummary?: boolean } = {}): Promise<string> {
+  try {
+    const p = await loadCareerProfile(userId);
+    const list = (label: string, items: string[]) => (items.length ? [`${label}: ${items.join(", ")}`] : []);
+    return [
+      ...list("Target roles", p.targetRoles),
+      ...(p.currentTitle.trim() ? [`Current or last title: ${p.currentTitle.trim()}`] : []),
+      ...(p.yearsExperience != null ? [`Years of experience: ${p.yearsExperience}`] : []),
+      ...(p.seniority ? [`Seniority: ${labelOf(SENIORITY_OPTIONS, p.seniority)}`] : []),
+      ...list("Skills", p.skills),
+      ...list("Tools", p.tools),
+      ...list("Industries", p.industries),
+      ...list("Preferred work mode", p.workModes.map((m) => labelOf(WORK_MODE_OPTIONS, m))),
+      ...list("Preferred locations", p.preferredLocations),
+      ...(opts.includeSummary && p.summary.trim() ? [`Professional summary: ${p.summary.trim().slice(0, 2000)}`] : []),
+    ].join("\n");
+  } catch {
+    return "";
   }
 }

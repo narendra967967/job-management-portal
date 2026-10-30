@@ -655,13 +655,11 @@ function DraftOutreachDialog({
     }
     setError("");
     setBusy(true);
-    const resumeLabel =
-      resumes.find((r) => r.id === resumeId)?.label ?? "my resume";
     const res = await draftOutreachAction({
       leadId: lead.id,
       contactId,
       kind,
-      resumeLabel,
+      resumeId: resumeId || undefined,
     });
     if (res.ok) setDraft(res.draft);
     else setError(res.error);

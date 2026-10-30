@@ -192,15 +192,25 @@ export default async function PrivacyPage() {
         (OpenAI, Anthropic or OpenRouter). For each feature we send only what it needs:
       </p>
       <ul>
-        <li><strong>Summaries, fit scores and outreach drafts:</strong> the job&rsquo;s title, company and description, your résumé text, and a contact you added.</li>
+        <li><strong>Summaries:</strong> the job description.</li>
+        <li>
+          <strong>Fit scores:</strong> the job&rsquo;s title, company and description, your résumé text and the
+          matching parts of your career profile (target roles, skills and tools, current title, years of
+          experience, seniority, industries, preferred work mode and locations).
+        </li>
+        <li>
+          <strong>Outreach drafts:</strong> the same details as fit scores, plus your professional summary and
+          the contact you&rsquo;re writing to.
+        </li>
         <li><strong>Salary insights:</strong> the job&rsquo;s title, company, location and description, your résumé text, and the country in your profile.</li>
         <li>
           <strong>Résumé ATS check:</strong> the résumé&rsquo;s text and the matching parts of your career
           profile (target roles, skills and tools, current title, years of experience, seniority and
-          industries). Your answers to the optional questions are never sent.
+          industries).
         </li>
         <li><strong>Add with AI:</strong> the job post text or screenshot you paste.</li>
       </ul>
+      <p>Your pay details and your answers to the optional questions are never sent.</p>
       <p>
         The provider uses this only to produce the result we show you, under its own terms and charges.
         We send nothing else, and we never use your data to train AI models.
