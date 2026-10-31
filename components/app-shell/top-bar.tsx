@@ -102,6 +102,7 @@ export function NotificationsMenu() {
   return (
     <DropdownMenu onOpenChange={(o) => o && markNotificationsRead()}>
       <DropdownMenuTrigger
+        data-tour="notifications"
         aria-label={`Notifications${unread ? `, ${unread} unread` : ""}`}
         className="relative flex size-11 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none lg:size-10"
       >

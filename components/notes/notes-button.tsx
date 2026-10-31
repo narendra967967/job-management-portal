@@ -41,6 +41,7 @@ export function NotesButton() {
     <>
       <button
         type="button"
+        data-tour="notes"
         onClick={() => setOpen(true)}
         aria-label={hasNotes ? "My notes" : "My notes (not on your plan)"}
         title={hasNotes ? "My notes" : "Notes are on higher plans"}

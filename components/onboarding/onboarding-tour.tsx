@@ -11,7 +11,7 @@ import { useEffect, useRef } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { driver, type DriveStep } from "driver.js";
 import "driver.js/dist/driver.css";
-import { useProfile } from "@/lib/mock-store";
+import { useFeatures, useProfile } from "@/lib/mock-store";
 import { markTourSeenAction } from "@/actions/tour";
 
 const sel = (id: string) => `[data-tour="${id}"]`;
@@ -24,7 +24,42 @@ function visible(selector: string): Element | null {
   return null;
 }
 
-function desktopSteps(firstName: string): DriveStep[] {
+/** The notes step differs by plan: the button shows a lock when notes aren't included. */
+function notesStep(hasNotes: boolean): DriveStep {
+  return {
+    element: sel("notes"),
+    popover: {
+      title: "Your notes",
+      description: hasNotes
+        ? "A private notepad for interview prep, questions to ask and anything else you don't want to lose. It saves as you type."
+        : "A private notepad for interview prep and questions to ask. It's on higher plans, so you'll see a lock here until you upgrade.",
+      side: "bottom",
+      align: "end",
+    },
+  };
+}
+
+const NOTIFICATIONS_STEP: DriveStep = {
+  element: sel("notifications"),
+  popover: {
+    title: "Notifications",
+    description: "Follow-ups that are due and other updates land here, with a count on the bell. Open one to go straight to it.",
+    side: "bottom",
+    align: "end",
+  },
+};
+
+const SUPPORT_STEP: DriveStep = {
+  element: sel("support-widget"),
+  popover: {
+    title: "Talk to us",
+    description: "This button is on every page. Write to us from here without leaving what you're doing. Our replies come back here too, with a badge so you don't miss them.",
+    side: "left",
+    align: "end",
+  },
+};
+
+function desktopSteps(firstName: string, hasNotes: boolean): DriveStep[] {
   return [
     {
       popover: {
@@ -105,11 +140,13 @@ function desktopSteps(firstName: string): DriveStep[] {
     {
       element: sel("search"),
       popover: {
-        title: "Search and notifications",
-        description: "Find any job by company or title. Updates and reminders show up under the bell at the top right.",
+        title: "Search",
+        description: "Find any job by company or title, from any page.",
         side: "bottom",
       },
     },
+    notesStep(hasNotes),
+    NOTIFICATIONS_STEP,
     {
       element: sel("nav-settings"),
       popover: {
@@ -123,12 +160,13 @@ function desktopSteps(firstName: string): DriveStep[] {
     {
       element: sel("help"),
       popover: {
-        title: "Help when you need it",
-        description: "How-to guides and support are always here, and Take the tour starts this walkthrough again whenever you like.",
+        title: "Guides and this tour",
+        description: "How-to guides explain each feature step by step, and Take the tour starts this walkthrough again whenever you like.",
         side: "right",
         align: "end",
       },
     },
+    SUPPORT_STEP,
     {
       popover: {
         title: "You're all set",
@@ -139,8 +177,8 @@ function desktopSteps(firstName: string): DriveStep[] {
   ];
 }
 
-function mobileSteps(firstName: string): DriveStep[] {
-  const all = desktopSteps(firstName);
+function mobileSteps(firstName: string, hasNotes: boolean): DriveStep[] {
+  const all = desktopSteps(firstName, hasNotes);
   return [
     all[0],
     {
@@ -153,6 +191,8 @@ function mobileSteps(firstName: string): DriveStep[] {
     },
     { element: sel("add-lead-fab"), popover: { ...all[2].popover, side: "left" } },
     { element: sel("lead-card"), popover: { ...all[5].popover, side: "bottom" } },
+    notesStep(hasNotes),
+    NOTIFICATIONS_STEP,
     {
       element: sel("menu"),
       popover: {
@@ -162,6 +202,7 @@ function mobileSteps(firstName: string): DriveStep[] {
         align: "start",
       },
     },
+    { ...SUPPORT_STEP, popover: { ...SUPPORT_STEP.popover, side: "top" } },
     all[all.length - 1],
   ];
 }
@@ -171,6 +212,7 @@ export function OnboardingTour({ autoStart }: { autoStart: boolean }) {
   const params = useSearchParams();
   const router = useRouter();
   const { name } = useProfile();
+  const { notes: hasNotes } = useFeatures();
   const running = useRef(false);
   const autoDone = useRef(!autoStart);
 
@@ -190,7 +232,7 @@ export function OnboardingTour({ autoStart }: { autoStart: boolean }) {
       const firstName = (name || "").trim().split(/\s+/)[0] ?? "";
       const isDesktop = window.matchMedia("(min-width: 768px)").matches;
       const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      const steps = (isDesktop ? desktopSteps(firstName) : mobileSteps(firstName))
+      const steps = (isDesktop ? desktopSteps(firstName, hasNotes) : mobileSteps(firstName, hasNotes))
         .filter((s) => !s.element || visible(s.element as string))
         .map((s) => (s.element ? { ...s, element: () => visible(s.element as string)! } : s));
       const last = steps.length - 1;
@@ -245,7 +287,7 @@ export function OnboardingTour({ autoStart }: { autoStart: boolean }) {
       tour.drive();
     }, 600);
     return () => clearTimeout(t);
-  }, [pathname, requested, router, name]);
+  }, [pathname, requested, router, name, hasNotes]);
 
   return null;
 }

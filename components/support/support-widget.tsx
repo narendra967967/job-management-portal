@@ -178,6 +178,7 @@ export function SupportWidget() {
       {/* Launcher */}
       <button
         type="button"
+        data-tour="support-widget"
         onClick={() => (open ? closePanel() : openPanel())}
         aria-label={open ? "Close help" : "Help & support"}
         aria-expanded={open}
