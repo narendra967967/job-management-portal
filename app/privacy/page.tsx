@@ -227,12 +227,10 @@ export default async function PrivacyPage() {
 
       <h2>How we store and protect your data</h2>
       <p>
-        Your data is stored on secure servers in India. We protect it with industry-standard measures,
-        including restricted access, encrypted connections and encrypted backups, and we never store
-        passwords, keys or other credentials in readable form. Backups expire within 30 days. Sensitive actions,
-        such as resetting your leads or requesting account deletion, are confirmed with a one-time code
-        sent to your email. No method of storage is perfectly secure, but we work to keep your information
-        safe.
+        We restrict who can reach your data, encrypt it on its way to and from your device, and never
+        store passwords, keys or other credentials in readable form. Sensitive actions, such as resetting
+        your leads or requesting account deletion, are confirmed with a one-time code sent to your email.
+        No method of storage is perfectly secure, but we work to keep your information safe.
       </p>
 
       <h2>Sharing</h2>
