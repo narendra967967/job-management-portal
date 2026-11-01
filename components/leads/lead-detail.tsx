@@ -126,6 +126,18 @@ const OUTCOME_BANNER: Record<
   },
 };
 
+// The next-status button wears the color of the status it moves the job to.
+const NEXT_STATUS_BUTTON: Partial<Record<LeadStatus, string>> = {
+  shortlisted:
+    "bg-status-shortlisted text-status-shortlisted-foreground hover:bg-status-shortlisted/80",
+  applied:
+    "bg-status-applied text-status-applied-foreground hover:bg-status-applied/80",
+  interview:
+    "bg-status-interview text-status-interview-foreground hover:bg-status-interview/80",
+  "offer-received":
+    "bg-status-offer-received text-status-offer-received-foreground hover:bg-status-offer-received/80",
+};
+
 export function LeadDetail(props: Props) {
   return (
     <div className="mx-auto max-w-3xl space-y-5">
@@ -251,21 +263,6 @@ export function LeadDetailContent({
             />
           </div>
         </div>
-
-        {next && (
-          <Button
-            className="mt-3 w-full sm:w-auto"
-            disabled={advancing}
-            onClick={async () => {
-              setAdvancing(true);
-              await setStatus(next);
-              setAdvancing(false);
-            }}
-          >
-            Mark as {LEAD_STATUS_LABELS[next]}
-            <ArrowRight className="size-4" data-icon="inline-end" aria-hidden />
-          </Button>
-        )}
 
         {/* Why this lead is closed / discarded — prominent on the detail view. */}
         {status === "closed" &&
@@ -402,7 +399,8 @@ export function LeadDetailContent({
           )}
         </div>
 
-        <div className="mt-4">
+        {/* On phones the next step stacks above the link, as the main action. */}
+        <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
           <a
             href={lead.canonicalJobUrl}
             target="_blank"
@@ -412,6 +410,20 @@ export function LeadDetailContent({
             <ExternalLink className="size-4" aria-hidden />
             {openPostingLabel(lead)}
           </a>
+          {next && (
+            <Button
+              className={cn("px-4", NEXT_STATUS_BUTTON[next])}
+              disabled={advancing}
+              onClick={async () => {
+                setAdvancing(true);
+                await setStatus(next);
+                setAdvancing(false);
+              }}
+            >
+              Mark as {LEAD_STATUS_LABELS[next]}
+              <ArrowRight className="size-4" data-icon="inline-end" aria-hidden />
+            </Button>
+          )}
         </div>
       </div>
 
