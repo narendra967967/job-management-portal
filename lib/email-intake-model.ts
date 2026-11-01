@@ -107,6 +107,7 @@ export function userReason(status: InboundStatus, reason: string): string {
     "Signature check failed": "Couldn't confirm it really came from the job site",
     "Sender not allowed": "We don't accept alerts from this site yet",
     "Hand-forwarded from a site that isn't allowed": "Hand-forwarded from a site we don't accept yet",
+    "Forwarding turned off": "Arrived while forwarding was turned off",
     "Too large": "The email was too large",
     "Malformed email": "The email couldn't be read",
     "Already processed": "Already received earlier",
@@ -172,6 +173,8 @@ export interface ForwardingHealth {
 /** The signed-in user's forwarding address and its progress. */
 export interface MyForwarding {
   address: string;
+  /** The user's own switch. Off: mail to the address is dropped, setup is kept. */
+  enabled: boolean;
   /** Gmail's forwarding confirmation code (older format), when one has arrived. */
   gmailCode: string | null;
   /** Gmail's confirmation link (current format) — verify link only, never cancel. */
@@ -188,6 +191,8 @@ export interface MyForwarding {
 
 /** Per-user forwarding status as admins see it. */
 export interface UserForwardingStatus {
+  /** The user's own switch. */
+  enabled: boolean;
   addressCreatedAt: string | null;
   /** Gmail's confirmation (link or code) arrived — setup started in Gmail. */
   gmailCodeAt: string | null;

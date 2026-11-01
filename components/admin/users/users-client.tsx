@@ -603,6 +603,7 @@ function RenewDialog({
 /** Per-user forwarding status (A4). */
 function ForwardingCell({ f }: { f: AdminUserRow["forwarding"] }) {
   const mounted = useMounted(); // relative time uses the clock
+  if (f && !f.enabled) return <Badge variant="neutral">Turned off by user</Badge>;
   if (f?.lastReceivedAt) {
     return (
       <span className="flex flex-col gap-0.5">

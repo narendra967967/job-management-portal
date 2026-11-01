@@ -10,6 +10,9 @@
 // Layout: the three setup steps are an accordion with the full instructions —
 // the current step opens by itself, finished ones turn green. Short side notes
 // sit behind InfoTips.
+//
+// The switch in the header is the user's own: off stops all intake (the server
+// drops the mail), hides the setup and keeps the address and Gmail progress.
 
 import { useEffect, useState } from "react";
 import { Check, ChevronRight, Copy, ExternalLink, Mail, MailCheck, RotateCcw, ShieldCheck, Briefcase } from "lucide-react";
@@ -31,6 +34,7 @@ import {
   confirmMyForwardingAction,
   getMyForwardingAction,
   resetMyForwardingAction,
+  setMyForwardingEnabledAction,
 } from "@/actions/email-intake";
 
 const STAGE_PILL: Record<ForwardingStage, string> = {
@@ -78,7 +82,8 @@ export function EmailForwardingCard() {
     onToggle: () => setOpenStep((o) => (o === n ? null : n)),
   });
 
-  const pollMs = forwardingEnabled ? POLL_MS[stage] : null;
+  const on = fwd.enabled;
+  const pollMs = forwardingEnabled && on ? POLL_MS[stage] : null;
   useEffect(() => {
     if (!pollMs) return;
     let stopped = false;
@@ -98,6 +103,32 @@ export function EmailForwardingCard() {
       clearInterval(timer);
     };
   }, [pollMs]);
+
+  async function toggle() {
+    if (on) {
+      const ok = await confirm({
+        title: "Turn off email forwarding?",
+        description:
+          "Job alerts that arrive while it's off won't become leads, and they aren't added when you turn it back on. Your address and Gmail setup stay as they are.",
+        confirmLabel: "Turn off",
+      });
+      if (!ok) return;
+    }
+    setBusy(true);
+    try {
+      setForwardingState(await setMyForwardingEnabledAction({ enabled: !on }));
+      if (on) toast.success("Email forwarding turned off", "New job alerts won't become leads.");
+      else
+        toast.success(
+          "Email forwarding turned on",
+          current > 3 || stage === "waiting_first_alert" ? "Your next job alert lands in Leads." : "Pick up the setup where you left off.",
+        );
+    } catch {
+      toast.error("Couldn't change that", "Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function markVerified() {
     setBusy(true);
@@ -177,17 +208,69 @@ export function EmailForwardingCard() {
     </div>
   );
 
+  const header = (
+    <div className="flex items-start justify-between gap-3">
+      <div className="min-w-0">
+        <h2 className="text-sm font-medium">Email forwarding</h2>
+        <p className="mt-0.5 text-xs text-muted-foreground">Your job alerts, straight into Leads.</p>
+      </div>
+      {/* Phones: pill under the switch, since "Waiting for first alert" is long. */}
+      <div className="flex shrink-0 flex-col-reverse items-end sm:flex-row sm:items-center sm:gap-3">
+        <span
+          className={cn(
+            "rounded-full px-2.5 py-0.5 text-[11px] font-medium",
+            on ? STAGE_PILL[stage] : "bg-muted text-muted-foreground",
+          )}
+        >
+          {on ? FORWARDING_STAGE_LABELS[stage] : "Turned off"}
+        </span>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={on}
+          aria-label="Email forwarding"
+          onClick={toggle}
+          disabled={busy}
+          className="inline-flex min-h-11 items-center rounded-lg focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-60"
+        >
+          <span
+            className={cn(
+              "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors",
+              on ? "bg-primary" : "bg-muted-foreground/30",
+            )}
+          >
+            <span
+              className={cn(
+                "inline-block size-5 rounded-full bg-white shadow transition-transform",
+                on ? "translate-x-5.5" : "translate-x-0.5",
+              )}
+            />
+          </span>
+        </button>
+      </div>
+    </div>
+  );
+
+  if (!on) {
+    return (
+      <section className="rounded-2xl border bg-card p-4 md:p-5">
+        {header}
+        <p className="mt-3 text-sm text-muted-foreground">
+          New job alerts won&rsquo;t become leads while this is off, even ones you forward by hand. Your address
+          and Gmail setup are saved, so turning it back on picks up where you left off.
+        </p>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Gmail keeps sending alerts here until you delete the filter there, and Jobtiva ignores them. To bring
+          one in later, turn this back on and forward that email by hand.
+        </p>
+        {dialog}
+      </section>
+    );
+  }
+
   return (
     <section className="rounded-2xl border bg-card p-4 md:p-5">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="text-sm font-medium">Email forwarding</h2>
-          <p className="mt-0.5 text-xs text-muted-foreground">Your job alerts, straight into Leads.</p>
-        </div>
-        <span className={cn("shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-medium", STAGE_PILL[stage])}>
-          {FORWARDING_STAGE_LABELS[stage]}
-        </span>
-      </div>
+      {header}
 
       {/* U1 — the address */}
       <div className="mt-4">

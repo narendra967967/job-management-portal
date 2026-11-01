@@ -821,6 +821,9 @@ export const inboundAddresses = pgTable(
       .primaryKey()
       .references(() => user.id, { onDelete: "cascade" }),
     token: text("token").notNull(),
+    // The user's own on/off switch (the admin's is email_intake_config). Off =
+    // mail to this address is dropped; the address and Gmail progress are kept.
+    enabled: boolean("enabled").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     // Gmail's forwarding confirmation, shown in Settings until confirmed:
     // today a link (mail-settings.google.com/mail/vf-…), in older/other

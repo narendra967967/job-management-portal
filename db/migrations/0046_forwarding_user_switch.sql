@@ -1,0 +1,1 @@
+ALTER TABLE "inbound_addresses" ADD COLUMN "enabled" boolean DEFAULT true NOT NULL;

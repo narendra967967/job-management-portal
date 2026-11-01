@@ -11,7 +11,9 @@ import "server-only";
 //
 // SMTP outcome policy (load-safe, no bounce spam):
 //   - unknown recipient → 550 at RCPT (no body is ever received);
-//   - forwarding switched off → 451 (senders retry later);
+//   - forwarding switched off by the admin → 451 (senders retry later);
+//   - forwarding switched off by the user → 250 and dropped, so Gmail neither
+//     queues the mail nor sends the user a bounce for every alert;
 //   - everything else that we could process → 250, including mail we drop by
 //     policy (not allowed, failed signature) — dropping silently avoids
 //     Gmail sending bounce notices to the user and gives probers no signal;
@@ -28,7 +30,7 @@ import {
   inboundEmailLog as logT,
   user as userT,
 } from "@/db/schema";
-import { getIntakeConfig, loadSenders, receivingDomain, userIdForToken } from "@/lib/email-intake-data";
+import { getIntakeConfig, isForwardingOn, loadSenders, receivingDomain, userIdForToken } from "@/lib/email-intake-data";
 import type { InboundSender, InboundStatus } from "@/lib/email-intake-model";
 import { ALERT_PARSERS } from "@/lib/alert-parsers";
 import { ingestAlertDrafts } from "@/lib/lead-ingest";
@@ -142,6 +144,14 @@ export async function processInbound(raw: Buffer, recipient: string): Promise<Sm
   const from = bareAddress(parsed.from?.value?.[0]?.address);
   const fromDomain = domainOf(from);
   const messageId = (parsed.messageId ?? "").trim() || null;
+
+  // The user's own switch stops everything, Gmail's confirmation email included.
+  // The Message-ID isn't claimed, so the alert can still be forwarded by hand later.
+  if (!(await isForwardingOn(userId))) {
+    await log({ userId, status: "rejected", reason: "Forwarding turned off", fromDomain, sizeBytes: raw.length });
+    return { code: 250, message: "Accepted" };
+  }
+
   // Only DKIM + ARC are used; skip the DMARC/BIMI DNS lookups.
   const auth = await authenticate(raw, { trustReceived: false, disableDmarc: true, disableBimi: true });
 

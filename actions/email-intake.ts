@@ -13,6 +13,7 @@ import {
   listInboundLog,
   markForwardingConfirmed,
   resetForwarding,
+  setForwardingEnabled,
 } from "@/lib/email-intake-data";
 import { getRetentionConfig } from "@/lib/retention";
 import {
@@ -42,6 +43,14 @@ export async function getMyForwardingAction(): Promise<MyForwardingState> {
 export async function resetMyForwardingAction(): Promise<MyForwardingState> {
   const userId = await getCurrentUserId();
   const [config, forwarding] = await Promise.all([getIntakeConfig(), resetForwarding(userId)]);
+  return { forwardingEnabled: config.forwardingEnabled, forwarding };
+}
+
+/** The user's own on/off switch. Off drops incoming mail; setup is kept. */
+export async function setMyForwardingEnabledAction(input: unknown): Promise<MyForwardingState> {
+  const userId = await getCurrentUserId();
+  const { enabled } = z.object({ enabled: z.boolean() }).parse(input);
+  const [config, forwarding] = await Promise.all([getIntakeConfig(), setForwardingEnabled(userId, enabled)]);
   return { forwardingEnabled: config.forwardingEnabled, forwarding };
 }
 

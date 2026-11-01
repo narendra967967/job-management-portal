@@ -77,6 +77,7 @@ job (revokes can take a few seconds per user) and reports progress/result to the
 | U3 | **Confirmation code panel:** shows Gmail's code when it arrives (auto-refresh), with "copy" | Appears within ~10 s of Gmail sending it |
 | U4 | **Status:** *Waiting for Gmail confirmation* → *Waiting for first alert* → *✓ Working · last alert 2 h ago* | Driven by the address row timestamps |
 | U5 | **Reset my address** (confirm dialog) | New address shown; reminder to update the Gmail filter |
+| U9 | **On/off switch** on the card (`inbound_addresses.enabled`, default on; confirm dialog when turning off) | Off: mail to the address gets 250 and is dropped before any checks, Gmail confirmations included, logged as "Forwarding turned off"; queued AI reads stop; setup hidden, address and Gmail progress kept. Alerts are not imported later, but can be forwarded by hand once it is back on. Connect Gmail is not affected |
 | U6 | **Ingestion issues** (existing): forwarded emails that couldn't be read — subject only (only for accepted, verified senders) | Unsupported/unparseable alerts listed |
 | U7 | **Leads empty state / banner** when forwarding isn't set up | Links to Settings → Email forwarding |
 | U8 | **Can't auto-forward?** note for company-managed (Google Workspace) accounts whose admin blocks external forwarding — points **only** to manual forwarding (forward an alert by hand to the same address) or **Add with AI** | Shown in the setup guide; no other workaround offered |

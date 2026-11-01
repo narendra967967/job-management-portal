@@ -149,6 +149,7 @@ let intake: WorkspaceIntake = {
   forwardingEnabled: true,
   forwarding: {
     address: "",
+    enabled: true,
     gmailCode: null,
     gmailConfirmUrl: null,
     gmailConfirmFrom: null,

@@ -82,6 +82,7 @@ export function newToken(): string {
 function toMyForwarding(row: typeof addressesT.$inferSelect): MyForwarding {
   return {
     address: `${row.token}@${receivingDomain()}`,
+    enabled: row.enabled,
     gmailCode: row.gmailCode,
     gmailConfirmUrl: row.gmailConfirmUrl,
     gmailConfirmFrom: row.gmailConfirmFrom,
@@ -145,6 +146,19 @@ export async function markForwardingConfirmed(userId: string): Promise<void> {
     .update(addressesT)
     .set({ confirmedAt: new Date(), gmailConfirmText: null })
     .where(and(eq(addressesT.userId, userId), sql`${addressesT.confirmedAt} is null`));
+}
+
+/** The user's own switch. Off stops intake; address and Gmail progress stay. */
+export async function setForwardingEnabled(userId: string, enabled: boolean): Promise<MyForwarding> {
+  await getOrCreateForwarding(userId);
+  const [row] = await db.update(addressesT).set({ enabled }).where(eq(addressesT.userId, userId)).returning();
+  return toMyForwarding(row);
+}
+
+/** Whether this user currently takes in forwarded mail. */
+export async function isForwardingOn(userId: string): Promise<boolean> {
+  const [row] = await db.select({ enabled: addressesT.enabled }).from(addressesT).where(eq(addressesT.userId, userId));
+  return row?.enabled ?? false;
 }
 
 /** Resolve a recipient token to its user (null = unknown address). */
@@ -308,6 +322,7 @@ export async function userForwardingStatuses(): Promise<Record<string, UserForwa
     rows.map((r) => [
       r.userId,
       {
+        enabled: r.enabled,
         addressCreatedAt: iso(r.createdAt),
         gmailCodeAt: iso(r.gmailCodeAt),
         confirmedAt: iso(r.confirmedAt),

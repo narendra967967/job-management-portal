@@ -16,7 +16,7 @@ import {
 import { aiComplete, AI_NOT_CONFIGURED } from "@/lib/ai";
 import { AI_READER_SYSTEM, aiReaderPrompt, draftsFromAiReply } from "@/lib/inbound/ai-reader";
 import { ingestAlertDrafts } from "@/lib/lead-ingest";
-import { getIntakeConfig } from "@/lib/email-intake-data";
+import { getIntakeConfig, isForwardingOn } from "@/lib/email-intake-data";
 import type { InboundStatus } from "@/lib/email-intake-model";
 
 const MAX_ATTEMPTS = 3;
@@ -93,6 +93,11 @@ async function issue(job: QueueRow, reason: string) {
 
 async function processJob(job: QueueRow) {
   try {
+    // Turned off while this email waited: no AI call, no leads.
+    if (!(await isForwardingOn(job.userId))) {
+      await finish(job, "rejected", "Forwarding turned off");
+      return;
+    }
     const { aiMaxJobs } = await getIntakeConfig();
     const reply = await aiComplete(
       job.userId,

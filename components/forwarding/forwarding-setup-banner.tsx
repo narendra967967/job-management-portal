@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 
 export function ForwardingSetupBanner() {
   const { forwardingEnabled, forwarding } = useIntake();
-  if (!forwardingEnabled) return null;
+  if (!forwardingEnabled || !forwarding.enabled) return null;
   const stage = forwardingStage(forwarding);
   if (stage === "working") return null;
 
