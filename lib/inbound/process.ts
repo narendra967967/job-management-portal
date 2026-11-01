@@ -277,8 +277,8 @@ async function readJobs(ctx: {
   }
 
   const fix = aiAllowed
-    ? "Add your AI key in Settings → AI provider and AI can read alerts like this one."
-    : "AI can read alerts like this one on higher plans, with your own AI key.";
+    ? "Add your AI key in Settings → AI provider, then forward this alert again by hand so AI can read it."
+    : "AI can read alerts like this one on higher plans, with your own AI key. Once that's set up, forward this alert again by hand.";
   const issue =
     sender.parser === "none"
       ? `Jobtiva can't read this site's alerts on its own yet. ${fix}`

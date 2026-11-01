@@ -76,12 +76,12 @@ export interface MyEmailLogRow {
   fix: EmailLogFix | null;
 }
 
-export type EmailLogFix = "request-site" | "add-ai-key" | "check-ai-key" | "upgrade-plan";
+export type EmailLogFix = "request-site" | "add-ai-key" | "check-ai-key" | "upgrade-plan" | "forward-again";
 
 /** The one step that would get a blocked email through. Rejected senders need
  *  us to add the site. Emails no built-in reader could read need AI, which takes
- *  a plan that includes it and the user's own key (checked as they are now, so a
- *  key added since no longer asks for one). */
+ *  a plan that includes it and the user's own key (checked as they are now). Once
+ *  both are in place the old email still isn't read: it has to come in again. */
 export function emailLogFix(
   status: InboundStatus,
   reason: string,
@@ -90,8 +90,11 @@ export function emailLogFix(
   if (status === "rejected" && /Sender not allowed|site that isn't allowed/.test(reason)) return "request-site";
   if (status === "unsupported") {
     if (/AI reader (stopped|failed)/.test(reason)) return "check-ai-key";
+    // "AI found no jobs" and the like: AI already read it, so none of this helps.
+    if (!/No reader for this sender|No job cards found|AI key removed/.test(reason)) return null;
     if (!now.aiReading) return "upgrade-plan";
     if (!now.hasAiKey) return "add-ai-key";
+    return "forward-again";
   }
   return null;
 }

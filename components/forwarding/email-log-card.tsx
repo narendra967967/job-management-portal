@@ -28,7 +28,7 @@ const FIX_LINK =
 const escapeHtml = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
-/** The next step for a blocked email: ask for the site, add a key or see the plan. */
+/** The next step for a blocked email: ask for the site, add a key, see the plan or forward it again. */
 function LogFix({ row }: { row: MyEmailLogRow }) {
   const { open } = useContactSupport();
   if (!row.fix) return null;
@@ -67,6 +67,15 @@ function LogFix({ row }: { row: MyEmailLogRow }) {
           Fix this, then forward the alert again.{" "}
           <Link href="/settings?tab=ai" className={FIX_LINK}>
             Check your AI key
+          </Link>
+        </>
+      )}
+      {row.fix === "forward-again" && (
+        <>
+          AI can read this now, but only if it comes in again. Forward the alert by hand from Gmail. If you
+          already have, it&apos;ll be in a newer row.{" "}
+          <Link href="/settings?tab=forwarding" className={FIX_LINK}>
+            Get your Jobtiva address
           </Link>
         </>
       )}
