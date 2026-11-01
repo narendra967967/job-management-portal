@@ -48,3 +48,7 @@ next-env.d.ts
 
 # local mail receiver spool (npm run mail-in)
 /.mail-spool/
+
+# Local Claude Code branch guard: untracked so it stays in place on every branch
+.claude/settings.local.json
+.claude/hooks/

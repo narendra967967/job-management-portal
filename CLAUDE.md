@@ -44,6 +44,12 @@ Quick index into the documents, so you're not re-deriving these from scratch:
    a logged-in session. That data is captured manually by design (see FRD Section 3.2). This
    is a hard boundary, not a starting point for future automation.
 
+5. **Check the branch before starting any work, every time.** Run
+   `git branch --show-current` first. If it isn't `narendra`, don't write or change anything,
+   including files, the database, commits or branch switches. Stop and tell me. A local hook
+   also blocks edits and git changes on any other branch, but the check comes first because
+   the hook can't see everything, such as database changes or scripts that write files.
+
 ## Tech stack (don't introduce alternatives without asking)
 
 Next.js 15 (App Router) + TypeScript, single codebase, no separate backend · Tailwind CSS +
