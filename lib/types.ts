@@ -198,6 +198,41 @@ export interface JobLead {
   hasOutreach: boolean;
 }
 
+/** A status change the system made on its own (Timeline + the card's message). */
+export interface LeadAutoAction {
+  id: string;
+  leadId: string;
+  rule: string;
+  fromStatus: LeadStatus;
+  toStatus: LeadStatus;
+  reason: string;
+  /** Full timestamp, ISO. */
+  createdAt: string;
+  /** Same moment as a calendar day, for the Timeline. */
+  date: string;
+  undone: boolean;
+  cleared: boolean;
+}
+
+/** Moves from the user's own actions stop being news after this long. */
+const ACTIVITY_NOTE_MS = 7 * 86_400_000;
+
+/** The automatic move that explains a lead's current status, if any. */
+export function currentAutoAction(
+  actions: LeadAutoAction[],
+  lead: Pick<JobLead, "id" | "status">,
+  nowMs: number,
+): LeadAutoAction | null {
+  const latest = actions
+    .filter((a) => a.leadId === lead.id)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+  if (!latest || latest.undone || latest.cleared || latest.toStatus !== lead.status) return null;
+  if (latest.rule === "activity" && nowMs - new Date(latest.createdAt).getTime() > ACTIVITY_NOTE_MS) {
+    return null;
+  }
+  return latest;
+}
+
 /** Stages where a job can sit in Ready to action. */
 export const READY_LEAD_STATUSES: LeadStatus[] = ["shortlisted", "applied"];
 

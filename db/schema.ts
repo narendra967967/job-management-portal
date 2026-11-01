@@ -352,6 +352,8 @@ export const userSettings = pgTable("user_settings", {
   autoStatus: boolean("auto_status").notNull().default(true),
   // How many follow-ups are scheduled automatically after the first (FR-5.4).
   maxFollowUps: integer("max_follow_ups").notNull().default(2),
+  // Automatic lead rules (lib/lead-rules-model.ts); empty = all at their defaults.
+  leadRules: jsonb("lead_rules").notNull().default(sql`'{}'::jsonb`),
   // How often the Gmail sync should run for this user (hours): 24/12/6/3/1.
   syncIntervalHours: integer("sync_interval_hours").notNull().default(24),
   defaultResumeId: uuid("default_resume_id").references(() => resumes.id, {
@@ -404,6 +406,36 @@ export const resumeFiles = pgTable("resume_files", {
  * automatically), so the UI shows "NC" until the user triggers a score/rescore.
  * One row per (user, lead, resume); a rescore overwrites it.
  */
+/** Every status change the system made on its own, and why (shown on the card). */
+export const leadAutoActions = pgTable(
+  "lead_auto_actions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    leadId: uuid("lead_id")
+      .notNull()
+      .references(() => jobLeads.id, { onDelete: "cascade" }),
+    rule: text("rule").notNull(),
+    fromStatus: leadStatus("from_status").notNull(),
+    fromCloseOutcome: closeOutcome("from_close_outcome"),
+    toStatus: leadStatus("to_status").notNull(),
+    reason: text("reason").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    // The user undid it; that rule leaves this lead alone from then on.
+    undoneAt: timestamp("undone_at", { withTimezone: true }),
+    // The user changed the status themselves, so the message no longer applies.
+    clearedAt: timestamp("cleared_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("lead_auto_actions_user_idx").on(t.userId),
+    index("lead_auto_actions_lead_idx").on(t.leadId),
+  ],
+);
+
 export const fitScores = pgTable(
   "fit_scores",
   {

@@ -31,6 +31,7 @@ import {
   REMINDER_OUTCOME_LABELS,
   RESUME_ALLOWED_EXT,
 } from "@/lib/types";
+import { leadRulesSchema } from "@/lib/lead-rules-model";
 
 /* ---------------- shared primitives ---------------- */
 
@@ -75,6 +76,7 @@ export const followUpsSchema = z.object({
   staleLeadDays: zDayCount,
   autoStatus: z.boolean().default(true),
   maxFollowUps: z.coerce.number().int().min(0).max(5).default(2),
+  leadRules: leadRulesSchema,
 });
 
 export const gmailConfigSchema = z.object({

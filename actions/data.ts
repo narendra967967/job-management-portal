@@ -9,7 +9,7 @@
 
 import { isUniqueViolation } from "@/lib/db-errors";
 import { activeLeadCount, getPlanLimits, leadLimitMessage } from "@/lib/entitlements";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { getCurrentUserId } from "@/lib/current-user";
 import {
@@ -33,6 +33,7 @@ import { jobKeyForUrl } from "@/lib/job-key";
 import { sourceFromUrl } from "@/lib/lead-source";
 import {
   advanceLeadStatus,
+  touchLead,
   pipelineRank,
   type AutoStatusChange,
 } from "@/lib/auto-status";
@@ -40,6 +41,7 @@ import { loadWorkspace, type WorkspaceData } from "@/lib/queries";
 import {
   contacts as contactsT,
   jobLeads as leadsT,
+  leadAutoActions as autoActionsT,
   jobLeadDetails as detailsT,
   outreachMessages as outreachT,
   reminders as remindersT,
@@ -152,6 +154,17 @@ export async function setLeadStatusAction(
       .where(and(eq(leadsT.id, input.leadId), eq(leadsT.userId, userId)))
       .returning({ id: leadsT.id });
     if (!row) throw new Error("Lead not found.");
+    // The user decided this, so any automatic message on the card no longer applies.
+    await tx
+      .update(autoActionsT)
+      .set({ clearedAt: new Date() })
+      .where(
+        and(
+          eq(autoActionsT.leadId, input.leadId),
+          eq(autoActionsT.userId, userId),
+          isNull(autoActionsT.clearedAt),
+        ),
+      );
     // Terminal → cancel pending reminders + open tasks for this job.
     if (!isJobOpen(next)) {
       await tx
@@ -194,7 +207,7 @@ export async function setLeadTopChoiceAction(
     if (!row) throw new Error("Lead not found.");
     // Starring a lead means you're interested → Shortlisted.
     const autoStatus = input.topChoice
-      ? await advanceLeadStatus(tx, userId, input.leadId, "shortlisted")
+      ? await advanceLeadStatus(tx, userId, input.leadId, "shortlisted", "you marked it as a Top Choice")
       : null;
     return { autoStatus };
   });
@@ -222,6 +235,46 @@ export async function undoAutoStatusAction(
         eq(leadsT.status, b.status as LeadStatus),
       ),
     );
+  await db
+    .update(autoActionsT)
+    .set({ undoneAt: new Date() })
+    .where(
+      and(
+        eq(autoActionsT.leadId, a.leadId),
+        eq(autoActionsT.userId, userId),
+        eq(autoActionsT.toStatus, b.status as LeadStatus),
+        isNull(autoActionsT.undoneAt),
+      ),
+    );
+}
+
+/** Undo a move from a card's automatic message. The rule won't touch the lead again. */
+export async function undoAutoActionAction(id: string): Promise<void> {
+  const userId = await getCurrentUserId();
+  const actionId = parseInput(zId, id);
+  await db.transaction(async (tx) => {
+    const [action] = await tx
+      .select()
+      .from(autoActionsT)
+      .where(and(eq(autoActionsT.id, actionId), eq(autoActionsT.userId, userId)));
+    if (!action || action.undoneAt) throw new Error("This can no longer be undone.");
+    const [row] = await tx
+      .update(leadsT)
+      .set({ status: action.fromStatus, closeOutcome: action.fromCloseOutcome })
+      .where(
+        and(
+          eq(leadsT.id, action.leadId),
+          eq(leadsT.userId, userId),
+          eq(leadsT.status, action.toStatus),
+        ),
+      )
+      .returning({ id: leadsT.id });
+    if (!row) throw new Error("This job has changed since, so it can't be undone.");
+    await tx
+      .update(autoActionsT)
+      .set({ undoneAt: new Date(), clearedAt: new Date() })
+      .where(eq(autoActionsT.id, actionId));
+  });
 }
 
 /**
@@ -325,7 +378,7 @@ export async function createLeadAction(input: {
       // Same rule as starring an existing lead: Top Choice → Shortlisted
       // (forward-only; respects the user's automatic-status setting).
       if (data.topChoice) {
-        await advanceLeadStatus(tx, userId, leadId, "shortlisted");
+        await advanceLeadStatus(tx, userId, leadId, "shortlisted", "you marked it as a Top Choice");
       }
 
       if (data.contact) {
@@ -445,8 +498,9 @@ export async function addContactAction(input: {
       connectionType: data.connectionType as ConnectionType,
       aiParsed: data.aiParsed,
     });
+    await touchLead(userId, data.leadId, tx);
     // Finding a recruiter / referral means you're working this job.
-    const autoStatus = await advanceLeadStatus(tx, userId, data.leadId, "shortlisted");
+    const autoStatus = await advanceLeadStatus(tx, userId, data.leadId, "shortlisted", "you added a contact");
     return { autoStatus };
   });
 }
@@ -567,6 +621,7 @@ export async function markSentAction(input: {
       userId,
       data.leadId,
       data.kind === "referral-ask" ? "shortlisted" : "applied",
+      data.kind === "referral-ask" ? "you sent a referral request" : "you sent a message",
     );
     return { autoStatus };
   });

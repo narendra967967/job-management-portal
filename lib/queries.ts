@@ -20,6 +20,7 @@ import {
   jobLeads as leadsT,
   outreachMessages as outreachT,
   plans as plansT,
+  leadAutoActions,
   reminders as remindersT,
   resumes as resumesT,
   tasks as tasksT,
@@ -27,11 +28,13 @@ import {
   userSettings as settingsT,
 } from "@/db/schema";
 import { OUTREACH_KIND_LABELS, fitScoreKey } from "@/lib/types";
+import { normalizeLeadRules, type LeadRules } from "@/lib/lead-rules-model";
 import { listNotifications, type NotificationRow } from "@/lib/notifications";
 import { getFeatureAccess, type FeatureAccess } from "@/lib/entitlements";
 import { getIntakeConfig, getOrCreateForwarding, loadSenders } from "@/lib/email-intake-data";
 import { acceptedSites, gmailFilterFrom, type MyForwarding } from "@/lib/email-intake-model";
 import type {
+  LeadAutoAction,
   AiSettings,
   Contact,
   FitScore,
@@ -85,6 +88,7 @@ export interface WorkspaceData {
   contacts: Contact[];
   outreach: OutreachMessage[];
   reminders: Reminder[];
+  autoActions: LeadAutoAction[];
   tasks: Task[];
   resumes: Resume[];
   defaultResumeId: string | null;
@@ -92,6 +96,7 @@ export interface WorkspaceData {
   staleLeadDays: number;
   autoStatus: boolean;
   maxFollowUps: number;
+  leadRules: LeadRules;
   profile: Profile;
   google: GoogleConnection;
   aiSettings: AiSettings;
@@ -143,6 +148,7 @@ export async function loadWorkspace(userId: string): Promise<WorkspaceData> {
     contactRows,
     outreachRows,
     reminderRows,
+    autoActionRows,
     taskRows,
     resumeRows,
     settingsRow,
@@ -167,6 +173,7 @@ export async function loadWorkspace(userId: string): Promise<WorkspaceData> {
       .where(eq(outreachT.userId, userId))
       .orderBy(desc(outreachT.createdAt)),
     db.select().from(remindersT).where(eq(remindersT.userId, userId)),
+    db.select().from(leadAutoActions).where(eq(leadAutoActions.userId, userId)),
     db.select().from(tasksT).where(eq(tasksT.userId, userId)),
     db
       .select()
@@ -389,12 +396,26 @@ export async function loadWorkspace(userId: string): Promise<WorkspaceData> {
     createdAt: e.createdAt.toISOString(),
   }));
 
+  const autoActions: LeadAutoAction[] = autoActionRows.map((a) => ({
+    id: a.id,
+    leadId: a.leadId,
+    rule: a.rule,
+    fromStatus: a.fromStatus,
+    toStatus: a.toStatus,
+    reason: a.reason,
+    createdAt: a.createdAt.toISOString(),
+    date: ymd(a.createdAt)!,
+    undone: a.undoneAt !== null,
+    cleared: a.clearedAt !== null,
+  }));
+
   return {
     leads,
     details,
     contacts,
     outreach,
     reminders,
+    autoActions,
     tasks,
     resumes,
     defaultResumeId: settings?.defaultResumeId ?? resumes.find((r) => r.isDefault)?.id ?? null,
@@ -402,6 +423,7 @@ export async function loadWorkspace(userId: string): Promise<WorkspaceData> {
     staleLeadDays: settings?.staleLeadDays ?? 14,
     autoStatus: settings?.autoStatus ?? true,
     maxFollowUps: settings?.maxFollowUps ?? 2,
+    leadRules: normalizeLeadRules(settings?.leadRules),
     profile,
     google,
     aiSettings,

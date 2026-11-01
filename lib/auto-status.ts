@@ -8,15 +8,17 @@ import "server-only";
 //  - leaves a lead alone while it's pinned (the user manually moved it
 //    backwards — see setLeadStatusAction).
 // Callers pass their transaction (or db) and report the change back to the
-// client, which shows a toast with Undo.
+// client, which shows a toast with Undo. Each move is recorded with its reason,
+// for the message on the card and the Timeline.
 
 import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   jobLeads as leadsT,
+  leadAutoActions as autoActionsT,
   userSettings as settingsT,
 } from "@/db/schema";
-import { OPEN_LEAD_STATUSES, type LeadStatus } from "@/lib/types";
+import { LEAD_STATUS_LABELS, OPEN_LEAD_STATUSES, type LeadStatus } from "@/lib/types";
 
 type Exec = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -24,6 +26,15 @@ export interface AutoStatusChange {
   leadId: string;
   from: LeadStatus;
   to: LeadStatus;
+}
+
+/** Count something stored off the lead row (its description, a contact) as
+ *  activity, so the stale and cleanup clocks restart. */
+export async function touchLead(userId: string, leadId: string, exec: Exec = db) {
+  await exec
+    .update(leadsT)
+    .set({ updatedAt: new Date() })
+    .where(and(eq(leadsT.id, leadId), eq(leadsT.userId, userId)));
 }
 
 /** Position in the open pipeline; -1 for terminal statuses. */
@@ -40,6 +51,8 @@ export async function advanceLeadStatus(
   userId: string,
   leadId: string,
   target: LeadStatus,
+  /** Finishes "Moved to Shortlisted automatically because …". */
+  because: string,
 ): Promise<AutoStatusChange | null> {
   const [settings] = await exec
     .select({ autoStatus: settingsT.autoStatus })
@@ -70,5 +83,14 @@ export async function advanceLeadStatus(
       ),
     )
     .returning({ id: leadsT.id });
-  return row ? { leadId, from, to: target } : null;
+  if (!row) return null;
+  await exec.insert(autoActionsT).values({
+    userId,
+    leadId,
+    rule: "activity",
+    fromStatus: from,
+    toStatus: target,
+    reason: `Moved to ${LEAD_STATUS_LABELS[target]} automatically because ${because}.`,
+  });
+  return { leadId, from, to: target };
 }

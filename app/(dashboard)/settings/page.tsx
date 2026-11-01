@@ -136,6 +136,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import type { LeadRules } from "@/lib/lead-rules-model";
 
 interface SettingsSection {
   id: string;
@@ -155,7 +156,17 @@ const SECTION = {
   issues: { id: "issues", label: "Ingestion issues", icon: AlertTriangle, render: () => <IngestionIssuesCard /> },
   ai: { id: "ai", label: "AI provider", icon: Sparkles, render: () => <AiProviderCard /> },
   prompts: { id: "prompts", label: "AI prompts", icon: Wand2, render: () => <AiPromptsCard /> },
-  followups: { id: "followups", label: "Follow-ups", icon: Bell, render: () => <FollowUpsCard /> },
+  followups: {
+    id: "followups",
+    label: "Follow-ups",
+    icon: Bell,
+    render: () => (
+      <div className="space-y-4">
+        <FollowUpsCard />
+        <LeadRulesCard />
+      </div>
+    ),
+  },
   resumes: { id: "resumes", label: "Resumes", icon: FileText, render: () => <ResumesCard /> },
   help: { id: "help", label: "Help & support", icon: LifeBuoy, render: () => <HelpSupportCard /> },
   account: {
@@ -1751,6 +1762,151 @@ function FollowUpsCard() {
         </div>
       </div>
     </section>
+  );
+}
+
+/** Whole number clamped to a range, as the Follow-ups fields do. */
+function clampTo(raw: string, min: number, max: number): number {
+  const n = Math.round(Number(raw));
+  if (!Number.isFinite(n) || n < min) return min;
+  return Math.min(max, n);
+}
+
+function LeadRulesCard() {
+  const [settings, update] = useAppSettings();
+  const rules = settings.leadRules;
+  const set = <K extends keyof LeadRules>(key: K, patch: Partial<LeadRules[K]>) =>
+    update({ leadRules: { ...rules, [key]: { ...rules[key], ...patch } } });
+  const days = (key: Exclude<keyof LeadRules, "strongFit">, label: string) => (
+    <Field label={label}>
+      <Input
+        type="number"
+        min={1}
+        max={365}
+        step={1}
+        disabled={!rules[key].on}
+        value={rules[key].days}
+        onChange={(e) => set(key, { days: clampTo(e.target.value, 1, 365) })}
+      />
+    </Field>
+  );
+  return (
+    <section className="rounded-2xl border bg-card p-4 md:p-5">
+      <h2 className="text-sm font-medium">Automatic cleanup</h2>
+      <p className="mt-0.5 text-xs text-muted-foreground">
+        Jobs fill up while leads sit untouched, so Jobtiva moves them on once a day. Each card
+        says why it moved and has an Undo button.
+      </p>
+      <div className="mt-4 divide-y">
+        <LeadRuleRow
+          title="Never touched"
+          result="New jobs close as Job position closed."
+          on={rules.neverTouched.on}
+          onChange={(on) => set("neverTouched", { on })}
+        >
+          {days("neverTouched", "No activity for (days)")}
+        </LeadRuleRow>
+        <LeadRuleRow
+          title="Shortlisted and forgotten"
+          result="Shortlisted jobs close as Job position closed."
+          on={rules.forgotten.on}
+          onChange={(on) => set("forgotten", { on })}
+        >
+          {days("forgotten", "No activity for (days)")}
+        </LeadRuleRow>
+        <LeadRuleRow
+          title="Applied, no outreach"
+          result="Applied jobs close as No response."
+          on={rules.appliedQuiet.on}
+          onChange={(on) => set("appliedQuiet", { on })}
+        >
+          {days("appliedQuiet", "No activity for (days)")}
+        </LeadRuleRow>
+        <LeadRuleRow
+          title="Follow-ups used up"
+          result="Jobs close as No response when your follow-ups get no reply."
+          on={rules.followUpsDone.on}
+          onChange={(on) => set("followUpsDone", { on })}
+        >
+          {days("followUpsDone", "No activity for (days)")}
+        </LeadRuleRow>
+        <LeadRuleRow
+          title="Low fit"
+          result="New and Shortlisted jobs are discarded."
+          on={rules.lowFit.on}
+          onChange={(on) => set("lowFit", { on })}
+        >
+          <Field label="Score below">
+            <Input
+              type="number"
+              min={1}
+              max={100}
+              step={1}
+              disabled={!rules.lowFit.on}
+              value={rules.lowFit.score}
+              onChange={(e) => set("lowFit", { score: clampTo(e.target.value, 1, 100) })}
+            />
+          </Field>
+          {days("lowFit", "After (days)")}
+        </LeadRuleRow>
+        <LeadRuleRow
+          title="Strong fit"
+          result="New jobs move to Shortlisted. While this is on, lower scores stay where they are."
+          on={rules.strongFit.on}
+          onChange={(on) => set("strongFit", { on })}
+        >
+          <Field label="Score at or above">
+            <Input
+              type="number"
+              min={1}
+              max={100}
+              step={1}
+              disabled={!rules.strongFit.on}
+              value={rules.strongFit.score}
+              onChange={(e) => set("strongFit", { score: clampTo(e.target.value, 1, 100) })}
+            />
+          </Field>
+        </LeadRuleRow>
+      </div>
+      {rules.lowFit.on && rules.strongFit.on && rules.lowFit.score > rules.strongFit.score && (
+        <p role="alert" className="mt-3 text-xs text-destructive">
+          Your low fit score is above your strong fit score, so some jobs meet both. Low fit wins.
+        </p>
+      )}
+      <p className="mt-3 text-xs text-muted-foreground">
+        Top Choice jobs, jobs with a reminder or open to-do, Interview and Offer Received jobs,
+        and jobs you moved back yourself are never touched. Score rules use your default
+        resume and only apply to jobs you&apos;ve scored. A job closed for going quiet reopens
+        by itself if it shows up in a new alert.
+      </p>
+    </section>
+  );
+}
+
+function LeadRuleRow({
+  title,
+  result,
+  on,
+  onChange,
+  children,
+}: {
+  title: string;
+  result: string;
+  on: boolean;
+  onChange: (on: boolean) => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="grid gap-3 py-3 first:pt-0 last:pb-0 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center">
+      <div className="flex items-start gap-3">
+        <SettingSwitch checked={on} onChange={onChange} label={title} />
+        <div className="min-w-0">
+          <p className="text-sm font-medium">{title}</p>
+          <p className="text-xs text-muted-foreground">{result}</p>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3 xl:flex xl:[&>*]:w-32">{children}</div>
+    </div>
   );
 }
 

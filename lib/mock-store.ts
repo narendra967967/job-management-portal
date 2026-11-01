@@ -27,6 +27,7 @@ import {
   markSentAction,
   setLeadStatusAction,
   setLeadTopChoiceAction,
+  undoAutoActionAction,
   undoAutoStatusAction,
   setReminderOutcomeAction,
   snoozeReminderAction,
@@ -81,12 +82,14 @@ import type {
   OutreachKind,
   OutreachMessage,
   Profile,
+  LeadAutoAction,
   Reminder,
   ReminderOutcome,
   Resume,
   Task,
 } from "@/lib/types";
 import type { GmailConfigData, WorkspaceData, WorkspaceIntake } from "@/lib/queries";
+import { DEFAULT_LEAD_RULES, type LeadRules } from "@/lib/lead-rules-model";
 import type { MyForwardingState } from "@/actions/email-intake";
 
 export interface AppSettings {
@@ -96,6 +99,8 @@ export interface AppSettings {
   autoStatus: boolean;
   /** Follow-ups auto-scheduled after the first one (FR-5.4), 0–5. */
   maxFollowUps: number;
+  /** Per-user automatic lead rules. */
+  leadRules: LeadRules;
 }
 
 /* ---------------- state ---------------- */
@@ -105,6 +110,7 @@ let details: Record<string, JobLeadDetail> = {};
 let contacts: Contact[] = [];
 let outreach: OutreachMessage[] = [];
 let reminders: Reminder[] = [];
+let autoActions: LeadAutoAction[] = [];
 let tasks: Task[] = [];
 let resumes: Resume[] = [];
 let defaultResumeId = "";
@@ -122,6 +128,7 @@ let appSettings: AppSettings = {
   staleLeadDays: 14,
   autoStatus: true,
   maxFollowUps: 2,
+  leadRules: DEFAULT_LEAD_RULES,
 };
 let profile: Profile = { name: "", email: "", mobile: "", country: "", plan: null };
 let google: GoogleConnection = {
@@ -182,6 +189,7 @@ function stateFrom(data: WorkspaceData) {
     contacts: data.contacts,
     outreach: data.outreach,
     reminders: data.reminders,
+    autoActions: data.autoActions,
     tasks: data.tasks,
     resumes: data.resumes,
     defaultResumeId:
@@ -191,6 +199,7 @@ function stateFrom(data: WorkspaceData) {
       staleLeadDays: data.staleLeadDays,
       autoStatus: data.autoStatus,
       maxFollowUps: data.maxFollowUps,
+      leadRules: data.leadRules,
     } as AppSettings,
     profile: data.profile,
     google: data.google,
@@ -215,6 +224,7 @@ function apply(data: WorkspaceData) {
   contacts = st.contacts;
   outreach = st.outreach;
   reminders = st.reminders;
+  autoActions = st.autoActions;
   tasks = st.tasks;
   resumes = st.resumes;
   defaultResumeId = st.defaultResumeId;
@@ -285,6 +295,7 @@ const getDetails = () => details;
 const getContacts = () => contacts;
 const getOutreach = () => outreach;
 const getReminders = () => reminders;
+const getAutoActions = () => autoActions;
 const getTasks = () => tasks;
 const getStoredNotifications = () => storedNotifications;
 
@@ -311,6 +322,10 @@ export function useLeads(): JobLead[] {
 }
 function useStoredNotifications(): WorkspaceData["notifications"] {
   return useWs("storedNotifications", getStoredNotifications);
+}
+/** All automatic status changes, for the card messages and Timeline. */
+export function useAutoActions(): LeadAutoAction[] {
+  return useWs("autoActions", getAutoActions);
 }
 export function useLead(id: string): JobLead | undefined {
   return useLeads().find((l) => l.id === id);
@@ -430,6 +445,17 @@ export async function discardLead(leadId: string, from: LeadStatus) {
     });
   } catch (e) {
     toast.error("Couldn't update lead", e instanceof Error ? e.message : undefined);
+  }
+}
+
+/** Undo a move from a card's automatic message. */
+export async function undoAutoAction(id: string, from: LeadStatus) {
+  try {
+    await undoAutoActionAction(id);
+    await refresh();
+    toast.success(`Back to ${LEAD_STATUS_LABELS[from]}`);
+  } catch (e) {
+    toast.error("Couldn't undo", e instanceof Error ? e.message : undefined);
   }
 }
 
@@ -1018,6 +1044,7 @@ export type TimelineKind =
   | "message"
   | "reminder"
   | "reminder-resolved"
+  | "auto"
   | "status";
 
 export interface TimelineEvent {
@@ -1034,6 +1061,7 @@ export function useLeadTimeline(leadId: string): TimelineEvent[] {
   const leadReminders = useRemindersForLead(leadId);
   const lead = useLead(leadId);
   const { status, closeOutcome } = useLeadStatus(leadId);
+  const allAutoActions = useAutoActions();
 
   const events: TimelineEvent[] = [];
 
@@ -1078,6 +1106,17 @@ export function useLeadTimeline(leadId: string): TimelineEvent[] {
         r.outcome === "pending"
           ? `${label} due`
           : `${label} · ${REMINDER_OUTCOME_LABELS[r.outcome]}`,
+    });
+  }
+
+  for (const a of allAutoActions) {
+    if (a.leadId !== leadId) continue;
+    events.push({
+      id: `auto-${a.id}`,
+      kind: "auto",
+      date: a.date,
+      title: a.reason,
+      detail: a.undone ? "You undid this" : undefined,
     });
   }
 

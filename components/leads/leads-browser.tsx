@@ -60,6 +60,7 @@ import {
   LeadCardMenu,
   SourceChip,
   TOP_CHOICE_CARD,
+  AutoActionNote,
   TopChoiceStar,
   discardWithFollowUpsConfirm,
 } from "@/components/leads/lead-meta";
@@ -1480,6 +1481,7 @@ function LeadCard({
             {cached && band ? band.label : "Not scored"} · {resumeLabel}
           </span>
         </div>
+        <AutoActionNote lead={{ id: lead.id, status }} className="mt-2.5" />
         <div className="mt-auto flex flex-wrap items-center gap-1.5 pt-3">
           <SourceChip lead={lead} />
           {lead.tags.map((tag, i) => (

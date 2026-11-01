@@ -337,6 +337,13 @@
       "when": 1793521446193,
       "tag": "0047_close_outcome_position_closed",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1793558627283,
+      "tag": "0048_lead_auto_rules",
+      "breakpoints": true
     }
   ]
 }

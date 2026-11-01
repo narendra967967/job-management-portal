@@ -4,6 +4,7 @@
 // The AI API key is encrypted at rest (lib/crypto); only its last 4 chars are
 // ever read back to the client (via loadWorkspace).
 
+import type { LeadRules } from "@/lib/lead-rules-model";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { getCurrentUserId } from "@/lib/current-user";
@@ -66,9 +67,10 @@ export async function updateFollowUpsAction(input: {
   staleLeadDays: number;
   autoStatus: boolean;
   maxFollowUps: number;
+  leadRules: LeadRules;
 }) {
   const userId = await getCurrentUserId();
-  const { reminderIntervalDays, staleLeadDays, autoStatus, maxFollowUps } = parseInput(
+  const { reminderIntervalDays, staleLeadDays, autoStatus, maxFollowUps, leadRules } = parseInput(
     followUpsSchema,
     input,
   );
@@ -77,6 +79,7 @@ export async function updateFollowUpsAction(input: {
     staleLeadDays,
     autoStatus,
     maxFollowUps,
+    leadRules,
   });
 }
 

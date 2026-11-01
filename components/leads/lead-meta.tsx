@@ -5,15 +5,17 @@
 //  - SourceChip:   where the job came from + whether it was added by the system
 //  - TopChoiceStar / TOP_CHOICE_CARD: the Top Choice marker + golden glow
 //  - TopChoiceToggle: the star beside the title on an opened job
+//  - AutoActionNote: why the system moved this lead, with Undo
 
 import { useState } from "react";
 import { Bot, ExternalLink, Lock, MoreHorizontal, PenLine, Star, Wallet } from "lucide-react";
 import {
+  currentAutoAction,
   LEAD_ORIGIN_LABELS,
   LEAD_SOURCE_LABELS,
   type JobLead,
 } from "@/lib/types";
-import { setLeadTopChoice, useFeatures } from "@/lib/mock-store";
+import { setLeadTopChoice, undoAutoAction, useAutoActions, useFeatures } from "@/lib/mock-store";
 import { SalaryInsightDialog } from "@/components/leads/salary-insight";
 import {
   DropdownMenu,
@@ -138,6 +140,48 @@ export function TopChoiceToggle({
     >
       <Star className={cn("size-5", topChoice && "fill-top-choice text-top-choice")} aria-hidden />
     </button>
+  );
+}
+
+/** Why the system moved this lead, while that still explains its status. */
+export function AutoActionNote({
+  lead,
+  className,
+}: {
+  lead: Pick<JobLead, "id" | "status">;
+  className?: string;
+}) {
+  const action = currentAutoAction(useAutoActions(), lead, Date.now());
+  const [undoing, setUndoing] = useState(false);
+  if (!action) return null;
+  const stop = (e: React.SyntheticEvent) => e.stopPropagation();
+  return (
+    <div
+      className={cn(
+        "flex items-center gap-1.5 rounded-md bg-ai-muted/60 px-2 py-1 text-[11px] leading-snug text-foreground",
+        className,
+      )}
+    >
+      <Bot className="size-3 shrink-0 text-ai" aria-hidden />
+      <p className="min-w-0 flex-1">{action.reason}</p>
+      {/* Stops the tap from opening the card or starting a drag. */}
+      <button
+        type="button"
+        aria-label={`Undo: ${action.reason}`}
+        disabled={undoing}
+        onPointerDown={stop}
+        onKeyDown={stop}
+        onClick={async (e) => {
+          e.stopPropagation();
+          setUndoing(true);
+          await undoAutoAction(action.id, action.fromStatus);
+          setUndoing(false);
+        }}
+        className="-my-1 inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded font-medium text-primary underline-offset-2 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-60 lg:min-h-7"
+      >
+        Undo
+      </button>
+    </div>
   );
 }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Bot,
   Sparkles,
   UserPlus,
   Send,
@@ -26,6 +27,7 @@ const KIND_META: Record<
     icon: CircleCheck,
     dot: "bg-status-applied text-status-applied-foreground",
   },
+  auto: { icon: Bot, dot: "bg-ai-muted text-ai" },
   status: { icon: CircleDot, dot: "bg-muted text-muted-foreground" },
 };
 

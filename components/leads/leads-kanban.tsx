@@ -72,6 +72,7 @@ import {
   LeadCardMenu,
   SourceChip,
   TOP_CHOICE_CARD,
+  AutoActionNote,
   TopChoiceStar,
   discardWithFollowUpsConfirm,
 } from "@/components/leads/lead-meta";
@@ -653,6 +654,7 @@ function KanbanCard({
           {lead.company} · {lead.location}
         </span>
       </p>
+      {!overlay && <AutoActionNote lead={lead} className="mt-2" />}
       <div className="mt-2 flex flex-wrap items-center gap-1">
         <SourceChip lead={lead} className="px-1.5 text-[10px]" />
         {ready && (

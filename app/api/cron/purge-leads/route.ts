@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { runLeadPurge } from "@/lib/lead-purge";
+import { runLeadRules } from "@/lib/lead-rules";
 import { runRetention } from "@/lib/retention";
 
 // Stale-lead purge endpoint — called on a (daily) schedule by GitHub Actions.
@@ -7,7 +8,8 @@ import { runRetention } from "@/lib/retention";
 // doing any work. The lead purge is a no-op unless Lead retention is enabled in
 // admin Settings → Cron; Data retention (admin Settings) is always applied —
 // the inbound log, ingestion issues, processed-email ledger, lead purge
-// history and notifications are trimmed to their windows.
+// history and notifications are trimmed to their windows. Each user's automatic
+// lead rules run here too, first, so they're on the same daily schedule.
 
 export async function POST(request: NextRequest) {
   const secret = process.env.CRON_SECRET;
@@ -16,7 +18,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const leadRules = await runLeadRules();
   const result = await runLeadPurge();
   const retention = await runRetention();
-  return NextResponse.json({ ok: true, ...result, retention });
+  return NextResponse.json({ ok: true, ...result, retention, leadRules });
 }

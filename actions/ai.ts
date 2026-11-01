@@ -7,6 +7,8 @@
 
 import { and, eq } from "drizzle-orm";
 import { advanceLeadStatus, type AutoStatusChange } from "@/lib/auto-status";
+import { getLeadRules } from "@/lib/lead-rules";
+import { touchLead } from "@/lib/auto-status";
 import { db } from "@/lib/db";
 import { careerBriefFor } from "@/lib/career-data";
 import { getCurrentUserId } from "@/lib/current-user";
@@ -149,8 +151,9 @@ export async function saveJdAction(
     .insert(detailsT)
     .values({ leadId, userId, jdText: text })
     .onConflictDoUpdate({ target: detailsT.leadId, set: { jdText: text } });
+  await touchLead(userId, leadId);
   // Saving a JD means you're looking into this job → Shortlisted.
-  const autoStatus = await advanceLeadStatus(db, userId, leadId, "shortlisted");
+  const autoStatus = await advanceLeadStatus(db, userId, leadId, "shortlisted", "you saved the job description");
   return { ok: true, autoStatus };
 }
 
@@ -183,8 +186,9 @@ export async function summarizeJdAction(
     .insert(detailsT)
     .values({ leadId, userId, jdText: text })
     .onConflictDoUpdate({ target: detailsT.leadId, set: { jdText: text } });
+  await touchLead(userId, leadId);
   // The JD is saved either way → Shortlisted (reported even if the AI fails).
-  const autoStatus = await advanceLeadStatus(db, userId, leadId, "shortlisted");
+  const autoStatus = await advanceLeadStatus(db, userId, leadId, "shortlisted", "you saved the job description");
 
   try {
     const system = await effectivePrompt(userId, "summary");
@@ -424,8 +428,13 @@ export async function scoreFitAction(
         set: { score, rationale: rationale || null },
       });
 
-    // Checking your fit means you're evaluating it → Shortlisted.
-    const autoStatus = await advanceLeadStatus(db, userId, input.leadId, "shortlisted");
+    // A good score means it's worth pursuing → Shortlisted. While the strong-fit
+    // rule is on, a score below its limit leaves the job where it is.
+    const { strongFit } = await getLeadRules(userId);
+    const autoStatus =
+      strongFit.on && score < strongFit.score
+        ? null
+        : await advanceLeadStatus(db, userId, input.leadId, "shortlisted", `your resume scored ${score} for this job`);
     return { ok: true, score, rationale, autoStatus };
   } catch (err) {
     return { ok: false, error: friendly(err) };

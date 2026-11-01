@@ -42,6 +42,7 @@ import { StatusBadge } from "@/components/leads/status-badge";
 import {
   SourceChip,
   TOP_CHOICE_CARD,
+  AutoActionNote,
   TopChoiceToggle,
   openPostingLabel,
 } from "@/components/leads/lead-meta";
@@ -263,6 +264,8 @@ export function LeadDetailContent({
             />
           </div>
         </div>
+
+        <AutoActionNote lead={{ id: lead.id, status }} className="mt-3 text-xs" />
 
         {/* Why this lead is closed / discarded — prominent on the detail view. */}
         {status === "closed" &&
