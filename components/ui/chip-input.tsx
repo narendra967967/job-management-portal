@@ -1,8 +1,8 @@
 "use client";
 
 // Multi-value text input shown as removable chips (skills, languages, roles…).
-// Enter or comma adds what's typed; Backspace on an empty field removes the last
-// chip. Suggestions sit underneath as tappable "+ value" buttons — shown up
+// Enter or comma adds what's typed, and a pasted comma-separated list adds in one
+// go; Backspace on an empty field removes the last chip. Suggestions sit underneath as tappable "+ value" buttons — shown up
 // front for short curated lists, or only while typing for long ones (countries).
 
 import { useId, useMemo, useState, type KeyboardEvent } from "react";
@@ -32,20 +32,35 @@ export function ChipInput({
   invalid?: boolean;
 }) {
   const [draft, setDraft] = useState("");
+  const [notice, setNotice] = useState("");
   const listId = useId();
   const full = max != null && value.length >= max;
 
   /** Add one or more comma-separated values (typed or pasted). */
   function add(raw: string) {
+    if (!raw.trim()) return setDraft("");
     let next = value;
+    let tooLong = 0;
+    let noRoom = 0;
     for (const part of raw.split(",")) {
-      const v = part.trim().replace(/\s+/g, " ").slice(0, maxLength);
+      const v = part.trim().replace(/\s+/g, " ");
       if (!v || next.some((x) => x.toLowerCase() === v.toLowerCase())) continue;
-      if (max != null && next.length >= max) break;
-      next = [...next, v];
+      if (v.length > maxLength) tooLong++;
+      else if (max != null && next.length >= max) noRoom++;
+      else next = [...next, v];
     }
     if (next !== value) onChange(next);
     setDraft("");
+    const left = [
+      noRoom > 0 && `Only ${max} fit, so ${noRoom} ${noRoom === 1 ? "was" : "were"} left out.`,
+      tooLong > 0 && `${tooLong} ${tooLong === 1 ? "was" : "were"} left out for being over ${maxLength} characters.`,
+    ].filter(Boolean);
+    setNotice(left.join(" "));
+  }
+
+  function remove(next: string[]) {
+    onChange(next);
+    setNotice("");
   }
 
   function onKeyDown(e: KeyboardEvent<HTMLInputElement>) {
@@ -54,7 +69,7 @@ export function ChipInput({
       // Read the field itself: with fast typing, `draft` can lag a keystroke.
       add(e.currentTarget.value);
     } else if (e.key === "Backspace" && !e.currentTarget.value && value.length) {
-      onChange(value.slice(0, -1));
+      remove(value.slice(0, -1));
     }
   }
 
@@ -83,7 +98,7 @@ export function ChipInput({
             <span className="truncate">{v}</span>
             <button
               type="button"
-              onClick={() => onChange(value.filter((x) => x !== v))}
+              onClick={() => remove(value.filter((x) => x !== v))}
               aria-label={`Remove ${v}`}
               className="relative flex size-5 shrink-0 items-center justify-center rounded text-primary/70 after:absolute after:-inset-2 after:content-[''] hover:bg-primary/15 hover:text-primary"
             >
@@ -100,11 +115,15 @@ export function ChipInput({
             placeholder={value.length ? "" : placeholder}
             aria-label={ariaLabel}
             aria-describedby={shown.length ? listId : undefined}
-            maxLength={maxLength}
             className="h-8 min-w-32 flex-1 bg-transparent px-1 text-base outline-none placeholder:text-muted-foreground md:text-sm"
           />
         )}
       </div>
+      {notice && (
+        <p role="status" className="text-xs text-destructive">
+          {notice}
+        </p>
+      )}
       {(shown.length > 0 || max != null) && (
         <div className="flex flex-wrap items-center gap-1.5" id={listId}>
           {!full &&
