@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { Bell, Clock, Sparkles, Search } from "lucide-react";
-import { useLeads, useReminders, useNotifications, useProfile, markNotificationsRead } from "@/lib/mock-store";
+import { useLeads, useReminders, useNotifications, useProfile, useStaleCutoff, markNotificationsRead } from "@/lib/mock-store";
+import { isLeadStale } from "@/lib/types";
 import { useSearchQuery, setSearchQuery } from "@/lib/search-store";
 import { Input } from "@/components/ui/input";
 import { PlanBadge } from "@/components/ui/plan-badge";
@@ -57,7 +58,9 @@ export function PlanChip({ className }: { className?: string }) {
 
 /** Compact key numbers in the top bar. */
 export function TopBarStats({ className }: { className?: string }) {
-  const newCount = useLeads().filter((l) => l.status === "new").length;
+  const staleCutoff = useStaleCutoff();
+  // Stale leads wait in Archive, so this matches the New tile on Leads.
+  const newCount = useLeads().filter((l) => l.status === "new" && !isLeadStale(l, staleCutoff)).length;
   const dueCount = useReminders().filter((r) => r.outcome === "pending").length;
   return (
     <div className={cn("flex items-center gap-1.5", className)}>

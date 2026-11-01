@@ -203,7 +203,10 @@ export async function loadWorkspace(userId: string): Promise<WorkspaceData> {
   const jdByLead = new Set(
     detailRows.filter((d) => d.jdText && d.jdText.trim()).map((d) => d.leadId),
   );
-  const outreachByLead = new Set(outreachRows.map((m) => m.leadId));
+  // Drafts don't count: nothing has reached anyone until it's marked sent.
+  const outreachByLead = new Set(
+    outreachRows.filter((m) => m.status === "sent").map((m) => m.leadId),
+  );
 
   const leads: JobLead[] = leadRows.map((l) => ({
     id: l.id,
@@ -221,6 +224,7 @@ export async function loadWorkspace(userId: string): Promise<WorkspaceData> {
     origin: l.origin,
     topChoice: l.topChoice,
     capturedAt: ymd(l.capturedAt)!,
+    lastActiveAt: ymd(l.updatedAt > l.capturedAt ? l.updatedAt : l.capturedAt)!,
     contactCount: contactCountByLead.get(l.id) ?? 0,
     hasDueReminder: dueByLead.has(l.id),
     hasJd: jdByLead.has(l.id),

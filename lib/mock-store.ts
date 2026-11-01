@@ -683,6 +683,14 @@ export function useDefaultResumeId(): [string, (id: string) => void] {
   return [id, setDefault];
 }
 
+/** Local YYYY-MM-DD before which a quiet lead counts as stale. */
+export function useStaleCutoff(): string {
+  const { staleLeadDays } = useWs("appSettings", getAppSettings);
+  const d = new Date();
+  d.setDate(d.getDate() - staleLeadDays);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 export function useAppSettings(): [
   AppSettings,
   (patch: Partial<AppSettings>) => void,

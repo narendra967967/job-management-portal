@@ -32,7 +32,9 @@ import {
   LEAD_STATUS_LABELS,
   OPEN_LEAD_STATUSES,
   isJobOpen,
+  isLeadStale,
   isReadyForAction,
+  READY_LEAD_STATUSES,
   fitScoreKey,
   normalizeLeadStatus,
   type CloseOutcome,
@@ -66,11 +68,11 @@ import { useSearchQuery } from "@/lib/search-store";
 import {
   useLeads,
   useResumes,
-  useReminders,
   useContactsForLead,
   useRemindersForLead,
   useDefaultResumeId,
   useAppSettings,
+  useStaleCutoff,
   useFitScore,
   useAllFitScores,
   discardLead,
@@ -230,6 +232,12 @@ const STATUS_META: Record<
   },
 };
 
+// Stale leads live only in Archive, so sorting by them means nothing elsewhere.
+const SORT_GROUPS_NO_STALE = SORT_GROUPS.map((g) => ({
+  ...g,
+  options: g.options.filter((o) => o.value !== "stale-first"),
+}));
+
 type ArchiveBucket = "stale" | "closed" | "discarded";
 
 const BUCKET_META: Record<
@@ -254,25 +262,9 @@ export type LeadsScope = "all" | "archive" | "ready" | "outreached";
 export function LeadsBrowser({ scope = "all" }: { scope?: LeadsScope }) {
   const allLeads = useLeads();
   const resumes = useResumes();
-  const allReminders = useReminders();
   const fitScores = useAllFitScores();
-  const [{ staleLeadDays }] = useAppSettings();
-
-  // Stale = open lead, no pending follow-up, captured before the cutoff (FR-2.4).
-  const pendingLeadIds = useMemo(
-    () =>
-      new Set(
-        allReminders.filter((r) => r.outcome === "pending").map((r) => r.leadId),
-      ),
-    [allReminders],
-  );
-  const staleCutoff = useMemo(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - staleLeadDays);
-    return toISODate(d);
-  }, [staleLeadDays]);
-  const isStale = (l: JobLead) =>
-    isJobOpen(l.status) && !pendingLeadIds.has(l.id) && l.capturedAt < staleCutoff;
+  const staleCutoff = useStaleCutoff();
+  const isStale = (l: JobLead) => isLeadStale(l, staleCutoff);
   const bucketOf = (l: JobLead): ArchiveBucket =>
     l.status === "closed"
       ? "closed"
@@ -282,9 +274,10 @@ export function LeadsBrowser({ scope = "all" }: { scope?: LeadsScope }) {
 
   // Each scope narrows the base set:
   //  - archive: terminal (closed/discarded) + stale
-  //  - ready: open leads with a JD *and* a contact (ready to work)
+  //  - ready: shortlisted/applied leads with a JD *and* a contact, nothing sent
   //  - outreached: open leads that have had outreach sent
-  //  - all (default): active/open leads only (terminal ones live in Archive)
+  //  - all (default): open leads
+  // Stale leads appear only in Archive, so the other three leave them out.
   const leads = useMemo(
     () => {
       switch (scope) {
@@ -294,17 +287,19 @@ export function LeadsBrowser({ scope = "all" }: { scope?: LeadsScope }) {
               l.status === "closed" || l.status === "discarded" || isStale(l),
           );
         case "ready":
-          return allLeads.filter(isReadyForAction);
+          return allLeads.filter((l) => isReadyForAction(l) && !isStale(l));
         case "outreached":
-          return allLeads.filter((l) => isJobOpen(l.status) && l.hasOutreach);
+          return allLeads.filter((l) => isJobOpen(l.status) && l.hasOutreach && !isStale(l));
         default:
-          return allLeads.filter((l) => isJobOpen(l.status));
+          return allLeads.filter((l) => isJobOpen(l.status) && !isStale(l));
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [allLeads, scope, pendingLeadIds, staleCutoff],
+    [allLeads, scope, staleCutoff],
   );
 
+  // The stages this list can hold, for its tiles and status filter.
+  const scopeStatuses = scope === "ready" ? READY_LEAD_STATUSES : OPEN_LEAD_STATUSES;
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [bucketFilter, setBucketFilter] = useState<ArchiveBucket | "all">("all");
   const [locationFilter, setLocationFilter] = useState<LocationFilter>("all");
@@ -511,8 +506,7 @@ export function LeadsBrowser({ scope = "all" }: { scope?: LeadsScope }) {
 
     const scoreOf = (l: JobLead) =>
       fitScores[fitScoreKey(l.id, resumeChoice[l.id] || defaultResumeId)]?.score;
-    const staleOf = (l: JobLead) =>
-      isJobOpen(l.status) && !pendingLeadIds.has(l.id) && l.capturedAt < staleCutoff;
+    const staleOf = (l: JobLead) => isLeadStale(l, staleCutoff);
     const newest = (a: JobLead, b: JobLead) =>
       b.capturedAt.localeCompare(a.capturedAt);
 
@@ -552,7 +546,7 @@ export function LeadsBrowser({ scope = "all" }: { scope?: LeadsScope }) {
       case "due-first":
         out.sort(
           (a, b) =>
-            Number(pendingLeadIds.has(b.id)) - Number(pendingLeadIds.has(a.id)) ||
+            Number(b.hasDueReminder) - Number(a.hasDueReminder) ||
             newest(a, b),
         );
         break;
@@ -568,7 +562,7 @@ export function LeadsBrowser({ scope = "all" }: { scope?: LeadsScope }) {
         out.sort(newest);
     }
     return out;
-  }, [leads, scope, statusFilter, bucketFilter, locationFilter, countryFilter, titleFilter, tagFilter, topChoiceFilter, sourceFilter, originFilter, search, dateBounds, sort, fitScores, resumeChoice, defaultResumeId, pendingLeadIds, staleCutoff]);
+  }, [leads, scope, statusFilter, bucketFilter, locationFilter, countryFilter, titleFilter, tagFilter, topChoiceFilter, sourceFilter, originFilter, search, dateBounds, sort, fitScores, resumeChoice, defaultResumeId, staleCutoff]);
 
   // Reset to the first page (and clear any selection) whenever the result set
   // changes.
@@ -657,8 +651,9 @@ export function LeadsBrowser({ scope = "all" }: { scope?: LeadsScope }) {
       <div
         data-tour="status-tiles"
         className={cn(
-          "hidden gap-2.5 sm:grid sm:grid-cols-3",
-          scope !== "archive" && "lg:grid-cols-5",
+          "hidden gap-2.5 sm:grid",
+          scope === "ready" ? "sm:grid-cols-2" : "sm:grid-cols-3",
+          scope !== "archive" && scope !== "ready" && "lg:grid-cols-5",
         )}
       >
         {scope === "archive"
@@ -676,7 +671,7 @@ export function LeadsBrowser({ scope = "all" }: { scope?: LeadsScope }) {
                 />
               );
             })
-          : OPEN_LEAD_STATUSES.map((s) => {
+          : scopeStatuses.map((s) => {
               const meta = STATUS_META[s];
               return (
                 <MetricBox
@@ -721,7 +716,7 @@ export function LeadsBrowser({ scope = "all" }: { scope?: LeadsScope }) {
           value={sort}
           onValueChange={(v) => setSort(v as Sort)}
           className="ml-auto"
-          groups={SORT_GROUPS}
+          groups={scope === "archive" ? SORT_GROUPS : SORT_GROUPS_NO_STALE}
         />
       </div>
 
@@ -806,7 +801,7 @@ export function LeadsBrowser({ scope = "all" }: { scope?: LeadsScope }) {
                     onValueChange={(v) => setStatusFilter(v as StatusFilter)}
                     options={[
                       { value: "all", label: "All statuses" },
-                      ...OPEN_LEAD_STATUSES.map((s) => ({
+                      ...scopeStatuses.map((s) => ({
                         value: s,
                         label: LEAD_STATUS_LABELS[s],
                       })),
@@ -1364,17 +1359,11 @@ function LeadCard({
     resumes.find((r) => r.id === resumeId)?.label ?? "resume";
   const open = isJobOpen(status);
   const hasContacts = contactCount > 0;
-  // Stale = open, no pending follow-up, and captured longer ago than the
-  // configured threshold (FR-2.4).
   const [{ staleLeadDays }] = useAppSettings();
+  const staleCutoff = useStaleCutoff();
   const hasPendingReminder = leadReminders.some((r) => r.outcome === "pending");
-  const staleCutoff = (() => {
-    const d = new Date();
-    d.setDate(d.getDate() - staleLeadDays);
-    return toISODate(d);
-  })();
-  const stale = open && !hasPendingReminder && lead.capturedAt < staleCutoff;
-  const ready = open && lead.hasJd && contactCount > 0;
+  const stale = isLeadStale(lead, staleCutoff);
+  const ready = isReadyForAction(lead);
 
   // One tap, except when discarding would cancel follow-ups, which Undo can't restore.
   async function discard() {

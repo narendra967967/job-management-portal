@@ -189,6 +189,8 @@ export interface JobLead {
   /** The user starred this job as a Top Choice. */
   topChoice: boolean;
   capturedAt: string; // ISO date
+  /** Latest of captured, renewed by an alert or changed by the user (ISO date). */
+  lastActiveAt: string;
   contactCount: number;
   hasDueReminder: boolean;
   /** A job description has been saved for this lead. */
@@ -197,18 +199,37 @@ export interface JobLead {
   hasOutreach: boolean;
 }
 
+/** Stages where a job can sit in Ready to action. */
+export const READY_LEAD_STATUSES: LeadStatus[] = ["shortlisted", "applied"];
+
 /**
- * "Ready for action" — an open lead that has both a saved JD and at least one
- * contact, so there's enough to actually work it. Derived, not a stored status.
+ * "Ready for action" — a shortlisted or applied lead that has both a saved JD and
+ * at least one contact, so there's enough to actually work it. Derived, not a
+ * stored status.
  */
 export function isReadyForAction(lead: JobLead): boolean {
   return (
-    isJobOpen(lead.status) &&
+    READY_LEAD_STATUSES.includes(lead.status) &&
     lead.hasJd &&
     lead.contactCount > 0 &&
     // Once you've reached out, it's no longer "ready to action" — it moves to
     // the Outreached view.
     !lead.hasOutreach
+  );
+}
+
+/** Stages that can go stale; Interview and Offer Received are clearly active. */
+const STALE_LEAD_STATUSES: LeadStatus[] = ["new", "shortlisted", "applied"];
+
+/**
+ * Stale = nothing pending and no activity since `cutoff` (FR-2.4). A stale lead
+ * is still open, but it lives only in Archive until something brings it back.
+ */
+export function isLeadStale(lead: JobLead, cutoff: string): boolean {
+  return (
+    STALE_LEAD_STATUSES.includes(lead.status) &&
+    !lead.hasDueReminder &&
+    lead.lastActiveAt < cutoff
   );
 }
 

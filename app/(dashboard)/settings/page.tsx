@@ -1711,8 +1711,9 @@ function FollowUpsCard() {
       <p className="mt-3 text-xs text-muted-foreground">
         A follow-up is auto-scheduled {settings.reminderIntervalDays} day
         {settings.reminderIntervalDays === 1 ? "" : "s"} after a message is
-        marked sent. Open leads with no pending follow-up for{" "}
-        {settings.staleLeadDays} days are flagged <em>Stale</em> for review.
+        marked sent. New, shortlisted and applied leads with no pending
+        follow-up and no activity for {settings.staleLeadDays} days move to
+        Archive as <em>Stale</em>.
       </p>
 
       <div className="mt-5 grid gap-3 border-t pt-4 sm:grid-cols-2">

@@ -21,7 +21,6 @@ import {
   Gauge,
   Users,
   Clock,
-  AlertTriangle,
   Archive,
   CheckCircle2,
   ArrowDownUp,
@@ -32,6 +31,7 @@ import {
   LEAD_STATUSES,
   fitScoreKey,
   isJobOpen,
+  isLeadStale,
   isReadyForAction,
   type CloseOutcome,
   type FitScore,
@@ -42,7 +42,7 @@ import {
   useLeads,
   useResumes,
   useDefaultResumeId,
-  useAppSettings,
+  useStaleCutoff,
   useFitScore,
   useAllFitScores,
   discardLead,
@@ -133,7 +133,6 @@ type SortKey =
   | "score-asc"
   | "ready-first"
   | "due-first"
-  | "stale-first"
   | "company-asc"
   | "title-asc";
 
@@ -163,7 +162,6 @@ const SORT_GROUPS: {
     options: [
       { value: "ready-first", label: "Ready first" },
       { value: "due-first", label: "Due reminder first" },
-      { value: "stale-first", label: "Stale first" },
     ],
   },
   {
@@ -184,7 +182,7 @@ const SORT_LABELS: Record<SortKey, string> = Object.fromEntries(
 
 /**
  * Sort a column's cards. Unscored ("NC") cards sink to the bottom on a score
- * sort; the actionability sorts (ready/due/stale) bring matching cards to the
+ * sort; the actionability sorts (ready/due) bring matching cards to the
  * top, then fall back to a sensible secondary order.
  */
 function sortLeads(
@@ -192,12 +190,9 @@ function sortLeads(
   sort: SortKey,
   scores: Record<string, FitScore>,
   resumeId: string,
-  staleCutoff: string,
 ): JobLead[] {
   const arr = [...leads];
   const scoreOf = (l: JobLead) => scores[fitScoreKey(l.id, resumeId)]?.score;
-  const isStale = (l: JobLead) =>
-    isJobOpen(l.status) && !l.hasDueReminder && l.capturedAt < staleCutoff;
   switch (sort) {
     case "added-asc":
       arr.sort((a, b) => a.capturedAt.localeCompare(b.capturedAt));
@@ -241,14 +236,6 @@ function sortLeads(
           b.capturedAt.localeCompare(a.capturedAt),
       );
       break;
-    case "stale-first":
-      // Gone-quiet leads first, oldest of those at the very top to chase.
-      arr.sort(
-        (a, b) =>
-          Number(isStale(b)) - Number(isStale(a)) ||
-          a.capturedAt.localeCompare(b.capturedAt),
-      );
-      break;
     case "added-desc":
     default:
       arr.sort((a, b) => b.capturedAt.localeCompare(a.capturedAt));
@@ -256,18 +243,10 @@ function sortLeads(
   return arr;
 }
 
-/** Local YYYY-MM-DD for the stale check. */
-function toISODate(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-    d.getDate(),
-  ).padStart(2, "0")}`;
-}
-
 export function LeadsKanban() {
   const allLeads = useLeads();
   const resumes = useResumes();
   const [defaultResumeId] = useDefaultResumeId();
-  const [{ staleLeadDays }] = useAppSettings();
   const search = useSearchQuery();
   const { confirm, dialog: confirmDialog } = useConfirm();
 
@@ -296,14 +275,14 @@ export function LeadsKanban() {
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
   );
 
-  const staleCutoff = useMemo(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - staleLeadDays);
-    return toISODate(d);
-  }, [staleLeadDays]);
+  const staleCutoff = useStaleCutoff();
 
   const filtered = useMemo(() => {
-    let out = applyLeadFilters(allLeads, filters);
+    // Stale leads appear only in Archive.
+    let out = applyLeadFilters(
+      allLeads.filter((l) => !isLeadStale(l, staleCutoff)),
+      filters,
+    );
     const q = search.trim().toLowerCase();
     if (q) {
       out = out.filter(
@@ -315,7 +294,7 @@ export function LeadsKanban() {
       );
     }
     return out;
-  }, [allLeads, filters, search]);
+  }, [allLeads, filters, search, staleCutoff]);
 
   const byStatus = useMemo(() => {
     const map: Record<LeadStatus, JobLead[]> = {
@@ -425,7 +404,6 @@ export function LeadsKanban() {
                 key={s}
                 status={s}
                 leads={byStatus[s]}
-                staleCutoff={staleCutoff}
                 resumeId={defaultResumeId}
                 sort={sorts[s] ?? DEFAULT_SORT}
                 onSortChange={(k) => setSorts((prev) => ({ ...prev, [s]: k }))}
@@ -440,7 +418,6 @@ export function LeadsKanban() {
           {activeLead ? (
             <KanbanCard
               lead={activeLead}
-              staleCutoff={staleCutoff}
               resumeId={defaultResumeId}
               overlay
             />
@@ -499,7 +476,6 @@ export function LeadsKanban() {
 function Column({
   status,
   leads,
-  staleCutoff,
   resumeId,
   sort,
   onSortChange,
@@ -508,7 +484,6 @@ function Column({
 }: {
   status: LeadStatus;
   leads: JobLead[];
-  staleCutoff: string;
   resumeId: string;
   sort: SortKey;
   onSortChange: (sort: SortKey) => void;
@@ -518,8 +493,8 @@ function Column({
   const { setNodeRef, isOver } = useDroppable({ id: status });
   const scores = useAllFitScores();
   const sortedLeads = useMemo(
-    () => sortLeads(leads, sort, scores, resumeId, staleCutoff),
-    [leads, sort, scores, resumeId, staleCutoff],
+    () => sortLeads(leads, sort, scores, resumeId),
+    [leads, sort, scores, resumeId],
   );
   const sortLabel = SORT_LABELS[sort] ?? "Sort";
   const sorted = sort !== DEFAULT_SORT;
@@ -588,7 +563,6 @@ function Column({
           <DraggableCard
             key={lead.id}
             lead={lead}
-            staleCutoff={staleCutoff}
             resumeId={resumeId}
             onOpen={onOpen}
             onDiscard={onDiscard}
@@ -606,13 +580,11 @@ function Column({
 
 function DraggableCard({
   lead,
-  staleCutoff,
   resumeId,
   onOpen,
   onDiscard,
 }: {
   lead: JobLead;
-  staleCutoff: string;
   resumeId: string;
   onOpen: (lead: JobLead) => void;
   onDiscard: (lead: JobLead) => void;
@@ -628,20 +600,18 @@ function DraggableCard({
       onClick={() => onOpen(lead)}
       className={cn("cursor-grab active:cursor-grabbing", isDragging && "opacity-40")}
     >
-      <KanbanCard lead={lead} staleCutoff={staleCutoff} resumeId={resumeId} onDiscard={onDiscard} />
+      <KanbanCard lead={lead} resumeId={resumeId} onDiscard={onDiscard} />
     </div>
   );
 }
 
 function KanbanCard({
   lead,
-  staleCutoff,
   resumeId,
   overlay,
   onDiscard,
 }: {
   lead: JobLead;
-  staleCutoff: string;
   resumeId: string;
   overlay?: boolean;
   onDiscard?: (lead: JobLead) => void;
@@ -649,9 +619,7 @@ function KanbanCard({
   const cached = useFitScore(lead.id, resumeId);
   const band = cached ? fitBand(cached.score) : null;
   const open = isJobOpen(lead.status);
-  const ready = open && lead.hasJd && lead.contactCount > 0 && !lead.hasOutreach;
-  const stale =
-    open && !lead.hasDueReminder && lead.capturedAt < staleCutoff;
+  const ready = isReadyForAction(lead);
   const stop = (e: React.SyntheticEvent) => e.stopPropagation();
 
   return (
@@ -697,12 +665,6 @@ function KanbanCard({
           <Badge className="bg-status-shortlisted text-status-shortlisted-foreground">
             <Clock className="size-2.5" aria-hidden />
             Due
-          </Badge>
-        )}
-        {stale && (
-          <Badge className="border border-destructive/40 text-destructive">
-            <AlertTriangle className="size-2.5" aria-hidden />
-            Stale
           </Badge>
         )}
         {lead.contactCount > 0 && (
