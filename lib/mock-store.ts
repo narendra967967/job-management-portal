@@ -380,6 +380,17 @@ interface AutoStatusChange {
   to: LeadStatus;
 }
 
+/** Put a lead back after a move, from a toast's Undo button. */
+async function undoStatusChange({ leadId, from, to }: AutoStatusChange) {
+  try {
+    await undoAutoStatusAction(leadId, from, to);
+    await refresh();
+    toast.success(`Back to ${LEAD_STATUS_LABELS[from]}`);
+  } catch (e) {
+    toast.error("Couldn't undo", e instanceof Error ? e.message : undefined);
+  }
+}
+
 /** Tell the user a lead moved on its own, with an Undo button (#14). */
 function announceAutoStatus(change: AutoStatusChange | null | undefined) {
   if (!change) return;
@@ -389,17 +400,7 @@ function announceAutoStatus(change: AutoStatusChange | null | undefined) {
     lead ? `${lead.title} · ${lead.company}` : undefined,
     {
       label: "Undo",
-      onClick: () => {
-        void (async () => {
-          try {
-            await undoAutoStatusAction(change.leadId, change.from, change.to);
-            await refresh();
-            toast.success(`Back to ${LEAD_STATUS_LABELS[change.from]}`);
-          } catch (e) {
-            toast.error("Couldn't undo", e instanceof Error ? e.message : undefined);
-          }
-        })();
-      },
+      onClick: () => void undoStatusChange(change),
     },
   );
 }
@@ -413,6 +414,20 @@ export async function setLeadStatus(
     await setLeadStatusAction(leadId, status, closeOutcome);
     await refresh();
     statusToast(status, closeOutcome);
+  } catch (e) {
+    toast.error("Couldn't update lead", e instanceof Error ? e.message : undefined);
+  }
+}
+
+/** Discard from a card in one tap; the toast's Undo puts it back. */
+export async function discardLead(leadId: string, from: LeadStatus) {
+  try {
+    await setLeadStatusAction(leadId, "discarded", null);
+    await refresh();
+    toast.success("Lead discarded", "Moved to Archive.", {
+      label: "Undo",
+      onClick: () => void undoStatusChange({ leadId, from, to: "discarded" }),
+    });
   } catch (e) {
     toast.error("Couldn't update lead", e instanceof Error ? e.message : undefined);
   }

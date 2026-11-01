@@ -22,6 +22,7 @@ import {
   Users,
   Clock,
   AlertTriangle,
+  Archive,
   CheckCircle2,
   ArrowDownUp,
 } from "lucide-react";
@@ -44,6 +45,7 @@ import {
   useAppSettings,
   useFitScore,
   useAllFitScores,
+  discardLead,
   setLeadStatus,
 } from "@/lib/mock-store";
 import {
@@ -366,6 +368,20 @@ export function LeadsKanban() {
     setLeadStatus(lead.id, target);
   }
 
+  // One tap, except when discarding would cancel follow-ups, which Undo can't restore.
+  async function discardFromCard(lead: JobLead) {
+    if (lead.hasDueReminder) {
+      const ok = await confirm({
+        title: "Discard this lead?",
+        description: `"${lead.title}" moves to Archive and its pending follow-ups are canceled. You can reopen it later.`,
+        confirmLabel: "Discard",
+        destructive: true,
+      });
+      if (!ok) return;
+    }
+    await discardLead(lead.id, lead.status);
+  }
+
   // Columns shown, in canonical pipeline order.
   const shown = LEAD_STATUSES.filter((s) => columns.includes(s));
 
@@ -421,6 +437,7 @@ export function LeadsKanban() {
                 sort={sorts[s] ?? DEFAULT_SORT}
                 onSortChange={(k) => setSorts((prev) => ({ ...prev, [s]: k }))}
                 onOpen={setDetailLead}
+                onDiscard={discardFromCard}
               />
             ))
           )}
@@ -494,6 +511,7 @@ function Column({
   sort,
   onSortChange,
   onOpen,
+  onDiscard,
 }: {
   status: LeadStatus;
   leads: JobLead[];
@@ -502,6 +520,7 @@ function Column({
   sort: SortKey;
   onSortChange: (sort: SortKey) => void;
   onOpen: (lead: JobLead) => void;
+  onDiscard: (lead: JobLead) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: status });
   const scores = useAllFitScores();
@@ -579,6 +598,7 @@ function Column({
             staleCutoff={staleCutoff}
             resumeId={resumeId}
             onOpen={onOpen}
+            onDiscard={onDiscard}
           />
         ))}
         {leads.length === 0 && (
@@ -596,11 +616,13 @@ function DraggableCard({
   staleCutoff,
   resumeId,
   onOpen,
+  onDiscard,
 }: {
   lead: JobLead;
   staleCutoff: string;
   resumeId: string;
   onOpen: (lead: JobLead) => void;
+  onDiscard: (lead: JobLead) => void;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: lead.id,
@@ -613,7 +635,7 @@ function DraggableCard({
       onClick={() => onOpen(lead)}
       className={cn("cursor-grab active:cursor-grabbing", isDragging && "opacity-40")}
     >
-      <KanbanCard lead={lead} staleCutoff={staleCutoff} resumeId={resumeId} />
+      <KanbanCard lead={lead} staleCutoff={staleCutoff} resumeId={resumeId} onDiscard={onDiscard} />
     </div>
   );
 }
@@ -623,11 +645,13 @@ function KanbanCard({
   staleCutoff,
   resumeId,
   overlay,
+  onDiscard,
 }: {
   lead: JobLead;
   staleCutoff: string;
   resumeId: string;
   overlay?: boolean;
+  onDiscard?: (lead: JobLead) => void;
 }) {
   const cached = useFitScore(lead.id, resumeId);
   const band = cached ? fitBand(cached.score) : null;
@@ -635,6 +659,7 @@ function KanbanCard({
   const ready = open && lead.hasJd && lead.contactCount > 0 && !lead.hasOutreach;
   const stale =
     open && !lead.hasDueReminder && lead.capturedAt < staleCutoff;
+  const stop = (e: React.SyntheticEvent) => e.stopPropagation();
 
   return (
     <div
@@ -692,6 +717,23 @@ function KanbanCard({
             <Users className="size-2.5" aria-hidden />
             {lead.contactCount}
           </Badge>
+        )}
+        {open && onDiscard && (
+          // Stops the tap from opening the card or starting a drag.
+          <button
+            type="button"
+            aria-label={`Discard ${lead.title}`}
+            title="Discard"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDiscard(lead);
+            }}
+            onPointerDown={stop}
+            onKeyDown={stop}
+            className="-my-1 -mr-1 ml-auto inline-flex size-11 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:size-7"
+          >
+            <Archive className="size-4" aria-hidden />
+          </button>
         )}
       </div>
     </div>
