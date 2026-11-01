@@ -72,6 +72,28 @@ export interface MyEmailLogRow {
   status: InboundStatus;
   reason: string;
   leadsCreated: number;
+  /** What the user can do about it, if anything. */
+  fix: EmailLogFix | null;
+}
+
+export type EmailLogFix = "request-site" | "add-ai-key" | "check-ai-key" | "upgrade-plan";
+
+/** The one step that would get a blocked email through. Rejected senders need
+ *  us to add the site. Emails no built-in reader could read need AI, which takes
+ *  a plan that includes it and the user's own key (checked as they are now, so a
+ *  key added since no longer asks for one). */
+export function emailLogFix(
+  status: InboundStatus,
+  reason: string,
+  now: { aiReading: boolean; hasAiKey: boolean },
+): EmailLogFix | null {
+  if (status === "rejected" && /Sender not allowed|site that isn't allowed/.test(reason)) return "request-site";
+  if (status === "unsupported") {
+    if (/AI reader (stopped|failed)/.test(reason)) return "check-ai-key";
+    if (!now.aiReading) return "upgrade-plan";
+    if (!now.hasAiKey) return "add-ai-key";
+  }
+  return null;
 }
 
 /** The log's reason in plain words for the user. Drops technical notes in
@@ -80,16 +102,22 @@ export function userReason(status: InboundStatus, reason: string): string {
   const r = reason.replace(/\s*\([^)]*\)/g, "").trim();
   const plain: Record<string, string> = {
     "Signature check failed": "Couldn't confirm it really came from the job site",
-    "Sender not allowed": "Not from a supported job site",
+    "Sender not allowed": "We don't accept alerts from this site yet",
+    "Hand-forwarded from a site that isn't allowed": "Hand-forwarded from a site we don't accept yet",
     "Too large": "The email was too large",
     "Malformed email": "The email couldn't be read",
     "Already processed": "Already received earlier",
     "Unknown address": "Sent to an address that isn't yours",
     "Empty confirmation email": "Gmail's confirmation email had no link",
-    "No reader for this sender": "No jobs could be read from this email",
-    "No job cards found": "No jobs found in this email",
+    "No reader for this sender": "Jobtiva can't read this site's alerts on its own",
+    "No job cards found": "Jobtiva couldn't find any jobs in this email on its own",
   };
   if (status === "gmail_code") return "Gmail forwarding confirmation";
+  // The AI reader's failures carry provider details the user can't act on.
+  const label = r.startsWith("Hand-forwarded · ") ? "Hand-forwarded · " : "";
+  if (/AI reader stopped: provider answered 402/.test(r)) return `${label}Your AI provider is out of credit`;
+  if (/AI reader stopped/.test(r)) return `${label}Your AI provider rejected your key`;
+  if (/AI reader failed/.test(r)) return `${label}AI couldn't read this email`;
   const parts = r.split(" · ");
   const last = parts[parts.length - 1];
   if (plain[last]) parts[parts.length - 1] = plain[last];

@@ -4,7 +4,9 @@
 // to the signed-in user; the address is created on first use.
 
 import { z } from "zod";
+import { userHasAiKey } from "@/lib/ai";
 import { getCurrentUserId } from "@/lib/current-user";
+import { getFeatureAccess } from "@/lib/entitlements";
 import {
   getIntakeConfig,
   getOrCreateForwarding,
@@ -14,6 +16,7 @@ import {
 } from "@/lib/email-intake-data";
 import { getRetentionConfig } from "@/lib/retention";
 import {
+  emailLogFix,
   INBOUND_LOG_PAGE_SIZES,
   INBOUND_STATUS_LABELS,
   siteLabel,
@@ -86,7 +89,7 @@ export async function listMyEmailLogAction(
   until += DAY_MS; // "to" is inclusive
   since = Math.max(since, until - MAX_RANGE_DAYS * DAY_MS);
 
-  const [{ rows, total }, retention] = await Promise.all([
+  const [{ rows, total }, retention, access, hasAiKey] = await Promise.all([
     listInboundLog({
       since: new Date(since),
       until: new Date(until),
@@ -96,7 +99,10 @@ export async function listMyEmailLogAction(
       size: q.size,
     }),
     getRetentionConfig(),
+    getFeatureAccess(userId),
+    userHasAiKey(userId),
   ]);
+  const now = { aiReading: access.aiEmailReading, hasAiKey };
   return {
     ok: true,
     total,
@@ -109,6 +115,7 @@ export async function listMyEmailLogAction(
       status: r.status,
       reason: userReason(r.status, r.reason),
       leadsCreated: r.leadsCreated,
+      fix: emailLogFix(r.status, r.reason, now),
     })),
   };
 }

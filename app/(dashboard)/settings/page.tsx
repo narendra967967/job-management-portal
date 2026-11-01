@@ -1097,6 +1097,14 @@ function IngestionIssuesCard() {
           {errors.map((e) => (
             <li key={e.id} className="rounded-lg border p-3">
               <p className="text-xs font-medium">{e.reason}</p>
+              {/Settings → AI provider/.test(e.reason) && (
+                <Link
+                  href="/settings?tab=ai"
+                  className="inline-flex min-h-11 items-center text-xs font-medium text-primary underline-offset-4 hover:underline sm:min-h-0"
+                >
+                  Add your AI key
+                </Link>
+              )}
               {e.rawExcerpt && (
                 <p className="mt-0.5 truncate text-xs text-muted-foreground">
                   {e.rawExcerpt}

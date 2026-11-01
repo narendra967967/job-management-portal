@@ -9,17 +9,18 @@ export const TICKET_STATUS_LABELS: Record<TicketStatus, string> = {
   resolved: "Resolved",
 };
 
-export type TicketCategory = "question" | "bug" | "billing" | "account" | "other" | "deletion";
+export type TicketCategory = "question" | "bug" | "billing" | "account" | "job-site" | "other" | "deletion";
 
 /** Categories a user can pick in the contact forms. "deletion" is only created
  *  by Settings → Account → Request account deletion. */
-export const TICKET_CATEGORIES: TicketCategory[] = ["question", "bug", "billing", "account", "other"];
+export const TICKET_CATEGORIES: TicketCategory[] = ["question", "bug", "billing", "account", "job-site", "other"];
 
 export const TICKET_CATEGORY_LABELS: Record<TicketCategory, string> = {
   question: "Question",
   bug: "Bug / problem",
   billing: "Billing",
   account: "Account",
+  "job-site": "Job site request",
   other: "Other",
   deletion: "Account deletion",
 };

@@ -277,12 +277,12 @@ async function readJobs(ctx: {
   }
 
   const fix = aiAllowed
-    ? "Add an AI key in Settings → AI provider and Jobtiva reads emails like this with AI."
-    : "Upgrade to a plan with AI email reading (and add your AI key) and Jobtiva reads emails like this with AI.";
+    ? "Add your AI key in Settings → AI provider and AI can read alerts like this one."
+    : "AI can read alerts like this one on higher plans, with your own AI key.";
   const issue =
     sender.parser === "none"
-      ? `Unsupported format — no reader for this site yet. ${fix}`
-      : `No job cards found in this alert. ${fix}`;
+      ? `Jobtiva can't read this site's alerts on its own yet. ${fix}`
+      : `Jobtiva couldn't find any jobs in this alert on its own. ${fix}`;
   await db.insert(errorsT).values({ userId, messageId: sourceId, reason: issue, rawExcerpt: subject });
   await log({ ...base, status: "unsupported", reason: `${label}${sender.parser === "none" ? "No reader for this sender" : "No job cards found"}` });
   return { code: 250, message: "Accepted" };

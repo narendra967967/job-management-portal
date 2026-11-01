@@ -115,7 +115,7 @@ async function processJob(job: QueueRow) {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     if (msg === AI_NOT_CONFIGURED) {
-      await issue(job, "Unsupported format — add an AI key in Settings → AI provider to read emails from this site");
+      await issue(job, "Add your AI key in Settings → AI provider and AI can read alerts like this one.");
       await finish(job, "unsupported", "AI key removed before reading");
       return;
     }

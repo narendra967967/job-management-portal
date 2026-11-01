@@ -5,6 +5,7 @@
 // asking support. Metadata only (the log never stores email content).
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { ChevronLeft, ChevronRight, Loader2, RefreshCw } from "lucide-react";
 import { cn, formatDateTime } from "@/lib/utils";
 import { useMounted } from "@/lib/use-mounted";
@@ -14,11 +15,72 @@ import {
   type InboundStatus,
   type MyEmailLogRow,
 } from "@/lib/email-intake-model";
+import { useContactSupport } from "@/components/support/contact-support";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const PAGE_SIZE = 25;
+
+const FIX_LINK =
+  "inline-flex min-h-11 items-center font-medium text-primary underline-offset-4 hover:underline xl:min-h-0";
+
+const escapeHtml = (s: string) =>
+  s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+/** The next step for a blocked email: ask for the site, add a key or see the plan. */
+function LogFix({ row }: { row: MyEmailLogRow }) {
+  const { open } = useContactSupport();
+  if (!row.fix) return null;
+  const site = row.site === "—" ? row.sender : row.site;
+  return (
+    <p className="text-xs text-muted-foreground">
+      {row.fix === "request-site" && (
+        <>
+          Is this a job site you use?{" "}
+          <button
+            type="button"
+            className={FIX_LINK}
+            onClick={() =>
+              open({
+                category: "job-site",
+                subject: `Please add ${site}`,
+                message: `<p>I get job alerts from ${escapeHtml(site)} (${escapeHtml(row.sender)}), and they're being rejected. Please add this site so they become leads.</p>`,
+                source: "email-log",
+              })
+            }
+          >
+            Ask us to add it
+          </button>
+        </>
+      )}
+      {row.fix === "add-ai-key" && (
+        <>
+          AI can read alerts like this one, but it needs your key.{" "}
+          <Link href="/settings?tab=ai" className={FIX_LINK}>
+            Add your AI key
+          </Link>
+        </>
+      )}
+      {row.fix === "check-ai-key" && (
+        <>
+          Fix this, then forward the alert again.{" "}
+          <Link href="/settings?tab=ai" className={FIX_LINK}>
+            Check your AI key
+          </Link>
+        </>
+      )}
+      {row.fix === "upgrade-plan" && (
+        <>
+          AI can read alerts like this one on higher plans.{" "}
+          <Link href="/settings?tab=plan" className={FIX_LINK}>
+            See your plan
+          </Link>
+        </>
+      )}
+    </p>
+  );
+}
 
 const STATUS_TONE: Record<InboundStatus, string> = {
   accepted: "bg-status-applied text-status-applied-foreground",
@@ -158,6 +220,7 @@ export function EmailLogCard() {
                     <span className="text-muted-foreground"> · {r.sender}</span>
                   </p>
                   <p className="text-xs text-muted-foreground">{r.reason}</p>
+                  <LogFix row={r} />
                   {r.leadsCreated > 0 && (
                     <p className="text-xs font-medium text-status-applied-foreground">
                       {r.leadsCreated} new {r.leadsCreated === 1 ? "lead" : "leads"}
@@ -193,7 +256,10 @@ export function EmailLogCard() {
                       <td className="px-3 py-2">
                         <StatusPill status={r.status} />
                       </td>
-                      <td className="min-w-56 px-3 py-2 text-xs text-muted-foreground">{r.reason}</td>
+                      <td className="min-w-56 px-3 py-2 text-xs text-muted-foreground">
+                        {r.reason}
+                        <LogFix row={r} />
+                      </td>
                       <td className="px-3 py-2 text-right tabular-nums">{r.leadsCreated || "—"}</td>
                     </tr>
                   ))}
