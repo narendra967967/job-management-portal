@@ -484,9 +484,7 @@ function UsageMeter({ label, used, limit }: { label: string; used: number; limit
       <p className="text-xs text-muted-foreground">{label}</p>
       <p className="mt-0.5 text-sm font-medium tabular-nums">
         {limit == null ? (
-          <>
-            {used} <span className="font-normal text-muted-foreground">· Unlimited</span>
-          </>
+          "Unlimited"
         ) : (
           <>
             {used} <span className="font-normal text-muted-foreground">of {limit}</span>
