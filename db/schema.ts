@@ -936,6 +936,7 @@ export const retentionConfig = pgTable("retention_config", {
   processedLedgerDays: integer("processed_ledger_days").notNull().default(180),
   leadPurgeLogDays: integer("lead_purge_log_days").notNull().default(365),
   notificationDays: integer("notification_days").notNull().default(90),
+  autoActionDays: integer("auto_action_days").notNull().default(365),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .defaultNow()

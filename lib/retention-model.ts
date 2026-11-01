@@ -7,7 +7,8 @@ export type RetentionKey =
   | "ingestIssueDays"
   | "processedLedgerDays"
   | "leadPurgeLogDays"
-  | "notificationDays";
+  | "notificationDays"
+  | "autoActionDays";
 
 export type RetentionConfig = Record<RetentionKey, number>;
 
@@ -60,6 +61,14 @@ export const RETENTION_TYPES: RetentionType[] = [
     min: 7,
     max: 365,
     default: 90,
+  },
+  {
+    key: "autoActionDays",
+    label: "Automatic move history",
+    hint: "Why the system moved a lead, shown on its card and Timeline · moves a user undid are kept with the lead, so that rule stays off it",
+    min: 90,
+    max: 1095,
+    default: 365,
   },
 ];
 

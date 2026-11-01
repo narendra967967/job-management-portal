@@ -33,7 +33,7 @@ export default async function PrivacyPage() {
   ]);
   const contact = supportEmail || "our support address";
   return (
-    <LegalLayout title="Privacy policy" updated="October 31, 2026">
+    <LegalLayout title="Privacy policy" updated="November 2, 2026">
       <p>
         This Privacy Policy explains what information {appName} (&ldquo;we&rdquo;, &ldquo;us&rdquo;) collects
         when you use our job search tracker (the &ldquo;Service&rdquo;), how we use it and how we keep it
@@ -264,8 +264,9 @@ export default async function PrivacyPage() {
         are removed by automatic clean-up of stale leads when that is enabled. Records kept to run the
         Service are deleted automatically: the email delivery log after {days(retention.inboundLogDays)},
         ingestion issues after {days(retention.ingestIssueDays)}, the message IDs used to avoid importing
-        an email twice after {days(retention.processedLedgerDays)}, and notifications after{" "}
-        {days(retention.notificationDays)}.
+        an email twice after {days(retention.processedLedgerDays)}, notifications after{" "}
+        {days(retention.notificationDays)}, and the history of automatic status changes on your leads after{" "}
+        {days(retention.autoActionDays)}, except changes you undid, which stay with the lead.
         {gmailOn ? " Disconnecting Google stops all further reading of your mailbox." : ""} Confirmation
         codes expire shortly and are then deleted. When you reset your leads they are deleted
         right away. When you ask us to delete your account, we delete your data, including résumé

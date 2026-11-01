@@ -344,6 +344,13 @@
       "when": 1793558627283,
       "tag": "0048_lead_auto_rules",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1793559620454,
+      "tag": "0049_retention_auto_actions",
+      "breakpoints": true
     }
   ]
 }

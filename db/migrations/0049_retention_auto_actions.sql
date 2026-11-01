@@ -1,0 +1,1 @@
+ALTER TABLE "retention_config" ADD COLUMN "auto_action_days" integer DEFAULT 365 NOT NULL;
