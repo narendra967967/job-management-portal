@@ -29,6 +29,14 @@ import { cn } from "@/lib/utils";
 /** Card classes for a Top Choice lead: golden border + soft glow (see globals.css). */
 export const TOP_CHOICE_CARD = "top-choice-glow border-top-choice/70";
 
+/** Asked before a card's discard icon cancels follow-ups, which Undo can't restore. */
+export const discardWithFollowUpsConfirm = (title: string) => ({
+  title: "Discard this lead?",
+  description: `"${title}" moves to Archive and its pending follow-ups are canceled. You can reopen it later.`,
+  confirmLabel: "Discard",
+  destructive: true,
+});
+
 /** "Open on LinkedIn Jobs" / "Open job posting" — names the platform when known. */
 export function openPostingLabel(lead: Pick<JobLead, "source">): string {
   return lead.source === "other"

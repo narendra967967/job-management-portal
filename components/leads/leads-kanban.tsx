@@ -73,6 +73,7 @@ import {
   SourceChip,
   TOP_CHOICE_CARD,
   TopChoiceStar,
+  discardWithFollowUpsConfirm,
 } from "@/components/leads/lead-meta";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import {
@@ -370,15 +371,7 @@ export function LeadsKanban() {
 
   // One tap, except when discarding would cancel follow-ups, which Undo can't restore.
   async function discardFromCard(lead: JobLead) {
-    if (lead.hasDueReminder) {
-      const ok = await confirm({
-        title: "Discard this lead?",
-        description: `"${lead.title}" moves to Archive and its pending follow-ups are canceled. You can reopen it later.`,
-        confirmLabel: "Discard",
-        destructive: true,
-      });
-      if (!ok) return;
-    }
+    if (lead.hasDueReminder && !(await confirm(discardWithFollowUpsConfirm(lead.title)))) return;
     await discardLead(lead.id, lead.status);
   }
 

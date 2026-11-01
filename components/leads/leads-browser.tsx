@@ -59,6 +59,7 @@ import {
   SourceChip,
   TOP_CHOICE_CARD,
   TopChoiceStar,
+  discardWithFollowUpsConfirm,
 } from "@/components/leads/lead-meta";
 import { fitBand } from "@/lib/fit";
 import { useSearchQuery } from "@/lib/search-store";
@@ -72,6 +73,7 @@ import {
   useAppSettings,
   useFitScore,
   useAllFitScores,
+  discardLead,
   setLeadStatus,
   deleteLeads,
 } from "@/lib/mock-store";
@@ -1352,6 +1354,7 @@ function LeadCard({
     onResumeChange,
   });
   const [remindersOpen, setRemindersOpen] = useState(false);
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const leadReminders = useRemindersForLead(lead.id);
   const contactCount = useContactsForLead(lead.id).length;
 
@@ -1372,6 +1375,12 @@ function LeadCard({
   })();
   const stale = open && !hasPendingReminder && lead.capturedAt < staleCutoff;
   const ready = open && lead.hasJd && contactCount > 0;
+
+  // One tap, except when discarding would cancel follow-ups, which Undo can't restore.
+  async function discard() {
+    if (hasPendingReminder && !(await confirm(discardWithFollowUpsConfirm(lead.title)))) return;
+    await discardLead(lead.id, status);
+  }
 
   // Stop card-body clicks/keys from firing on the header & footer controls.
   const stop = {
@@ -1534,7 +1543,13 @@ function LeadCard({
       </div>
 
       {/* FOOTER — create actions for this lead (only while the job is open) */}
-      <div {...stop} className="grid grid-cols-3 divide-x border-t">
+      <div
+        {...stop}
+        className={cn(
+          "grid divide-x border-t",
+          open ? "grid-cols-[1fr_1fr_1fr_auto]" : "grid-cols-3",
+        )}
+      >
         <CardActionButton
           icon={UserPlus}
           label="Contact"
@@ -1562,6 +1577,17 @@ function LeadCard({
                 : "Add a contact first to draft outreach"
           }
         />
+        {open && (
+          <button
+            type="button"
+            aria-label={`Discard ${lead.title}`}
+            title="Discard"
+            onClick={discard}
+            className="inline-flex min-h-11 w-11 items-center justify-center text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:min-h-10"
+          >
+            <Archive className="size-4" aria-hidden />
+          </button>
+        )}
       </div>
 
       </div>
@@ -1570,6 +1596,7 @@ function LeadCard({
           portalled clicks never bubble to `onOpen` — and there's no
           stopPropagation wrapper to interfere with the dialogs' own dismissal. */}
       {dialogs}
+      {confirmDialog}
       <LeadRemindersDialog
         lead={lead}
         open={remindersOpen}
