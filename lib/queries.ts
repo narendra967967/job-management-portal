@@ -200,9 +200,6 @@ export async function loadWorkspace(userId: string): Promise<WorkspaceData> {
   const dueByLead = new Set(
     reminderRows.filter((r) => r.outcome === "pending").map((r) => r.leadId),
   );
-  const jdByLead = new Set(
-    detailRows.filter((d) => d.jdText && d.jdText.trim()).map((d) => d.leadId),
-  );
   // Drafts don't count: nothing has reached anyone until it's marked sent.
   const outreachByLead = new Set(
     outreachRows.filter((m) => m.status === "sent").map((m) => m.leadId),
@@ -227,7 +224,6 @@ export async function loadWorkspace(userId: string): Promise<WorkspaceData> {
     lastActiveAt: ymd(l.updatedAt > l.capturedAt ? l.updatedAt : l.capturedAt)!,
     contactCount: contactCountByLead.get(l.id) ?? 0,
     hasDueReminder: dueByLead.has(l.id),
-    hasJd: jdByLead.has(l.id),
     hasOutreach: outreachByLead.has(l.id),
   }));
 

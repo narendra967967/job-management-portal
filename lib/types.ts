@@ -194,7 +194,6 @@ export interface JobLead {
   contactCount: number;
   hasDueReminder: boolean;
   /** A job description has been saved for this lead. */
-  hasJd: boolean;
   /** At least one outreach message exists for this lead. */
   hasOutreach: boolean;
 }
@@ -202,20 +201,9 @@ export interface JobLead {
 /** Stages where a job can sit in Ready to action. */
 export const READY_LEAD_STATUSES: LeadStatus[] = ["shortlisted", "applied"];
 
-/**
- * "Ready for action" — a shortlisted or applied lead that has both a saved JD and
- * at least one contact, so there's enough to actually work it. Derived, not a
- * stored status.
- */
+/** "Ready for action" goes by status alone. Derived, not a stored status. */
 export function isReadyForAction(lead: JobLead): boolean {
-  return (
-    READY_LEAD_STATUSES.includes(lead.status) &&
-    lead.hasJd &&
-    lead.contactCount > 0 &&
-    // Once you've reached out, it's no longer "ready to action" — it moves to
-    // the Outreached view.
-    !lead.hasOutreach
-  );
+  return READY_LEAD_STATUSES.includes(lead.status);
 }
 
 /** Stages that can go stale; Interview and Offer Received are clearly active. */

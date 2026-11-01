@@ -117,7 +117,7 @@ function desktopSteps(firstName: string, hasNotes: boolean): DriveStep[] {
       popover: {
         title: "Your pipeline",
         description:
-          "Ready to action lists shortlisted and applied jobs that have a description and a contact, so you can act on them. Outreached holds the jobs you've messaged someone about, and Archive keeps closed, discarded and stale jobs.",
+          "Ready to action lists your shortlisted and applied jobs, so you can act on them. Outreached holds the jobs you've messaged someone about, and Archive keeps closed, discarded and stale jobs.",
         side: "right",
       },
     },

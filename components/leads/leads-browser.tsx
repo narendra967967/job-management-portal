@@ -274,7 +274,7 @@ export function LeadsBrowser({ scope = "all" }: { scope?: LeadsScope }) {
 
   // Each scope narrows the base set:
   //  - archive: terminal (closed/discarded) + stale
-  //  - ready: shortlisted/applied leads with a JD *and* a contact, nothing sent
+  //  - ready: shortlisted/applied leads
   //  - outreached: open leads that have had outreach sent
   //  - all (default): open leads
   // Stale leads appear only in Archive, so the other three leave them out.
@@ -1504,7 +1504,7 @@ function LeadCard({
           {ready && (
             <span
               className="inline-flex items-center gap-1 rounded-md bg-status-applied px-2 py-0.5 text-[11px] font-medium text-status-applied-foreground"
-              title="Has a job description and a contact — ready to work"
+              title="In Ready to action"
             >
               <CheckCircle2 className="size-3" aria-hidden />
               Ready
