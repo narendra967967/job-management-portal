@@ -4,6 +4,7 @@
 //  - LeadCardMenu: the card's "⋯" menu (Top Choice toggle + open the posting)
 //  - SourceChip:   where the job came from + whether it was added by the system
 //  - TopChoiceStar / TOP_CHOICE_CARD: the Top Choice marker + golden glow
+//  - TopChoiceToggle: the star beside the title on an opened job
 
 import { useState } from "react";
 import { Bot, ExternalLink, Lock, MoreHorizontal, PenLine, Star, Wallet } from "lucide-react";
@@ -85,7 +86,7 @@ export function LeadCardMenu({
   );
 }
 
-/** Menu item that toggles Top Choice (also used in the detail page's menu). */
+/** Menu item that toggles Top Choice. */
 export function TopChoiceMenuItem({ lead }: { lead: JobLead }) {
   return (
     <DropdownMenuItem onClick={() => setLeadTopChoice(lead.id, !lead.topChoice)}>
@@ -95,6 +96,40 @@ export function TopChoiceMenuItem({ lead }: { lead: JobLead }) {
       />
       {lead.topChoice ? "Remove Top Choice" : "Mark as Top Choice"}
     </DropdownMenuItem>
+  );
+}
+
+/** Star button that toggles Top Choice from an opened job's header. */
+export function TopChoiceToggle({
+  leadId,
+  topChoice,
+  className,
+}: {
+  leadId: string;
+  topChoice: boolean;
+  className?: string;
+}) {
+  const [saving, setSaving] = useState(false);
+  const label = topChoice ? "Remove Top Choice" : "Mark as Top Choice";
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      aria-pressed={topChoice}
+      title={label}
+      disabled={saving}
+      onClick={async () => {
+        setSaving(true);
+        await setLeadTopChoice(leadId, !topChoice);
+        setSaving(false);
+      }}
+      className={cn(
+        "inline-flex size-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-60 sm:size-9",
+        className,
+      )}
+    >
+      <Star className={cn("size-5", topChoice && "fill-top-choice text-top-choice")} aria-hidden />
+    </button>
   );
 }
 

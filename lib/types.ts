@@ -38,6 +38,12 @@ export function isJobOpen(status: LeadStatus): boolean {
   return OPEN_LEAD_STATUSES.includes(status);
 }
 
+/** The next step in the open pipeline; null at Offer Received and once terminal. */
+export function nextLeadStatus(status: LeadStatus): LeadStatus | null {
+  const i = OPEN_LEAD_STATUSES.indexOf(status);
+  return i < 0 ? null : (OPEN_LEAD_STATUSES[i + 1] ?? null);
+}
+
 export const LEAD_STATUS_LABELS: Record<LeadStatus, string> = {
   new: "New",
   shortlisted: "Shortlisted",

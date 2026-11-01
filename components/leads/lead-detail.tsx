@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
+  ArrowRight,
   ExternalLink,
   Sparkles,
   Users,
@@ -28,6 +29,8 @@ import {
   OUTREACH_KIND_LABELS,
   REMINDER_OUTCOME_LABELS,
   isJobOpen,
+  LEAD_STATUS_LABELS,
+  nextLeadStatus,
   type CloseOutcome,
   type Contact,
   type JobLead,
@@ -39,7 +42,7 @@ import { StatusBadge } from "@/components/leads/status-badge";
 import {
   SourceChip,
   TOP_CHOICE_CARD,
-  TopChoiceStar,
+  TopChoiceToggle,
   openPostingLabel,
 } from "@/components/leads/lead-meta";
 import { SalaryInsightSection } from "@/components/leads/salary-insight";
@@ -67,6 +70,7 @@ import {
   useContactsForLead,
   useOutreachForLead,
   useRemindersForLead,
+  useLead,
   useLeadStatus,
   useDefaultResumeId,
   useFitScore,
@@ -166,6 +170,10 @@ export function LeadDetailContent({
   const setStatus = (s: LeadStatus, o: CloseOutcome | null = null) =>
     setLeadStatus(lead.id, s, o);
   const open = isJobOpen(status);
+  const next = nextLeadStatus(status);
+  const [advancing, setAdvancing] = useState(false);
+  // The modal holds the lead as it was when opened, so read the live flag.
+  const topChoice = useLead(lead.id)?.topChoice ?? lead.topChoice;
 
   const [defaultResumeId] = useDefaultResumeId();
   const incomingResumeId = resumeId || defaultResumeId;
@@ -202,23 +210,37 @@ export function LeadDetailContent({
       <div
         className={cn(
           "rounded-2xl border bg-card p-4 md:p-5",
-          lead.topChoice && TOP_CHOICE_CARD,
+          topChoice && TOP_CHOICE_CARD,
         )}
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            {lead.topChoice && <TopChoiceStar className="mb-2" />}
-            <h1 className="text-lg leading-snug font-medium md:text-xl">
-              {lead.title}
-            </h1>
+            <div className="flex items-start gap-1">
+              <h1 className="min-w-0 text-lg leading-snug font-medium md:text-xl">
+                {lead.title}
+              </h1>
+              <TopChoiceToggle
+                leadId={lead.id}
+                topChoice={topChoice}
+                className="-mt-2 sm:-mt-1"
+              />
+            </div>
             <p className="mt-1 flex items-center gap-1 text-sm text-muted-foreground">
               <MapPin className="size-4 shrink-0" aria-hidden />
               {lead.company} · {lead.location}
             </p>
-            <SourceChip lead={lead} className="mt-2" />
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              {/* On phones the badge sits here so the title keeps its width. */}
+              <span className="sm:hidden">
+                <StatusBadge status={status} />
+              </span>
+              <SourceChip lead={lead} />
+            </div>
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
-            <StatusBadge status={status} />
+            <span className="hidden sm:inline-flex">
+              <StatusBadge status={status} />
+            </span>
             <LeadActions
               lead={lead}
               resumes={resumes}
@@ -229,6 +251,21 @@ export function LeadDetailContent({
             />
           </div>
         </div>
+
+        {next && (
+          <Button
+            className="mt-3 w-full sm:w-auto"
+            disabled={advancing}
+            onClick={async () => {
+              setAdvancing(true);
+              await setStatus(next);
+              setAdvancing(false);
+            }}
+          >
+            Mark as {LEAD_STATUS_LABELS[next]}
+            <ArrowRight className="size-4" data-icon="inline-end" aria-hidden />
+          </Button>
+        )}
 
         {/* Why this lead is closed / discarded — prominent on the detail view. */}
         {status === "closed" &&
