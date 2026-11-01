@@ -18,6 +18,7 @@ import {
   XCircle,
   Undo2,
   CircleSlash,
+  DoorClosed,
   Archive,
   type LucideIcon,
 } from "lucide-react";
@@ -113,6 +114,11 @@ const OUTCOME_BANNER: Record<
     icon: CircleSlash,
     className:
       "border-status-discarded-foreground/25 bg-status-discarded text-status-discarded-foreground",
+  },
+  "position-closed": {
+    icon: DoorClosed,
+    className:
+      "border-status-closed-foreground/25 bg-status-closed text-status-closed-foreground",
   },
 };
 

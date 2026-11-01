@@ -330,6 +330,13 @@
       "when": 1793511315059,
       "tag": "0046_forwarding_user_switch",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1793521446193,
+      "tag": "0047_close_outcome_position_closed",
+      "breakpoints": true
     }
   ]
 }

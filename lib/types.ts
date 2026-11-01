@@ -92,13 +92,14 @@ export const LEAD_ORIGIN_LABELS: Record<LeadOrigin, string> = {
 };
 
 // How a job concluded (set when status === "closed").
-export type CloseOutcome = "offer" | "rejected" | "withdrawn" | "no-response";
+export type CloseOutcome = "offer" | "rejected" | "withdrawn" | "no-response" | "position-closed";
 
 export const CLOSE_OUTCOME_LABELS: Record<CloseOutcome, string> = {
   offer: "Offer / hired",
   rejected: "Rejected",
   withdrawn: "Withdrew",
   "no-response": "No response",
+  "position-closed": "Job position closed",
 };
 
 // A To-do item. Always tied to a job; optionally linked to a reminder (when it

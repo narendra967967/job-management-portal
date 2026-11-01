@@ -61,6 +61,7 @@ export const closeOutcome = pgEnum("close_outcome", [
   "rejected",
   "withdrawn",
   "no-response",
+  "position-closed",
 ]);
 export const connectionType = pgEnum("connection_type", [
   "recruiter",

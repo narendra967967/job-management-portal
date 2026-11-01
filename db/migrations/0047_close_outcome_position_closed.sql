@@ -1,0 +1,1 @@
+ALTER TYPE "public"."close_outcome" ADD VALUE 'position-closed';

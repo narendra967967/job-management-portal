@@ -108,7 +108,7 @@ const COL_COUNT: Record<LeadStatus, string> = {
 const DEFAULT_COLUMNS: LeadStatus[] = ["new", "shortlisted", "applied", "interview", "offer-received"];
 
 // Recommended background colours for the close-outcome buttons: green = good,
-// red = rejected, amber = withdrew, grey = no response.
+// red = rejected, amber = withdrew, grey = no response, closed tone = position closed.
 const OUTCOME_BTN: Record<CloseOutcome, string> = {
   offer:
     "border-transparent bg-status-applied text-status-applied-foreground hover:bg-status-applied/80",
@@ -118,6 +118,8 @@ const OUTCOME_BTN: Record<CloseOutcome, string> = {
     "border-transparent bg-status-shortlisted text-status-shortlisted-foreground hover:bg-status-shortlisted/80",
   "no-response":
     "border-transparent bg-status-discarded text-status-discarded-foreground hover:bg-status-discarded/80",
+  "position-closed":
+    "border-transparent bg-status-closed text-status-closed-foreground hover:bg-status-closed/80",
 };
 
 // Per-column card sorting.
@@ -463,7 +465,7 @@ export function LeadsKanban() {
               <Button
                 key={o}
                 variant="outline"
-                className={OUTCOME_BTN[o]}
+                className={cn(OUTCOME_BTN[o], "odd:last:col-span-2")}
                 onClick={() => {
                   if (closingLead) setLeadStatus(closingLead.id, "closed", o);
                   setClosingLead(null);
