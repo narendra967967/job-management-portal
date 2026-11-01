@@ -32,6 +32,7 @@ import { cn } from "@/lib/utils";
 import { adminSignOut } from "@/lib/auth-admin-client";
 import { AdminNotesButton } from "@/components/admin/admin-notes-button";
 import { AdminBackdrop } from "@/components/admin/admin-backdrop";
+import { Toaster } from "@/components/admin/ui/toast";
 
 interface Item {
   href?: string;
@@ -307,6 +308,7 @@ export function AdminShell({
         </header>
         <main className="flex-1 overflow-y-auto p-4 md:p-6">{children}</main>
       </div>
+      <Toaster />
     </div>
   );
 }

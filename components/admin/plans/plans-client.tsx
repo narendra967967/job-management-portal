@@ -21,6 +21,7 @@ import {
 } from "@/actions/admin-plans";
 import { ACCENTS, formatMoney, yearlySavingsPct, type Plan } from "@/lib/admin/plans-model";
 import { cn } from "@/lib/utils";
+import { toast } from "@/components/admin/ui/toast";
 
 export function PlansClient({ initial }: { initial: Plan[] }) {
   const router = useRouter();
@@ -29,15 +30,12 @@ export function PlansClient({ initial }: { initial: Plan[] }) {
   const [editing, setEditing] = useState<Plan | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Plan | null>(null);
   const [recoTarget, setRecoTarget] = useState<Plan | null>(null);
-  const [flash, setFlash] = useState("");
-  const [flashErr, setFlashErr] = useState(false);
 
   const currentReco = plans.find((p) => p.popular) ?? null;
 
   function say(msg: string, err = false) {
-    setFlash(msg);
-    setFlashErr(err);
-    setTimeout(() => setFlash((m) => (m === msg ? "" : m)), 2800);
+    if (err) toast.error(msg);
+    else toast.success(msg);
   }
 
   function openAdd() {
@@ -101,13 +99,9 @@ export function PlansClient({ initial }: { initial: Plan[] }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
-        {flash ? (
-          <span className={cn("text-sm", flashErr ? "text-destructive" : "text-status-applied-foreground")}>{flash}</span>
-        ) : (
-          <span className="text-sm text-muted-foreground">
-            {plans.length} plan{plans.length === 1 ? "" : "s"}
-          </span>
-        )}
+        <span className="text-sm text-muted-foreground">
+          {plans.length} plan{plans.length === 1 ? "" : "s"}
+        </span>
         <Button onClick={openAdd}>
           <Plus /> Add plan
         </Button>

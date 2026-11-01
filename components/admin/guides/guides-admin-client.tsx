@@ -15,6 +15,7 @@ import { Button, buttonVariants } from "@/components/admin/ui/button";
 import { Badge } from "@/components/admin/ui/badge";
 import { Input } from "@/components/admin/ui/input";
 import { ConfirmDialog } from "@/components/admin/ui/confirm-dialog";
+import { toast } from "@/components/admin/ui/toast";
 import {
   deleteGuideAction,
   moveGuideAction,
@@ -35,8 +36,6 @@ export function GuidesAdminClient({ topics }: { topics: GuideTopic[] }) {
   const mounted = useMounted();
   const [busy, setBusy] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<GuideTopic | null>(null);
-  const [flash, setFlash] = useState("");
-  const [flashErr, setFlashErr] = useState(false);
   const [query, setQuery] = useState("");
   const [fStatus, setFStatus] = useState<"all" | GuideTopic["status"]>("all");
   const [fProgress, setFProgress] = useState<"all" | "in_progress" | "complete">("all");
@@ -76,9 +75,8 @@ export function GuidesAdminClient({ topics }: { topics: GuideTopic[] }) {
   }
 
   function say(msg: string, err = false) {
-    setFlash(msg);
-    setFlashErr(err);
-    setTimeout(() => setFlash((m) => (m === msg ? "" : m)), 2800);
+    if (err) toast.error(msg);
+    else toast.success(msg);
   }
 
   async function run(id: string, fn: () => Promise<{ ok: boolean; error?: string }>, okMsg?: string) {
@@ -207,18 +205,6 @@ export function GuidesAdminClient({ topics }: { topics: GuideTopic[] }) {
           Add guide
         </Link>
       </div>
-
-      {flash && (
-        <p
-          role="status"
-          className={cn(
-            "rounded-lg px-3 py-2 text-sm",
-            flashErr ? "bg-destructive/10 text-destructive" : "bg-status-applied text-status-applied-foreground",
-          )}
-        >
-          {flash}
-        </p>
-      )}
 
       {topics.length === 0 ? (
         <Card className="p-8 text-center text-sm text-muted-foreground">

@@ -1,0 +1,127 @@
+"use client";
+
+// Admin toasts: the admin panel's own copy (it shares no components with the user
+// app). Call `toast.success(...)` / `toast.error(...)` from any admin client;
+// <Toaster/> is mounted once in AdminShell. Green for success, red for error.
+
+import { Toast as ToastPrimitive } from "@base-ui/react/toast";
+import {
+  CheckCircle2,
+  AlertCircle,
+  Info,
+  X,
+  type LucideIcon,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+
+export const toastManager = ToastPrimitive.createToastManager();
+
+type ToastType = "success" | "error" | "info";
+
+/** Optional button on a toast (e.g. "Undo"). Clicking it also closes the toast. */
+export interface ToastAction {
+  label: string;
+  onClick: () => void;
+}
+
+function show(
+  type: ToastType,
+  title: string,
+  description?: string,
+  action?: ToastAction,
+) {
+  let id = "";
+  id = toastManager.add({
+    title,
+    description,
+    type,
+    // Give people time to reach an action button.
+    timeout: action ? 12000 : type === "error" ? 6000 : 4000,
+    priority: type === "error" ? "high" : "low",
+    actionProps: action
+      ? {
+          children: action.label,
+          onClick: () => {
+            toastManager.close(id);
+            action.onClick();
+          },
+        }
+      : undefined,
+  });
+  return id;
+}
+
+/** Imperative toast API — callable from anywhere. */
+export const toast = {
+  success: (title: string, description?: string, action?: ToastAction) =>
+    show("success", title, description, action),
+  error: (title: string, description?: string, action?: ToastAction) =>
+    show("error", title, description, action),
+  info: (title: string, description?: string, action?: ToastAction) =>
+    show("info", title, description, action),
+};
+
+const TYPE_STYLE: Record<
+  string,
+  { icon: LucideIcon; accent: string; bar: string }
+> = {
+  success: {
+    icon: CheckCircle2,
+    accent: "text-[oklch(0.58_0.14_150)]",
+    bar: "bg-[oklch(0.58_0.14_150)]",
+  },
+  error: {
+    icon: AlertCircle,
+    accent: "text-destructive",
+    bar: "bg-destructive",
+  },
+  info: { icon: Info, accent: "text-primary", bar: "bg-primary" },
+};
+
+function ToastList() {
+  const { toasts } = ToastPrimitive.useToastManager();
+  return toasts.map((t) => {
+    const style = TYPE_STYLE[t.type ?? "info"] ?? TYPE_STYLE.info;
+    const Icon = style.icon;
+    return (
+      <ToastPrimitive.Root
+        key={t.id}
+        toast={t}
+        className={cn(
+          "relative flex w-full items-start gap-3 overflow-hidden rounded-lg border bg-popover p-3.5 pr-9 text-popover-foreground shadow-lg ring-1 ring-foreground/5 transition-all",
+          "data-[ending-style]:opacity-0 data-[starting-style]:opacity-0",
+          "select-none data-[swiping]:transition-none",
+        )}
+      >
+        <span className={cn("absolute inset-y-0 left-0 w-1", style.bar)} />
+        <Icon className={cn("mt-0.5 size-5 shrink-0", style.accent)} aria-hidden />
+        <div className="min-w-0 flex-1">
+          <ToastPrimitive.Title className="text-sm font-semibold" />
+          <ToastPrimitive.Description className="mt-0.5 text-xs text-muted-foreground" />
+          {t.actionProps && (
+            <ToastPrimitive.Action className="mt-2 inline-flex min-h-8 items-center rounded-md border bg-background px-2.5 text-xs font-semibold text-primary transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none" />
+          )}
+        </div>
+        <ToastPrimitive.Close
+          aria-label="Dismiss"
+          className="absolute top-2 right-2 flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+        >
+          <X className="size-4" aria-hidden />
+        </ToastPrimitive.Close>
+      </ToastPrimitive.Root>
+    );
+  });
+}
+
+/** Mount once near the app root. Renders the toast stack (bottom-right). */
+export function Toaster() {
+  return (
+    <ToastPrimitive.Provider toastManager={toastManager}>
+      <ToastPrimitive.Portal>
+        <ToastPrimitive.Viewport className="fixed inset-x-0 bottom-0 z-[100] flex flex-col gap-2 p-4 sm:left-auto sm:right-2 sm:bottom-2 sm:w-full sm:max-w-sm">
+          <ToastList />
+        </ToastPrimitive.Viewport>
+      </ToastPrimitive.Portal>
+    </ToastPrimitive.Provider>
+  );
+}

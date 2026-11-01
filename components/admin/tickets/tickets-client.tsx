@@ -19,7 +19,6 @@ import {
   X,
   Check,
   CheckCheck,
-  AlertCircle,
   UserX,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/admin/ui/card";
@@ -52,6 +51,7 @@ import {
   type TickState,
 } from "@/lib/tickets-model";
 import { cn } from "@/lib/utils";
+import { toast } from "@/components/admin/ui/toast";
 
 const selectCls =
   "h-9 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
@@ -151,8 +151,6 @@ export function TicketsClient({ initial, priorityUserIds = [] }: { initial: Tick
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   // Account-deletion tickets: the user to delete (confirmed in a dialog).
   const [deleteUser, setDeleteUser] = useState<{ ticketId: string; name: string } | null>(null);
-  const [flash, setFlash] = useState("");
-  const [flashErr, setFlashErr] = useState(false);
   const chatScrollRef = useRef<HTMLDivElement>(null);
 
   const counts = useMemo(
@@ -258,9 +256,8 @@ export function TicketsClient({ initial, priorityUserIds = [] }: { initial: Tick
   }, [someSelected]);
 
   function say(msg: string, err = false) {
-    setFlash(msg);
-    setFlashErr(err);
-    setTimeout(() => setFlash((m) => (m === msg ? "" : m)), 2800);
+    if (err) toast.error(msg);
+    else toast.success(msg);
   }
   function toggleAll() {
     setSelected((prev) => {
@@ -395,18 +392,6 @@ export function TicketsClient({ initial, priorityUserIds = [] }: { initial: Tick
           {filtered.length} of {tickets.length}
         </span>
       </div>
-
-      {flash && (
-        <div
-          className={cn(
-            "flex items-center gap-2 rounded-lg border px-3 py-2 text-sm",
-            flashErr ? "border-destructive/25 bg-destructive/10 text-destructive" : "border-status-applied-foreground/25 bg-status-applied text-status-applied-foreground",
-          )}
-        >
-          {flashErr ? <AlertCircle className="size-4" aria-hidden /> : <Check className="size-4" aria-hidden />}
-          {flash}
-        </div>
-      )}
 
       {/* Bulk action bar */}
       {selCount > 0 && (

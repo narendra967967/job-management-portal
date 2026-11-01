@@ -15,8 +15,6 @@ import {
   UserX,
   Eye,
   Trash2,
-  Check,
-  AlertCircle,
   ChevronLeft,
   ChevronRight,
   X,
@@ -24,6 +22,7 @@ import {
   CalendarPlus,
 } from "lucide-react";
 import { Button } from "@/components/admin/ui/button";
+import { toast } from "@/components/admin/ui/toast";
 import { Input } from "@/components/admin/ui/input";
 import { Label } from "@/components/admin/ui/label";
 import { PlanBadge } from "@/components/admin/ui/plan-badge";
@@ -101,8 +100,6 @@ export function UsersClient({ initialUsers, plans }: { initialUsers: AdminUserRo
   const [pageSize, setPageSize] = useState(10);
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [flash, setFlash] = useState("");
-  const [flashErr, setFlashErr] = useState(false);
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<AdminUserRow | null>(null);
@@ -119,14 +116,10 @@ export function UsersClient({ initialUsers, plans }: { initialUsers: AdminUserRo
   const [renewBusy, setRenewBusy] = useState(false);
 
   function say(msg: string) {
-    setFlashErr(false);
-    setFlash(msg);
-    setTimeout(() => setFlash(""), 2600);
+    toast.success(msg);
   }
   function sayErr(msg: string) {
-    setFlashErr(true);
-    setFlash(msg);
-    setTimeout(() => setFlash(""), 4000);
+    toast.error(msg);
   }
 
   async function doResetForwarding(u: AdminUserRow) {
@@ -310,20 +303,6 @@ export function UsersClient({ initialUsers, plans }: { initialUsers: AdminUserRo
           Add user
         </Button>
       </div>
-
-      {flash && (
-        <div
-          className={cn(
-            "flex items-center gap-2 rounded-lg border px-3 py-2 text-sm",
-            flashErr
-              ? "border-destructive/25 bg-destructive/10 text-destructive"
-              : "border-status-applied-foreground/25 bg-status-applied text-status-applied-foreground",
-          )}
-        >
-          {flashErr ? <AlertCircle className="size-4" aria-hidden /> : <Check className="size-4" aria-hidden />}
-          {flash}
-        </div>
-      )}
 
       {/* Bulk action bar */}
       {selCount > 0 && (

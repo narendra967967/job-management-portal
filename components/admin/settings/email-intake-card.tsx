@@ -44,6 +44,7 @@ import {
 } from "@/actions/admin-email-intake";
 import type { AdminSettings } from "@/lib/admin/settings-data";
 import { useMounted } from "@/lib/use-mounted";
+import { toast } from "@/components/admin/ui/toast";
 import { formatDateTime } from "@/lib/utils";
 
 const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
@@ -85,19 +86,17 @@ export function EmailIntakeCard({ initial }: { initial: AdminSettings["intake"] 
 
   // A6 — Connect Gmail switch
   const [gmailDialog, setGmailDialog] = useState(false);
-  const [gmailFlash, setGmailFlash] = useState("");
   const [gmailError, setGmailError] = useState("");
   async function applyGmailSwitch() {
     const turningOff = config.gmailOAuthEnabled;
     setGmailError("");
     const res = await setGmailOAuthEnabledAction({ enabled: !turningOff });
     if (!res.ok) return setGmailError(res.error);
-    setGmailFlash(
+    toast.success(
       turningOff
         ? `Connect Gmail turned off — ${plural(res.disconnected, "connection")} revoked and removed.`
         : "Connect Gmail turned on — users can connect Gmail again.",
     );
-    setTimeout(() => setGmailFlash(""), 4000);
     router.refresh();
   }
 
@@ -126,11 +125,6 @@ export function EmailIntakeCard({ initial }: { initial: AdminSettings["intake"] 
             {config.gmailOAuthEnabled ? "Turn off" : "Turn on"}
           </Button>
         </div>
-        {gmailFlash && (
-          <p role="status" className="mt-3 rounded-lg bg-status-applied px-3 py-2 text-xs text-status-applied-foreground">
-            {gmailFlash}
-          </p>
-        )}
         {gmailError && <p className="mt-3 text-xs text-destructive">{gmailError}</p>}
         <ConfirmDialog
           open={gmailDialog}
