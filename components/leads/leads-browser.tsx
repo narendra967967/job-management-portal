@@ -60,6 +60,8 @@ import {
   LeadCardMenu,
   SourceChip,
   TOP_CHOICE_CARD,
+  STALE_CARD,
+  StaleChip,
   AutoActionNote,
   TopChoiceStar,
   discardWithFollowUpsConfirm,
@@ -74,6 +76,7 @@ import {
   useDefaultResumeId,
   useAppSettings,
   useStaleCutoff,
+  useStaleWarning,
   useFitScore,
   useAllFitScores,
   discardLead,
@@ -1364,6 +1367,7 @@ function LeadCard({
   const staleCutoff = useStaleCutoff();
   const hasPendingReminder = leadReminders.some((r) => r.outcome === "pending");
   const stale = isLeadStale(lead, staleCutoff);
+  const staleSoon = useStaleWarning({ ...lead, status });
   const ready = isReadyForAction(lead);
 
   // One tap, except when discarding would cancel follow-ups, which Undo can't restore.
@@ -1394,9 +1398,11 @@ function LeadCard({
         aria-label={`View details for ${lead.title}`}
         className={cn(
           "group relative flex h-full cursor-pointer flex-col overflow-hidden rounded-2xl border bg-card transition-all hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
-          lead.topChoice
-            ? TOP_CHOICE_CARD
-            : "shadow-xs hover:border-primary/40 hover:shadow-md",
+          staleSoon
+            ? cn("shadow-xs hover:shadow-md", STALE_CARD[staleSoon.level])
+            : lead.topChoice
+              ? TOP_CHOICE_CARD
+              : "shadow-xs hover:border-primary/40 hover:shadow-md",
           selected && "border-primary/60 ring-2 ring-primary/30",
         )}
       >
@@ -1518,6 +1524,7 @@ function LeadCard({
               Follow-up due
             </span>
           )}
+          {staleSoon && <StaleChip warning={staleSoon} />}
           {stale && (
             <span
               className="inline-flex items-center gap-1 rounded-md border border-destructive/40 px-2 py-0.5 text-[11px] font-medium text-destructive"

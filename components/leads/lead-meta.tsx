@@ -6,14 +6,17 @@
 //  - TopChoiceStar / TOP_CHOICE_CARD: the Top Choice marker + golden glow
 //  - TopChoiceToggle: the star beside the title on an opened job
 //  - AutoActionNote: why the system moved this lead, with Undo
+//  - STALE_CARD / StaleChip: the red border and chip as a lead nears stale
 
 import { useState } from "react";
-import { Bot, ExternalLink, Lock, MoreHorizontal, PenLine, Star, Wallet } from "lucide-react";
+import { Bot, ExternalLink, Hourglass, Lock, MoreHorizontal, PenLine, Star, Wallet } from "lucide-react";
 import {
   currentAutoAction,
   LEAD_ORIGIN_LABELS,
   LEAD_SOURCE_LABELS,
   type JobLead,
+  type StaleLevel,
+  type StaleWarning,
 } from "@/lib/types";
 import { setLeadTopChoice, undoAutoAction, useAutoActions, useFeatures } from "@/lib/mock-store";
 import { SalaryInsightDialog } from "@/components/leads/salary-insight";
@@ -30,6 +33,34 @@ import { cn } from "@/lib/utils";
 
 /** Card classes for a Top Choice lead: golden border + soft glow (see globals.css). */
 export const TOP_CHOICE_CARD = "top-choice-glow border-top-choice/70";
+
+/** Card border as a lead nears stale, light to strong red. Replaces the Top
+ *  Choice glow while it shows (the star stays). */
+export const STALE_CARD: Record<StaleLevel, string> = {
+  1: "border-destructive/35",
+  2: "border-destructive/65",
+  3: "border-destructive ring-1 ring-destructive/35",
+  4: "border-destructive ring-2 ring-destructive/55",
+};
+
+/** "Stale in 3 days" from the 70% step; earlier steps are border only, with
+ *  the same words for screen readers. */
+export function StaleChip({ warning, className }: { warning: StaleWarning; className?: string }) {
+  const text = warning.daysLeft <= 1 ? "Stale tomorrow" : `Stale in ${warning.daysLeft} days`;
+  if (warning.level < 3) return <span className="sr-only">{text}</span>;
+  return (
+    <span
+      title={`No activity for ${warning.quietDays} days. Any update keeps it on your board.`}
+      className={cn(
+        "inline-flex items-center gap-1 rounded-md bg-destructive/10 px-2 py-0.5 text-[11px] font-medium text-destructive",
+        className,
+      )}
+    >
+      <Hourglass className="size-3" aria-hidden />
+      {text}
+    </span>
+  );
+}
 
 /** Asked before a card's discard icon cancels follow-ups, which Undo can't restore. */
 export const discardWithFollowUpsConfirm = (title: string) => ({

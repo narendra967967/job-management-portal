@@ -256,6 +256,38 @@ export function isLeadStale(lead: JobLead, cutoff: string): boolean {
   );
 }
 
+/** 1 = light … 4 = last day before the lead goes stale. */
+export type StaleLevel = 1 | 2 | 3 | 4;
+
+export interface StaleWarning {
+  level: StaleLevel;
+  /** Days of no activity so far. */
+  quietDays: number;
+  /** Days until it goes stale (1 = tomorrow). */
+  daysLeft: number;
+}
+
+const ymdDay = (ymd: string) => {
+  const [y, m, d] = ymd.split("-").map(Number);
+  return Date.UTC(y, m - 1, d) / 86_400_000;
+};
+
+/**
+ * How close a lead that can go stale is to it, by the share of the user's
+ * stale period already spent with no activity: under 30% none, then 30% / 50% /
+ * 70% / 90% steps. Same clock as isLeadStale (stale once quiet for more than
+ * `staleDays`); null when it can't go stale, isn't close yet, or already is.
+ */
+export function staleWarning(lead: JobLead, staleDays: number, today: string): StaleWarning | null {
+  if (!STALE_LEAD_STATUSES.includes(lead.status) || lead.hasDueReminder || staleDays < 1) return null;
+  const quietDays = ymdDay(today) - ymdDay(lead.lastActiveAt);
+  if (quietDays > staleDays) return null;
+  const share = quietDays / staleDays;
+  if (share < 0.3) return null;
+  const level: StaleLevel = share < 0.5 ? 1 : share < 0.7 ? 2 : share < 0.9 ? 3 : 4;
+  return { level, quietDays, daysLeft: staleDays + 1 - quietDays };
+}
+
 export interface JobLeadDetail {
   leadId: string;
   jdText: string | null;

@@ -43,6 +43,7 @@ import {
   useResumes,
   useDefaultResumeId,
   useStaleCutoff,
+  useStaleWarning,
   useFitScore,
   useAllFitScores,
   discardLead,
@@ -72,6 +73,8 @@ import {
   LeadCardMenu,
   SourceChip,
   TOP_CHOICE_CARD,
+  STALE_CARD,
+  StaleChip,
   AutoActionNote,
   TopChoiceStar,
   discardWithFollowUpsConfirm,
@@ -621,14 +624,15 @@ function KanbanCard({
   const band = cached ? fitBand(cached.score) : null;
   const open = isJobOpen(lead.status);
   const ready = isReadyForAction(lead);
+  const staleSoon = useStaleWarning(lead);
   const stop = (e: React.SyntheticEvent) => e.stopPropagation();
 
   return (
     <div
       className={cn(
         "rounded-lg border bg-card p-3",
-        lead.topChoice ? TOP_CHOICE_CARD : "shadow-xs",
-        overlay ? "w-72 rotate-2 shadow-lg" : !lead.topChoice && "hover:border-primary/40",
+        staleSoon ? cn("shadow-xs", STALE_CARD[staleSoon.level]) : lead.topChoice ? TOP_CHOICE_CARD : "shadow-xs",
+        overlay ? "w-72 rotate-2 shadow-lg" : !lead.topChoice && !staleSoon && "hover:border-primary/40",
       )}
     >
       <div className="mb-1.5 flex items-center justify-between gap-2">
@@ -669,6 +673,7 @@ function KanbanCard({
             Due
           </Badge>
         )}
+        {staleSoon && <StaleChip warning={staleSoon} className="px-1.5 text-[10px]" />}
         {lead.contactCount > 0 && (
           <Badge className="bg-muted text-muted-foreground">
             <Users className="size-2.5" aria-hidden />

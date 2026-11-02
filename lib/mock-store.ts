@@ -59,7 +59,7 @@ import { markNotificationsReadAction } from "@/actions/notifications";
 import { toast } from "@/components/ui/toast";
 import type { SyncResult } from "@/lib/gmail-sync";
 import type { GmailSyncStatus, IngestError } from "@/lib/queries";
-import { contactPersonKey, isJobOpen, fitScoreKey, OPEN_LEAD_STATUSES } from "@/lib/types";
+import { contactPersonKey, isJobOpen, fitScoreKey, OPEN_LEAD_STATUSES, staleWarning, type StaleWarning } from "@/lib/types";
 import { formatDateTime } from "@/lib/utils";
 import { useMounted } from "@/lib/use-mounted";
 import {
@@ -715,6 +715,14 @@ export function useStaleCutoff(): string {
   const d = new Date();
   d.setDate(d.getDate() - staleLeadDays);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** How close this lead is to going stale, by the user's own stale setting. */
+export function useStaleWarning(lead: JobLead): StaleWarning | null {
+  const { staleLeadDays } = useWs("appSettings", getAppSettings);
+  const d = new Date();
+  const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return staleWarning(lead, staleLeadDays, today);
 }
 
 export function useAppSettings(): [
