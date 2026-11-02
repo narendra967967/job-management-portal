@@ -34,13 +34,14 @@ import { cn } from "@/lib/utils";
 /** Card classes for a Top Choice lead: golden border + soft glow (see globals.css). */
 export const TOP_CHOICE_CARD = "top-choice-glow border-top-choice/70";
 
-/** Card border as a lead nears stale, light to strong red. Replaces the Top
- *  Choice glow while it shows (the star stays). */
+/** Card border as a lead nears stale, light to strong orange (amber is taken by
+ *  Shortlisted, Due and Top Choice; red means errors). Replaces the Top Choice
+ *  glow while it shows (the star stays). */
 export const STALE_CARD: Record<StaleLevel, string> = {
-  1: "border-destructive/35",
-  2: "border-destructive/65",
-  3: "border-destructive ring-1 ring-destructive/35",
-  4: "border-destructive ring-2 ring-destructive/55",
+  1: "border-orange-400/45",
+  2: "border-orange-500/70",
+  3: "border-orange-500 ring-1 ring-orange-500/40",
+  4: "border-orange-600 ring-2 ring-orange-500/60",
 };
 
 /** "Stale in 3 days" from the 70% step; earlier steps are border only, with
@@ -52,7 +53,7 @@ export function StaleChip({ warning, className }: { warning: StaleWarning; class
     <span
       title={`No activity for ${warning.quietDays} days. Any update keeps it on your board.`}
       className={cn(
-        "inline-flex items-center gap-1 rounded-md bg-destructive/10 px-2 py-0.5 text-[11px] font-medium text-destructive",
+        "inline-flex items-center gap-1 rounded-md bg-orange-500/15 px-2 py-0.5 text-[11px] font-medium text-orange-700 dark:text-orange-300",
         className,
       )}
     >
