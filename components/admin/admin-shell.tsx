@@ -95,7 +95,10 @@ const TITLES: Record<string, string> = {
   "/jmp-admin/inbound-log": "Inbound email log",
   "/jmp-admin/guides/new": "New guide",
   "/jmp-admin/settings": "Settings",
+  "/jmp-admin/knowledge-base": "Knowledge base",
 };
+
+const KB_HREF = "/jmp-admin/knowledge-base";
 
 function isActive(pathname: string, href?: string) {
   if (!href) return false;
@@ -176,13 +179,19 @@ function NavGroup({
 
 function UserFooter({ pathname, admin, onLogout }: { pathname: string; admin: Admin; onLogout: () => void }) {
   const settingsActive = isActive(pathname, SETTINGS_HREF);
+  const kbActive = isActive(pathname, KB_HREF);
   return (
     <div className="mt-4 space-y-1 border-t border-slate-800 pt-3">
-      <span className="flex cursor-default items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-500">
+      <Link
+        href={KB_HREF}
+        className={cn(
+          "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+          kbActive ? "bg-slate-800 text-white" : "text-slate-300 hover:bg-slate-800/60 hover:text-white",
+        )}
+      >
         <BookOpen className="size-4 shrink-0" aria-hidden />
         Knowledge base
-        <span className="ml-auto rounded-full bg-slate-800 px-1.5 py-0.5 text-[9px] text-slate-400">soon</span>
-      </span>
+      </Link>
       <Link
         href={SETTINGS_HREF}
         className={cn(
@@ -224,7 +233,12 @@ export function AdminShell({
   const pathname = usePathname();
   const router = useRouter();
   const title =
-    TITLES[pathname] ?? (pathname.startsWith("/jmp-admin/guides/") ? "Edit guide" : "Admin");
+    TITLES[pathname] ??
+    (pathname.startsWith("/jmp-admin/guides/")
+      ? "Edit guide"
+      : pathname.startsWith(KB_HREF)
+        ? "Knowledge base"
+        : "Admin");
 
   // Accordion: one group open at a time. The group holding the active page opens
   // on load and whenever navigation moves into it; opening another closes the rest.
@@ -235,6 +249,7 @@ export function AdminShell({
   }, [activeGroup]);
   const mobileLinks: Item[] = [
     ...GROUPS.flatMap((g) => g.items).filter((i) => i.href && !i.soon),
+    { href: KB_HREF, label: "Knowledge base", icon: BookOpen },
     { href: SETTINGS_HREF, label: "Settings", icon: Settings },
   ];
 

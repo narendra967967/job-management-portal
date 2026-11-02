@@ -276,7 +276,7 @@ export function GuideEditor({
   );
 }
 
-function Field({
+export function Field({
   label,
   hint,
   className,
@@ -296,7 +296,7 @@ function Field({
   );
 }
 
-function Toggle({
+export function Toggle({
   checked,
   onChange,
   label,
