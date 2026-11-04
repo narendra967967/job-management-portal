@@ -1,7 +1,7 @@
 ---
 title: How a deploy works, and rolling one back
 category: Runbooks
-summary: Pushing to preprod deploys preprod; pushing to prod deploys prod after an approval click. Each deploy builds the image in GitHub, runs migrations from it, switches the container, health-checks it, and rolls back by itself if the check fails.
+summary: Pushing to preprod deploys preprod. Pushing to prod deploys prod after an approval click. Each deploy builds the image in GitHub, runs its migrations, switches the container and rolls back by itself if the health check fails.
 keywords: deploy, release, preprod, prod, migrations, rollback, roll back, github actions, ci, promote
 ---
 
@@ -9,7 +9,7 @@ Both environments run on one server, as separate containers with separate databa
 
 | Push to | Workflow | Deploys |
 |---|---|---|
-| `preprod` | Deploy preprod | Preprod, straight away |
+| `preprod` | Deploy preprod | Preprod, right away |
 | `prod` | Deploy prod | Prod, after the owner approves it in GitHub |
 
 ## What a deploy does

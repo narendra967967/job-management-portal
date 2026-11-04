@@ -3,16 +3,20 @@ import "server-only";
 // AI provider client. Reads the acting user's provider/model/key from
 // user_settings (the key is decrypted from ciphertext, per-user), then calls the
 // provider's REST API directly (no SDK dependency; supports OpenAI + Anthropic).
+// Admin-side AI (the knowledge base agent) uses the admin key in app_ai_config
+// instead, through adminAiComplete; users' features never touch it.
 // Server-only — the key never reaches the client.
 
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { userSettings as settingsT } from "@/db/schema";
+import { appAiConfig, userSettings as settingsT } from "@/db/schema";
 import { decryptSecret } from "@/lib/crypto";
 import { AI_PROVIDER_DEFAULT_MODEL, type AiProvider } from "@/lib/types";
 
 /** Thrown when the user hasn't configured an AI key in Settings. */
 export const AI_NOT_CONFIGURED = "AI_NOT_CONFIGURED";
+/** Thrown when admin Settings → AI has no admin key. */
+export const ADMIN_AI_NOT_CONFIGURED = "ADMIN_AI_NOT_CONFIGURED";
 
 interface UserAi {
   provider: AiProvider;
@@ -43,6 +47,24 @@ async function getUserAi(userId: string): Promise<UserAi> {
     provider,
     model: s.model?.trim() || AI_PROVIDER_DEFAULT_MODEL[provider],
     key: decryptSecret(s.ciphertext),
+  };
+}
+
+async function getAdminAi(): Promise<UserAi> {
+  const [c] = await db
+    .select({
+      provider: appAiConfig.adminProvider,
+      model: appAiConfig.adminModel,
+      ciphertext: appAiConfig.adminKeyCiphertext,
+    })
+    .from(appAiConfig)
+    .limit(1);
+
+  if (!c?.ciphertext) throw new Error(ADMIN_AI_NOT_CONFIGURED);
+  return {
+    provider: c.provider,
+    model: c.model?.trim() || AI_PROVIDER_DEFAULT_MODEL[c.provider],
+    key: decryptSecret(c.ciphertext),
   };
 }
 
@@ -144,15 +166,13 @@ async function callAnthropic(
   return (data.content?.[0]?.text ?? "").trim();
 }
 
-/** Run one system+user prompt against the user's configured provider. */
-export async function aiComplete(
-  userId: string,
+function complete(
+  ai: UserAi,
   system: string,
   user: string,
-  maxTokens = 600,
-  opts: AiCallOptions = {},
+  maxTokens: number,
+  opts: AiCallOptions,
 ): Promise<string> {
-  const ai = await getUserAi(userId);
   switch (ai.provider) {
     case "anthropic":
       return callAnthropic(ai, system, user, maxTokens, opts);
@@ -161,6 +181,27 @@ export async function aiComplete(
     default:
       return callOpenAI(ai, system, user, maxTokens, opts);
   }
+}
+
+/** Run one system+user prompt against the user's configured provider. */
+export async function aiComplete(
+  userId: string,
+  system: string,
+  user: string,
+  maxTokens = 600,
+  opts: AiCallOptions = {},
+): Promise<string> {
+  return complete(await getUserAi(userId), system, user, maxTokens, opts);
+}
+
+/** Run one system+user prompt on the admin key (admin Settings → AI). */
+export async function adminAiComplete(
+  system: string,
+  user: string,
+  maxTokens = 600,
+  opts: AiCallOptions = {},
+): Promise<string> {
+  return complete(await getAdminAi(), system, user, maxTokens, opts);
 }
 
 /** Whether the user has saved an AI key (no decryption, no provider call). */

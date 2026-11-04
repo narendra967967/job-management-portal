@@ -28,4 +28,4 @@ AI picks out jobs and points to them by link number. A job is only kept if its l
 | No credit (provider said 402) | Your AI provider is out of credit |
 | Failed after retries | AI couldn't read this email |
 
-A rejected key or no credit stops straight away instead of retrying, since retrying won't fix it. After fixing the key, the user forwards the alert again by hand.
+A rejected key or no credit stops right away instead of retrying, since retrying won't fix it. After fixing the key, the user forwards the alert again by hand.

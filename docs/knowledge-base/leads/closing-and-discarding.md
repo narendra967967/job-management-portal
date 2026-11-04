@@ -15,7 +15,7 @@ keywords: close, discard, undo, outcome, rejected, withdrew, no response, job po
 
 **Discard** a lead when it was never right for the user. Discard has no reason to pick.
 
-## What happens straight away
+## What happens right away
 
 - Pending reminders for the lead are marked closed, and its open to-dos are marked done.
 - The lead moves to Archive.
@@ -25,7 +25,7 @@ To bring one back, change its stage from the status menu. Its reminders and to-d
 
 ## The quick discard icon
 
-List and board cards for open leads have a box icon at the bottom right that discards in one tap. The toast has an **Undo** button that puts the lead back in the stage it came from. It only asks first when the lead has pending follow-ups, because those get cancelled and Undo can't restore them. Undo also doesn't reopen to-dos that discarding marked done.
+List and board cards for open leads have a box icon at the bottom right that discards in one tap. The toast has an **Undo** button that puts the lead back in the stage it came from. It only asks first when the lead has pending follow-ups, because those get canceled and Undo can't restore them. Undo also doesn't reopen to-dos that discarding marked done.
 
 ## Deleting for good
 

@@ -5,7 +5,7 @@
 // in the repo and arrive through the sync.
 
 import { randomBytes } from "node:crypto";
-import { and, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
@@ -25,9 +25,8 @@ import {
   kbHtmlToText,
   normalizeQuestion,
   type KbArticleInput,
-  type KbSource,
 } from "@/lib/kb-model";
-import { searchKb } from "@/lib/kb-search";
+import { answerKbQuestion, type KbTurn } from "@/lib/kb-agent";
 import { syncKbFromRepo, type KbSyncResult } from "@/lib/kb-files";
 
 type Result = { ok: true } | { ok: false; error: string };
@@ -138,23 +137,8 @@ const askSchema = z.object({
   question: z.string().trim().min(1, "Type a question.").max(KB_QUESTION_MAX, `Keep it under ${KB_QUESTION_MAX} characters.`),
 });
 
-/** Interim answer from the best-matching articles (Phase 5 hands this to AI). */
-async function answer(question: string): Promise<{ text: string; sources?: KbSource[]; unanswered: boolean }> {
-  const hits = await searchKb(question, 2);
-  if (!hits.length) {
-    return {
-      text: "I couldn't find this in the knowledge base, so I won't guess. I've added it to Unanswered so an article can be written.",
-      unanswered: true,
-    };
-  }
-  const best = hits[0];
-  const lead = best.contentText.split(/(?<=\.)\s/).slice(0, 2).join(" ");
-  return {
-    text: `${best.summary} ${lead}`.trim(),
-    sources: hits.map((h) => ({ id: h.id, title: h.title, kind: h.kind, href: h.href })),
-    unanswered: false,
-  };
-}
+/** How many earlier messages the agent sees, for follow-up questions. */
+const HISTORY_TURNS = 4;
 
 export async function askKbAction(
   conversationId: string | null,
@@ -173,6 +157,16 @@ export async function askKbAction(
       .where(and(eq(kbConversations.id, convoId), eq(kbConversations.userId, adminId)));
     if (!own) convoId = null;
   }
+  let history: KbTurn[] = [];
+  if (convoId) {
+    const rows = await db
+      .select({ role: kbMessages.role, text: kbMessages.text })
+      .from(kbMessages)
+      .where(eq(kbMessages.conversationId, convoId))
+      .orderBy(desc(kbMessages.createdAt))
+      .limit(HISTORY_TURNS);
+    history = rows.reverse().map((m) => ({ role: m.role === "user" ? "user" : "assistant", text: m.text }));
+  }
   if (!convoId) {
     const title = q.length > 70 ? `${q.slice(0, 67)}…` : q;
     const [c] = await db.insert(kbConversations).values({ userId: adminId, title }).returning({ id: kbConversations.id });
@@ -180,7 +174,7 @@ export async function askKbAction(
   }
   await db.insert(kbMessages).values({ conversationId: convoId, role: "user", text: q });
 
-  const a = await answer(q);
+  const a = await answerKbQuestion(q, history);
   await db.insert(kbMessages).values({
     conversationId: convoId,
     role: "assistant",

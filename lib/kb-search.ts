@@ -38,6 +38,16 @@ export interface KbHit {
   matched: string[];
   strong: string[];
   titled: string[];
+  /** Covers enough of the question on its own (see `counts`). Loose hits may not. */
+  strict: boolean;
+}
+
+export interface KbSearchOptions {
+  /**
+   * Also return hits that cover only part of the question, for when AI reads
+   * them and decides. They still need a title, keyword or summary match.
+   */
+  loose?: boolean;
 }
 
 /** The question's search terms: stemmed, filler words removed. */
@@ -60,7 +70,7 @@ function counts(hit: KbHit, terms: number, unknown: number): boolean {
   return m / terms >= share && hit.strong.length >= 1 && (terms <= 2 ? m >= 1 : m >= 2);
 }
 
-export async function searchKb(question: string, limit = 3): Promise<KbHit[]> {
+export async function searchKb(question: string, limit = 3, opts: KbSearchOptions = {}): Promise<KbHit[]> {
   const terms = await questionTerms(question);
   if (!terms.length) return [];
   const arr = sql`ARRAY[${sql.join(
@@ -135,8 +145,10 @@ export async function searchKb(question: string, limit = 3): Promise<KbHit[]> {
       matched: row.matched,
       strong: row.strong,
       titled: row.titled,
+      strict: false,
     }))
-    .filter((h) => counts(h, terms.length, unknown))
+    .map((h) => ({ ...h, strict: counts(h, terms.length, unknown) }))
+    .filter((h) => h.strict || (opts.loose && h.strong.length >= 1 && h.matched.length / terms.length >= 0.34))
     .sort((a, b) => b.weight - a.weight || b.score - a.score)
     .slice(0, limit);
 }

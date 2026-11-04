@@ -23,4 +23,4 @@ Users see their usage in **Settings → Plan**. An unlimited limit shows just "U
 
 At the résumé limit, uploading another says "Your plan allows N résumés. Delete one first, or upgrade your plan to add more."
 
-Closing or discarding leads frees room straight away, and so do the automatic cleanup rules.
+Closing or discarding leads frees room right away, and so do the automatic cleanup rules.

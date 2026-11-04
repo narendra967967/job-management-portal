@@ -172,7 +172,7 @@ function Message({ m, question }: { m: KbMessage; question?: string }) {
         {m.unanswered ? <SearchX className="size-4" /> : <Bot className="size-4" />}
       </span>
       <div className="min-w-0 max-w-[85%] space-y-2">
-        <Card className="rounded-2xl rounded-tl-md px-3.5 py-2.5 text-sm leading-relaxed">{m.text}</Card>
+        <Card className="whitespace-pre-line rounded-2xl rounded-tl-md px-3.5 py-2.5 text-sm leading-relaxed">{m.text}</Card>
         {m.sources && m.sources.length > 0 && (
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="text-[11px] text-muted-foreground">Sources</span>

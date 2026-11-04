@@ -76,6 +76,7 @@ export function parseKbFile(rel: string, raw: string): KbFile | { error: string 
   }
   if (!meta.title) return { error: "front matter needs a title" };
   if (!meta.summary) return { error: "front matter needs a summary" };
+  if (meta.summary.length > 240) return { error: `the summary is ${meta.summary.length} characters; keep it to 240` };
   if (!(KB_CATEGORIES as readonly string[]).includes(meta.category ?? "")) {
     return { error: `category must be one of: ${KB_CATEGORIES.join(", ")}` };
   }
@@ -89,7 +90,7 @@ export function parseKbFile(rel: string, raw: string): KbFile | { error: string 
     slug: rel.replace(/\.md$/, ""),
     title: meta.title.slice(0, 120),
     category: meta.category,
-    summary: meta.summary.slice(0, 240),
+    summary: meta.summary,
     keywords: parseKeywords(meta.keywords ?? ""),
     status,
     contentHtml,

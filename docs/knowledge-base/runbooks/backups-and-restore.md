@@ -1,7 +1,7 @@
 ---
 title: Backups and restoring from one
 category: Runbooks
-summary: Every night both databases and the uploaded files are backed up to the server and to Google Drive. Local copies are kept 14 days and Drive keeps 30. Restoring means stopping the app, recreating its database from the dump, and putting the files back.
+summary: Every night both databases and the uploaded files are backed up to the server and to Google Drive. Local copies last 14 days and Drive's 30. Restoring means stopping the app, recreating its database from the dump and putting the files back.
 keywords: backup, restore, google drive, rclone, database dump, lost data, recover, uploads
 ---
 

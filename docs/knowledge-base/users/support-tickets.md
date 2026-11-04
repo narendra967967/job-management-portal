@@ -1,7 +1,7 @@
 ---
 title: How support tickets work
 category: Users and support
-summary: Users write in from the help button on every page or Settings → Help & support. Each ticket gets a TKT-0001 style number, and replies show up live in the user's chat with a notification. Resolving a ticket emails the user the whole conversation.
+summary: Users write in from the help button on every page or Settings → Help & support. Each gets a TKT-0001 style number, and replies show up live in their chat with a notification. Resolving a ticket emails the user the whole conversation.
 keywords: ticket, support, help widget, reply, resolve, categories, job site request, account deletion, tkt, priority
 ---
 

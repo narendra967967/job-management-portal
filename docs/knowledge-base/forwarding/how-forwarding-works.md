@@ -21,7 +21,7 @@ The filter's From text only covers sites we accepted when they copied it. When w
 
 Every email is checked in order: the address must be theirs, the email must be under the size limit (2 MB by default), and it must come from an allowed sender and be signed by that sender's domain. Gmail's own forwarding seal counts too, for the many alerts Gmail re-signs when it forwards them. The same email arriving twice is only read once.
 
-An accepted alert is read by the site's built-in reader, or by AI when the site has none and the user's plan and key allow it. Each job becomes a lead. If the job is already there, it's refreshed and tagged "Re-newed" instead of added twice. New leads appear within about a minute and a half, or straight away on reload.
+An accepted alert is read by the site's built-in reader, or by AI when the site has none and the user's plan and key allow it. Each job becomes a lead. If the job is already there, it's refreshed and tagged "Re-newed" instead of added twice. New leads appear within about a minute and a half, or right away on reload.
 
 ## Where to look when something's missing
 
@@ -29,4 +29,4 @@ An accepted alert is read by the site's built-in reader, or by AI when the site 
 
 ## Resetting the address
 
-**Reset address** issues a new address straight away and stops the old one working. The user then has to add the new address in Gmail and update their filter. They do this if the old address leaks.
+**Reset address** issues a new address right away and stops the old one working. The user then has to add the new address in Gmail and update their filter. They do this if the old address leaks.
