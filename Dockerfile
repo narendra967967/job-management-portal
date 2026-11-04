@@ -47,6 +47,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 # migrations + their runner, and the one-off résumé mover. The traced standalone
 # bundle only has the drizzle-orm files the app uses; the migrator needs the full
 # package (same version), so copy it over the traced copy.
+# The admin knowledge base's repo articles: synced into the database at server
+# start (instrumentation.ts), so they ship with the code they describe.
+COPY --from=builder --chown=nextjs:nodejs /app/docs/knowledge-base ./docs/knowledge-base
 COPY --from=builder --chown=nextjs:nodejs /app/db/migrations ./db/migrations
 COPY --from=builder --chown=nextjs:nodejs /app/scripts/migrate.mjs /app/scripts/files-db-to-disk.mjs ./scripts/
 COPY --from=deps --chown=nextjs:nodejs /app/node_modules/drizzle-orm ./node_modules/drizzle-orm

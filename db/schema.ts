@@ -937,6 +937,7 @@ export const retentionConfig = pgTable("retention_config", {
   leadPurgeLogDays: integer("lead_purge_log_days").notNull().default(365),
   notificationDays: integer("notification_days").notNull().default(90),
   autoActionDays: integer("auto_action_days").notNull().default(365),
+  kbConversationDays: integer("kb_conversation_days").notNull().default(60),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .defaultNow()
@@ -1197,4 +1198,112 @@ export const featureUsage = pgTable(
     count: integer("count").notNull().default(0),
   },
   (t) => [uniqueIndex("feature_usage_user_feature_month_uq").on(t.userId, t.feature, t.month)],
+);
+
+/* ------------------------------------------------------------------ */
+/* Admin knowledge base (admin only, never shown to users)              */
+/* ------------------------------------------------------------------ */
+
+export const kbArticleSource = pgEnum("kb_article_source", ["repo", "admin"]);
+export const kbArticleStatus = pgEnum("kb_article_status", ["draft", "published"]);
+export const kbQuestionStatus = pgEnum("kb_question_status", ["open", "covered", "dismissed"]);
+
+/**
+ * One knowledge base article. `repo` articles come from docs/knowledge-base/*.md
+ * (lib/kb-files.ts syncs them at server start) and are read-only in the admin;
+ * `admin` articles are written in the admin editor. The agent answers from
+ * published articles only.
+ */
+export const kbArticles = pgTable(
+  "kb_articles",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    // Repo: the file path without .md ("runbooks/recaptcha-lockout"); admin: generated.
+    slug: text("slug").notNull(),
+    source: kbArticleSource("source").notNull(),
+    title: text("title").notNull(),
+    category: text("category").notNull(),
+    summary: text("summary").notNull().default(""),
+    keywords: text("keywords").array().notNull().default(sql`'{}'::text[]`),
+    status: kbArticleStatus("status").notNull().default("draft"),
+    // Sanitized HTML for display; plain text for search and answers.
+    contentHtml: text("content_html").notNull().default(""),
+    contentText: text("content_text").notNull().default(""),
+    // Repo only: the file's hash, so an unchanged file is skipped on sync.
+    contentHash: text("content_hash"),
+    updatedBy: text("updated_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [
+    uniqueIndex("kb_articles_slug_uq").on(t.slug),
+    index("kb_articles_status_idx").on(t.status),
+  ],
+);
+
+/** Earlier saves of an admin article (repo articles have git history instead). */
+export const kbArticleVersions = pgTable(
+  "kb_article_versions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    articleId: uuid("article_id")
+      .notNull()
+      .references(() => kbArticles.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    contentHtml: text("content_html").notNull(),
+    savedBy: text("saved_by").references(() => user.id, { onDelete: "set null" }),
+    savedAt: timestamp("saved_at", { withTimezone: true }).notNull(),
+  },
+  (t) => [index("kb_article_versions_article_idx").on(t.articleId, t.savedAt)],
+);
+
+/** A conversation with the agent, per admin. Trimmed by Data retention. */
+export const kbConversations = pgTable(
+  "kb_conversations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("kb_conversations_user_idx").on(t.userId, t.updatedAt)],
+);
+
+export const kbMessages = pgTable(
+  "kb_messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    conversationId: uuid("conversation_id")
+      .notNull()
+      .references(() => kbConversations.id, { onDelete: "cascade" }),
+    role: text("role").notNull(), // "user" | "assistant"
+    text: text("text").notNull(),
+    // [{ id, title }] of the articles an answer came from (titles kept as they were).
+    sources: jsonb("sources").$type<{ id: string; title: string }[]>(),
+    unanswered: boolean("unanswered").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("kb_messages_conversation_idx").on(t.conversationId, t.createdAt)],
+);
+
+/** Questions the agent couldn't answer; the same wording is counted, not repeated. */
+export const kbQuestions = pgTable(
+  "kb_questions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    question: text("question").notNull(),
+    // Lowercased, spaces collapsed: what "the same question" means.
+    normalized: text("normalized").notNull(),
+    timesAsked: integer("times_asked").notNull().default(1),
+    status: kbQuestionStatus("status").notNull().default("open"),
+    firstAskedAt: timestamp("first_asked_at", { withTimezone: true }).notNull().defaultNow(),
+    lastAskedAt: timestamp("last_asked_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("kb_questions_normalized_uq").on(t.normalized)],
 );

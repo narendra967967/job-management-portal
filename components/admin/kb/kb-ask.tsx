@@ -4,14 +4,15 @@
 // articles and list them as sources; when nothing fits, the agent says so and the
 // question goes to Unanswered. ?c=<id> reopens a past conversation.
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Bot, FileText, Loader2, Plus, SendHorizontal, SearchX } from "lucide-react";
 import { Card } from "@/components/admin/ui/card";
 import { Button, buttonVariants } from "@/components/admin/ui/button";
-import { ask, useKb } from "@/lib/kb-mock";
-import type { KbMessage } from "@/lib/kb-model";
+import { toast } from "@/components/admin/ui/toast";
+import { askKbAction } from "@/actions/admin-kb";
+import { KB_QUESTION_MAX, type KbConversation, type KbMessage } from "@/lib/kb-model";
 import { cn } from "@/lib/utils";
 
 const EXAMPLES = [
@@ -20,20 +21,18 @@ const EXAMPLES = [
   "How do I add a new job site?",
 ];
 
-const MAX = 500;
-
-export function KbAsk() {
+export function KbAsk({ conversation }: { conversation: KbConversation | null }) {
   const router = useRouter();
-  const params = useSearchParams();
-  const convoId = params.get("c");
-  const { conversations } = useKb();
-  const convo = conversations.find((c) => c.id === convoId) ?? null;
   const [draft, setDraft] = useState("");
   const [pending, setPending] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  const messages = convo?.messages ?? [];
+  const messages = useMemo(() => conversation?.messages ?? [], [conversation]);
+  // Once the refreshed conversation includes the question, stop showing it as pending.
+  useEffect(() => {
+    if (pending && messages.some((m) => m.role === "user" && m.text === pending)) setPending(null);
+  }, [messages, pending]);
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: "end" });
   }, [messages.length, pending]);
@@ -43,17 +42,26 @@ export function KbAsk() {
     if (!q || pending) return;
     setDraft("");
     setPending(q);
-    const id = await ask(convo?.id ?? null, q);
-    setPending(null);
-    if (id !== convoId) router.replace(`/jmp-admin/knowledge-base?c=${id}`, { scroll: false });
+    const res = await askKbAction(conversation?.id ?? null, q);
+    if (!res.ok) {
+      setPending(null);
+      setDraft(q);
+      toast.error(res.error);
+      return;
+    }
+    if (res.conversationId !== conversation?.id) {
+      router.replace(`/jmp-admin/knowledge-base?c=${res.conversationId}`, { scroll: false });
+    } else {
+      router.refresh();
+    }
     inputRef.current?.focus();
   }
 
   return (
     <div className="flex min-h-[calc(100dvh-14rem)] flex-col">
       <div className="mb-3 flex items-center justify-between gap-2">
-        <h2 className="min-w-0 truncate text-sm font-semibold">{convo ? convo.title : "New conversation"}</h2>
-        {convo && (
+        <h2 className="min-w-0 truncate text-sm font-semibold">{conversation ? conversation.title : "New conversation"}</h2>
+        {conversation && (
           <Link href="/jmp-admin/knowledge-base" className={cn(buttonVariants({ variant: "outline" }), "shrink-0 px-3")}>
             <Plus className="size-4" aria-hidden />
             New chat
@@ -62,7 +70,7 @@ export function KbAsk() {
       </div>
 
       <div className="flex-1 space-y-4">
-        {!convo && !pending && (
+        {!conversation && !pending && (
           <Card className="space-y-4 p-5 text-center">
             <span className="mx-auto flex size-11 items-center justify-center rounded-full bg-primary/10 text-primary">
               <Bot className="size-5" aria-hidden />
@@ -87,9 +95,7 @@ export function KbAsk() {
         ))}
         {pending && (
           <>
-            {!convo?.messages.some((m) => m.role === "user" && m.text === pending) && (
-              <Message m={{ id: "pending-q", role: "user", text: pending, at: "" }} />
-            )}
+            <Message m={{ id: "pending-q", role: "user", text: pending, at: "" }} />
             <div className="flex items-center gap-2 text-sm text-muted-foreground" role="status">
               <Loader2 className="size-4 animate-spin" aria-hidden />
               Looking through the articles…
@@ -105,13 +111,13 @@ export function KbAsk() {
           e.preventDefault();
           send(draft);
         }}
-        className="sticky bottom-0 mt-4 -mx-1 bg-gradient-to-t from-white/90 via-white/80 to-transparent px-1 pt-3 pb-1"
+        className="sticky bottom-0 -mx-1 mt-4 bg-gradient-to-t from-white/90 via-white/80 to-transparent px-1 pt-3 pb-1"
       >
         <Card className="flex items-end gap-2 p-2">
           <textarea
             ref={inputRef}
             value={draft}
-            maxLength={MAX}
+            maxLength={KB_QUESTION_MAX}
             rows={1}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {
@@ -128,9 +134,9 @@ export function KbAsk() {
             <SendHorizontal className="size-4" aria-hidden />
           </Button>
         </Card>
-        {draft.length > MAX - 50 && (
+        {draft.length > KB_QUESTION_MAX - 50 && (
           <p className="mt-1 px-1 text-right text-[11px] text-muted-foreground tabular-nums">
-            {draft.length}/{MAX}
+            {draft.length}/{KB_QUESTION_MAX}
           </p>
         )}
       </form>

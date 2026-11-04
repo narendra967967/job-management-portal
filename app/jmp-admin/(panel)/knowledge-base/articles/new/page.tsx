@@ -1,14 +1,10 @@
 // Knowledge base → new article. ?title= prefills it from an unanswered question.
 
-import { Suspense } from "react";
 import { requireAdmin } from "@/lib/current-user";
 import { KbArticleEditor } from "@/components/admin/kb/kb-article-editor";
 
-export default async function NewKbArticlePage() {
+export default async function NewKbArticlePage({ searchParams }: { searchParams: Promise<{ title?: string }> }) {
   await requireAdmin();
-  return (
-    <Suspense>
-      <KbArticleEditor />
-    </Suspense>
-  );
+  const { title } = await searchParams;
+  return <KbArticleEditor initialTitle={(title ?? "").slice(0, 120)} />;
 }

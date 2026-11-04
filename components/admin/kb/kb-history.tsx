@@ -1,35 +1,31 @@
 "use client";
 
-// History: past conversations with the agent, newest first. Opening one
-// continues it on the Ask tab.
+// History: this admin's past conversations with the agent, newest first.
+// Opening one continues it on the Ask tab.
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { MessageSquare, Search, Trash2 } from "lucide-react";
 import { Card } from "@/components/admin/ui/card";
 import { Button } from "@/components/admin/ui/button";
 import { Input } from "@/components/admin/ui/input";
 import { ConfirmDialog } from "@/components/admin/ui/confirm-dialog";
 import { toast } from "@/components/admin/ui/toast";
-import { deleteConversation, useKb } from "@/lib/kb-mock";
-import type { KbConversation } from "@/lib/kb-model";
+import { deleteKbConversationAction } from "@/actions/admin-kb";
+import type { KbConversationSummary } from "@/lib/kb-model";
 import { useMounted } from "@/lib/use-mounted";
 import { formatDateTime } from "@/lib/utils";
 
-export function KbHistory() {
-  const { conversations } = useKb();
+export function KbHistory({ conversations }: { conversations: KbConversationSummary[] }) {
+  const router = useRouter();
   const mounted = useMounted();
   const [query, setQuery] = useState("");
-  const [target, setTarget] = useState<KbConversation | null>(null);
+  const [target, setTarget] = useState<KbConversationSummary | null>(null);
 
   const list = useMemo(() => {
     const words = query.toLowerCase().split(/\s+/).filter(Boolean);
-    return conversations
-      .filter((c) => {
-        const hay = c.messages.map((m) => m.text).join(" ").toLowerCase();
-        return words.every((w) => hay.includes(w));
-      })
-      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    return conversations.filter((c) => words.every((w) => c.title.toLowerCase().includes(w)));
   }, [conversations, query]);
 
   return (
@@ -51,34 +47,34 @@ export function KbHistory() {
         </Card>
       ) : (
         <Card className="divide-y p-0">
-          {list.map((c) => {
-            const unanswered = c.messages.filter((m) => m.unanswered).length;
-            return (
-              <div key={c.id} className="flex items-center gap-2 p-1.5 pl-3">
-                <Link href={`/jmp-admin/knowledge-base?c=${c.id}`} className="flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-lg py-1.5 hover:text-primary">
-                  <MessageSquare className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-                  <span className="min-w-0">
-                    <span className="block truncate text-sm font-medium">{c.title}</span>
-                    <span className="block text-xs text-muted-foreground">
-                      {c.messages.length} {c.messages.length === 1 ? "message" : "messages"}
-                      {unanswered > 0 ? ` · ${unanswered} unanswered` : ""}
-                      {mounted ? ` · ${formatDateTime(c.updatedAt)}` : ""}
-                    </span>
+          {list.map((c) => (
+            <div key={c.id} className="flex items-center gap-2 p-1.5 pl-3">
+              <Link
+                href={`/jmp-admin/knowledge-base?c=${c.id}`}
+                className="flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-lg py-1.5 hover:text-primary"
+              >
+                <MessageSquare className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-medium">{c.title}</span>
+                  <span className="block text-xs text-muted-foreground">
+                    {c.messageCount} {c.messageCount === 1 ? "message" : "messages"}
+                    {c.unansweredCount > 0 ? ` · ${c.unansweredCount} unanswered` : ""}
+                    {mounted ? ` · ${formatDateTime(c.updatedAt)}` : ""}
                   </span>
-                </Link>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label={`Delete ${c.title}`}
-                  title="Delete"
-                  onClick={() => setTarget(c)}
-                  className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                >
-                  <Trash2 className="size-4" aria-hidden />
-                </Button>
-              </div>
-            );
-          })}
+                </span>
+              </Link>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label={`Delete ${c.title}`}
+                title="Delete"
+                onClick={() => setTarget(c)}
+                className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+              >
+                <Trash2 className="size-4" aria-hidden />
+              </Button>
+            </div>
+          ))}
         </Card>
       )}
 
@@ -89,13 +85,14 @@ export function KbHistory() {
         description="It's removed for good. Questions it added to Unanswered stay there."
         confirmLabel="Delete"
         destructive
-        onConfirm={() => {
+        onConfirm={async () => {
           const c = target;
           setTarget(null);
-          if (c) {
-            deleteConversation(c.id);
-            toast.success("Conversation deleted.");
-          }
+          if (!c) return;
+          const res = await deleteKbConversationAction(c.id);
+          if (!res.ok) return toast.error(res.error);
+          toast.success("Conversation deleted.");
+          router.refresh();
         }}
       />
     </div>

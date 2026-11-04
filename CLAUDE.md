@@ -129,6 +129,9 @@ English everywhere, including dates (October 31, 2026).
 - Don't ask about small implementation details you can reasonably decide yourself — use your
   judgment as the senior person in the room.
 - Prefer extending existing files/patterns already in the repo over introducing new ones.
+- **Keep the admin knowledge base current.** When a change alters how something works, update
+  the matching article in `docs/knowledge-base/` in the same commit, or add one (format in its
+  README). The server syncs these at start, so the agent always answers from what's deployed.
 - Before calling a task done: type-checks pass, the screen(s) touched have been checked at
   375px and 768px, no secrets in the diff, and the commit message says what changed and why.
 

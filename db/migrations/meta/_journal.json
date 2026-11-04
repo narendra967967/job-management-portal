@@ -351,6 +351,13 @@
       "when": 1793559620454,
       "tag": "0049_retention_auto_actions",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1793776374469,
+      "tag": "0050_admin_knowledge_base",
+      "breakpoints": true
     }
   ]
 }

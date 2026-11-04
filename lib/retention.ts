@@ -10,6 +10,7 @@ import {
   gmailIngestErrors,
   gmailProcessedMessages,
   inboundEmailLog,
+  kbConversations,
   leadAutoActions,
   leadPurgeLog,
   notifications,
@@ -66,5 +67,8 @@ export async function runRetention(): Promise<Record<RetentionKey, number>> {
       db.delete(notifications).where(lt(notifications.createdAt, cutoff(c.notificationDays))).returning({ id: notifications.id }),
     ),
     autoActionDays: await trimAutoActions(c.autoActionDays),
+    kbConversationDays: await removed(
+      db.delete(kbConversations).where(lt(kbConversations.updatedAt, cutoff(c.kbConversationDays))).returning({ id: kbConversations.id }),
+    ),
   };
 }

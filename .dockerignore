@@ -11,6 +11,8 @@ Dockerfile
 docker-compose*.yml
 README.md
 *.md
+# ...except the admin knowledge base, which the server syncs at start.
+!docs/knowledge-base/**/*.md
 .claude
 .vscode
 .idea

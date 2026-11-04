@@ -8,7 +8,8 @@ export type RetentionKey =
   | "processedLedgerDays"
   | "leadPurgeLogDays"
   | "notificationDays"
-  | "autoActionDays";
+  | "autoActionDays"
+  | "kbConversationDays";
 
 export type RetentionConfig = Record<RetentionKey, number>;
 
@@ -69,6 +70,14 @@ export const RETENTION_TYPES: RetentionType[] = [
     min: 90,
     max: 1095,
     default: 365,
+  },
+  {
+    key: "kbConversationDays",
+    label: "Knowledge base conversations",
+    hint: "Admins' chats with the knowledge base agent, counted from the last message",
+    min: 7,
+    max: 365,
+    default: 60,
   },
 ];
 

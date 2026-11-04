@@ -1,26 +1,41 @@
 "use client";
 
-// Knowledge base article editor: details, the body in the guide editor
-// (Visual / Code), and version history. Published articles are what the agent
-// answers from; drafts are left out.
+// Knowledge base article page. Articles written here: details, the body in the
+// guide editor (Visual / Code) and version history. Repo articles
+// (docs/knowledge-base): read-only, since the next sync would overwrite an edit.
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, History, RotateCcw, Save } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, FolderGit2, History, RotateCcw, Save } from "lucide-react";
 import { Card } from "@/components/admin/ui/card";
 import { Input } from "@/components/admin/ui/input";
+import { Badge } from "@/components/admin/ui/badge";
 import { Button, buttonVariants } from "@/components/admin/ui/button";
 import { toast } from "@/components/admin/ui/toast";
 import { HtmlEditor } from "@/components/admin/guides/html-editor";
 import { Field, Toggle } from "@/components/admin/guides/guide-editor";
-import { saveArticle, useKb, type KbArticleInput } from "@/lib/kb-mock";
-import { KB_CATEGORIES, parseKeywords, type KbArticleVersion, type KbCategory } from "@/lib/kb-model";
+import { saveKbArticleAction } from "@/actions/admin-kb";
+import {
+  KB_CATEGORIES,
+  KB_REPO_DIR,
+  parseKeywords,
+  type KbArticle,
+  type KbArticleVersion,
+  type KbCategory,
+} from "@/lib/kb-model";
 import { useMounted } from "@/lib/use-mounted";
 import { cn, formatDateTime } from "@/lib/utils";
 
 const selectCls =
   "h-11 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none sm:h-9 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
+
+const backLink = (
+  <Link href="/jmp-admin/knowledge-base/articles" className={cn(buttonVariants({ variant: "ghost" }), "px-2")}>
+    <ArrowLeft className="size-4" aria-hidden />
+    All articles
+  </Link>
+);
 
 interface FormValues {
   title: string;
@@ -31,18 +46,39 @@ interface FormValues {
   contentHtml: string;
 }
 
-export function KbArticleEditor({ articleId }: { articleId?: string }) {
+export function KbArticleEditor({
+  article,
+  versions = [],
+  initialTitle = "",
+}: {
+  article?: KbArticle;
+  versions?: KbArticleVersion[];
+  /** From an unanswered question. */
+  initialTitle?: string;
+}) {
+  if (article?.source === "repo") return <KbRepoArticle article={article} />;
+  return <AdminArticleForm article={article} versions={versions} initialTitle={initialTitle} />;
+}
+
+function AdminArticleForm({
+  article,
+  versions,
+  initialTitle,
+}: {
+  article?: KbArticle;
+  versions: KbArticleVersion[];
+  initialTitle: string;
+}) {
   const router = useRouter();
-  const params = useSearchParams();
   const mounted = useMounted();
-  const { articles } = useKb();
-  const article = articleId ? articles.find((a) => a.id === articleId) : undefined;
-  const isNew = !articleId;
+  const isNew = !article;
 
   const initial: FormValues = useMemo(
     () => ({
-      title: article?.title ?? params.get("title") ?? "",
-      category: article?.category ?? KB_CATEGORIES[0],
+      title: article?.title ?? initialTitle,
+      category: ((KB_CATEGORIES as readonly string[]).includes(article?.category ?? "")
+        ? article!.category
+        : KB_CATEGORIES[0]) as KbCategory,
       summary: article?.summary ?? "",
       keywords: article?.keywords.join(", ") ?? "",
       published: article?.status === "published",
@@ -55,6 +91,7 @@ export function KbArticleEditor({ articleId }: { articleId?: string }) {
   useEffect(() => setV(initial), [initial]);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
   const dirty = JSON.stringify(v) !== JSON.stringify(initial);
 
   useEffect(() => {
@@ -64,46 +101,35 @@ export function KbArticleEditor({ articleId }: { articleId?: string }) {
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [dirty]);
 
-  if (articleId && !article) {
-    return (
-      <Card className="mx-auto max-w-4xl p-8 text-center text-sm text-muted-foreground">
-        This article doesn&apos;t exist.{" "}
-        <Link href="/jmp-admin/knowledge-base/articles" className="font-medium text-primary hover:underline">
-          Back to articles
-        </Link>
-      </Card>
-    );
-  }
-
   const set = (patch: Partial<FormValues>) => {
     setV((prev) => ({ ...prev, ...patch }));
     setSaved(false);
+    setError("");
   };
 
-  function save() {
+  async function save() {
     setError("");
     if (!v.title.trim()) return setError("Add a title.");
     if (!v.summary.trim()) return setError("Add a one-line summary. The agent uses it in answers.");
-    if (v.published && !v.contentHtml.replace(/<[^>]+>/g, "").trim()) return setError("A published article needs some text.");
-    const input: KbArticleInput = {
+    setSaving(true);
+    const res = await saveKbArticleAction(article?.id ?? null, {
       title: v.title.trim(),
       category: v.category,
       summary: v.summary.trim(),
       keywords: parseKeywords(v.keywords),
       status: v.published ? "published" : "draft",
       contentHtml: v.contentHtml,
-    };
-    const id = saveArticle(articleId ?? null, input);
+    });
+    setSaving(false);
+    if (!res.ok) return setError(res.error);
     setSaved(true);
     if (isNew) {
       // The page re-mounts on its new address, so confirm with a toast.
       toast.success(v.published ? "Article created. The agent can use it now." : "Article created as a draft.");
-      router.replace(`/jmp-admin/knowledge-base/articles/${id}`);
+      router.replace(`/jmp-admin/knowledge-base/articles/${res.id}`);
+    } else {
+      router.refresh();
     }
-  }
-
-  function restore(ver: KbArticleVersion) {
-    set({ title: ver.title, contentHtml: ver.contentHtml });
   }
 
   const status = error
@@ -120,10 +146,7 @@ export function KbArticleEditor({ articleId }: { articleId?: string }) {
 
   return (
     <div className="mx-auto max-w-4xl space-y-4 pb-24">
-      <Link href="/jmp-admin/knowledge-base/articles" className={cn(buttonVariants({ variant: "ghost" }), "px-2")}>
-        <ArrowLeft className="size-4" aria-hidden />
-        All articles
-      </Link>
+      {backLink}
 
       <Card className="space-y-4 p-4 md:p-5">
         <h2 className="text-sm font-semibold">Details</h2>
@@ -182,25 +205,26 @@ export function KbArticleEditor({ articleId }: { articleId?: string }) {
         </p>
       </section>
 
-      {!isNew && article && (
+      {!isNew && (
         <Card className="space-y-3 p-4 md:p-5">
           <h2 className="flex items-center gap-2 text-sm font-semibold">
             <History className="size-4" aria-hidden />
             Version history
           </h2>
-          {article.versions.length === 0 ? (
+          {versions.length === 0 ? (
             <p className="text-xs text-muted-foreground">Earlier versions appear here after you save changes.</p>
           ) : (
             <ul className="divide-y">
-              {article.versions.map((ver) => (
+              {versions.map((ver) => (
                 <li key={ver.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
                   <div className="min-w-0 text-xs">
                     <p className="truncate font-medium">{ver.title}</p>
                     <p className="text-muted-foreground">
-                      {mounted ? formatDateTime(ver.savedAt) : ""} · {ver.savedBy}
+                      {mounted ? formatDateTime(ver.savedAt) : ""}
+                      {ver.savedBy ? ` · ${ver.savedBy}` : ""}
                     </p>
                   </div>
-                  <Button variant="outline" onClick={() => restore(ver)}>
+                  <Button variant="outline" onClick={() => set({ title: ver.title, contentHtml: ver.contentHtml })}>
                     <RotateCcw className="size-3.5" aria-hidden />
                     Restore
                   </Button>
@@ -226,12 +250,48 @@ export function KbArticleEditor({ articleId }: { articleId?: string }) {
           <Link href="/jmp-admin/knowledge-base/articles" className={cn(buttonVariants({ variant: "outline" }), "px-3")}>
             Cancel
           </Link>
-          <Button onClick={save} disabled={!dirty && !isNew}>
+          <Button onClick={save} disabled={saving || (!dirty && !isNew)}>
             <Save className="size-4" aria-hidden />
-            {isNew ? "Create article" : "Save changes"}
+            {saving ? "Saving…" : isNew ? "Create article" : "Save changes"}
           </Button>
         </div>
       </div>
+    </div>
+  );
+}
+
+/** A repo article: shown as it reads, with where to change it. */
+function KbRepoArticle({ article }: { article: KbArticle }) {
+  const mounted = useMounted();
+  return (
+    <div className="mx-auto max-w-4xl space-y-4">
+      {backLink}
+      <Card className="space-y-3 p-4 md:p-5">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Badge variant={article.status === "published" ? "success" : "neutral"}>
+            {article.status === "published" ? "Published" : "Draft"}
+          </Badge>
+          <Badge variant="neutral" className="gap-1">
+            <FolderGit2 className="size-3" aria-hidden />
+            Repo
+          </Badge>
+          <span className="text-xs text-muted-foreground">{article.category}</span>
+        </div>
+        <h2 className="text-lg font-semibold">{article.title}</h2>
+        <p className="text-sm text-muted-foreground">{article.summary}</p>
+        {article.keywords.length > 0 && (
+          <p className="text-xs text-muted-foreground">Keywords: {article.keywords.join(", ")}</p>
+        )}
+        <p className="rounded-lg bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
+          Read-only. This comes from <code className="break-all">{`${KB_REPO_DIR}/${article.slug}.md`}</code> and
+          changes there, in the same commit as the code it describes.
+          {mounted ? ` Last synced ${formatDateTime(article.updatedAt)}.` : ""}
+        </p>
+      </Card>
+      <Card className="p-4 md:p-5">
+        {/* Sanitized on sync (lib/kb-files.ts). */}
+        <div className="guide-content text-sm" dangerouslySetInnerHTML={{ __html: article.contentHtml }} />
+      </Card>
     </div>
   );
 }

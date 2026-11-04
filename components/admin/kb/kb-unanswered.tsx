@@ -5,11 +5,13 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Check, Plus, X } from "lucide-react";
 import { Card } from "@/components/admin/ui/card";
 import { Button, buttonVariants } from "@/components/admin/ui/button";
 import { Badge } from "@/components/admin/ui/badge";
-import { setQuestionStatus, useKb } from "@/lib/kb-mock";
+import { toast } from "@/components/admin/ui/toast";
+import { setKbQuestionStatusAction } from "@/actions/admin-kb";
 import { KB_QUESTION_STATUS_LABELS, type KbQuestion, type KbQuestionStatus } from "@/lib/kb-model";
 import { useMounted } from "@/lib/use-mounted";
 import { cn, formatDateTime } from "@/lib/utils";
@@ -23,46 +25,21 @@ const BADGE: Record<KbQuestionStatus, "warning" | "success" | "neutral"> = {
   dismissed: "neutral",
 };
 
-export function KbUnanswered() {
-  const { questions } = useKb();
+export function KbUnanswered({ questions }: { questions: KbQuestion[] }) {
+  const router = useRouter();
   const mounted = useMounted();
   const [fStatus, setFStatus] = useState<"all" | KbQuestionStatus>("open");
+  const [busy, setBusy] = useState<string | null>(null);
 
-  const list = useMemo(
-    () =>
-      questions
-        .filter((q) => fStatus === "all" || q.status === fStatus)
-        .sort((a, b) => b.timesAsked - a.timesAsked || b.lastAskedAt.localeCompare(a.lastAskedAt)),
-    [questions, fStatus],
-  );
+  const list = useMemo(() => questions.filter((q) => fStatus === "all" || q.status === fStatus), [questions, fStatus]);
 
-  const actions = (q: KbQuestion) => (
-    <>
-      <Link
-        href={`/jmp-admin/knowledge-base/articles/new?title=${encodeURIComponent(q.question)}`}
-        className={cn(buttonVariants({ variant: "outline" }), "px-3")}
-      >
-        <Plus className="size-3.5" aria-hidden />
-        Write article
-      </Link>
-      {q.status !== "covered" && (
-        <Button variant="ghost" onClick={() => setQuestionStatus(q.id, "covered")}>
-          <Check className="size-3.5" aria-hidden />
-          Covered
-        </Button>
-      )}
-      {q.status === "open" ? (
-        <Button variant="ghost" onClick={() => setQuestionStatus(q.id, "dismissed")}>
-          <X className="size-3.5" aria-hidden />
-          Dismiss
-        </Button>
-      ) : (
-        <Button variant="ghost" onClick={() => setQuestionStatus(q.id, "open")}>
-          Reopen
-        </Button>
-      )}
-    </>
-  );
+  async function setStatus(q: KbQuestion, status: KbQuestionStatus) {
+    setBusy(q.id);
+    const res = await setKbQuestionStatusAction(q.id, status);
+    setBusy(null);
+    if (!res.ok) return toast.error(res.error);
+    router.refresh();
+  }
 
   return (
     <div className="space-y-4">
@@ -85,7 +62,7 @@ export function KbUnanswered() {
       ) : (
         <Card className="divide-y p-0">
           {list.map((q) => (
-            <div key={q.id} className="flex flex-col gap-3 p-3 lg:flex-row lg:items-center">
+            <div key={q.id} className={cn("flex flex-col gap-3 p-3 lg:flex-row lg:items-center", busy === q.id && "opacity-60")}>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-1.5">
                   <p className="text-sm font-medium">{q.question}</p>
@@ -96,7 +73,31 @@ export function KbUnanswered() {
                   {mounted ? ` · last ${formatDateTime(q.lastAskedAt)}` : ""}
                 </p>
               </div>
-              <div className="flex flex-wrap items-center gap-1">{actions(q)}</div>
+              <div className="flex flex-wrap items-center gap-1">
+                <Link
+                  href={`/jmp-admin/knowledge-base/articles/new?title=${encodeURIComponent(q.question)}`}
+                  className={cn(buttonVariants({ variant: "outline" }), "px-3")}
+                >
+                  <Plus className="size-3.5" aria-hidden />
+                  Write article
+                </Link>
+                {q.status !== "covered" && (
+                  <Button variant="ghost" disabled={busy === q.id} onClick={() => setStatus(q, "covered")}>
+                    <Check className="size-3.5" aria-hidden />
+                    Covered
+                  </Button>
+                )}
+                {q.status === "open" ? (
+                  <Button variant="ghost" disabled={busy === q.id} onClick={() => setStatus(q, "dismissed")}>
+                    <X className="size-3.5" aria-hidden />
+                    Dismiss
+                  </Button>
+                ) : (
+                  <Button variant="ghost" disabled={busy === q.id} onClick={() => setStatus(q, "open")}>
+                    Reopen
+                  </Button>
+                )}
+              </div>
             </div>
           ))}
         </Card>
