@@ -36,7 +36,8 @@ for (const f of filesUnder("app/jmp-admin/(panel)/knowledge-base", /\.tsx$/)) {
   check("K1", `admin check in ${f}`, readFileSync(f, "utf8").includes("requireAdmin("));
 }
 {
-  const src = readFileSync("actions/admin-kb.ts", "utf8");
+  // Windows checkouts get CRLF line endings; the pattern below expects \n.
+  const src = readFileSync("actions/admin-kb.ts", "utf8").replace(/\r\n/g, "\n");
   // The body opens at the "{" ending the signature line; return types hold braces too.
   const actions = [...src.matchAll(/export async function (\w+)\([^]*?\)[^\n]*\{\n([^]*?)\n\}/g)];
   check("K1", "actions found in actions/admin-kb.ts", actions.length >= 7, `${actions.length}`);
