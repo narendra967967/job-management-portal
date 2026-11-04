@@ -25,6 +25,10 @@ The article, in Markdown.
 - **category** must be one of: Leads and automation, Email forwarding, AI, Plans and
   billing, Users and support, Settings and data, Runbooks.
 - **status** is optional. `draft` keeps the article out of answers.
+- **keywords** are for the words someone might ask with that the article never uses,
+  such as "vanished" for a stale lead. Search already matches word forms ("discarding"
+  finds "discard"), so there's no need to list those. The title counts most, so name the
+  thing the way an admin would ask about it.
 - The file path is the article's id. Renaming a file replaces the article.
 - This README and any file or folder starting with `_` are skipped.
 

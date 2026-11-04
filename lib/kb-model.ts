@@ -50,6 +50,9 @@ export interface KbArticleVersion {
 export interface KbSource {
   id: string;
   title: string;
+  /** A How-to guide rather than an article. Older messages have neither field. */
+  kind?: "article" | "guide";
+  href?: string;
 }
 
 export interface KbMessage {
@@ -57,7 +60,7 @@ export interface KbMessage {
   role: "user" | "assistant";
   text: string;
   at: string;
-  /** Articles the answer came from. */
+  /** Articles and guides the answer came from. */
   sources?: KbSource[];
   /** The agent found nothing to answer with. */
   unanswered?: boolean;

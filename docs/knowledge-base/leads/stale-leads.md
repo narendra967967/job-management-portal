@@ -2,7 +2,7 @@
 title: Why a lead went stale and how to bring it back
 category: Leads and automation
 summary: A New, Shortlisted or Applied lead goes stale when nothing has happened on it for the user's stale period, 14 days by default, and it has no pending reminder. Stale leads appear only in Archive until something happens on them.
-keywords: stale, archive, missing lead, disappeared, inactive, gray border, stale in days
+keywords: stale, archive, missing lead, disappeared, vanished, gone, inactive, gray border, stale in days
 ---
 
 A lead goes stale when all of these are true:

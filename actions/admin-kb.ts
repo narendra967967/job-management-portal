@@ -151,7 +151,7 @@ async function answer(question: string): Promise<{ text: string; sources?: KbSou
   const lead = best.contentText.split(/(?<=\.)\s/).slice(0, 2).join(" ");
   return {
     text: `${best.summary} ${lead}`.trim(),
-    sources: hits.map((h) => ({ id: h.id, title: h.title })),
+    sources: hits.map((h) => ({ id: h.id, title: h.title, kind: h.kind, href: h.href })),
     unanswered: false,
   };
 }

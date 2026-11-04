@@ -1,13 +1,13 @@
 "use client";
 
 // Ask: chat with the knowledge-base agent. Answers come only from published
-// articles and list them as sources; when nothing fits, the agent says so and the
+// articles and live How-to guides, listed as sources; when nothing fits, the agent says so and the
 // question goes to Unanswered. ?c=<id> reopens a past conversation.
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Bot, FileText, Loader2, Plus, SendHorizontal, SearchX } from "lucide-react";
+import { BookOpen, Bot, FileText, Loader2, Plus, SendHorizontal, SearchX } from "lucide-react";
 import { Card } from "@/components/admin/ui/card";
 import { Button, buttonVariants } from "@/components/admin/ui/button";
 import { toast } from "@/components/admin/ui/toast";
@@ -179,10 +179,10 @@ function Message({ m, question }: { m: KbMessage; question?: string }) {
             {m.sources.map((s) => (
               <Link
                 key={s.id}
-                href={`/jmp-admin/knowledge-base/articles/${s.id}`}
-                className="inline-flex min-h-9 items-center gap-1 rounded-md border bg-white/60 px-2 text-xs hover:border-primary/40 hover:text-primary"
+                href={s.href ?? `/jmp-admin/knowledge-base/articles/${s.id}`}
+                className="inline-flex min-h-11 items-center gap-1 rounded-md border bg-white/60 px-2.5 text-xs hover:border-primary/40 hover:text-primary"
               >
-                <FileText className="size-3" aria-hidden />
+                {s.kind === "guide" ? <BookOpen className="size-3" aria-hidden /> : <FileText className="size-3" aria-hidden />}
                 {s.title}
               </Link>
             ))}

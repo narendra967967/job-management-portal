@@ -1285,7 +1285,7 @@ export const kbMessages = pgTable(
     role: text("role").notNull(), // "user" | "assistant"
     text: text("text").notNull(),
     // [{ id, title }] of the articles an answer came from (titles kept as they were).
-    sources: jsonb("sources").$type<{ id: string; title: string }[]>(),
+    sources: jsonb("sources").$type<{ id: string; title: string; kind?: "article" | "guide"; href?: string }[]>(),
     unanswered: boolean("unanswered").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
