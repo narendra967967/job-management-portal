@@ -32,6 +32,7 @@ import {
   BookOpen,
   Briefcase,
   Inbox,
+  Megaphone,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
@@ -69,6 +70,7 @@ import {
   useIntake,
   useFeatures,
 } from "@/lib/mock-store";
+import { USER_SAMPLES, setPromoOptOut, usePromoOptOut } from "@/lib/broadcasts-mock";
 import { buildGmailQuery } from "@/lib/use-gmail-settings";
 import { EmailForwardingCard } from "@/components/forwarding/email-forwarding-card";
 import { EmailLogCard } from "@/components/forwarding/email-log-card";
@@ -149,6 +151,7 @@ const SECTION = {
   profile: { id: "profile", label: "Profile", icon: User, render: () => <ProfileCard /> },
   career: { id: "career", label: "Career profile", icon: Briefcase, render: () => <CareerProfileTab /> },
   plan: { id: "plan", label: "Plan", icon: Crown, render: () => <PlanDetailsCard /> },
+  notifications: { id: "notifications", label: "Notifications", icon: Megaphone, render: () => <NotificationPrefsCard /> },
   forwarding: { id: "forwarding", label: "Email forwarding", icon: Forward, render: () => <EmailForwardingCard /> },
   google: { id: "google", label: "Gmail connection", icon: Mail, render: () => <GoogleCard /> },
   schedule: { id: "schedule", label: "Sync schedule", icon: RefreshCw, render: () => <SyncScheduleCard /> },
@@ -189,7 +192,13 @@ const SECTION = {
 // Gmail switch is on (docs/email-forwarding.md §4a); forwarding is always listed.
 function settingsGroups(gmailEnabled: boolean): { label: string; items: SettingsSection[] }[] {
   return [
-    { label: "General", items: [SECTION.profile, SECTION.career, SECTION.plan] },
+    {
+      label: "General",
+      // PHASE 1: the promotional switch isn't wired yet, so only show it in development.
+      items: USER_SAMPLES
+        ? [SECTION.profile, SECTION.career, SECTION.plan, SECTION.notifications]
+        : [SECTION.profile, SECTION.career, SECTION.plan],
+    },
     {
       label: "Email & sync",
       items: gmailEnabled
@@ -1907,6 +1916,40 @@ function LeadRuleRow({
       </div>
       <div className="grid grid-cols-2 gap-3 xl:flex xl:[&>*]:w-32">{children}</div>
     </div>
+  );
+}
+
+/* ---------------- Notifications ---------------- */
+
+function NotificationPrefsCard() {
+  const optOut = usePromoOptOut();
+  return (
+    <section className="rounded-2xl border bg-card p-4 md:p-5">
+      <h2 className="text-sm font-medium">Notifications</h2>
+      <p className="mt-0.5 text-xs text-muted-foreground">
+        Messages from the Jobtiva team, in the app and by email.
+      </p>
+      <div className="mt-4 divide-y">
+        <div className="flex items-start gap-3 py-3 first:pt-0">
+          <SettingSwitch checked={!optOut} onChange={(on) => setPromoOptOut(!on)} label="Promotional messages" />
+          <div className="min-w-0">
+            <p className="text-sm font-medium">Promotional messages</p>
+            <p className="text-xs text-muted-foreground">
+              New features, tips and offers. Turning this off stops them in the app and by email.
+            </p>
+          </div>
+        </div>
+        <div className="flex items-start gap-3 py-3 last:pb-0">
+          <ShieldCheck className="mt-0.5 size-5 shrink-0 text-muted-foreground" aria-hidden />
+          <div className="min-w-0">
+            <p className="text-sm font-medium">Important messages</p>
+            <p className="text-xs text-muted-foreground">
+              Downtime, policy changes and anything else that affects your account. These always arrive.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
 

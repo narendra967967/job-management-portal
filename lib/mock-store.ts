@@ -323,6 +323,8 @@ export function useLeads(): JobLead[] {
 function useStoredNotifications(): WorkspaceData["notifications"] {
   return useWs("storedNotifications", getStoredNotifications);
 }
+/** Saved notifications (newest first, with dates), for the Notifications page. */
+export const useNotificationHistory = useStoredNotifications;
 /** All automatic status changes, for the card messages and Timeline. */
 export function useAutoActions(): LeadAutoAction[] {
   return useWs("autoActions", getAutoActions);
