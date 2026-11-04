@@ -29,6 +29,16 @@ import { getSessionLengthSeconds } from "@/lib/session-length";
 // server restart.
 const SESSION_SECONDS = await getSessionLengthSeconds();
 
+/** How long an email confirmation link works. */
+const VERIFY_LINK_HOURS = 24;
+
+// Signing in while unverified sends a fresh link (sendOnSignIn), so a user who
+// lost the first one isn't stuck. This stops repeated attempts from filling
+// their inbox: one link per address per few minutes.
+const VERIFY_RESEND_MS = 3 * 60_000;
+const g = globalThis as unknown as { __verifySentAt?: Map<string, number> };
+const verifySentAt = (g.__verifySentAt ??= new Map<string, number>());
+
 /** Admin "Connect Gmail" switch (Settings → Email intake). Queried here rather
  *  than via lib/email-intake-data, which is server-only and so can't load in the
  *  Better Auth CLI. A missing row means the default (on). */
@@ -52,9 +62,16 @@ export const auth = betterAuth({
     // The public sign-up endpoint stays disabled; self-registration goes through
     // actions/signup.ts, which gates on the admin's allowSignup flag + password
     // policy and creates the user UNVERIFIED. requireEmailVerification then blocks
-    // sign-in until the email is confirmed.
+    // sign-in until the email is confirmed. Admin-created users start unverified
+    // too, and setting their password from the welcome link verifies them.
     disableSignUp: true,
     requireEmailVerification: true,
+    // A password set through an emailed link proves the user owns the address.
+    onPasswordReset: async ({ user: who }) => {
+      if (!who.emailVerified) {
+        await db.update(user).set({ emailVerified: true, updatedAt: new Date() }).where(eq(user.id, who.id));
+      }
+    },
     minPasswordLength: 8,
     password: {
       hash: hashPassword,
@@ -78,12 +95,12 @@ export const auth = betterAuth({
       }
       const content = isNew
         ? {
-            subject: `Welcome to ${appName} — set your password`,
+            subject: `Welcome to ${appName}: set your password`,
             heading: `Welcome to ${appName}`,
             lines: [
               `Hi ${recipient.name || "there"}, an administrator created an account for you on ${appName}.`,
               `Your login ID is ${recipient.email}.`,
-              "Click below to set your password and sign in. This link expires in 1 hour — if it does, use “Forgot password” on the sign-in page to get a new one.",
+              "Click below to set your password and sign in. This link expires in 1 hour. If it does, use “Forgot password” on the sign-in page to get a new one.",
             ],
             button: { label: "Set your password", url },
             footerNote:
@@ -94,7 +111,7 @@ export const auth = betterAuth({
             heading: "Reset your password",
             lines: [
               `We received a request to reset your ${appName} password.`,
-              "Click the button below to choose a new one — this link expires in 1 hour.",
+              "Click the button below to choose a new one. This link expires in 1 hour.",
             ],
             button: { label: "Reset your password", url },
             footerNote: "If you didn't request this, you can safely ignore this email.",
@@ -128,7 +145,13 @@ export const auth = betterAuth({
     // Clicking the link verifies the email AND signs the user in, landing them on
     // the dashboard. actions/signup.ts triggers the send after creating the account.
     autoSignInAfterVerification: true,
+    sendOnSignIn: true,
+    expiresIn: VERIFY_LINK_HOURS * 60 * 60,
     sendVerificationEmail: async ({ user: recipient, url }) => {
+      const key = recipient.email.toLowerCase();
+      const last = verifySentAt.get(key) ?? 0;
+      if (Date.now() - last < VERIFY_RESEND_MS) return;
+      verifySentAt.set(key, Date.now());
       const appName = await getAppName();
       try {
         await sendAppEmail({
@@ -137,7 +160,7 @@ export const auth = betterAuth({
           heading: "Confirm your email",
           lines: [
             `Hi ${recipient.name || "there"}, welcome to ${appName}!`,
-            "Confirm your email address to activate your account. This link expires in 1 hour.",
+            `Confirm your email address to activate your account. This link works for ${VERIFY_LINK_HOURS} hours, and signing in sends a new one if it runs out.`,
           ],
           button: { label: "Verify email", url },
           footerNote: "If you didn't create this account, you can safely ignore this email.",

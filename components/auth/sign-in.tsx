@@ -34,7 +34,12 @@ export function LoginForm({
     setBusy(true);
     const res = await signInEmail(email.trim(), password, remember, await getCaptcha("login"));
     if (res?.error) {
-      setError(res.error.message ?? "Incorrect email or password.");
+      // Only reached with the right password, and a fresh link has gone out.
+      setError(
+        res.error.code === "EMAIL_NOT_VERIFIED"
+          ? `Your email isn't confirmed yet. We've emailed a confirmation link to ${email.trim()}. It can take a minute, so check spam too.`
+          : (res.error.message ?? "Incorrect email or password."),
+      );
       setBusy(false);
       return;
     }

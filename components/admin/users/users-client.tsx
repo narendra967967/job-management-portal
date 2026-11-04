@@ -357,7 +357,10 @@ export function UsersClient({ initialUsers, plans }: { initialUsers: AdminUserRo
                         {u.name}
                         {u.role === "admin" && <span className="ml-1.5 text-[10px] text-primary">· admin</span>}
                       </p>
-                      <p className="truncate text-xs text-muted-foreground">{u.email}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {u.email}
+                        {!u.emailVerified && <span className="ml-1.5 text-[10px] text-status-shortlisted-foreground">· not verified</span>}
+                      </p>
                     </div>
                   </div>
                 </td>

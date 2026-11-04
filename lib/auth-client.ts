@@ -20,6 +20,8 @@ export function signInEmail(
     email,
     password,
     rememberMe,
+    // Where the confirmation link lands when an unverified sign-in sends one.
+    callbackURL: "/leads",
     fetchOptions: captchaFetchOptions(captchaToken),
   });
 }

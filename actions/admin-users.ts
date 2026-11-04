@@ -101,7 +101,9 @@ export async function createAdminUserAction(input: unknown): Promise<CreateResul
     id,
     name: v.name,
     email: v.email,
-    emailVerified: true,
+    // Verified once they set a password from the welcome link (onPasswordReset in
+    // lib/auth), or, if the admin typed one, by the link their first sign-in sends.
+    emailVerified: false,
     mobile: v.mobile || null,
     role: v.role,
     status: v.status,

@@ -19,6 +19,8 @@ export interface AdminUserRow {
   mobile: string;
   role: AdminUserRole;
   status: AdminUserStatus;
+  /** Email confirmed: by its link, or by setting a password from an emailed one. */
+  emailVerified: boolean;
   planId: string | null;
   planName: string | null;
   /** Plan accent colour key (plans.accent), for the badge. */
@@ -75,6 +77,7 @@ export async function listAdminUsers(excludeId?: string): Promise<AdminUserRow[]
         mobile: user.mobile,
         role: user.role,
         status: user.status,
+        emailVerified: user.emailVerified,
         planId: user.planId,
         planExpiresAt: user.planExpiresAt,
         createdAt: user.createdAt,
@@ -101,6 +104,7 @@ export async function listAdminUsers(excludeId?: string): Promise<AdminUserRow[]
     mobile: u.mobile ?? "",
     role: (u.role as AdminUserRole) ?? "user",
     status: (u.status as AdminUserStatus) ?? "active",
+    emailVerified: u.emailVerified,
     planId: u.planId,
     planName: u.planId ? (planById.get(u.planId)?.name ?? null) : null,
     planAccent: u.planId ? (planById.get(u.planId)?.accent ?? null) : null,
