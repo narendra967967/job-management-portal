@@ -21,7 +21,17 @@ Both environments run on one server, as separate containers with separate databa
 5. It checks `/login` responds. If not, it switches back to the previous image and the deploy fails.
 6. The newest 3 images are kept for rollback.
 
-On start, the app also syncs the admin knowledge base from `docs/knowledge-base`.
+On start, the app also syncs the admin knowledge base from `docs/knowledge-base`. The container log shows a line like `knowledge base sync: 0 added, 2 updated, 0 removed, 29 unchanged`, plus a warning for any file it skipped.
+
+## Before deploying knowledge base changes
+
+Run the knowledge base checks locally, after a sync, from the repo root:
+
+```bash
+node --env-file=.env.local --require ./scripts/security/server-only-stub.cjs --import tsx scripts/security/kb-checks.mts
+```
+
+It confirms every knowledge base page and action needs an admin, that every article parses and holds nothing shaped like a secret, that odd search input is safe, and that a set of known questions still finds the right article. Add `APP_URL=http://127.0.0.1:3100` with a production build running there to also check the pages turn signed-out visitors away. It never calls the AI. When an article changes enough that a known question finds something else, update the list in the script.
 
 ## Promote, don't rebuild
 
