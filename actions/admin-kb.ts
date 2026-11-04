@@ -140,6 +140,46 @@ const askSchema = z.object({
 /** How many earlier messages the agent sees, for follow-up questions. */
 const HISTORY_TURNS = 4;
 
+/**
+ * Questions per admin, so a stuck tab or a stolen session can't run up the
+ * AI bill. Counted from stored messages, which survive a restart, and from a
+ * tally in memory, which survives deleting conversations; the higher counts.
+ */
+const ASK_LIMITS = [
+  { max: 30, ms: 60 * 60_000, label: "hour" },
+  { max: 150, ms: 24 * 60 * 60_000, label: "day" },
+] as const;
+
+const g = globalThis as unknown as { __kbAsks?: Map<string, number[]> };
+const recentAsks = (g.__kbAsks ??= new Map<string, number[]>());
+
+/** Why this admin can't ask right now, or null when they can. */
+async function askLimitReached(adminId: string): Promise<string | null> {
+  const now = Date.now();
+  const tally = (recentAsks.get(adminId) ?? []).filter((t) => now - t < ASK_LIMITS[1].ms);
+  recentAsks.set(adminId, tally);
+  const since = new Date(Date.now() - ASK_LIMITS[1].ms);
+  const rows = await db
+    .select({ at: kbMessages.createdAt })
+    .from(kbMessages)
+    .innerJoin(kbConversations, eq(kbConversations.id, kbMessages.conversationId))
+    .where(and(eq(kbConversations.userId, adminId), eq(kbMessages.role, "user"), sql`${kbMessages.createdAt} > ${since}`))
+    .orderBy(desc(kbMessages.createdAt));
+  const stored = rows.map((r) => r.at.getTime());
+  for (const limit of ASK_LIMITS) {
+    const inWindow = [stored, [...tally].reverse()]
+      .map((times) => times.filter((t) => now - t < limit.ms))
+      .sort((a, b) => b.length - a.length)[0];
+    if (inWindow.length < limit.max) continue;
+    // Newest first, so this is the question whose ageing out frees a slot.
+    const oldest = inWindow[limit.max - 1];
+    const wait = Math.max(1, Math.ceil((oldest + limit.ms - now) / 60_000));
+    const when = wait < 120 ? `${wait} minute${wait === 1 ? "" : "s"}` : `${Math.ceil(wait / 60)} hours`;
+    return `That's ${limit.max} questions in the last ${limit.label}, the most allowed. You can ask again in ${when}.`;
+  }
+  return null;
+}
+
 export async function askKbAction(
   conversationId: string | null,
   question: string,
@@ -148,6 +188,9 @@ export async function askKbAction(
   const p = askSchema.safeParse({ conversationId, question });
   if (!p.success) return { ok: false, error: firstIssue(p.error) };
   const q = p.data.question;
+  const limited = await askLimitReached(adminId);
+  if (limited) return { ok: false, error: limited };
+  recentAsks.get(adminId)?.push(Date.now());
 
   let convoId = p.data.conversationId;
   if (convoId) {
@@ -180,18 +223,20 @@ export async function askKbAction(
     role: "assistant",
     text: a.text,
     sources: a.sources ?? null,
-    unanswered: a.unanswered,
+    unanswered: a.outcome === "unanswered",
+    outcome: a.outcome,
   });
   await db.update(kbConversations).set({ updatedAt: new Date() }).where(eq(kbConversations.id, convoId));
 
-  if (a.unanswered) {
+  if (a.outcome === "unanswered" || a.outcome === "partial") {
     // The same question again counts up and reopens, instead of a new row.
+    const partial = a.outcome === "partial";
     await db
       .insert(kbQuestions)
-      .values({ question: q, normalized: normalizeQuestion(q) })
+      .values({ question: q, normalized: normalizeQuestion(q), partial })
       .onConflictDoUpdate({
         target: kbQuestions.normalized,
-        set: { timesAsked: sql`${kbQuestions.timesAsked} + 1`, lastAskedAt: new Date(), status: "open" },
+        set: { timesAsked: sql`${kbQuestions.timesAsked} + 1`, lastAskedAt: new Date(), status: "open", partial },
       });
   }
   revalidate();

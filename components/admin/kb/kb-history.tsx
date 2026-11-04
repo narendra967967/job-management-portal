@@ -1,7 +1,8 @@
 "use client";
 
 // History: this admin's past conversations with the agent, newest first.
-// Opening one continues it on the Ask tab.
+// Opening one continues it on the Ask tab. Above them, this month's usage
+// across all admins, since that's what the AI bill follows.
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
@@ -13,11 +14,35 @@ import { Input } from "@/components/admin/ui/input";
 import { ConfirmDialog } from "@/components/admin/ui/confirm-dialog";
 import { toast } from "@/components/admin/ui/toast";
 import { deleteKbConversationAction } from "@/actions/admin-kb";
-import type { KbConversationSummary } from "@/lib/kb-model";
+import type { KbConversationSummary, KbUsage } from "@/lib/kb-model";
 import { useMounted } from "@/lib/use-mounted";
 import { formatDateTime } from "@/lib/utils";
 
-export function KbHistory({ conversations }: { conversations: KbConversationSummary[] }) {
+const USAGE: { key: keyof KbUsage; label: string }[] = [
+  { key: "questions", label: "Questions" },
+  { key: "answered", label: "Answered" },
+  { key: "partial", label: "Partly answered" },
+  { key: "unanswered", label: "Not found" },
+  { key: "fallback", label: "Without AI" },
+];
+
+function UsageRow({ usage }: { usage: KbUsage }) {
+  return (
+    <section aria-labelledby="kb-usage">
+      <h2 id="kb-usage" className="mb-2 text-sm font-semibold">This month</h2>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+        {USAGE.map((u) => (
+          <Card key={u.key} className="px-3 py-2.5">
+            <p className="text-xl font-semibold tabular-nums">{usage[u.key]}</p>
+            <p className="text-xs text-muted-foreground">{u.label}</p>
+          </Card>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+export function KbHistory({ conversations, usage }: { conversations: KbConversationSummary[]; usage: KbUsage }) {
   const router = useRouter();
   const mounted = useMounted();
   const [query, setQuery] = useState("");
@@ -30,6 +55,7 @@ export function KbHistory({ conversations }: { conversations: KbConversationSumm
 
   return (
     <div className="space-y-4">
+      <UsageRow usage={usage} />
       <div className="relative w-full sm:max-w-xs">
         <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
         <Input

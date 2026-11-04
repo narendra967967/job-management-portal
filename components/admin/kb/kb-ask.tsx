@@ -188,10 +188,10 @@ function Message({ m, question }: { m: KbMessage; question?: string }) {
             ))}
           </div>
         )}
-        {m.unanswered && (
+        {(m.unanswered || m.partial) && (
           <Link
             href={`/jmp-admin/knowledge-base/articles/new${question ? `?title=${encodeURIComponent(question)}` : ""}`}
-            className="inline-flex min-h-9 items-center gap-1 text-xs font-medium text-primary hover:underline"
+            className="inline-flex min-h-11 items-center gap-1 text-xs font-medium text-primary hover:underline"
           >
             <Plus className="size-3.5" aria-hidden />
             Write an article for this

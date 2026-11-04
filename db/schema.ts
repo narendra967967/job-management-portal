@@ -1287,6 +1287,8 @@ export const kbMessages = pgTable(
     // [{ id, title }] of the articles an answer came from (titles kept as they were).
     sources: jsonb("sources").$type<{ id: string; title: string; kind?: "article" | "guide"; href?: string }[]>(),
     unanswered: boolean("unanswered").notNull().default(false),
+    // Assistant replies: how it was answered, for usage. Null on older rows.
+    outcome: text("outcome").$type<"answered" | "partial" | "unanswered" | "fallback">(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("kb_messages_conversation_idx").on(t.conversationId, t.createdAt)],
@@ -1301,6 +1303,8 @@ export const kbQuestions = pgTable(
     // Lowercased, spaces collapsed: what "the same question" means.
     normalized: text("normalized").notNull(),
     timesAsked: integer("times_asked").notNull().default(1),
+    // The agent answered some of it; the rest is what needs writing.
+    partial: boolean("partial").notNull().default(false),
     status: kbQuestionStatus("status").notNull().default("open"),
     firstAskedAt: timestamp("first_asked_at", { withTimezone: true }).notNull().defaultNow(),
     lastAskedAt: timestamp("last_asked_at", { withTimezone: true }).notNull().defaultNow(),

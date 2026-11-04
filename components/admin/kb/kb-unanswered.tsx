@@ -67,6 +67,7 @@ export function KbUnanswered({ questions }: { questions: KbQuestion[] }) {
                 <div className="flex flex-wrap items-center gap-1.5">
                   <p className="text-sm font-medium">{q.question}</p>
                   <Badge variant={BADGE[q.status]}>{KB_QUESTION_STATUS_LABELS[q.status]}</Badge>
+                  {q.partial && <Badge>Partly answered</Badge>}
                 </div>
                 <p className="mt-0.5 text-xs text-muted-foreground">
                   Asked {q.timesAsked} {q.timesAsked === 1 ? "time" : "times"}

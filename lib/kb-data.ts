@@ -19,6 +19,7 @@ import type {
   KbConversation,
   KbConversationSummary,
   KbQuestion,
+  KbUsage,
 } from "@/lib/kb-model";
 
 const iso = (d: Date) => d.toISOString();
@@ -111,6 +112,7 @@ export async function loadKbConversation(userId: string, id: string): Promise<Kb
       at: iso(m.createdAt),
       sources: m.sources ?? undefined,
       unanswered: m.unanswered || undefined,
+      partial: m.outcome === "partial" || undefined,
     })),
   };
 }
@@ -123,8 +125,27 @@ export async function loadKbQuestions(): Promise<KbQuestion[]> {
     firstAskedAt: iso(q.firstAskedAt),
     lastAskedAt: iso(q.lastAskedAt),
     timesAsked: q.timesAsked,
+    partial: q.partial,
     status: q.status,
   }));
+}
+
+export async function loadKbUsage(): Promise<KbUsage> {
+  const start = new Date();
+  start.setUTCDate(1);
+  start.setUTCHours(0, 0, 0, 0);
+  const rows = await db
+    .select({ role: kbMessages.role, outcome: kbMessages.outcome, unanswered: kbMessages.unanswered, n: count() })
+    .from(kbMessages)
+    .where(sql`${kbMessages.createdAt} >= ${start}`)
+    .groupBy(kbMessages.role, kbMessages.outcome, kbMessages.unanswered);
+  const usage: KbUsage = { questions: 0, answered: 0, partial: 0, unanswered: 0, fallback: 0 };
+  for (const r of rows) {
+    if (r.role === "user") usage.questions += r.n;
+    // Replies from before outcomes were stored only know whether they were unanswered.
+    else usage[r.outcome ?? (r.unanswered ? "unanswered" : "answered")] += r.n;
+  }
+  return usage;
 }
 
 export async function countOpenKbQuestions(): Promise<number> {

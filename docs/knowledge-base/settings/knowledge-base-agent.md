@@ -14,13 +14,11 @@ It runs on the admin provider, model and key in **Settings → AI**. If the mode
 | Situation | What the agent does |
 |---|---|
 | The articles answer it | Answers, with the articles it used listed under **Sources** |
-| They answer part of it | Answers that part and says what's missing |
+| They answer part of it | Answers that part, says what's missing, and adds the question to **Unanswered** marked Partly answered |
 | Nothing covers it | Says so and adds the question to **Unanswered**. Asking again counts up instead of adding a duplicate |
-| No admin key saved | Shows the closest article's summary, with a note that AI isn't set up |
-| The provider rejects the key or is out of credit | Shows the closest article's summary, with a note naming which |
-| The AI provider fails another way | Shows the closest article's summary, with a note that AI couldn't answer |
+| No admin key, a rejected key, no credit, or another AI failure | Says which, and shows the closest article's summary. If no article is a close enough match to show without AI, it links the nearest ones instead. Nothing goes to Unanswered, since the articles may well answer it |
 
-Partly answered questions don't go to Unanswered, so it's worth reading the last line of a short answer.
+Both kinds come with a **Write an article for this** link, which starts a new article titled with the question.
 
 Follow-up questions work. The agent sees the last four messages of the conversation, so "and how long does that take?" is read with the question before it. A new topic is better in **New chat**.
 
@@ -29,5 +27,11 @@ Follow-up questions work. The agent sees the last four messages of the conversat
 A wrong answer nearly always means the article is wrong, thin or missing. Repo articles live in `docs/knowledge-base/` and change with the code, then arrive on the next deploy or through **Sync from repo** on the Articles tab. Anything else can be written with **New article**. Publishing one titled like an open Unanswered question marks it covered.
 
 Never put keys, passwords or tokens in an article. The agent is told not to repeat them, but anything in an article can end up in an answer.
+
+## Limits and usage
+
+Each admin can ask 30 questions an hour and 150 a day. It's there so a stuck tab or a stolen session can't run up the AI bill, and the message says when asking opens up again. Deleting conversations doesn't reset it.
+
+The **History** tab opens with this month's numbers across all admins, counted from saved conversations: questions asked, and how many were answered, partly answered, not found, or answered without AI. That last one counts the fallbacks, and if it climbs, check the key and credit in **Settings → AI**.
 
 Conversations are kept for 60 days by default, set in **Settings → Data retention**.

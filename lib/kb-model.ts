@@ -64,6 +64,8 @@ export interface KbMessage {
   sources?: KbSource[];
   /** The agent found nothing to answer with. */
   unanswered?: boolean;
+  /** It answered some of the question, and the rest went to Unanswered. */
+  partial?: boolean;
 }
 
 export interface KbConversationSummary {
@@ -90,7 +92,19 @@ export interface KbQuestion {
   firstAskedAt: string;
   lastAskedAt: string;
   timesAsked: number;
+  /** Last time it was asked, the agent answered some of it. */
+  partial: boolean;
   status: KbQuestionStatus;
+}
+
+/** Agent replies this calendar month (UTC), across all admins. */
+export interface KbUsage {
+  questions: number;
+  answered: number;
+  partial: number;
+  unanswered: number;
+  /** No AI answer: no admin key, or the provider failed. */
+  fallback: number;
 }
 
 export const KB_QUESTION_STATUS_LABELS: Record<KbQuestionStatus, string> = {
