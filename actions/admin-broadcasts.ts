@@ -2,18 +2,21 @@
 
 // Admin broadcasts. Every action checks for an admin session and validates its
 // input. A broadcast can change only until it starts; after that it's a record
-// of what went out. Sending itself is the cron worker's job: "Send now" queues
-// the broadcast for this moment, and Schedule queues it for later.
+// of what went out. Sending is lib/broadcasts-send.ts: "Send now" queues the
+// broadcast for this moment and runs the sender straight after responding;
+// Schedule queues it for later, and the cron picks it up.
 
 import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/current-user";
 import { broadcastRecipients, broadcasts, user } from "@/db/schema";
 import { sanitizeGuideHtml } from "@/lib/guide-html";
 import { sendAppEmail, SMTP_NOT_CONFIGURED } from "@/lib/email";
 import { getAppName } from "@/lib/branding";
+import { runBroadcasts } from "@/lib/broadcasts-send";
 import {
   BROADCAST_HTML_MAX,
   BROADCAST_TITLE_MAX,
@@ -59,6 +62,14 @@ export async function saveBroadcastAction(
   if (!p.success) return { ok: false, error: firstIssue(p.error) };
   const v = p.data;
 
+  const sendingNow = mode === "send" && !v.scheduledFor;
+  const kick = () => {
+    if (!sendingNow) return;
+    after(() =>
+      runBroadcasts().catch((e) => console.error("[broadcasts] send failed:", e instanceof Error ? e.message : e)),
+    );
+  };
+
   const values = {
     title: v.title.trim(),
     contentHtml: sanitizeGuideHtml(v.contentHtml),
@@ -80,10 +91,12 @@ export async function saveBroadcastAction(
       .returning({ id: broadcasts.id });
     if (!done.length) return { ok: false, error: STARTED };
     revalidate(id);
+    kick();
     return { ok: true, id };
   }
   const [created] = await db.insert(broadcasts).values({ ...values, createdBy: adminId }).returning({ id: broadcasts.id });
   revalidate(created.id);
+  kick();
   return { ok: true, id: created.id };
 }
 

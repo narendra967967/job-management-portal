@@ -722,6 +722,9 @@ export const broadcastRecipients = pgTable(
     status: broadcastRecipientStatus("status").notNull().default("pending"),
     attempts: integer("attempts").notNull().default(0),
     lastError: text("last_error"),
+    // Set while a worker is sending it, and after a failure (the retry waits
+    // until it's old). A crashed worker's claim frees itself the same way.
+    lockedAt: timestamp("locked_at", { withTimezone: true }),
     sentAt: timestamp("sent_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },

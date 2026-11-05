@@ -12,7 +12,7 @@ import { ConfirmDialog } from "@/components/admin/ui/confirm-dialog";
 import { toast } from "@/components/admin/ui/toast";
 import { HtmlEditor } from "@/components/admin/guides/html-editor";
 import { InfoTip } from "@/components/ui/info-tip";
-import { BroadcastPreview, NotSendingBanner, StatusBadge } from "@/components/admin/broadcasts/broadcast-bits";
+import { BroadcastPreview, StatusBadge } from "@/components/admin/broadcasts/broadcast-bits";
 import {
   cancelBroadcastAction,
   deleteBroadcastAction,
@@ -151,7 +151,7 @@ export function BroadcastEditor({
     const r = await run(() => saveBroadcastAction(existing?.id ?? null, v, "send"));
     if (!r || !("id" in r)) return;
     setDirty(false);
-    toast.success(v.scheduledFor ? `Scheduled for ${formatDateTime(v.scheduledFor)}` : "Queued to send");
+    toast.success(v.scheduledFor ? `Scheduled for ${formatDateTime(v.scheduledFor)}` : "Sending started");
     router.push(`/jmp-admin/broadcasts/${r.id}`);
     router.refresh();
   }
@@ -174,7 +174,6 @@ export function BroadcastEditor({
 
   return (
     <div className="mx-auto max-w-5xl space-y-4">
-      <NotSendingBanner />
       {scheduled && existing && (
         <Card className="flex flex-wrap items-center gap-3 p-3">
           <CalendarClock className="size-4 text-primary" aria-hidden />

@@ -8,7 +8,7 @@ import { Plus, Search } from "lucide-react";
 import { Card } from "@/components/admin/ui/card";
 import { buttonVariants } from "@/components/admin/ui/button";
 import { Input } from "@/components/admin/ui/input";
-import { CategoryBadge, ChannelIcons, NotSendingBanner, StatusBadge, selectCls } from "@/components/admin/broadcasts/broadcast-bits";
+import { CategoryBadge, ChannelIcons, StatusBadge, selectCls } from "@/components/admin/broadcasts/broadcast-bits";
 import { BROADCAST_STATUS_LABELS, type Broadcast, type BroadcastStatus } from "@/lib/broadcasts-model";
 import { useMounted } from "@/lib/use-mounted";
 import { cn, formatDateTime } from "@/lib/utils";
@@ -53,7 +53,6 @@ export function BroadcastsList({ broadcasts: raw }: { broadcasts: Broadcast[] })
 
   return (
     <div className="mx-auto max-w-5xl space-y-4">
-      <NotSendingBanner />
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative w-full min-w-0 sm:w-auto sm:max-w-xs sm:flex-1">
           <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />

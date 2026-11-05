@@ -10,18 +10,23 @@ import { Card } from "@/components/admin/ui/card";
 import { Button } from "@/components/admin/ui/button";
 import { ConfirmDialog } from "@/components/admin/ui/confirm-dialog";
 import { toast } from "@/components/admin/ui/toast";
-import { BroadcastPreview, CategoryBadge, NotSendingBanner, StatusBadge } from "@/components/admin/broadcasts/broadcast-bits";
+import { BroadcastPreview, CategoryBadge, StatusBadge } from "@/components/admin/broadcasts/broadcast-bits";
 import { cancelBroadcastAction, deleteBroadcastAction, duplicateBroadcastAction } from "@/actions/admin-broadcasts";
 import { BROADCAST_CHANNELS, sendsEmail, sendsInApp, type Broadcast } from "@/lib/broadcasts-model";
 import { useMounted } from "@/lib/use-mounted";
 import { formatDateTime } from "@/lib/utils";
 
-function Bar({ done, failed, total }: { done: number; failed: number; total: number }) {
+function Bar({ done, failed, skipped, total }: { done: number; failed: number; skipped: number; total: number }) {
   const pct = (n: number) => (total ? `${(n / total) * 100}%` : "0%");
   return (
-    <div className="flex h-2 overflow-hidden rounded-full bg-muted" role="img" aria-label={`${done} sent, ${failed} failed, of ${total}`}>
+    <div
+      className="flex h-2 overflow-hidden rounded-full bg-muted"
+      role="img"
+      aria-label={`${done} sent, ${failed} failed, ${skipped} skipped, of ${total}`}
+    >
       <span className="bg-primary transition-[width]" style={{ width: pct(done) }} />
       <span className="bg-destructive transition-[width]" style={{ width: pct(failed) }} />
+      <span className="bg-muted-foreground/40 transition-[width]" style={{ width: pct(skipped) }} />
     </div>
   );
 }
@@ -55,11 +60,10 @@ export function BroadcastDetail({ broadcast: b, appName }: { broadcast: Broadcas
       setBusy(false);
     }
   }
-  const waiting = d ? d.emailTotal - d.emailSent - d.emailFailed : 0;
+  const waiting = d ? Math.max(0, d.emailTotal - d.emailSent - d.emailFailed - d.emailSkipped) : 0;
 
   return (
     <div className="mx-auto max-w-3xl space-y-4">
-      <NotSendingBanner />
       <Card className="space-y-3 p-4">
         <div className="flex flex-wrap items-center gap-1.5">
           <CategoryBadge category={b.category} />
@@ -97,11 +101,11 @@ export function BroadcastDetail({ broadcast: b, appName }: { broadcast: Broadcas
                     {d.emailSent} of {d.emailTotal} sent
                   </span>
                 </div>
-                <Bar done={d.emailSent} failed={d.emailFailed} total={d.emailTotal} />
+                <Bar done={d.emailSent} failed={d.emailFailed} skipped={d.emailSkipped} total={d.emailTotal} />
                 <p className="text-xs text-muted-foreground">
                   {d.emailFailed > 0 && `${d.emailFailed} failed after 3 tries. `}
-                  {b.status === "sending" && waiting > 0 && `${waiting} waiting. Sent a few at a time so the mail server doesn't block us.`}
-                  {b.status === "canceled" && waiting > 0 && `${waiting} were never sent.`}
+                  {d.emailSkipped > 0 && `${d.emailSkipped} skipped${d.skipReason ? ` (${d.skipReason.toLowerCase()})` : ""}. `}
+                  {b.status === "sending" && waiting > 0 && `${waiting} waiting. They go out one every few seconds so the mail server doesn't block us.`}
                 </p>
               </div>
             )}

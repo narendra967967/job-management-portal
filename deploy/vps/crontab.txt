@@ -9,6 +9,11 @@
 */5 * * * *   /srv/jobtiva/cron-run.sh prod ai       >> /srv/jobtiva/logs/cron.log 2>&1
 */5 * * * *   /srv/jobtiva/cron-run.sh preprod ai    >> /srv/jobtiva/logs/cron.log 2>&1
 
+# Broadcasts: start due scheduled sends and work through the email queue (paced; a run
+# lasts up to ~4 min, and a run still going makes the next one a no-op).
+2-59/5 * * * *  /srv/jobtiva/cron-run.sh prod broadcasts    >> /srv/jobtiva/logs/cron.log 2>&1
+4-59/5 * * * *  /srv/jobtiva/cron-run.sh preprod broadcasts >> /srv/jobtiva/logs/cron.log 2>&1
+
 # Stale-lead purge (no-op unless enabled in admin Settings) + Data retention (admin Settings).
 0 21 * * *    /srv/jobtiva/cron-run.sh prod purge    >> /srv/jobtiva/logs/cron.log 2>&1
 10 21 * * *   /srv/jobtiva/cron-run.sh preprod purge >> /srv/jobtiva/logs/cron.log 2>&1

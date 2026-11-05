@@ -1,10 +1,10 @@
 "use client";
 
-// Small pieces shared by the Broadcasts screens: badges, the not-sending-yet
-// banner and the in-app / email preview.
+// Small pieces shared by the Broadcasts screens: badges and the in-app / email
+// preview.
 
 import { useState } from "react";
-import { FlaskConical, Mail, Megaphone } from "lucide-react";
+import { Mail, Megaphone } from "lucide-react";
 import { Badge } from "@/components/admin/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/admin/ui/dialog";
 import {
@@ -21,17 +21,6 @@ import { cn } from "@/lib/utils";
 
 export const selectCls =
   "h-11 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none sm:h-9 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
-
-/** PHASE 2: until the sender is built, every Broadcasts screen says nothing goes out. */
-export function NotSendingBanner() {
-  return (
-    <p className="flex items-start gap-2 rounded-lg border border-dashed border-primary/30 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
-      <FlaskConical className="mt-0.5 size-3.5 shrink-0 text-primary" aria-hidden />
-      Sending isn&apos;t switched on yet. Broadcasts are saved, and Send now or Schedule queues them, but nothing
-      reaches users until the sender is built.
-    </p>
-  );
-}
 
 export function CategoryBadge({ category }: { category: BroadcastCategory }) {
   return <Badge variant={category === "important" ? "danger" : "neutral"}>{BROADCAST_CATEGORIES[category].label}</Badge>;

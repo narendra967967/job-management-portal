@@ -54,6 +54,10 @@ export interface BroadcastDelivery {
   emailTotal: number;
   emailSent: number;
   emailFailed: number;
+  /** Not sent and not going to be: canceled, or development's test-address rule. */
+  emailSkipped: number;
+  /** Why most of the skipped ones were skipped. */
+  skipReason: string | null;
 }
 
 export interface Broadcast {
@@ -99,7 +103,15 @@ export interface InboxBroadcast {
   read: boolean;
 }
 
-const plain = (html: string) => html.replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
+// Inline tags vanish without a trace ("guides</a>." stays "guides."); block
+// tags become spaces so paragraphs don't run together.
+const plain = (html: string) =>
+  html
+    .replace(/<\/?(?:a|b|strong|em|i|u|s|span|code|mark|small|sub|sup)\b[^>]*>/gi, "")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 /** A short plain-text preview for the bell and lists. */
 export const broadcastExcerpt = (html: string, max = 140) => {
   const t = plain(html);

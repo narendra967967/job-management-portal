@@ -2,9 +2,9 @@ import "server-only";
 
 // Broadcast reads for the admin screens, and who a broadcast would reach.
 
-import { desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { broadcasts, user } from "@/db/schema";
+import { broadcastRecipients, broadcasts, user } from "@/db/schema";
 import type { Broadcast, BroadcastAudience, BroadcastCategory } from "@/lib/broadcasts-model";
 
 type Row = typeof broadcasts.$inferSelect & { createdByName: string | null };
@@ -27,7 +27,14 @@ function toBroadcast(r: Row): Broadcast {
     finishedAt: iso(r.finishedAt),
     canceledAt: iso(r.canceledAt),
     delivery: r.startedAt
-      ? { inApp: r.inAppCount, emailTotal: r.emailTotal, emailSent: r.emailSent, emailFailed: r.emailFailed }
+      ? {
+          inApp: r.inAppCount,
+          emailTotal: r.emailTotal,
+          emailSent: r.emailSent,
+          emailFailed: r.emailFailed,
+          emailSkipped: 0,
+          skipReason: null,
+        }
       : null,
   };
 }
@@ -43,9 +50,22 @@ export async function loadBroadcasts(): Promise<Broadcast[]> {
   return rows.map((r) => toBroadcast({ ...r.b, createdByName: r.createdByName }));
 }
 
+/** One broadcast, with its skipped emails counted from the queue. */
 export async function loadBroadcast(id: string): Promise<Broadcast | null> {
   const [r] = await select().where(eq(broadcasts.id, id));
-  return r ? toBroadcast({ ...r.b, createdByName: r.createdByName }) : null;
+  if (!r) return null;
+  const b = toBroadcast({ ...r.b, createdByName: r.createdByName });
+  if (b.delivery && b.delivery.emailTotal > 0) {
+    const skipped = await db
+      .select({ reason: broadcastRecipients.lastError, n: sql<number>`count(*)::int` })
+      .from(broadcastRecipients)
+      .where(and(eq(broadcastRecipients.broadcastId, id), eq(broadcastRecipients.status, "skipped")))
+      .groupBy(broadcastRecipients.lastError)
+      .orderBy(sql`count(*) desc`);
+    b.delivery.emailSkipped = skipped.reduce((a, s) => a + s.n, 0);
+    b.delivery.skipReason = skipped[0]?.reason ?? null;
+  }
+  return b;
 }
 
 /**
