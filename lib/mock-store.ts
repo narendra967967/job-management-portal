@@ -46,6 +46,7 @@ import {
   setDefaultResumeAction,
   updateAiSettingsAction,
   updateFollowUpsAction,
+  setPromoOptOutAction,
   updateAiPromptsAction,
   updateGmailConfigAction,
   updateProfileAction,
@@ -151,6 +152,7 @@ let ingestErrors: IngestError[] = [];
 let aiPrompts = { summary: "", draft: "", score: "" };
 let fitScores: Record<string, FitScore> = {};
 let storedNotifications: WorkspaceData["notifications"] = [];
+let promoOptOut = false;
 let intake: WorkspaceIntake = {
   gmailOAuthEnabled: true,
   forwardingEnabled: true,
@@ -212,6 +214,7 @@ function stateFrom(data: WorkspaceData) {
     aiPrompts: data.aiPrompts,
     fitScores: data.fitScores,
     storedNotifications: data.notifications,
+    promoOptOut: data.promoOptOut,
     intake: data.intake,
   };
 }
@@ -240,6 +243,7 @@ function apply(data: WorkspaceData) {
   aiPrompts = st.aiPrompts;
   fitScores = st.fitScores;
   storedNotifications = st.storedNotifications;
+  promoOptOut = st.promoOptOut;
   intake = st.intake;
 }
 
@@ -323,8 +327,20 @@ export function useLeads(): JobLead[] {
 function useStoredNotifications(): WorkspaceData["notifications"] {
   return useWs("storedNotifications", getStoredNotifications);
 }
-/** Saved notifications (newest first, with dates), for the Notifications page. */
-export const useNotificationHistory = useStoredNotifications;
+const getPromoOptOut = () => promoOptOut;
+/** Settings → Notifications: promotional messages turned off. */
+export function usePromoOptOut(): [boolean, (optOut: boolean) => void] {
+  const value = useWs("promoOptOut", getPromoOptOut);
+  const set = (optOut: boolean) => {
+    promoOptOut = optOut;
+    emit();
+    void (async () => {
+      await setPromoOptOutAction(optOut);
+      await refresh();
+    })();
+  };
+  return [value, set];
+}
 /** All automatic status changes, for the card messages and Timeline. */
 export function useAutoActions(): LeadAutoAction[] {
   return useWs("autoActions", getAutoActions);
@@ -1254,7 +1270,7 @@ export function useTodos(): TodoGroups {
 
 export interface StoreNotification {
   id: string;
-  kind: "new-lead" | "reminder-due" | "system";
+  kind: "new-lead" | "reminder-due" | "system" | "broadcast";
   title: string;
   detail: string;
   /** Lead-linked (derived) items click through to the lead. */
@@ -1283,10 +1299,11 @@ export function useNotifications(): StoreNotification[] {
   for (const n of dbNotifications) {
     items.push({
       id: n.id,
-      kind: "system",
+      kind: n.broadcastCategory ? "broadcast" : "system",
       title: n.title,
       detail: n.body,
-      href: n.href ?? undefined,
+      // A broadcast opens its full message; other notices go where they point.
+      href: n.broadcastCategory ? `/notifications/${n.id}` : (n.href ?? undefined),
       read: n.read,
     });
   }

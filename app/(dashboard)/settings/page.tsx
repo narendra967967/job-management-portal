@@ -69,8 +69,8 @@ import {
   updateAiPrompts,
   useIntake,
   useFeatures,
+  usePromoOptOut,
 } from "@/lib/mock-store";
-import { USER_SAMPLES, setPromoOptOut, usePromoOptOut } from "@/lib/broadcasts-mock";
 import { buildGmailQuery } from "@/lib/use-gmail-settings";
 import { EmailForwardingCard } from "@/components/forwarding/email-forwarding-card";
 import { EmailLogCard } from "@/components/forwarding/email-log-card";
@@ -192,13 +192,7 @@ const SECTION = {
 // Gmail switch is on (docs/email-forwarding.md §4a); forwarding is always listed.
 function settingsGroups(gmailEnabled: boolean): { label: string; items: SettingsSection[] }[] {
   return [
-    {
-      label: "General",
-      // PHASE 1: the promotional switch isn't wired yet, so only show it in development.
-      items: USER_SAMPLES
-        ? [SECTION.profile, SECTION.career, SECTION.plan, SECTION.notifications]
-        : [SECTION.profile, SECTION.career, SECTION.plan],
-    },
+    { label: "General", items: [SECTION.profile, SECTION.career, SECTION.plan, SECTION.notifications] },
     {
       label: "Email & sync",
       items: gmailEnabled
@@ -1922,7 +1916,7 @@ function LeadRuleRow({
 /* ---------------- Notifications ---------------- */
 
 function NotificationPrefsCard() {
-  const optOut = usePromoOptOut();
+  const [optOut, setPromoOptOut] = usePromoOptOut();
   return (
     <section className="rounded-2xl border bg-card p-4 md:p-5">
       <h2 className="text-sm font-medium">Notifications</h2>

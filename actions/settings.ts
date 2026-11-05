@@ -83,6 +83,15 @@ export async function updateFollowUpsAction(input: {
   });
 }
 
+/* ---------------- notifications ---------------- */
+
+/** Settings → Notifications "Promotional messages" switch. Important ones can't be turned off. */
+export async function setPromoOptOutAction(optOut: boolean) {
+  const userId = await getCurrentUserId();
+  const v = parseInput(z.boolean(), optOut);
+  await upsertSettings(userId, { promoOptOut: v, promoOptOutAt: v ? new Date() : null });
+}
+
 /* ---------------- default resume ---------------- */
 
 export async function setDefaultResumeAction(id: string) {

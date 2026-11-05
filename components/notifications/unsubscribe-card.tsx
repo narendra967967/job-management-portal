@@ -2,24 +2,27 @@
 
 // The page a promotional email's unsubscribe link opens. One click is enough:
 // arriving here with a valid link turns promotional messages off, no sign-in.
-// PHASE 1: works on the sample opt-out in this browser; phase 4 checks a signed
-// token from the link instead.
+// The page does the unsubscribing; this only shows the result and offers undo.
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { BellOff, BellRing, Link2Off } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { setPromoOptOut } from "@/lib/broadcasts-mock";
 import { cn } from "@/lib/utils";
 
-export function UnsubscribeCard({ token, appName }: { token: string | null; appName: string }) {
+export function UnsubscribeCard({
+  valid,
+  appName,
+  resubscribe,
+}: {
+  valid: boolean;
+  appName: string;
+  /** Turns promotional messages back on for the link's owner. */
+  resubscribe: () => Promise<void>;
+}) {
   const [state, setState] = useState<"off" | "on">("off");
 
-  useEffect(() => {
-    if (token) setPromoOptOut(true);
-  }, [token]);
-
-  if (!token) {
+  if (!valid) {
     return (
       <Shell icon={<Link2Off className="size-7" aria-hidden />} title="This link isn't complete">
         <p>
@@ -42,8 +45,8 @@ export function UnsubscribeCard({ token, appName }: { token: string | null; appN
       <Button
         variant="outline"
         className="mt-6 h-11 px-5"
-        onClick={() => {
-          setPromoOptOut(false);
+        onClick={async () => {
+          await resubscribe();
           setState("on");
         }}
       >

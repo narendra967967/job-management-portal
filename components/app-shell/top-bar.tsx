@@ -5,8 +5,6 @@ import { useRouter, usePathname } from "next/navigation";
 import { Bell, Clock, Megaphone, Sparkles, Search } from "lucide-react";
 import { useLeads, useReminders, useNotifications, useProfile, useStaleCutoff, markNotificationsRead } from "@/lib/mock-store";
 import { isLeadStale } from "@/lib/types";
-import { markInboxRead, useInbox } from "@/lib/broadcasts-mock";
-import { broadcastExcerpt } from "@/lib/broadcasts-model";
 import { useSearchQuery, setSearchQuery } from "@/lib/search-store";
 import { Input } from "@/components/ui/input";
 import { PlanBadge } from "@/components/ui/plan-badge";
@@ -94,20 +92,7 @@ const MAX_NOTIFICATIONS = 5;
 
 export function NotificationsMenu() {
   const router = useRouter();
-  const inbox = useInbox();
-  // Messages from the team first: they're rarer, and the newest thing here.
-  const notifications = [
-    ...inbox.map((b) => ({
-      id: b.id,
-      kind: "broadcast" as const,
-      title: b.title,
-      detail: broadcastExcerpt(b.contentHtml),
-      href: `/notifications/${b.id}`,
-      leadId: undefined,
-      read: b.read,
-    })),
-    ...useNotifications(),
-  ];
+  const notifications = useNotifications();
   const unread = notifications.filter((n) => !n.read).length;
   // Only ever show the five most recent; the rest live on their pages.
   const top = notifications.slice(0, MAX_NOTIFICATIONS);
@@ -119,13 +104,7 @@ export function NotificationsMenu() {
   }
 
   return (
-    <DropdownMenu
-      onOpenChange={(o) => {
-        if (!o) return;
-        markNotificationsRead();
-        markInboxRead(inbox.map((b) => b.broadcastId));
-      }}
-    >
+    <DropdownMenu onOpenChange={(o) => o && markNotificationsRead()}>
       <DropdownMenuTrigger
         data-tour="notifications"
         aria-label={`Notifications${unread ? `, ${unread} unread` : ""}`}

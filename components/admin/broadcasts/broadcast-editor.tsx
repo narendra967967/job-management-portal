@@ -12,15 +12,13 @@ import { ConfirmDialog } from "@/components/admin/ui/confirm-dialog";
 import { toast } from "@/components/admin/ui/toast";
 import { HtmlEditor } from "@/components/admin/guides/html-editor";
 import { InfoTip } from "@/components/ui/info-tip";
-import { BroadcastPreview, SampleBanner, StatusBadge } from "@/components/admin/broadcasts/broadcast-bits";
+import { BroadcastPreview, NotSendingBanner, StatusBadge } from "@/components/admin/broadcasts/broadcast-bits";
 import {
-  SAMPLE_ADMIN_EMAIL,
-  cancelBroadcast,
-  deleteBroadcast,
-  sampleAudience,
-  saveBroadcast,
-  type useBroadcast,
-} from "@/lib/broadcasts-mock";
+  cancelBroadcastAction,
+  deleteBroadcastAction,
+  saveBroadcastAction,
+  sendTestBroadcastAction,
+} from "@/actions/admin-broadcasts";
 import {
   BROADCAST_CATEGORIES,
   BROADCAST_CHANNELS,
@@ -29,13 +27,14 @@ import {
   broadcastInputSchema,
   sendsEmail,
   sendsInApp,
+  type Broadcast,
+  type BroadcastAudience,
   type BroadcastCategory,
   type BroadcastChannel,
   type BroadcastInput,
 } from "@/lib/broadcasts-model";
+import { useMounted } from "@/lib/use-mounted";
 import { cn, formatDateTime } from "@/lib/utils";
-
-type Existing = ReturnType<typeof useBroadcast>;
 
 /** ISO → the value a datetime-local input wants, in this browser's time zone. */
 function toLocalInput(iso: string | null): string {
@@ -47,8 +46,18 @@ function toLocalInput(iso: string | null): string {
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
-export function BroadcastEditor({ existing, appName }: { existing: Existing; appName: string }) {
+export function BroadcastEditor({
+  existing,
+  audiences,
+  appName,
+}: {
+  existing: Broadcast | undefined;
+  audiences: Record<BroadcastCategory, BroadcastAudience>;
+  appName: string;
+}) {
   const router = useRouter();
+  // Dates follow this browser's locale, so they wait for it.
+  const mounted = useMounted();
   const [title, setTitle] = useState(existing?.title ?? "");
   const [contentHtml, setContentHtml] = useState(existing?.contentHtml ?? "");
   const [category, setCategory] = useState<BroadcastCategory>(existing?.category ?? "important");
@@ -61,9 +70,10 @@ export function BroadcastEditor({ existing, appName }: { existing: Existing; app
   const [confirmSend, setConfirmSend] = useState(false);
   const [confirmUnschedule, setConfirmUnschedule] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   const scheduled = existing?.status === "scheduled";
-  const audience = sampleAudience(category);
+  const audience = audiences[category];
   const tz = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone, []);
   const [minLocal, setMinLocal] = useState("");
   useEffect(() => {
@@ -98,35 +108,52 @@ export function BroadcastEditor({ existing, appName }: { existing: Existing; app
     return r.success && !next.scheduledFor ? r.data : null;
   }
 
-  function saveDraft() {
+  /** Runs a server action with the buttons held, and shows its error. */
+  async function run<T extends { ok: boolean }>(fn: () => Promise<T>): Promise<T | null> {
+    setBusy(true);
+    try {
+      const r = await fn();
+      if (!r.ok) toast.error((r as { error?: string }).error ?? "Something went wrong.");
+      return r.ok ? r : null;
+    } catch {
+      toast.error("That didn't go through. Check your connection and try again.");
+      return null;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveDraft() {
     if (!title.trim()) {
       setErrors({ title: "Give it a title so you can find the draft later." });
       return;
     }
-    const id = saveBroadcast(existing?.id ?? null, {
-      title: title.trim(),
-      contentHtml,
-      category,
-      channel,
-      scheduledFor: null,
-    }, "draft");
+    const r = await run(() =>
+      saveBroadcastAction(existing?.id ?? null, { title: title.trim(), contentHtml, category, channel, scheduledFor: null }, "draft"),
+    );
+    if (!r || !("id" in r)) return;
     setDirty(false);
     toast.success(scheduled ? "Unscheduled and saved as a draft" : "Draft saved");
-    if (!existing) router.replace(`/jmp-admin/broadcasts/${id}`);
+    if (!existing) router.replace(`/jmp-admin/broadcasts/${r.id}`);
+    else router.refresh();
   }
 
-  function sendTest() {
-    if (!input()) return;
-    toast.success(`Test sent to ${SAMPLE_ADMIN_EMAIL}`);
-  }
-
-  function send() {
+  async function sendTest() {
     const v = input();
     if (!v) return;
-    const id = saveBroadcast(existing?.id ?? null, v, "send");
+    const r = await run(() => sendTestBroadcastAction(v));
+    if (r && "to" in r) toast.success(`Test sent to ${r.to}`);
+  }
+
+  async function send() {
+    const v = input();
+    if (!v) return;
+    const r = await run(() => saveBroadcastAction(existing?.id ?? null, v, "send"));
+    if (!r || !("id" in r)) return;
     setDirty(false);
-    toast.success(v.scheduledFor ? `Scheduled for ${formatDateTime(v.scheduledFor)}` : "Sending started");
-    router.push(`/jmp-admin/broadcasts/${id}`);
+    toast.success(v.scheduledFor ? `Scheduled for ${formatDateTime(v.scheduledFor)}` : "Queued to send");
+    router.push(`/jmp-admin/broadcasts/${r.id}`);
+    router.refresh();
   }
 
   const inApp = sendsInApp(channel) ? audience.inApp : 0;
@@ -147,12 +174,12 @@ export function BroadcastEditor({ existing, appName }: { existing: Existing; app
 
   return (
     <div className="mx-auto max-w-5xl space-y-4">
-      <SampleBanner />
+      <NotSendingBanner />
       {scheduled && existing && (
         <Card className="flex flex-wrap items-center gap-3 p-3">
           <CalendarClock className="size-4 text-primary" aria-hidden />
           <p className="min-w-0 flex-1 text-sm">
-            <StatusBadge status="scheduled" /> <span className="ml-1">{formatDateTime(existing.scheduledFor)}</span>
+            <StatusBadge status="scheduled" /> <span className="ml-1">{mounted ? formatDateTime(existing.scheduledFor) : ""}</span>
           </p>
           <Button variant="outline" onClick={() => setConfirmUnschedule(true)}>
             <XCircle className="size-4" aria-hidden />
@@ -317,7 +344,7 @@ export function BroadcastEditor({ existing, appName }: { existing: Existing; app
           </Card>
 
           <div className="grid gap-2">
-            <Button onClick={() => input() && setConfirmSend(true)}>
+            <Button onClick={() => input() && setConfirmSend(true)} disabled={busy}>
               {timing === "later" ? <CalendarClock className="size-4" aria-hidden /> : <Send className="size-4" aria-hidden />}
               {timing === "later" ? (scheduled ? "Update schedule" : "Schedule") : "Send now"}
             </Button>
@@ -326,18 +353,18 @@ export function BroadcastEditor({ existing, appName }: { existing: Existing; app
                 <Eye className="size-4" aria-hidden />
                 Preview
               </Button>
-              <Button variant="outline" onClick={sendTest} disabled={!sendsEmail(channel)} title={sendsEmail(channel) ? undefined : "Only for broadcasts that send email"}>
+              <Button variant="outline" onClick={sendTest} disabled={busy || !sendsEmail(channel)} title={sendsEmail(channel) ? undefined : "Only for broadcasts that send email"}>
                 <Mail className="size-4" aria-hidden />
                 Test to me
               </Button>
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <Button variant="outline" onClick={saveDraft}>
+              <Button variant="outline" onClick={saveDraft} disabled={busy}>
                 <Save className="size-4" aria-hidden />
                 {scheduled ? "Unschedule" : "Save draft"}
               </Button>
               {existing && existing.status === "draft" && (
-                <Button variant="outline" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setConfirmDelete(true)}>
+                <Button variant="outline" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setConfirmDelete(true)} disabled={busy}>
                   <Trash2 className="size-4" aria-hidden />
                   Delete
                 </Button>
@@ -371,11 +398,13 @@ export function BroadcastEditor({ existing, appName }: { existing: Existing; app
         description="Nobody gets it. It stays in the list as canceled, and Duplicate makes a new draft from it."
         confirmLabel="Cancel send"
         destructive
-        onConfirm={() => {
+        onConfirm={async () => {
           if (!existing) return;
-          cancelBroadcast(existing.id);
+          const r = await run(() => cancelBroadcastAction(existing.id));
+          if (!r) return;
           setDirty(false);
           toast.success("Send canceled");
+          router.refresh();
         }}
       />
       <ConfirmDialog
@@ -385,12 +414,14 @@ export function BroadcastEditor({ existing, appName }: { existing: Existing; app
         description="It's gone for good."
         confirmLabel="Delete"
         destructive
-        onConfirm={() => {
+        onConfirm={async () => {
           if (!existing) return;
-          deleteBroadcast(existing.id);
+          const r = await run(() => deleteBroadcastAction(existing.id));
+          if (!r) return;
           setDirty(false);
           toast.success("Draft deleted");
           router.push("/jmp-admin/broadcasts");
+          router.refresh();
         }}
       />
     </div>

@@ -350,6 +350,9 @@ export const userSettings = pgTable("user_settings", {
   staleLeadDays: integer("stale_lead_days").notNull().default(14), // FR-2.4
   // Move a lead's status forward automatically from what the user does on it.
   autoStatus: boolean("auto_status").notNull().default(true),
+  // Settings → Notifications "Promotional messages" off, or an unsubscribe link.
+  promoOptOut: boolean("promo_opt_out").notNull().default(false),
+  promoOptOutAt: timestamp("promo_opt_out_at", { withTimezone: true }),
   // How many follow-ups are scheduled automatically after the first (FR-5.4).
   maxFollowUps: integer("max_follow_ups").notNull().default(2),
   // Automatic lead rules (lib/lead-rules-model.ts); empty = all at their defaults.
@@ -654,10 +657,78 @@ export const notifications = pgTable(
     title: text("title").notNull(),
     body: text("body").notNull(),
     href: text("href"), // optional click-through target
+    // Set on a broadcast's in-app copy; its full HTML lives on the broadcast.
+    broadcastId: uuid("broadcast_id").references(() => broadcasts.id, { onDelete: "cascade" }),
     readAt: timestamp("read_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index("notifications_user_idx").on(t.userId, t.createdAt.desc())],
+  (t) => [
+    index("notifications_user_idx").on(t.userId, t.createdAt.desc()),
+    index("notifications_broadcast_idx").on(t.broadcastId),
+  ],
+);
+
+/* ---------------- broadcasts ---------------- */
+
+export const broadcastCategory = pgEnum("broadcast_category", ["important", "promotional"]);
+export const broadcastChannel = pgEnum("broadcast_channel", ["in_app", "email", "both"]);
+export const broadcastStatus = pgEnum("broadcast_status", ["draft", "scheduled", "sending", "sent", "canceled"]);
+export const broadcastRecipientStatus = pgEnum("broadcast_recipient_status", ["pending", "sent", "failed", "skipped"]);
+
+/** A message an admin sends to every user (lib/broadcasts-model.ts has the rules). */
+export const broadcasts = pgTable(
+  "broadcasts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    title: text("title").notNull(),
+    contentHtml: text("content_html").notNull().default(""),
+    category: broadcastCategory("category").notNull(),
+    channel: broadcastChannel("channel").notNull(),
+    status: broadcastStatus("status").notNull().default("draft"),
+    // Due time for a scheduled send; "Send now" schedules for the moment it's sent.
+    scheduledFor: timestamp("scheduled_for", { withTimezone: true }),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    // Who it reached, fixed when sending starts, and the email tallies so far.
+    // Kept here so the numbers outlive trimmed notifications and recipient rows.
+    inAppCount: integer("in_app_count").notNull().default(0),
+    emailTotal: integer("email_total").notNull().default(0),
+    emailSent: integer("email_sent").notNull().default(0),
+    emailFailed: integer("email_failed").notNull().default(0),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    canceledAt: timestamp("canceled_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [index("broadcasts_due_idx").on(t.status, t.scheduledFor)],
+);
+
+/** The email queue for a broadcast: one row per user it's going to. */
+export const broadcastRecipients = pgTable(
+  "broadcast_recipients",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    broadcastId: uuid("broadcast_id")
+      .notNull()
+      .references(() => broadcasts.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    // The address at send time, so a later email change doesn't redirect it.
+    email: text("email").notNull(),
+    status: broadcastRecipientStatus("status").notNull().default("pending"),
+    attempts: integer("attempts").notNull().default(0),
+    lastError: text("last_error"),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("broadcast_recipients_uq").on(t.broadcastId, t.userId),
+    index("broadcast_recipients_queue_idx").on(t.status, t.broadcastId),
+  ],
 );
 
 /** Support tickets — messages users send from the app (e.g. the deactivated-account

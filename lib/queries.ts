@@ -95,6 +95,8 @@ export interface WorkspaceData {
   reminderIntervalDays: number;
   staleLeadDays: number;
   autoStatus: boolean;
+  /** Settings → Notifications: promotional messages turned off. */
+  promoOptOut: boolean;
   maxFollowUps: number;
   leadRules: LeadRules;
   profile: Profile;
@@ -422,6 +424,7 @@ export async function loadWorkspace(userId: string): Promise<WorkspaceData> {
     reminderIntervalDays: settings?.reminderIntervalDays ?? 3,
     staleLeadDays: settings?.staleLeadDays ?? 14,
     autoStatus: settings?.autoStatus ?? true,
+    promoOptOut: settings?.promoOptOut ?? false,
     maxFollowUps: settings?.maxFollowUps ?? 2,
     leadRules: normalizeLeadRules(settings?.leadRules),
     profile,
