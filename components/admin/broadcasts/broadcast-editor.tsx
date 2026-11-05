@@ -236,7 +236,7 @@ export function BroadcastEditor({ existing, appName }: { existing: Existing; app
 
           <Card className="space-y-1.5 p-4">
             <span className="text-sm font-medium">Message</span>
-            <HtmlEditor value={contentHtml} onChange={touch(setContentHtml)} placeholder="Write the message…" />
+            <HtmlEditor value={contentHtml} onChange={touch(setContentHtml)} placeholder="Write the message…" label="Message" />
             <span className={cn("block text-[11px]", errors.contentHtml ? "text-destructive" : "text-muted-foreground")}>
               {errors.contentHtml ?? "Images need a full web address (https://…) to show in emails."}
             </span>

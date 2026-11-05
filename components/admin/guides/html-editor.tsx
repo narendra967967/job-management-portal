@@ -64,10 +64,13 @@ export function HtmlEditor({
   value,
   onChange,
   placeholder = "Start writing your guide…",
+  label = "Guide",
 }: {
   value: string;
   onChange: (html: string) => void;
   placeholder?: string;
+  /** What screen readers call it: "<label> content" and "<label> HTML". */
+  label?: string;
 }) {
   const [mode, setMode] = useState<Mode>("visual");
   const [code, setCode] = useState("");
@@ -257,7 +260,7 @@ export function HtmlEditor({
             suppressContentEditableWarning
             role="textbox"
             aria-multiline="true"
-            aria-label="Guide content"
+            aria-label={`${label} content`}
             data-placeholder={placeholder}
             onInput={emit}
             // New lines become <p> paragraphs (Chrome's default is <div>).
@@ -286,7 +289,7 @@ export function HtmlEditor({
         </>
       ) : (
         <textarea
-          aria-label="Guide HTML"
+          aria-label={`${label} HTML`}
           value={code}
           spellCheck={false}
           onChange={(e) => {
