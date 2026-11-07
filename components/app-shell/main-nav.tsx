@@ -18,9 +18,10 @@ import {
   Rocket,
   Send,
   ChevronDown,
+  Lock,
   type LucideIcon,
 } from "lucide-react";
-import { BookOpen, Compass, LifeBuoy } from "lucide-react";
+import { BookOpen, Compass, LifeBuoy, Sparkles } from "lucide-react";
 import { Logo } from "@/components/app-shell/logo";
 import { SidebarAddLeadButton } from "@/components/leads/add-lead-dialog";
 import { SupportNavButton, useContactSupport } from "@/components/support/contact-support";
@@ -37,6 +38,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { useLimitedMode } from "@/lib/access-mode";
 
 function initials(name: string) {
   return name
@@ -116,6 +118,41 @@ function NavLink({
   );
 }
 
+/** Limited mode: a locked item. Still visible (so users see what they'd get
+ *  back) and it leads to Upgrade Plan. */
+function LockedNavLink({ label, icon: Icon }: NavItem) {
+  return (
+    <Link
+      href="/upgrade"
+      aria-label={`${label} (locked, upgrade your plan to unlock)`}
+      className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground/60 transition-colors hover:bg-sidebar-accent"
+    >
+      <Icon className="size-5 shrink-0" aria-hidden />
+      <span className="flex-1">{label}</span>
+      <Lock className="size-3.5 shrink-0" aria-hidden />
+    </Link>
+  );
+}
+
+/** The one open menu in limited mode. */
+function UpgradePlanLink({ pathname }: { pathname: string }) {
+  const active = isActive(pathname, "/upgrade");
+  return (
+    <Link
+      href="/upgrade"
+      className={cn(
+        "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors",
+        active
+          ? "bg-gradient-to-r from-primary to-[oklch(0.5_0.2_308)] text-primary-foreground shadow-sm"
+          : "bg-primary/10 text-primary hover:bg-primary/15",
+      )}
+    >
+      <Sparkles className="size-5 shrink-0" aria-hidden />
+      Upgrade Plan
+    </Link>
+  );
+}
+
 /** A collapsible group of nav links (controlled — the parent runs the accordion). */
 function NavGroup({
   label,
@@ -123,12 +160,14 @@ function NavGroup({
   pathname,
   open,
   onToggle,
+  locked = false,
 }: {
   label: string;
   items: NavItem[];
   pathname: string;
   open: boolean;
   onToggle: () => void;
+  locked?: boolean;
 }) {
   return (
     <div data-tour={`group-${label.toLowerCase().replace(/[^a-z]+/g, "-")}`}>
@@ -153,9 +192,13 @@ function NavGroup({
       >
         <div className="overflow-hidden">
           <div className="mt-0.5 space-y-1" aria-hidden={!open}>
-            {items.map((item) => (
-              <NavLink key={item.href} {...item} pathname={pathname} />
-            ))}
+            {items.map((item) =>
+              locked ? (
+                <LockedNavLink key={item.href} {...item} />
+              ) : (
+                <NavLink key={item.href} {...item} pathname={pathname} />
+              ),
+            )}
           </div>
         </div>
       </div>
@@ -172,6 +215,7 @@ function activeGroupIndex(pathname: string): number {
  *  only one is open at a time, and the one holding the current page opens itself. */
 export function SidebarNav() {
   const pathname = usePathname();
+  const limited = useLimitedMode();
   const activeIdx = activeGroupIndex(pathname);
   const [openIdx, setOpenIdx] = useState<number | null>(activeIdx >= 0 ? activeIdx : 0);
 
@@ -182,7 +226,7 @@ export function SidebarNav() {
 
   return (
     <nav className="flex flex-col gap-3 p-3">
-      <SidebarAddLeadButton />
+      {limited ? <UpgradePlanLink pathname={pathname} /> : <SidebarAddLeadButton />}
       {NAV_GROUPS.map((g, i) => (
         <NavGroup
           key={g.label}
@@ -191,6 +235,7 @@ export function SidebarNav() {
           pathname={pathname}
           open={openIdx === i}
           onToggle={() => setOpenIdx((cur) => (cur === i ? null : i))}
+          locked={limited}
         />
       ))}
     </nav>
@@ -200,6 +245,7 @@ export function SidebarNav() {
 /** Sidebar footer — desktop: Settings link + profile + logout. */
 export function SidebarFooter() {
   const pathname = usePathname();
+  const limited = useLimitedMode();
   const profile = useProfile();
   const active = isActive(pathname, "/settings");
   const guidesActive = isActive(pathname, "/guides");
@@ -220,6 +266,7 @@ export function SidebarFooter() {
         How-to guides
       </Link>
       {/* Restart the onboarding tour (components/onboarding/onboarding-tour.tsx). */}
+      {!limited && (
       <Link
         href="/leads?tour=1"
         className="relative mb-1 flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground"
@@ -227,6 +274,7 @@ export function SidebarFooter() {
         <Compass className="size-5 shrink-0" aria-hidden />
         Take the tour
       </Link>
+      )}
       </div>
       <Link
         href="/settings"
@@ -390,6 +438,27 @@ export function MobileNav({ name }: { name?: string }) {
 /** Bottom tab bar — mobile only (below md). */
 export function BottomNav() {
   const pathname = usePathname();
+  const limited = useLimitedMode();
+  const { open: openSupport } = useContactSupport();
+  if (limited) {
+    const tab = "flex min-h-14 flex-col items-center justify-center gap-1 px-0.5 text-[10px] font-medium whitespace-nowrap transition-colors";
+    return (
+      <nav className="grid shrink-0 grid-cols-3 border-t bg-card pb-[env(safe-area-inset-bottom)] md:hidden">
+        <Link href="/upgrade" className={cn(tab, isActive(pathname, "/upgrade") ? "text-primary" : "text-muted-foreground")}>
+          <Sparkles className="size-5 shrink-0" aria-hidden />
+          Upgrade Plan
+        </Link>
+        <button type="button" onClick={() => openSupport()} className={cn(tab, "text-muted-foreground")}>
+          <LifeBuoy className="size-5 shrink-0" aria-hidden />
+          Help
+        </button>
+        <Link href="/settings" className={cn(tab, isActive(pathname, "/settings") ? "text-primary" : "text-muted-foreground")}>
+          <Settings className="size-5 shrink-0" aria-hidden />
+          Settings
+        </Link>
+      </nav>
+    );
+  }
   return (
     <nav data-tour="bottom-nav" className="grid shrink-0 grid-cols-5 border-t bg-card pb-[env(safe-area-inset-bottom)] md:hidden">
       {BOTTOM_NAV.map(({ href, label, icon: Icon }) => {

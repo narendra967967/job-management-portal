@@ -34,6 +34,7 @@ import { careerCompletionFor } from "@/lib/career-data";
 import { Suspense } from "react";
 import { OnboardingTour } from "@/components/onboarding/onboarding-tour";
 import { tourDue } from "@/lib/tour";
+import { NotLimited } from "@/components/billing/not-limited";
 
 // Per-user, session-gated routes — never statically prerendered (no DB at build).
 export const dynamic = "force-dynamic";
@@ -89,21 +90,31 @@ export default async function DashboardLayout({
             <div className="md:hidden">
               <Logo showName={false} name={appName} />
             </div>
-            <TopBarSearch />
+            <NotLimited>
+              <TopBarSearch />
+            </NotLimited>
             <div className="ml-auto flex items-center gap-1.5 sm:gap-2.5">
               <PlanChip className="hidden xl:inline-flex" />
-              <TopBarStats className="hidden lg:flex" />
-              <HeaderAddLeadButton />
-              <NotesButton />
+              <NotLimited>
+                <TopBarStats className="hidden lg:flex" />
+                <HeaderAddLeadButton />
+                <NotesButton />
+              </NotLimited>
               {/* On phones the floating help bubble covers this — keep room for search. */}
               <div className="hidden sm:block">
                 <SupportIconButton />
               </div>
-              <NotificationsMenu />
+              <NotLimited>
+                <NotificationsMenu />
+              </NotLimited>
             </div>
           </div>
         </header>
-        {!career.complete && <CareerProfileNotice percent={career.percent} />}
+        {!career.complete && (
+          <NotLimited>
+            <CareerProfileNotice percent={career.percent} />
+          </NotLimited>
+        )}
 
         <main className="flex-1 overflow-y-auto px-4 pt-4 pb-6 md:px-6 md:pt-6 md:pb-8">
           {children}
@@ -114,7 +125,9 @@ export default async function DashboardLayout({
       </div>
 
       {/* Mobile-only floating "Add lead" button (above the bottom nav). */}
-      <AddLeadFab />
+      <NotLimited>
+        <AddLeadFab />
+      </NotLimited>
       </div>
       {/* Floating help launcher + panel (bottom-right, all dashboard pages). */}
       <SupportWidget />

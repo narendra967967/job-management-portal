@@ -51,6 +51,32 @@ function toText(html: string): string {
     .trim();
 }
 
+/** Public fields of a plan row (also used for the in-app plan picker). */
+export function toPublicPlan(r: typeof plans.$inferSelect): PublicPlan {
+  return {
+    id: r.id,
+    name: r.name,
+    summary: toText(r.description),
+    accent: ((ACCENT_KEYS as string[]).includes(r.accent) ? r.accent : "indigo") as AccentKey,
+    isFree: r.isFree,
+    freeDurationDays: r.freeDurationDays,
+    monthlyPrice: r.monthlyPrice,
+    yearlyPrice: r.yearlyPrice,
+    currency: (r.currency === "USD" ? "USD" : "INR") as Currency,
+    popular: r.popular,
+    limitActiveLeads: r.limitActiveLeads,
+    limitResumes: r.limitResumes,
+    limitAiAddMonthly: r.limitAiAddMonthly,
+    allowAiDrafts: r.allowAiDrafts,
+    allowAiEmailReading: r.allowAiEmailReading,
+    allowNotes: r.allowNotes,
+    allowSalaryInsight: r.allowSalaryInsight,
+    allowAtsCheck: r.allowAtsCheck,
+    allowCustomPrompts: r.allowCustomPrompts,
+    prioritySupport: r.prioritySupport,
+  };
+}
+
 /** Plans for the public pricing page: free first, then by monthly price. Build-safe. */
 export const getPricingPlans = cache(async (): Promise<PublicPlan[]> => {
   try {
@@ -59,28 +85,7 @@ export const getPricingPlans = cache(async (): Promise<PublicPlan[]> => {
       .from(plans)
       .where(and(eq(plans.status, "active"), eq(plans.showOnPricing, true)))
       .orderBy(desc(plans.isFree), asc(plans.monthlyPrice), asc(plans.yearlyPrice));
-    return rows.map((r) => ({
-      id: r.id,
-      name: r.name,
-      summary: toText(r.description),
-      accent: ((ACCENT_KEYS as string[]).includes(r.accent) ? r.accent : "indigo") as AccentKey,
-      isFree: r.isFree,
-      freeDurationDays: r.freeDurationDays,
-      monthlyPrice: r.monthlyPrice,
-      yearlyPrice: r.yearlyPrice,
-      currency: (r.currency === "USD" ? "USD" : "INR") as Currency,
-      popular: r.popular,
-      limitActiveLeads: r.limitActiveLeads,
-      limitResumes: r.limitResumes,
-      limitAiAddMonthly: r.limitAiAddMonthly,
-      allowAiDrafts: r.allowAiDrafts,
-      allowAiEmailReading: r.allowAiEmailReading,
-      allowNotes: r.allowNotes,
-      allowSalaryInsight: r.allowSalaryInsight,
-      allowAtsCheck: r.allowAtsCheck,
-      allowCustomPrompts: r.allowCustomPrompts,
-      prioritySupport: r.prioritySupport,
-    }));
+    return rows.map(toPublicPlan);
   } catch {
     // DB unavailable (e.g. `next build`).
     return [];

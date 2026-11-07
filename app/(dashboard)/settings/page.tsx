@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   FileText,
   Upload,
@@ -25,7 +25,6 @@ import {
   ScrollText,
   Download,
   Crown,
-  ArrowUpRight,
   type LucideIcon,
   Pause,
   Play,
@@ -73,6 +72,9 @@ import {
 } from "@/lib/mock-store";
 import { buildGmailQuery } from "@/lib/use-gmail-settings";
 import { EmailForwardingCard } from "@/components/forwarding/email-forwarding-card";
+import { PlanChooser } from "@/components/billing/plan-chooser";
+import { PaymentsPreviewBar } from "@/components/billing/payments-preview-bar";
+import { useLimitedMode } from "@/lib/access-mode";
 import { EmailLogCard } from "@/components/forwarding/email-log-card";
 import { DangerZoneCard } from "@/components/account/danger-zone";
 import { CareerProfileTab } from "@/components/career/career-profile-tab";
@@ -246,7 +248,9 @@ export default function SettingsPage() {
   const searchParams = useSearchParams();
   const tabParam = searchParams.get("tab");
   const gmailEnabled = useIntake().gmailOAuthEnabled;
-  const GROUPS = settingsGroups(gmailEnabled);
+  // Limited mode (plan ended): only Help & support and Account stay open.
+  const limited = useLimitedMode();
+  const GROUPS = limited ? [] : settingsGroups(gmailEnabled);
   const SECTIONS: SettingsSection[] = [...GROUPS.flatMap((g) => g.items), ...FOOTER];
   const active = SECTIONS.some((s) => s.id === tabParam) ? (tabParam as string) : SECTIONS[0].id;
   const current = SECTIONS.find((s) => s.id === active) ?? SECTIONS[0];
@@ -517,25 +521,16 @@ function UsageMeter({ label, used, limit }: { label: string; used: number; limit
 /* ---------------- Google connection ---------------- */
 
 function PlanDetailsCard() {
-  const { open: openSupport } = useContactSupport();
   const [plan, setPlan] = useState<MyPlanDetails | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const loadPlan = useCallback(() => {
     getMyPlanAction().then((p) => {
       setPlan(p);
       setLoading(false);
     });
   }, []);
-
-  function requestUpgrade() {
-    openSupport({
-      category: "billing",
-      subject: "Upgrade request",
-      message: `<p>I'd like to upgrade my plan${plan ? ` (currently on ${plan.name})` : ""}. Please help me move to a higher plan.</p>`,
-      source: "plan",
-    });
-  }
+  useEffect(loadPlan, [loadPlan]);
 
   const money = (n: number, cur: string) => `${cur === "USD" ? "$" : "₹"}${n.toLocaleString("en-IN")}`;
   const daysLeft = plan?.expiresAt
@@ -543,6 +538,7 @@ function PlanDetailsCard() {
     : null;
 
   return (
+    <>
     <div className="rounded-2xl border bg-card">
       <div className="border-b p-4 md:p-5">
         <h2 className="text-sm font-medium">Your plan</h2>
@@ -639,31 +635,29 @@ function PlanDetailsCard() {
               </li>
             ))}
           </ul>
-
-          {/* Upgrade — only when a higher-priced active plan exists */}
-          {plan.upgradeAvailable ? (
-            <div className="relative mt-5">
-              <div
-                aria-hidden
-                className="absolute -inset-0.5 animate-pulse rounded-xl bg-gradient-to-r from-primary to-[oklch(0.5_0.2_308)] opacity-60 blur-md"
-              />
-              <button
-                type="button"
-                onClick={requestUpgrade}
-                className="relative flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-[oklch(0.5_0.2_308)] px-5 py-3 text-sm font-semibold text-primary-foreground shadow-lg transition-transform hover:scale-[1.01] active:scale-[0.99]"
-              >
-                <Sparkles className="size-4" aria-hidden /> Upgrade your plan
-                <ArrowUpRight className="size-4" aria-hidden />
-              </button>
-            </div>
-          ) : (
-            <p className="mt-5 flex items-center justify-center gap-1.5 rounded-xl bg-muted/50 px-4 py-3 text-sm text-muted-foreground">
-              <Check className="size-4 text-primary" aria-hidden /> You&apos;re on the top plan.
-            </p>
-          )}
         </div>
       )}
     </div>
+
+      {/* Renew or move up: the plan picker + checkout (payments on) or a request (off). */}
+      {plan && (
+        <div className="mt-4 rounded-2xl border bg-card p-4 md:p-5">
+          <PaymentsPreviewBar />
+          <h2 className="text-sm font-medium">{plan.isFree ? "Choose a plan" : "Renew or upgrade"}</h2>
+          <div className="mt-3">
+            <PlanChooser
+              variant="settings"
+              onChanged={loadPlan}
+              empty={
+                <p className="flex items-center gap-1.5 rounded-xl bg-muted/50 px-4 py-3 text-sm text-muted-foreground">
+                  <Check className="size-4 text-primary" aria-hidden /> You&apos;re on the top plan.
+                </p>
+              }
+            />
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 

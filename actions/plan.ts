@@ -5,11 +5,13 @@
 // exists. "Higher value" is compared on the monthly price (the default basis;
 // a per-user billing interval isn't tracked yet).
 
-import { and, eq, gt } from "drizzle-orm";
+import { and, asc, eq, gt } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/current-user";
-import { plans, resumes, user } from "@/db/schema";
+import { billingConfig, plans, resumes, user } from "@/db/schema";
 import { activeLeadCount, usageThisMonth } from "@/lib/entitlements";
+import { toPublicPlan } from "@/lib/pricing";
+import type { CurrentPlanInfo, OfferPlan, TaxSettings } from "@/lib/billing-model";
 
 export interface MyPlanDetails {
   name: string;
@@ -84,5 +86,56 @@ export async function getMyPlanAction(): Promise<MyPlanDetails | null> {
     freeDurationDays: pl.freeDurationDays,
     expiresAt: row.planExpiresAt ? row.planExpiresAt.toISOString() : null,
     upgradeAvailable: higher.length > 0,
+  };
+}
+
+export interface PlanOptions {
+  current: CurrentPlanInfo;
+  /** The current plan has passed its expiry (limited mode). */
+  expired: boolean;
+  /** Plans the user can buy: active, paid, listed on the pricing page —
+   *  plus their own paid plan for renewal even when it isn't listed. Cheapest first. */
+  offers: OfferPlan[];
+  tax: TaxSettings;
+}
+
+/** What the plan picker (Settings → Plan, Upgrade Plan) needs. Never offers a
+ *  free plan: the free trial is once only and only an admin extends it. */
+export async function getPlanOptionsAction(): Promise<PlanOptions | null> {
+  const u = await getSessionUser();
+  if (!u) return null;
+
+  const [row] = await db
+    .select({ planId: user.planId, planExpiresAt: user.planExpiresAt })
+    .from(user)
+    .where(eq(user.id, u.id));
+  const [cur] = row?.planId ? await db.select().from(plans).where(eq(plans.id, row.planId)) : [];
+  const [billing] = await db.select().from(billingConfig).limit(1);
+
+  const listed = await db
+    .select()
+    .from(plans)
+    .where(and(eq(plans.status, "active"), eq(plans.isFree, false), eq(plans.showOnPricing, true)))
+    .orderBy(asc(plans.monthlyPrice), asc(plans.yearlyPrice));
+  const offers = listed.map(toPublicPlan).filter((p) => p.monthlyPrice > 0 || p.yearlyPrice > 0);
+  if (cur && !cur.isFree && cur.status === "active" && !offers.some((o) => o.id === cur.id)) {
+    offers.push(toPublicPlan(cur));
+    offers.sort((a, b) => a.monthlyPrice - b.monthlyPrice || a.yearlyPrice - b.yearlyPrice);
+  }
+
+  const expiresAt = row?.planExpiresAt ?? null;
+  return {
+    current: {
+      planId: cur?.id ?? null,
+      name: cur?.name ?? "",
+      isFree: cur?.isFree ?? true,
+      monthlyPrice: cur?.monthlyPrice ?? 0,
+      yearlyPrice: cur?.yearlyPrice ?? 0,
+      expiresAt: expiresAt ? expiresAt.toISOString() : null,
+      lastPeriod: null, // known once orders are recorded (Phase 2)
+    },
+    expired: !!expiresAt && expiresAt.getTime() < Date.now(),
+    offers,
+    tax: { taxRate: billing?.taxRate ?? 18, pricesIncludeTax: billing?.pricesIncludeTax ?? false },
   };
 }

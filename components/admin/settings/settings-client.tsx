@@ -11,6 +11,7 @@ import {
   Lock,
   Cog,
   CreditCard,
+  Wallet,
   Mail,
   Sparkles,
   Clock,
@@ -50,6 +51,7 @@ import { Field, SaveRow, SubHead, Toggle, selectCls } from "@/components/admin/s
 import { EmailIntakeCard } from "@/components/admin/settings/email-intake-card";
 import { RetentionCard } from "@/components/admin/settings/retention-card";
 import { CaptchaCard } from "@/components/admin/settings/captcha-card";
+import { PaymentsCard } from "@/components/admin/settings/payments-card";
 
 interface SettingsSection {
   id: string;
@@ -63,6 +65,7 @@ const SECTION = {
   password: { id: "password", label: "Password", icon: Lock, render: () => <PasswordCard /> },
   general: { id: "general", label: "General", icon: Cog, render: (i: AdminSettings) => <GeneralCard initial={i.general} branding={i.branding} /> },
   billing: { id: "billing", label: "Billing", icon: CreditCard, render: (i: AdminSettings) => <BillingCard initial={i.billing} /> },
+  payments: { id: "payments", label: "Payments", icon: Wallet, render: () => <PaymentsCard /> },
   email: { id: "email", label: "Email / SMTP", icon: Mail, render: (i: AdminSettings) => <EmailCard initial={i.smtp} /> },
   intake: { id: "intake", label: "Email intake", icon: Inbox, render: (i: AdminSettings) => <EmailIntakeCard initial={i.intake} /> },
   ai: { id: "ai", label: "AI", icon: Sparkles, render: (i: AdminSettings) => <AiCard initial={i.ai} /> },
@@ -78,7 +81,7 @@ const SECTION = {
 
 const GROUPS: { label: string; items: SettingsSection[] }[] = [
   { label: "Account", items: [SECTION.profile, SECTION.password] },
-  { label: "Application", items: [SECTION.general, SECTION.billing, SECTION.email, SECTION.intake, SECTION.ai, SECTION.cron, SECTION.security, SECTION.retention] },
+  { label: "Application", items: [SECTION.general, SECTION.billing, SECTION.payments, SECTION.email, SECTION.intake, SECTION.ai, SECTION.cron, SECTION.security, SECTION.retention] },
 ];
 const SECTIONS: SettingsSection[] = GROUPS.flatMap((g) => g.items);
 
@@ -478,13 +481,9 @@ function BrandingAsset({
 /* ---------------- Application: Billing ---------------- */
 
 function BillingCard({ initial }: { initial: AdminSettings["billing"] }) {
-  const [enabled, setEnabled] = useState(initial.enabled);
-  const [provider, setProvider] = useState(initial.provider);
-  const [mode, setMode] = useState(initial.mode);
-  const [currency, setCurrency] = useState(initial.currency);
-  const [keyId, setKeyId] = useState(initial.keyId);
-  const [keySecret, setKeySecret] = useState("");
-  const [showSecret, setShowSecret] = useState(false);
+  // Gateway fields now live in Settings → Payments; passed through unchanged
+  // until Phase 2 moves them to payment_gateways.
+  const { enabled, provider, mode, currency, keyId } = initial;
   const [gstin, setGstin] = useState(initial.gstin);
   const [taxRate, setTaxRate] = useState(String(initial.taxRate));
   const [pricesIncludeTax, setPricesIncludeTax] = useState(initial.pricesIncludeTax);
@@ -495,48 +494,7 @@ function BillingCard({ initial }: { initial: AdminSettings["billing"] }) {
   return (
     <section className="rounded-2xl border bg-card p-4 md:p-5">
       <h2 className="text-sm font-medium">Billing</h2>
-      <label className="mt-4 flex cursor-pointer items-center gap-2 text-sm">
-        <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} className="size-4 cursor-pointer rounded border-input accent-primary" />
-        Enable payments
-      </label>
-
-      <SubHead>Gateway</SubHead>
-      <div className={cn("space-y-3", !enabled && "pointer-events-none opacity-50")}>
-        <div className="grid gap-3 sm:grid-cols-3">
-          <Field label="Provider" hint="Payment gateway">
-            <select className={selectCls} value={provider} onChange={(e) => setProvider(e.target.value)}>
-              <option value="razorpay">Razorpay</option>
-              <option value="stripe">Stripe</option>
-            </select>
-          </Field>
-          <Field label="Mode" hint="Use test keys until go-live">
-            <select className={selectCls} value={mode} onChange={(e) => setMode(e.target.value)}>
-              <option value="test">Test</option>
-              <option value="live">Live</option>
-            </select>
-          </Field>
-          <Field label="Currency" hint="Charge currency">
-            <select className={selectCls} value={currency} onChange={(e) => setCurrency(e.target.value)}>
-              <option value="INR">₹ INR</option>
-              <option value="USD">$ USD</option>
-            </select>
-          </Field>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Key ID" hint="Publishable / key id from the provider">
-            <Input value={keyId} onChange={(e) => setKeyId(e.target.value)} autoComplete="off" className="font-mono" />
-          </Field>
-          <Field label="Key secret" hint={initial.hasSecret ? "Saved · type to replace" : "Stored encrypted"}>
-            <div className="relative">
-              <Input type={showSecret ? "text" : "password"} value={keySecret} onChange={(e) => setKeySecret(e.target.value)} placeholder={initial.hasSecret ? "••••••••" : ""} autoComplete="off" className="pr-9 font-mono" />
-              <button type="button" onClick={() => setShowSecret((s) => !s)} aria-label={showSecret ? "Hide secret" : "Show secret"} className="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-                {showSecret ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-              </button>
-            </div>
-          </Field>
-        </div>
-      </div>
-
+      {/* Gateways (on/off, mode, keys) moved to Settings → Payments. */}
       <SubHead>Tax</SubHead>
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="GSTIN" hint="15-character GST number (optional)">
@@ -572,7 +530,7 @@ function BillingCard({ initial }: { initial: AdminSettings["billing"] }) {
         onSave={() =>
           sv.save(() =>
             updateBillingAction({
-              enabled, provider, mode, currency, keyId, keySecret: keySecret || undefined,
+              enabled, provider, mode, currency, keyId,
               gstin, taxRate: Number(taxRate), pricesIncludeTax, companyName, companyAddress, invoicePrefix,
             }),
           )

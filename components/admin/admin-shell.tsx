@@ -69,7 +69,7 @@ const GROUPS: Group[] = [
     items: [
       { href: "/jmp-admin/plans", label: "Plans & Pricing", icon: Tag },
       { label: "Subscriptions", icon: Repeat, soon: true },
-      { label: "Orders & Payments", icon: CreditCard, soon: true },
+      { href: "/jmp-admin/orders", label: "Orders & Payments", icon: CreditCard },
       { label: "Revenue", icon: TrendingUp, soon: true },
       { label: "Coupons & Discounts", icon: Ticket, soon: true },
       { label: "Campaigns", icon: Megaphone, soon: true },
@@ -92,6 +92,7 @@ const TITLES: Record<string, string> = {
   "/jmp-admin/users": "Users",
   "/jmp-admin/tickets": "Tickets",
   "/jmp-admin/plans": "Plans & Pricing",
+  "/jmp-admin/orders": "Orders & Payments",
   "/jmp-admin/guides": "How-to guides",
   "/jmp-admin/inbound-log": "Inbound email log",
   "/jmp-admin/guides/new": "New guide",
