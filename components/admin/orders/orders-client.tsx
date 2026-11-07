@@ -21,7 +21,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/admin/ui/dropdown-menu";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/admin/ui/dialog";
+import { OrderDetailsDialog } from "@/components/admin/orders/order-details-dialog";
 import {
   GATEWAY_LABELS,
   ORDER_STATUS_LABELS,
@@ -436,55 +436,7 @@ export function OrdersClient() {
       )}
 
       {/* Always mounted; open toggles (Base UI dialog pattern used across admin). */}
-      <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Order details</DialogTitle>
-          </DialogHeader>
-          {details && (
-            <dl className="space-y-2 text-sm">
-              <Detail label="Status">
-                <Badge variant={STATUS_VARIANT[details.status]}>{ORDER_STATUS_LABELS[details.status]}</Badge>
-              </Detail>
-              {details.failureReason && <Detail label="Reason">{details.failureReason}</Detail>}
-              <Detail label="User">
-                {details.user ? (
-                  <>
-                    {details.user.name}
-                    <span className="block text-xs text-muted-foreground">{details.user.email}</span>
-                  </>
-                ) : (
-                  "Deleted user"
-                )}
-              </Detail>
-              <Detail label="Plan">
-                {details.planName} · {PERIOD_LABELS[details.period]} · {KIND_LABELS[details.kind]}
-              </Detail>
-              <Detail label="Amount">{formatPaise(details.total, details.currency)}</Detail>
-              <Detail label="Created">{formatDateTime(details.createdAt)}</Detail>
-              {details.paidAt && <Detail label="Paid">{formatDateTime(details.paidAt)}</Detail>}
-              <Detail label="Gateway">
-                {GATEWAY_LABELS[details.gateway as GatewayId] ?? details.gateway} ({details.mode})
-              </Detail>
-              <Detail label="Order ID">
-                <span className="font-mono text-xs break-all">{details.gatewayOrderId ?? "–"}</span>
-              </Detail>
-              <Detail label="Payment ID">
-                <span className="font-mono text-xs break-all">{details.gatewayPaymentId ?? "–"}</span>
-              </Detail>
-            </dl>
-          )}
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-}
-
-function Detail({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="grid grid-cols-[6.5rem_1fr] gap-2">
-      <dt className="text-muted-foreground">{label}</dt>
-      <dd className="min-w-0">{children}</dd>
+      <OrderDetailsDialog order={details} open={detailsOpen} onOpenChange={setDetailsOpen} />
     </div>
   );
 }

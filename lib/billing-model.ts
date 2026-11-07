@@ -175,12 +175,24 @@ export interface AdminOrderRow {
   planName: string;
   period: BillingPeriod;
   kind: QuoteKind;
-  /** Paise. */
+  /** Paise: price before GST, GST, and what was charged. */
+  base: number;
+  tax: number;
   total: number;
+  taxRate: number;
   currency: string;
+  /** The term this order buys (ISO); applied once paid. */
+  startsAt: string;
+  expiresAt: string;
+  /** Extra days credited for the unused value of the previous plan. */
+  creditDays: number;
   gateway: string;
   mode: "test" | "live";
   status: OrderStatus;
+  /** How the user paid (from the gateway): UPI, Card, Netbanking, Wallet… */
+  method: string | null;
+  /** Our receipt number (billing invoice prefix + sequence). */
+  receipt: string;
   gatewayOrderId: string | null;
   gatewayPaymentId: string | null;
   failureReason: string | null;

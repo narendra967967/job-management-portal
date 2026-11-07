@@ -89,11 +89,19 @@ const selectCls =
   "h-9 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
 const checkboxCls = "size-4 shrink-0 cursor-pointer rounded border-input accent-primary";
 
-export function UsersClient({ initialUsers, plans }: { initialUsers: AdminUserRow[]; plans: PlanOption[] }) {
+export function UsersClient({
+  initialUsers,
+  plans,
+  initialQuery = "",
+}: {
+  initialUsers: AdminUserRow[];
+  plans: PlanOption[];
+  initialQuery?: string;
+}) {
   const router = useRouter();
   const users = initialUsers;
 
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(initialQuery);
   const [fStatus, setFStatus] = useState("all");
   const [fPlan, setFPlan] = useState("all");
   const [fExpiry, setFExpiry] = useState("all");

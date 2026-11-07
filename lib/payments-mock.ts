@@ -128,13 +128,27 @@ export function mockOrders(): AdminOrderRow[] {
   return Array.from({ length: 40 }, (_, i) => {
     const s = shapes[(i * 7) % shapes.length];
     const createdAt = daysAgo(Math.floor(i * 1.1), (i * 5) % 24);
+    const base = Math.round((s.total * 100) / 118);
+    const end = new Date(createdAt);
+    if (s.period === "monthly") end.setMonth(end.getMonth() + 1);
+    else end.setFullYear(end.getFullYear() + 1);
+    const creditDays = s.kind === "upgrade" ? 9 : 0;
+    end.setDate(end.getDate() + creditDays);
     return {
       id: `order-${i}`,
       createdAt,
-      paidAt: s.status === "paid" ? createdAt : null,
+      paidAt: s.status === "paid" ? new Date(new Date(createdAt).getTime() + 90_000).toISOString() : null,
       user: SAMPLE_USERS[i % SAMPLE_USERS.length],
       ...s,
+      base,
+      tax: s.total - base,
+      taxRate: 18,
       currency: "INR",
+      startsAt: createdAt,
+      expiresAt: end.toISOString(),
+      creditDays,
+      method: s.status === "paid" || s.status === "failed" ? ["UPI", "Card", "Netbanking", "Wallet"][i % 4] : null,
+      receipt: `JOB-${String(1200 + i).padStart(6, "0")}`,
       gateway: "razorpay",
       mode: "test",
       gatewayOrderId: `order_SAMPLE${String(1000 + i)}`,
