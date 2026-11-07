@@ -379,6 +379,13 @@
       "when": 1793875684116,
       "tag": "0053_broadcast_recipient_lock",
       "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1794077266238,
+      "tag": "0054_payments",
+      "breakpoints": true
     }
   ]
 }

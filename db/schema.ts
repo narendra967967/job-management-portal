@@ -24,6 +24,8 @@ import {
   timestamp,
   jsonb,
   uniqueIndex,
+  primaryKey,
+  check,
   index,
   customType,
 } from "drizzle-orm/pg-core";
@@ -790,14 +792,22 @@ export const ticketReplies = pgTable(
   (t) => [index("ticket_replies_ticket_idx").on(t.ticketId, t.createdAt)],
 );
 
-/** Settings → Billing (one "app" row). Gateway secret encrypted at rest. */
+/** Settings → Billing (one "app" row): tax and invoicing. The gateway fields
+ *  (enabled, provider, mode, key_id, key_secret_ciphertext) moved to
+ *  payment_gateways in 0054 and are no longer read; they stay one release so
+ *  an automatic rollback to the previous build still works, then get dropped. */
 export const billingConfig = pgTable("billing_config", {
   id: text("id").primaryKey().default("app"),
+  /** @deprecated moved to payment_gateways (0054); drop next release. */
   enabled: boolean("enabled").notNull().default(false),
+  /** @deprecated moved to payment_gateways (0054); drop next release. */
   provider: text("provider").notNull().default("razorpay"),
+  /** @deprecated moved to payment_gateways (0054); drop next release. */
   mode: text("mode").notNull().default("test"),
   currency: text("currency").notNull().default("INR"),
+  /** @deprecated moved to payment_gateways (0054); drop next release. */
   keyId: text("key_id"),
+  /** @deprecated moved to payment_gateways (0054); drop next release. */
   keySecretCiphertext: text("key_secret_ciphertext"),
   gstin: text("gstin"),
   taxRate: integer("tax_rate").notNull().default(18),
@@ -810,6 +820,129 @@ export const billingConfig = pgTable("billing_config", {
     .defaultNow()
     .$onUpdate(() => new Date()),
 });
+
+/* ------------------------------------------------------------------ */
+/* Payments: gateways, plan orders, renewal reminders                   */
+/* Spec: memory payments-plan. Amounts are in paise (smallest unit).    */
+/* ------------------------------------------------------------------ */
+
+export const gatewayMode = pgEnum("gateway_mode", ["test", "live"]);
+export const billingPeriod = pgEnum("billing_period", ["monthly", "yearly"]);
+export const orderKind = pgEnum("order_kind", ["new", "renew", "upgrade"]);
+export const orderStatus = pgEnum("order_status", ["created", "paid", "failed", "cancelled"]);
+
+/** Admin → Settings → Payments: one row per gateway (id = "razorpay", …).
+ *  Secrets are encrypted at rest and never leave the server. */
+export const paymentGateways = pgTable("payment_gateways", {
+  id: text("id").primaryKey(),
+  enabled: boolean("enabled").notNull().default(false),
+  mode: gatewayMode("mode").notNull().default("test"),
+  keyId: text("key_id"),
+  keySecretCiphertext: text("key_secret_ciphertext"),
+  webhookSecretCiphertext: text("webhook_secret_ciphertext"),
+  // Last "Test connection" result.
+  lastTestOk: boolean("last_test_ok"),
+  lastTestAt: timestamp("last_test_at", { withTimezone: true }),
+  // Order when several gateways are offered at checkout.
+  sortOrder: integer("sort_order").notNull().default(0),
+  updatedBy: text("updated_by").references(() => user.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date()),
+});
+
+/** One plan purchase attempt. A financial record: it outlives the user and the
+ *  plan (both set null on delete, with name/email/plan snapshots), and is never
+ *  purged by data retention. */
+export const paymentOrders = pgTable(
+  "payment_orders",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    // Receipt number = receipt_prefix + number zero-padded (e.g. JOB-001201).
+    // The prefix is copied from Billing at creation, so receipts never change.
+    number: integer("number").notNull().generatedByDefaultAsIdentity(),
+    receiptPrefix: text("receipt_prefix").notNull(),
+    userId: text("user_id").references(() => user.id, { onDelete: "set null" }),
+    userName: text("user_name").notNull().default(""),
+    userEmail: text("user_email").notNull().default(""),
+    planId: uuid("plan_id").references(() => plans.id, { onDelete: "set null" }),
+    planName: text("plan_name").notNull(),
+    period: billingPeriod("period").notNull(),
+    kind: orderKind("kind").notNull(),
+    status: orderStatus("status").notNull().default("created"),
+    currency: text("currency").notNull().default("INR"),
+    // Paise: price before GST, GST, and what is charged.
+    baseAmount: integer("base_amount").notNull(),
+    taxAmount: integer("tax_amount").notNull(),
+    totalAmount: integer("total_amount").notNull(),
+    taxRate: integer("tax_rate").notNull(),
+    pricesIncludeTax: boolean("prices_include_tax").notNull(),
+    // Unused value of the previous plan, as extra days (upgrades).
+    creditDays: integer("credit_days").notNull().default(0),
+    // The term granted; set when the payment is confirmed.
+    termStartsAt: timestamp("term_starts_at", { withTimezone: true }),
+    termEndsAt: timestamp("term_ends_at", { withTimezone: true }),
+    gateway: text("gateway").notNull(),
+    mode: gatewayMode("mode").notNull(),
+    gatewayOrderId: text("gateway_order_id"),
+    gatewayPaymentId: text("gateway_payment_id"),
+    // How the user paid, from the gateway (upi, card, netbanking, wallet…).
+    method: text("method"),
+    failureReason: text("failure_reason"),
+    paidAt: timestamp("paid_at", { withTimezone: true }),
+    failedAt: timestamp("failed_at", { withTimezone: true }),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [
+    uniqueIndex("payment_orders_number_uq").on(t.number),
+    // A gateway order / payment maps to exactly one of our orders (idempotent
+    // verify + webhook).
+    uniqueIndex("payment_orders_gateway_order_uq").on(t.gateway, t.gatewayOrderId),
+    uniqueIndex("payment_orders_gateway_payment_uq").on(t.gateway, t.gatewayPaymentId),
+    index("payment_orders_created_idx").on(t.createdAt.desc()),
+    index("payment_orders_user_created_idx").on(t.userId, t.createdAt.desc()),
+    index("payment_orders_status_created_idx").on(t.status, t.createdAt.desc()),
+    // Money sanity, enforced by the database whatever the code does.
+    check("payment_orders_amounts_ck", sql`${t.baseAmount} >= 0 and ${t.taxAmount} >= 0 and ${t.totalAmount} = ${t.baseAmount} + ${t.taxAmount}`),
+    // Razorpay's minimum charge is 100 paise (₹1.00).
+    check("payment_orders_min_total_ck", sql`${t.totalAmount} >= 100`),
+    check("payment_orders_credit_days_ck", sql`${t.creditDays} >= 0`),
+  ],
+);
+
+/** Renewal reminders sent: one row per user, plan expiry and day (7 … 1 days
+ *  before). The primary key makes the daily job safe to run twice. */
+export const planRemindersSent = pgTable(
+  "plan_reminders_sent",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    // The expiry the reminder was about (a renewal moves it, starting fresh).
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    daysBefore: integer("days_before").notNull(),
+    planId: uuid("plan_id").references(() => plans.id, { onDelete: "set null" }),
+    // Plan offered as the upsell in this email, if any.
+    upsellPlanId: uuid("upsell_plan_id").references(() => plans.id, { onDelete: "set null" }),
+    sentAt: timestamp("sent_at", { withTimezone: true }).notNull().defaultNow(),
+    // "sent" or "failed" (with the error), so the job can show and retry failures.
+    status: text("status").notNull().default("sent"),
+    error: text("error"),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.expiresAt, t.daysBefore] }),
+    index("plan_reminders_sent_at_idx").on(t.sentAt.desc()),
+    check("plan_reminders_days_ck", sql`${t.daysBefore} between 1 and 7`),
+    check("plan_reminders_status_ck", sql`${t.status} in ('sent', 'failed')`),
+  ],
+);
 
 /** Settings → AI (one "app" row). Admin tools AI key + default user prompts. */
 export const appAiConfig = pgTable("app_ai_config", {
