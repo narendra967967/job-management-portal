@@ -1,7 +1,7 @@
 // Inbound email log (Operations, A5): one row per received email — metadata
 // only, never content. Admin-gated. Filters live in the URL
 // (?from=&to=&tzo=&user=&status=&q=&page=&size=) and run in the database; with
-// no dates the client fills in today (in the viewer's timezone) and fetches.
+// no dates the client fills in the last 7 days (in the viewer's timezone) and fetches.
 
 import { requireAdmin } from "@/lib/current-user";
 import { InboundLogClient, type InboundLogFilters } from "@/components/admin/inbound/inbound-log-client";
@@ -47,7 +47,7 @@ export default async function AdminInboundLogPage({
   let since = localMidnight(filters.from, tzo);
   let until = localMidnight(filters.to, tzo);
   if (since === null || until === null) {
-    // No (valid) dates yet: the client sets today's and fetches.
+    // No (valid) dates yet: the client sets the last 7 days and fetches.
     return <InboundLogClient filters={filters} rows={[]} total={0} retentionDays={retention.inboundLogDays} needsDates />;
   }
   if (since > until) [since, until] = [until, since];

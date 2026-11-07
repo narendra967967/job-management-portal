@@ -1,17 +1,29 @@
 "use client";
 
-// Inbound email log (A5). Filters — date range (default today, in the viewer's
-// timezone), user email, status, free text — are applied with Fetch and live
-// in the URL; the server page filters and paginates in the database. Shows
-// metadata only: rejected mail keeps just the sender's domain.
+// Inbound email log (A5). Filters — date range (default the last 7 days, in
+// the viewer's timezone), user email, status, free text — are applied with
+// Fetch and live in the URL; the server page filters and paginates in the
+// database. A table at every width with multi-select (CSV export) and an
+// Action menu per row. Shows metadata only: rejected mail keeps just the
+// sender's domain.
 
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, Copy, Download, Filter, Search, User } from "lucide-react";
 import { Input } from "@/components/admin/ui/input";
 import { Badge } from "@/components/admin/ui/badge";
 import { Button } from "@/components/admin/ui/button";
-import { Card } from "@/components/admin/ui/card";
+import { toast } from "@/components/admin/ui/toast";
+import { DropdownMenuItem } from "@/components/admin/ui/dropdown-menu";
+import {
+  BulkBar,
+  RowActions,
+  RowCheckbox,
+  SelectAllCheckbox,
+  TableBox,
+  lastDays,
+  useRowSelection,
+} from "@/components/admin/ui/data-table";
 import {
   INBOUND_LOG_PAGE_SIZES,
   INBOUND_STATUS_LABELS,
@@ -48,10 +60,9 @@ export interface InboundLogFilters {
   size: number;
 }
 
-/** Today as YYYY-MM-DD in the browser's timezone. */
-function localToday(): string {
-  const now = new Date();
-  return new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
+function csvCell(v: string | number | null | undefined): string {
+  const s = v == null ? "" : String(v);
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
 export function InboundLogClient({
@@ -102,11 +113,11 @@ export function InboundLogClient({
     setTo(filters.to);
   }, [filters.from, filters.to, filters.page, filters.size, filters.user, filters.status, filters.q, rows]);
 
-  // First visit: today's log.
+  // First visit: the last 7 days.
   useEffect(() => {
     if (!needsDates) return;
-    const today = localToday();
-    go({ from: today, to: today, page: 1 });
+    const range = lastDays(7);
+    go({ from: range.from, to: range.to, page: 1 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [needsDates]);
 
@@ -116,6 +127,46 @@ export function InboundLogClient({
     if (from > to) return setError("“From” must be on or before “To”.");
     setError("");
     go({ from, to, user, status, q, page: 1 });
+  }
+
+  const selection = useRowSelection(rows.map((r) => r.id));
+
+  async function copy(value: string, what: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+      toast.success(`${what} copied`);
+    } catch {
+      toast.error(`Couldn't copy the ${what.toLowerCase()}`);
+    }
+  }
+
+  function exportSelected() {
+    const header = ["Received", "User", "Email", "Site", "Sender", "Signed by", "Status", "Detail", "Leads created", "Size (bytes)"];
+    const lines = rows
+      .filter((r) => selection.isSelected(r.id))
+      .map((r) =>
+        [
+          r.receivedAt,
+          r.user?.name,
+          r.user?.email,
+          siteLabel(r.site),
+          r.fromAddress ?? `…@${r.fromDomain}`,
+          r.signingDomain,
+          INBOUND_STATUS_LABELS[r.status],
+          r.reason,
+          r.leadsCreated,
+          r.sizeBytes,
+        ]
+          .map(csvCell)
+          .join(","),
+      );
+    const blob = new Blob([[header.join(","), ...lines].join("\n")], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `inbound-email-log-${filters.from}-to-${filters.to}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   const pageCount = Math.max(1, Math.ceil(total / filters.size));
@@ -161,75 +212,89 @@ export function InboundLogClient({
         {error && <p className="col-span-2 text-xs text-destructive sm:basis-full">{error}</p>}
       </form>
 
-      {/* Wide screens: table; below xl (next to the admin sidebar): stacked rows */}
-      <Card className="hidden overflow-x-auto p-0 xl:block">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b text-left text-xs text-muted-foreground">
-              <th className="px-4 py-2.5 font-medium">Received</th>
-              <th className="px-4 py-2.5 font-medium">User</th>
-              <th className="px-4 py-2.5 font-medium">Site</th>
-              <th className="px-4 py-2.5 font-medium">Sender</th>
-              <th className="px-4 py-2.5 font-medium">Status</th>
-              <th className="px-4 py-2.5 font-medium">Detail</th>
-              <th className="px-4 py-2.5 text-right font-medium">Size</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.id} className="border-b last:border-0 hover:bg-muted/40">
-                <td className="px-4 py-2.5 whitespace-nowrap text-muted-foreground">
-                  {mounted ? formatDateTime(r.receivedAt) : ""}
-                </td>
-                <td className="px-4 py-2.5">
-                  {r.user ? (
-                    <span className="block min-w-0">
-                      <span className="block truncate">{r.user.name}</span>
-                      <span className="block truncate text-xs text-muted-foreground">{r.user.email}</span>
-                    </span>
-                  ) : (
-                    <span className="text-muted-foreground">Unknown address</span>
+      <BulkBar selection={selection}>
+        <Button variant="outline" size="sm" onClick={exportSelected}>
+          <Download className="size-4" /> Export CSV
+        </Button>
+      </BulkBar>
+
+      <TableBox minWidth={980}>
+        <thead>
+          <tr className="border-b border-border text-left text-xs text-muted-foreground">
+            <th className="w-10 px-3 py-2.5">
+              <SelectAllCheckbox selection={selection} />
+            </th>
+            <th className="px-4 py-2.5 font-medium">Received</th>
+            <th className="px-4 py-2.5 font-medium">User</th>
+            <th className="px-4 py-2.5 font-medium">Site</th>
+            <th className="px-4 py-2.5 font-medium">Sender</th>
+            <th className="px-4 py-2.5 font-medium">Status</th>
+            <th className="px-4 py-2.5 font-medium">Detail</th>
+            <th className="px-4 py-2.5 text-right font-medium">Size</th>
+            <th className="px-4 py-2.5 text-right font-medium">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.id} className={`border-b border-border last:border-0 hover:bg-muted/40 ${selection.isSelected(r.id) ? "bg-primary/5" : ""}`}>
+              <td className="px-3 py-3">
+                <RowCheckbox selection={selection} id={r.id} label={`email received ${formatDateTime(r.receivedAt)}`} />
+              </td>
+              <td className="px-4 py-2.5 whitespace-nowrap text-muted-foreground">
+                {mounted ? formatDateTime(r.receivedAt) : ""}
+              </td>
+              <td className="px-4 py-2.5">
+                {r.user ? (
+                  <span className="block min-w-0">
+                    <span className="block truncate">{r.user.name}</span>
+                    <span className="block truncate text-xs text-muted-foreground">{r.user.email}</span>
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground">Unknown address</span>
+                )}
+              </td>
+              <td className="px-4 py-2.5 whitespace-nowrap">{siteLabel(r.site)}</td>
+              <td className="px-4 py-2.5 font-mono text-[12px]">
+                <SenderText row={r} />
+              </td>
+              <td className="px-4 py-2.5">
+                <Badge variant={STATUS_VARIANT[r.status]}>{INBOUND_STATUS_LABELS[r.status]}</Badge>
+              </td>
+              <td className="px-4 py-2.5 text-xs text-muted-foreground">{r.reason}</td>
+              <td className="px-4 py-2.5 text-right text-xs tabular-nums text-muted-foreground">{formatBytes(r.sizeBytes)}</td>
+              <td className="px-4 py-2 text-right">
+                <RowActions label={`email received ${formatDateTime(r.receivedAt)}`}>
+                  {r.user && (
+                    <>
+                      <DropdownMenuItem onClick={() => router.push(`/jmp-admin/users?q=${encodeURIComponent(r.user!.email)}`)}>
+                        <User /> View user
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setUser(r.user!.email);
+                          go({ user: r.user!.email, page: 1 });
+                        }}
+                      >
+                        <Filter /> Only this user&rsquo;s emails
+                      </DropdownMenuItem>
+                    </>
                   )}
-                </td>
-                <td className="px-4 py-2.5 whitespace-nowrap">{siteLabel(r.site)}</td>
-                <td className="px-4 py-2.5 font-mono text-[12px]">
-                  <SenderText row={r} />
-                </td>
-                <td className="px-4 py-2.5">
-                  <Badge variant={STATUS_VARIANT[r.status]}>{INBOUND_STATUS_LABELS[r.status]}</Badge>
-                </td>
-                <td className="px-4 py-2.5 text-xs text-muted-foreground">{r.reason}</td>
-                <td className="px-4 py-2.5 text-right text-xs tabular-nums text-muted-foreground">{formatBytes(r.sizeBytes)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </Card>
-
-      <ul className="space-y-2 xl:hidden">
-        {rows.map((r) => (
-          <li key={r.id} className="rounded-xl border bg-card p-3 text-sm">
-            <div className="flex items-start justify-between gap-2">
-              <Badge variant={STATUS_VARIANT[r.status]}>{INBOUND_STATUS_LABELS[r.status]}</Badge>
-              <span className="text-[11px] text-muted-foreground">{mounted ? formatDateTime(r.receivedAt) : ""}</span>
-            </div>
-            <p className="mt-1.5 truncate">
-              {r.user ? r.user.name : <span className="text-muted-foreground">Unknown address</span>}
-              <span className="text-muted-foreground"> · {siteLabel(r.site)}</span>
-            </p>
-            <p className="truncate font-mono text-[12px] text-muted-foreground">
-              <SenderText row={r} />
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {r.reason} · {formatBytes(r.sizeBytes)}
-            </p>
-          </li>
-        ))}
-      </ul>
-
-      {rows.length === 0 && !needsDates && (
-        <p className="py-10 text-center text-sm text-muted-foreground">No emails match these filters.</p>
-      )}
+                  <DropdownMenuItem onClick={() => copy(r.fromAddress ?? r.fromDomain, "Sender")}>
+                    <Copy /> Copy sender
+                  </DropdownMenuItem>
+                </RowActions>
+              </td>
+            </tr>
+          ))}
+          {rows.length === 0 && !needsDates && (
+            <tr>
+              <td colSpan={9} className="px-4 py-10 text-center text-sm text-muted-foreground">
+                No emails match these filters.
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </TableBox>
 
       {total > 0 && (
         <div className="flex flex-wrap items-center gap-3 text-sm">

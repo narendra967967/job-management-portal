@@ -6,13 +6,25 @@
 // Values come from the server page; every change goes through
 // actions/admin-email-intake.ts, then refreshes.
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Pencil, Plus, Power, Search, Trash2 } from "lucide-react";
 import { Button } from "@/components/admin/ui/button";
 import { Input } from "@/components/admin/ui/input";
 import { Badge } from "@/components/admin/ui/badge";
 import { ConfirmDialog } from "@/components/admin/ui/confirm-dialog";
+import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/admin/ui/dropdown-menu";
+import {
+  BulkBar,
+  RowActions as RowMenu,
+  RowCheckbox,
+  SelectAllCheckbox,
+  TableBox,
+  TablePagination,
+  tableSelectCls,
+  usePagination,
+  useRowSelection,
+} from "@/components/admin/ui/data-table";
 import {
   Dialog,
   DialogContent,
@@ -207,9 +219,25 @@ function SendersTable({ senders, onChanged }: { senders: InboundSender[]; onChan
     setFormKey((k) => k + 1);
     setFormOpen(true);
   }
-  const [deleting, setDeleting] = useState<InboundSender | null>(null);
+  const [deleting, setDeleting] = useState<InboundSender[] | null>(null);
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
+  const [query, setQuery] = useState("");
+  const [fEnabled, setFEnabled] = useState<"all" | "enabled" | "disabled">("all");
+  const [fReader, setFReader] = useState<"all" | InboundParser>("all");
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return senders.filter(
+      (s) =>
+        (fEnabled === "all" || s.enabled === (fEnabled === "enabled")) &&
+        (fReader === "all" || s.parser === fReader) &&
+        (!q || s.match.includes(q) || s.signingDomain.includes(q)),
+    );
+  }, [senders, query, fEnabled, fReader]);
+  const selection = useRowSelection(filtered.map((s) => s.id));
+  const paging = usePagination(filtered, `${query}|${fEnabled}|${fReader}`);
+  const chosen = filtered.filter((s) => selection.isSelected(s.id));
   const enabledCount = senders.filter((s) => s.enabled).length;
 
   /** Runs one change; the server keeps at least one sender enabled. */
@@ -222,84 +250,129 @@ function SendersTable({ senders, onChanged }: { senders: InboundSender[]; onChan
     onChanged();
     return null;
   }
-  async function setEnabled(s: InboundSender, enabled: boolean) {
-    const err = await run(() => setSenderEnabledAction(s.id, enabled));
-    if (err) setError(err);
+
+  /** One change per sender; stops reporting after the first refusal. */
+  async function runEach(list: InboundSender[], fn: (s: InboundSender) => Promise<{ ok: boolean; error?: string }>) {
+    setPending(true);
+    setError("");
+    let firstError = "";
+    for (const s of list) {
+      const res = await fn(s);
+      if (!res.ok) firstError ||= res.error ?? "Couldn't save.";
+    }
+    setPending(false);
+    if (firstError) setError(firstError);
+    selection.clear();
+    onChanged();
   }
 
   return (
-    <div>
-      {/* Wide screens: table; phone/tablet/laptop (next to the admin sidebar): stacked rows */}
-      <div className="hidden overflow-hidden rounded-lg border xl:block">
-        <table className="w-full text-sm">
-          <thead className="bg-muted/40 text-left text-[11px] tracking-wide text-muted-foreground uppercase">
-            <tr>
-              <th className="px-3 py-2 font-medium">Sender</th>
-              <th className="px-3 py-2 font-medium">Signed by</th>
-              <th className="px-3 py-2 font-medium">Reader</th>
-              <th className="px-3 py-2 font-medium">Enabled</th>
-              <th className="px-3 py-2" />
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {senders.map((s) => (
-              <tr key={s.id} className={s.enabled ? "" : "opacity-60"}>
-                <td className="px-3 py-2 font-mono text-[12px] break-all">{s.match}</td>
-                <td className="px-3 py-2 font-mono text-[12px]">{s.signingDomain}</td>
-                <td className="px-3 py-2 text-xs">
-                  {s.parser === "none" ? <Badge variant="warning">No reader yet</Badge> : PARSER_LABELS[s.parser]}
-                </td>
-                <td className="px-3 py-2">
-                  <input
-                    type="checkbox"
-                    aria-label={`Enable ${s.match}`}
-                    checked={s.enabled}
-                    disabled={pending}
-                    onChange={(e) => setEnabled(s, e.target.checked)}
-                    className="size-4 cursor-pointer accent-primary"
-                  />
-                </td>
-                <td className="px-3 py-2 text-right whitespace-nowrap">
-                  <RowActions onEdit={() => openForm(s)} onDelete={() => setDeleting(s)} label={s.match} />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <ul className="space-y-2 xl:hidden">
-        {senders.map((s) => (
-          <li key={s.id} className={`rounded-lg border p-3 ${s.enabled ? "" : "opacity-60"}`}>
-            <p className="font-mono text-[12px] break-all">{s.match}</p>
-            <p className="mt-1 text-[11px] text-muted-foreground">
-              Signed by <span className="font-mono">{s.signingDomain}</span> ·{" "}
-              {s.parser === "none" ? "No reader yet" : PARSER_LABELS[s.parser]}
-            </p>
-            <div className="mt-2 flex items-center justify-between">
-              <label className="flex min-h-10 items-center gap-2 text-xs">
-                <input
-                  type="checkbox"
-                  checked={s.enabled}
-                  disabled={pending}
-                    onChange={(e) => setEnabled(s, e.target.checked)}
-                  className="size-4 accent-primary"
-                />
-                Enabled
-              </label>
-              <RowActions onEdit={() => openForm(s)} onDelete={() => setDeleting(s)} label={s.match} />
-            </div>
-          </li>
-        ))}
-      </ul>
-
-      {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
-      <div className="mt-3 flex items-center gap-3">
-        <Button variant="outline" className="min-h-9" onClick={() => openForm("new")}>
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative w-full min-w-0 sm:w-auto sm:max-w-xs sm:flex-1">
+          <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Sender or domain"
+            aria-label="Search senders"
+            className="h-9 pl-8"
+          />
+        </div>
+        <select className={tableSelectCls} value={fEnabled} onChange={(e) => setFEnabled(e.target.value as typeof fEnabled)} aria-label="Filter status">
+          <option value="all">All statuses</option>
+          <option value="enabled">Enabled</option>
+          <option value="disabled">Disabled</option>
+        </select>
+        <select className={tableSelectCls} value={fReader} onChange={(e) => setFReader(e.target.value as typeof fReader)} aria-label="Filter reader">
+          <option value="all">All readers</option>
+          {(Object.keys(PARSER_LABELS) as InboundParser[]).map((p) => (
+            <option key={p} value={p}>
+              {PARSER_LABELS[p]}
+            </option>
+          ))}
+        </select>
+        <Button variant="outline" className="ml-auto min-h-9" onClick={() => openForm("new")}>
           <Plus className="size-4" aria-hidden />
           Add sender
         </Button>
+      </div>
+
+      <BulkBar selection={selection}>
+        <Button variant="outline" size="sm" disabled={pending || !chosen.some((s) => !s.enabled)} onClick={() => runEach(chosen.filter((s) => !s.enabled), (s) => setSenderEnabledAction(s.id, true))}>
+          <Power className="size-4" /> Enable
+        </Button>
+        <Button variant="outline" size="sm" disabled={pending || !chosen.some((s) => s.enabled)} onClick={() => runEach(chosen.filter((s) => s.enabled), (s) => setSenderEnabledAction(s.id, false))}>
+          <Power className="size-4" /> Disable
+        </Button>
+        <Button variant="destructive" size="sm" disabled={pending} onClick={() => setDeleting(chosen)}>
+          <Trash2 className="size-4" /> Remove
+        </Button>
+      </BulkBar>
+
+      <TableBox minWidth={720}>
+        <thead>
+          <tr className="border-b border-border text-left text-xs text-muted-foreground">
+            <th className="w-10 px-3 py-2.5">
+              <SelectAllCheckbox selection={selection} />
+            </th>
+            <th className="px-3 py-2.5 font-medium">Sender</th>
+            <th className="px-3 py-2.5 font-medium">Signed by</th>
+            <th className="px-3 py-2.5 font-medium">Reader</th>
+            <th className="px-3 py-2.5 font-medium">Status</th>
+            <th className="w-20 px-3 py-2.5 text-right font-medium">Action</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-border">
+          {paging.paged.map((s) => (
+            <tr key={s.id} className={selection.isSelected(s.id) ? "bg-primary/5" : "hover:bg-muted/40"}>
+              <td className="px-3 py-3">
+                <RowCheckbox selection={selection} id={s.id} label={s.match} />
+              </td>
+              <td className="px-3 py-2.5 font-mono text-[12px] break-all">{s.match}</td>
+              <td className="px-3 py-2.5 font-mono text-[12px]">{s.signingDomain}</td>
+              <td className="px-3 py-2.5 text-xs">
+                {s.parser === "none" ? <Badge variant="warning">No reader yet</Badge> : PARSER_LABELS[s.parser]}
+              </td>
+              <td className="px-3 py-2.5">
+                <Badge variant={s.enabled ? "success" : "neutral"}>{s.enabled ? "Enabled" : "Disabled"}</Badge>
+              </td>
+              <td className="px-3 py-2 text-right">
+                <RowMenu label={s.match}>
+                  <DropdownMenuItem onClick={() => openForm(s)}>
+                    <Pencil /> Edit
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={async () => {
+                      const err = await run(() => setSenderEnabledAction(s.id, !s.enabled));
+                      if (err) setError(err);
+                    }}
+                  >
+                    <Power /> {s.enabled ? "Disable" : "Enable"}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem destructive onClick={() => setDeleting([s])}>
+                    <Trash2 /> Remove
+                  </DropdownMenuItem>
+                </RowMenu>
+              </td>
+            </tr>
+          ))}
+          {filtered.length === 0 && (
+            <tr>
+              <td colSpan={6} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                {senders.length === 0 ? "No senders yet." : "No senders match these filters."}
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </TableBox>
+
+      {error && <p className="text-xs text-destructive">{error}</p>}
+      <div className="flex flex-wrap items-center gap-3">
         <span className="text-[11px] text-muted-foreground">{enabledCount} enabled</span>
       </div>
+      <TablePagination paging={paging} />
 
       {/* Always mounted (open toggles) — mounting it inside the opening click
           would count that click as an outside press and close it at once. */}
@@ -323,39 +396,17 @@ function SendersTable({ senders, onChanged }: { senders: InboundSender[]; onChan
       <ConfirmDialog
         open={!!deleting}
         onOpenChange={(o) => !o && setDeleting(null)}
-        title={`Remove ${deleting?.match ?? ""}?`}
-        description="Emails from this sender will be rejected from now on. Leads already created stay."
-        confirmLabel="Remove sender"
+        title={deleting?.length === 1 ? `Remove ${deleting[0].match}?` : `Remove ${deleting?.length ?? 0} senders?`}
+        description="Emails from these senders will be rejected from now on. Leads already created stay."
+        confirmLabel="Remove"
         destructive
         onConfirm={async () => {
-          const d = deleting;
+          const list = deleting ?? [];
           setDeleting(null);
-          if (!d) return;
-          const err = await run(() => deleteSenderAction(d.id));
-          if (err) setError(err);
+          if (list.length) await runEach(list, (d) => deleteSenderAction(d.id));
         }}
       />
     </div>
-  );
-}
-
-function RowActions({ onEdit, onDelete, label }: { onEdit: () => void; onDelete: () => void; label: string }) {
-  return (
-    <span className="inline-flex gap-1">
-      <Button variant="ghost" size="icon" aria-label={`Edit ${label}`} title="Edit" onClick={onEdit}>
-        <Pencil className="size-4" aria-hidden />
-      </Button>
-      <Button
-        variant="ghost"
-        size="icon"
-        aria-label={`Remove ${label}`}
-        title="Remove"
-        onClick={onDelete}
-        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-      >
-        <Trash2 className="size-4" aria-hidden />
-      </Button>
-    </span>
   );
 }
 
