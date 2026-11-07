@@ -13,7 +13,7 @@ To stop floods, a user can open at most 5 tickets an hour and have at most 8 ope
 
 ## Answering
 
-Tickets arrive in admin **Tickets**, with counts by status and a table you can filter and act on in bulk. Each ticket has a number like **TKT-0042**, which both sides see.
+Tickets arrive in admin **Customers → Support tickets**, with counts by status and a table you can filter and act on in bulk. Each ticket has a number like **TKT-0042**, which both sides see.
 
 Conversations are live in both directions. A reply appears in the other person's open chat without a reload, with sent, delivered and read ticks. An admin reply also creates a notification for the user, but doesn't email them.
 

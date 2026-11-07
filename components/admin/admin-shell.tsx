@@ -10,6 +10,8 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
+  GraduationCap,
+  Sparkles,
   Users,
   BookOpen,
   MailOpen,
@@ -53,34 +55,43 @@ interface Admin {
   email: string;
 }
 
+// Dashboard stands on its own at the top; everything else sits in a group.
+// Labels are sentence case, like the user-side menu.
+const DASHBOARD: Item = { href: "/jmp-admin/dashboard", label: "Dashboard", icon: LayoutDashboard };
+
 const GROUPS: Group[] = [
-  { label: "Overview", items: [{ href: "/jmp-admin/dashboard", label: "Dashboard", icon: LayoutDashboard }] },
   {
-    label: "People and Tickets",
+    label: "Customers",
     items: [
       { href: "/jmp-admin/users", label: "Users", icon: Users },
-      { href: "/jmp-admin/tickets", label: "Tickets", icon: LifeBuoy },
-      { href: "/jmp-admin/broadcasts", label: "Broadcasts", icon: Megaphone },
+      { href: "/jmp-admin/tickets", label: "Support tickets", icon: LifeBuoy },
     ],
   },
   {
-    // One parent for everything money-related: selling, orders, revenue, and
-    // the marketing levers that drive it. All post-payment-integration (soon).
-    label: "Sales & Revenue",
+    // Selling and the money it brings in.
+    label: "Sales",
     items: [
-      { href: "/jmp-admin/plans", label: "Plans & Pricing", icon: Tag },
+      { href: "/jmp-admin/plans", label: "Plans & pricing", icon: Tag },
+      { href: "/jmp-admin/orders", label: "Orders & payments", icon: CreditCard },
       { label: "Subscriptions", icon: Repeat, soon: true },
-      { href: "/jmp-admin/orders", label: "Orders & Payments", icon: CreditCard },
       { label: "Revenue", icon: TrendingUp, soon: true },
-      { label: "Coupons & Discounts", icon: Ticket, soon: true },
-      { label: "Campaigns", icon: Megaphone, soon: true },
+      { label: "Coupons & discounts", icon: Ticket, soon: true },
+    ],
+  },
+  {
+    // Everything sent or shown to users.
+    label: "Engagement",
+    items: [
+      { href: "/jmp-admin/broadcasts", label: "Broadcasts", icon: Megaphone },
+      { href: "/jmp-admin/guides", label: "How-to guides", icon: GraduationCap },
+      { label: "Campaigns", icon: Sparkles, soon: true },
       { label: "Referrals", icon: Gift, soon: true },
     ],
   },
   {
-    label: "Operations",
+    // Watching the system run.
+    label: "Monitoring",
     items: [
-      { href: "/jmp-admin/guides", label: "How-to guides", icon: BookOpen },
       { href: "/jmp-admin/inbound-log", label: "Inbound email log", icon: MailOpen },
       { label: "Gmail health", icon: Inbox, soon: true },
       { label: "Activity log", icon: ScrollText, soon: true },
@@ -91,9 +102,9 @@ const GROUPS: Group[] = [
 const TITLES: Record<string, string> = {
   "/jmp-admin/dashboard": "Dashboard",
   "/jmp-admin/users": "Users",
-  "/jmp-admin/tickets": "Tickets",
-  "/jmp-admin/plans": "Plans & Pricing",
-  "/jmp-admin/orders": "Orders & Payments",
+  "/jmp-admin/tickets": "Support tickets",
+  "/jmp-admin/plans": "Plans & pricing",
+  "/jmp-admin/orders": "Orders & payments",
   "/jmp-admin/guides": "How-to guides",
   "/jmp-admin/inbound-log": "Inbound email log",
   "/jmp-admin/guides/new": "New guide",
@@ -258,6 +269,7 @@ export function AdminShell({
     setOpenGroup(activeGroup);
   }, [activeGroup]);
   const mobileLinks: Item[] = [
+    DASHBOARD,
     ...GROUPS.flatMap((g) => g.items).filter((i) => i.href && !i.soon),
     { href: KB_HREF, label: "Knowledge base", icon: BookOpen },
     { href: SETTINGS_HREF, label: "Settings", icon: Settings },
@@ -279,6 +291,7 @@ export function AdminShell({
         <div className="flex flex-col gap-5">
           <Brand />
           <div className="flex flex-col gap-3">
+            <ItemRow item={DASHBOARD} pathname={pathname} />
             {GROUPS.map((g) => (
               <NavGroup
                 key={g.label}

@@ -1,11 +1,11 @@
 ---
 title: How plans work and what each plan switch controls
 category: Plans and billing
-summary: Plans are set up in admin Plans & Pricing. Each has prices, limits and feature switches. One free plan is the default for new sign-ups, and a feature that's off shows as locked to the user.
+summary: Plans are set up in admin Sales → Plans & pricing. Each has prices, limits and feature switches. One free plan is the default for new sign-ups, and a feature that's off shows as locked to the user.
 keywords: plans, pricing, free plan, default plan, features, plan switches, locked, upgrade, pricing page, paid plan
 ---
 
-Plans live in admin **Plans & Pricing**. Each plan has a name, an internal code (made from the name and fixed once saved), a description, a header color, prices, limits and feature switches.
+Plans live in admin **Sales → Plans & pricing**. Each plan has a name, an internal code (made from the name and fixed once saved), a description, a header color, prices, limits and feature switches.
 
 ## Free and paid plans
 
