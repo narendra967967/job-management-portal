@@ -33,6 +33,7 @@ import { adminSignOut } from "@/lib/auth-admin-client";
 import { AdminNotesButton } from "@/components/admin/admin-notes-button";
 import { AdminBackdrop } from "@/components/admin/admin-backdrop";
 import { Toaster } from "@/components/admin/ui/toast";
+import { FreshPage, freshNavigation } from "@/lib/nav-reset";
 
 interface Item {
   href?: string;
@@ -137,6 +138,7 @@ function ItemRow({ item, pathname }: { item: Item; pathname: string }) {
   return (
     <Link
       href={item.href}
+      onClick={() => freshNavigation(item.href!)}
       className={cn(
         "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
         active ? "bg-slate-800 text-white" : "text-slate-300 hover:bg-slate-800/60 hover:text-white",
@@ -188,6 +190,7 @@ function UserFooter({ pathname, admin, onLogout }: { pathname: string; admin: Ad
     <div className="mt-4 space-y-1 border-t border-slate-800 pt-3">
       <Link
         href={KB_HREF}
+        onClick={() => freshNavigation(KB_HREF)}
         className={cn(
           "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
           kbActive ? "bg-slate-800 text-white" : "text-slate-300 hover:bg-slate-800/60 hover:text-white",
@@ -198,6 +201,7 @@ function UserFooter({ pathname, admin, onLogout }: { pathname: string; admin: Ad
       </Link>
       <Link
         href={SETTINGS_HREF}
+        onClick={() => freshNavigation(SETTINGS_HREF)}
         className={cn(
           "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
           settingsActive ? "bg-slate-800 text-white" : "text-slate-300 hover:bg-slate-800/60 hover:text-white",
@@ -309,6 +313,7 @@ export function AdminShell({
             <Link
               key={it.href}
               href={it.href!}
+              onClick={() => freshNavigation(it.href!)}
               className={cn(
                 "flex shrink-0 items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium",
                 active ? "bg-slate-800 text-white" : "text-slate-300",
@@ -327,7 +332,9 @@ export function AdminShell({
           <h1 className="text-base font-semibold md:text-lg">{title}</h1>
           <AdminNotesButton />
         </header>
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">{children}</main>
+        <main className="flex-1 overflow-y-auto p-4 md:p-6">
+          <FreshPage>{children}</FreshPage>
+        </main>
       </div>
       <Toaster />
     </div>

@@ -35,6 +35,7 @@ import { Suspense } from "react";
 import { OnboardingTour } from "@/components/onboarding/onboarding-tour";
 import { tourDue } from "@/lib/tour";
 import { NotLimited } from "@/components/billing/not-limited";
+import { FreshPage } from "@/lib/nav-reset";
 
 // Per-user, session-gated routes — never statically prerendered (no DB at build).
 export const dynamic = "force-dynamic";
@@ -117,7 +118,7 @@ export default async function DashboardLayout({
         )}
 
         <main className="flex-1 overflow-y-auto px-4 pt-4 pb-6 md:px-6 md:pt-6 md:pb-8">
-          {children}
+          <FreshPage>{children}</FreshPage>
         </main>
 
         {/* Mobile bottom nav — a flex child pinned below <main>, not fixed. */}

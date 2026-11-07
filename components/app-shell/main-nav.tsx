@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { useLimitedMode } from "@/lib/access-mode";
+import { freshNavigation } from "@/lib/nav-reset";
 
 function initials(name: string) {
   return name
@@ -104,6 +105,7 @@ function NavLink({
   return (
     <Link
       href={href}
+      onClick={() => freshNavigation(href)}
       data-tour={`nav${href.replace(/\//g, "-")}`}
       className={cn(
         "relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
@@ -124,6 +126,7 @@ function LockedNavLink({ label, icon: Icon }: NavItem) {
   return (
     <Link
       href="/upgrade"
+      onClick={() => freshNavigation("/upgrade")}
       aria-label={`${label} (locked, upgrade your plan to unlock)`}
       className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground/60 transition-colors hover:bg-sidebar-accent"
     >
@@ -140,6 +143,7 @@ function UpgradePlanLink({ pathname }: { pathname: string }) {
   return (
     <Link
       href="/upgrade"
+      onClick={() => freshNavigation("/upgrade")}
       className={cn(
         "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors",
         active
@@ -255,6 +259,7 @@ export function SidebarFooter() {
       <SupportNavButton className="mb-1" />
       <Link
         href="/guides"
+        onClick={() => freshNavigation("/guides")}
         className={cn(
           "relative mb-1 flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
           guidesActive
@@ -269,6 +274,7 @@ export function SidebarFooter() {
       {!limited && (
       <Link
         href="/leads?tour=1"
+        onClick={() => freshNavigation("/leads?tour=1")}
         className="relative mb-1 flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground"
       >
         <Compass className="size-5 shrink-0" aria-hidden />
@@ -278,6 +284,7 @@ export function SidebarFooter() {
       </div>
       <Link
         href="/settings"
+        onClick={() => freshNavigation("/settings")}
         data-tour="nav-settings"
         className={cn(
           "relative mb-1 flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
@@ -444,7 +451,7 @@ export function BottomNav() {
     const tab = "flex min-h-14 flex-col items-center justify-center gap-1 px-0.5 text-[10px] font-medium whitespace-nowrap transition-colors";
     return (
       <nav className="grid shrink-0 grid-cols-3 border-t bg-card pb-[env(safe-area-inset-bottom)] md:hidden">
-        <Link href="/upgrade" className={cn(tab, isActive(pathname, "/upgrade") ? "text-primary" : "text-muted-foreground")}>
+        <Link href="/upgrade" onClick={() => freshNavigation("/upgrade")} className={cn(tab, isActive(pathname, "/upgrade") ? "text-primary" : "text-muted-foreground")}>
           <Sparkles className="size-5 shrink-0" aria-hidden />
           Upgrade Plan
         </Link>
@@ -452,7 +459,7 @@ export function BottomNav() {
           <LifeBuoy className="size-5 shrink-0" aria-hidden />
           Help
         </button>
-        <Link href="/settings" className={cn(tab, isActive(pathname, "/settings") ? "text-primary" : "text-muted-foreground")}>
+        <Link href="/settings" onClick={() => freshNavigation("/settings")} className={cn(tab, isActive(pathname, "/settings") ? "text-primary" : "text-muted-foreground")}>
           <Settings className="size-5 shrink-0" aria-hidden />
           Settings
         </Link>
@@ -467,6 +474,7 @@ export function BottomNav() {
           <Link
             key={href}
             href={href}
+            onClick={() => freshNavigation(href)}
             className={cn(
               "flex min-h-14 flex-col items-center justify-center gap-1 px-0.5 text-[10px] font-medium whitespace-nowrap transition-colors",
               active ? "text-primary" : "text-muted-foreground",
