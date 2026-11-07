@@ -124,9 +124,10 @@ export function mockOrders(): AdminOrderRow[] {
     { planName: "Premium", period: "yearly", kind: "new", total: 588_882, status: "cancelled", failureReason: "Closed the payment window" },
     { planName: "Premium", period: "monthly", kind: "new", total: 58_882, status: "created", failureReason: null },
   ];
-  return Array.from({ length: 14 }, (_, i) => {
-    const s = shapes[i % shapes.length];
-    const createdAt = daysAgo(i * 2, i);
+  // ~40 orders over the last 45 days, so the 7-day default and date filters show something.
+  return Array.from({ length: 40 }, (_, i) => {
+    const s = shapes[(i * 7) % shapes.length];
+    const createdAt = daysAgo(Math.floor(i * 1.1), (i * 5) % 24);
     return {
       id: `order-${i}`,
       createdAt,
