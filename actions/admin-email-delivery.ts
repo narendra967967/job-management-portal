@@ -15,42 +15,15 @@ import { getEmailDelivery, getSesCredentials, providersReady } from "@/lib/email
 import { getSesAccount, sesErrorMessage } from "@/lib/ses";
 import { sendAppEmail } from "@/lib/email";
 import { getAppName } from "@/lib/branding";
-import {
-  PROVIDER_LABELS,
-  accessKeyIdError,
-  emailError,
-  regionError,
-  secretKeyError,
-  type SesAccountInfo,
-} from "@/lib/email-delivery-model";
+import { PROVIDER_LABELS, emailError, sesInputSchema, type SesAccountInfo } from "@/lib/email-delivery-model";
 
 type Result = { ok: true } | { ok: false; error: string };
 
 const revalidate = () => revalidatePath("/jmp-admin/settings");
 
-/** Turns a model check ("" = fine) into a Zod refinement. */
-const checked = (fn: (v: string) => string, max: number) =>
-  z
-    .string()
-    .trim()
-    .max(max)
-    .superRefine((v, ctx) => {
-      const msg = fn(v);
-      if (msg) ctx.addIssue({ code: "custom", message: msg });
-    });
-
-const sesSchema = z.object({
-  region: checked(regionError, 30).refine(Boolean, "Enter the region."),
-  accessKeyId: checked(accessKeyIdError, 128).refine(Boolean, "Enter the access key ID."),
-  secretAccessKey: checked(secretKeyError, 128),
-  fromName: z.string().trim().max(100, "Keep the from name under 100 characters."),
-  fromEmail: checked(emailError, 254).refine(Boolean, "Enter the from email."),
-  replyTo: checked(emailError, 254),
-});
-
 export async function saveSesAction(input: unknown): Promise<Result> {
   const adminId = await requireAdmin();
-  const p = sesSchema.safeParse(input);
+  const p = sesInputSchema.safeParse(input);
   if (!p.success) return { ok: false, error: p.error.issues[0]?.message ?? "Check the details." };
   const v = p.data;
   const current = await getEmailDelivery();

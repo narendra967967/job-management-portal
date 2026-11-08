@@ -3,6 +3,8 @@
 // admin screen and the server. Every outbound email goes through lib/mailer.ts,
 // which reads the chosen service. Spec: memory amazon-ses.
 
+import { z } from "zod";
+
 export type EmailProvider = "smtp" | "ses";
 
 export const PROVIDER_LABELS: Record<EmailProvider, string> = {
@@ -100,3 +102,24 @@ export function sesMissing(s: Pick<SesSettings, "region" | "accessKeyId" | "hasS
 /** SMTP can send when it's switched on with a server and a from address. */
 export const smtpReady = (s: { enabled: boolean; host: string; fromEmail: string }) =>
   s.enabled && !!s.host.trim() && !!s.fromEmail.trim();
+
+/** Turns a model check ("" = fine) into a Zod refinement. */
+const checked = (fn: (v: string) => string, max: number) =>
+  z
+    .string()
+    .trim()
+    .max(max)
+    .superRefine((v, ctx) => {
+      const msg = fn(v);
+      if (msg) ctx.addIssue({ code: "custom", message: msg });
+    });
+
+/** The Amazon SES details as the server accepts them (Save on the SES tab). */
+export const sesInputSchema = z.object({
+  region: checked(regionError, 30).refine(Boolean, "Enter the region."),
+  accessKeyId: checked(accessKeyIdError, 128).refine(Boolean, "Enter the access key ID."),
+  secretAccessKey: checked(secretKeyError, 128),
+  fromName: z.string().trim().max(100, "Keep the from name under 100 characters."),
+  fromEmail: checked(emailError, 254).refine(Boolean, "Enter the from email."),
+  replyTo: checked(emailError, 254),
+});

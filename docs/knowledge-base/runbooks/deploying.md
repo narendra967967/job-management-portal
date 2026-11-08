@@ -43,6 +43,14 @@ node --env-file=.env.local --require ./scripts/security/server-only-stub.cjs --i
 
 It fails if an email can't be filled in, if saving would let a broken placeholder through, if unsafe HTML survives cleaning, or if any code sends email without going through a template (broadcasts and the two test emails in Settings → Email delivery are the only ones allowed to). It also saves wording for one email for a moment to prove the fallback works, then puts back exactly what was there. Nothing is ever sent.
 
+Changes to how email is sent (the mailer, SMTP or Amazon SES) have a second check:
+
+```bash
+node --env-file=.env.local --require ./scripts/security/server-only-stub.cjs --import tsx scripts/security/email-delivery-checks.mts
+```
+
+It never contacts AWS. It runs its own stand-in for the SES API and confirms that the chosen service is the one used, that requests are signed and never carry the secret key, that the admin screen never receives it, that unsubscribe headers survive, that AWS errors come out in plain words, and that an incomplete SES setup fails rather than quietly using SMTP. Its test SES details are AWS's published example key, saved for a moment and then removed, leaving the table exactly as it was.
+
 ## Promote, don't rebuild
 
 To release what preprod tested, fast-forward `prod` to it with `git merge --ff-only preprod`. The commit is the same, so the exact image that ran on preprod goes live without being rebuilt.
