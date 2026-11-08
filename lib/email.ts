@@ -34,6 +34,8 @@ export interface AppEmailOptions {
   footerNote?: string;
   /** Explicit plain-text body; auto-derived from the above when omitted. */
   text?: string;
+  /** Extra headers, e.g. List-Unsubscribe on promotional email. */
+  headers?: Record<string, string>;
 }
 
 function esc(s: string): string {
@@ -128,5 +130,5 @@ export async function sendAppEmail(opts: AppEmailOptions): Promise<void> {
     return;
   }
   const { html, text } = await renderAppEmail(opts);
-  await sendMail({ to: opts.to, subject: opts.subject, html, text });
+  await sendMail({ to: opts.to, subject: opts.subject, html, text, headers: opts.headers });
 }

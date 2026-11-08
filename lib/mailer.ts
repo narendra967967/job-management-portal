@@ -18,6 +18,8 @@ export interface MailInput {
   subject: string;
   html: string;
   text?: string;
+  /** Extra headers, e.g. List-Unsubscribe on promotional email. */
+  headers?: Record<string, string>;
 }
 
 interface ResolvedSmtp {
@@ -101,5 +103,6 @@ export async function sendMail(input: MailInput): Promise<void> {
     subject: input.subject,
     html: input.html,
     text: input.text,
+    headers: input.headers,
   });
 }

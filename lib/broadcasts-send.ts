@@ -19,6 +19,7 @@ import { broadcastRecipients, broadcasts } from "@/db/schema";
 import { getAppBaseUrl, getAppName } from "@/lib/branding";
 import { sendAppEmail, SMTP_NOT_CONFIGURED } from "@/lib/email";
 import { broadcastExcerpt, sendsEmail, sendsInApp } from "@/lib/broadcasts-model";
+import { unsubscribeHeaders, unsubscribePageUrl } from "@/lib/unsubscribe";
 
 const MAX_ATTEMPTS = 3;
 /** A claimed email is free again after this; also the wait before a retry. */
@@ -120,19 +121,19 @@ async function startDue(): Promise<number> {
 }
 
 /** Emails a broadcast's message: images and links made absolute, videos as links. */
-function emailBody(html: string, promotional: boolean): string {
+function emailBody(html: string, unsubscribeUrl: string | null): string {
   const base = getAppBaseUrl();
   let body = html
     .replace(/\s(src|href)="\/(?!\/)/g, ` $1="${base}/`)
     .replace(/<iframe\b[^>]*\bsrc="([^"]+)"[^>]*>\s*(?:<\/iframe>)?/gi, '<p><a href="$1">Watch the video</a></p>')
     .replace(/<video\b[^>]*\bsrc="([^"]+)"[^>]*>[\s\S]*?<\/video>/gi, '<p><a href="$1">Watch the video</a></p>');
-  if (promotional) {
-    body += `<p style="margin-top:24px;font-size:12px;color:#6b7280">Rather not get emails like this? <a href="${base}/settings?tab=notifications">Turn off promotional messages</a></p>`;
+  if (unsubscribeUrl) {
+    body += `<p style="margin-top:24px;font-size:12px;color:#6b7280">Rather not get emails like this? <a href="${unsubscribeUrl}">Unsubscribe from promotional messages</a>. It takes one click, no sign-in.</p>`;
   }
   return body;
 }
 
-type Claimed = { id: string; broadcast_id: string; email: string; attempts: number };
+type Claimed = { id: string; broadcast_id: string; user_id: string; email: string; attempts: number };
 
 async function claimNext(): Promise<Claimed | null> {
   const r = await db.execute(sql`
@@ -146,7 +147,7 @@ async function claimNext(): Promise<Claimed | null> {
       for update of r skip locked
       limit 1
     )
-    returning id, broadcast_id, email, attempts
+    returning id, broadcast_id, user_id, email, attempts
   `);
   return (r as unknown as { rows: Claimed[] }).rows[0] ?? null;
 }
@@ -211,7 +212,9 @@ export async function runBroadcasts(): Promise<BroadcastRunResult> {
           to: job.email,
           subject: b.title,
           heading: b.title,
-          bodyHtml: emailBody(b.html, b.promo),
+          bodyHtml: emailBody(b.html, b.promo ? unsubscribePageUrl(job.user_id) : null),
+          // Promotional only: mail apps show their own one-click Unsubscribe button.
+          headers: b.promo ? unsubscribeHeaders(job.user_id) : undefined,
           footerNote: b.promo
             ? `You're getting this because you have a ${appName} account.`
             : `This is a service message about your ${appName} account, so it can't be turned off.`,
