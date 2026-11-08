@@ -61,6 +61,9 @@ export interface AdminSettings {
     keyId: string;
     hasSecret: boolean;
     gstin: string;
+    gstRegistered: boolean | null;
+    pan: string;
+    sacCode: string;
     taxRate: number;
     pricesIncludeTax: boolean;
     companyName: string;
@@ -162,6 +165,9 @@ export async function loadAdminSettings(adminId: string): Promise<AdminSettings>
       keyId: b?.keyId ?? "",
       hasSecret: !!b?.keySecretCiphertext,
       gstin: b?.gstin ?? "",
+      gstRegistered: b?.gstRegistered ?? null,
+      pan: b?.pan ?? "",
+      sacCode: b?.sacCode ?? "",
       taxRate: b?.taxRate ?? 18,
       pricesIncludeTax: b?.pricesIncludeTax ?? false,
       companyName: b?.companyName ?? "",

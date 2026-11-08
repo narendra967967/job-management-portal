@@ -112,7 +112,9 @@ export function OrderDetailsDialog({
               </div>
               <div className="w-full text-left sm:w-auto sm:text-right">
                 <p className="text-2xl font-bold tabular-nums">{formatPaise(o.total, o.currency)}</p>
-                <p className="text-xs text-muted-foreground">incl. {formatPaise(o.tax, o.currency)} GST</p>
+                <p className="text-xs text-muted-foreground">
+                  {o.tax > 0 ? `incl. ${formatPaise(o.tax, o.currency)} GST` : "No GST charged"}
+                </p>
               </div>
             </div>
 
@@ -156,7 +158,9 @@ export function OrderDetailsDialog({
 
                 <Section icon={CreditCard} title="Payment">
                   <Row label="Price">{formatPaise(o.base, o.currency)}</Row>
-                  <Row label={`GST (${o.taxRate}%)`}>{formatPaise(o.tax, o.currency)}</Row>
+                  <Row label={o.tax > 0 ? `GST (${o.taxRate}%)` : "GST"}>
+                    {o.tax > 0 ? formatPaise(o.tax, o.currency) : "Not charged (not GST registered)"}
+                  </Row>
                   <Row label="Total">
                     <span className="font-semibold">{formatPaise(o.total, o.currency)}</span>
                   </Row>

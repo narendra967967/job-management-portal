@@ -52,6 +52,8 @@ import { EmailIntakeCard } from "@/components/admin/settings/email-intake-card";
 import { RetentionCard } from "@/components/admin/settings/retention-card";
 import { CaptchaCard } from "@/components/admin/settings/captcha-card";
 import { PaymentsCard } from "@/components/admin/settings/payments-card";
+import { Badge } from "@/components/admin/ui/badge";
+import { billingMissing, isValidGstin, isValidPan, isValidSac } from "@/lib/billing-model";
 
 interface SettingsSection {
   id: string;
@@ -65,7 +67,12 @@ const SECTION = {
   password: { id: "password", label: "Password", icon: Lock, render: () => <PasswordCard /> },
   general: { id: "general", label: "General", icon: Cog, render: (i: AdminSettings) => <GeneralCard initial={i.general} branding={i.branding} /> },
   billing: { id: "billing", label: "Billing", icon: CreditCard, render: (i: AdminSettings) => <BillingCard initial={i.billing} /> },
-  payments: { id: "payments", label: "Payments", icon: Wallet, render: () => <PaymentsCard /> },
+  payments: {
+    id: "payments",
+    label: "Payments",
+    icon: Wallet,
+    render: (i: AdminSettings) => <PaymentsCard billingMissing={billingMissing({ ...i.billing, taxRate: i.billing.taxRate })} />,
+  },
   email: { id: "email", label: "Email / SMTP", icon: Mail, render: (i: AdminSettings) => <EmailCard initial={i.smtp} /> },
   intake: { id: "intake", label: "Email intake", icon: Inbox, render: (i: AdminSettings) => <EmailIntakeCard initial={i.intake} /> },
   ai: { id: "ai", label: "AI", icon: Sparkles, render: (i: AdminSettings) => <AiCard initial={i.ai} /> },
@@ -481,47 +488,147 @@ function BrandingAsset({
 /* ---------------- Application: Billing ---------------- */
 
 function BillingCard({ initial }: { initial: AdminSettings["billing"] }) {
-  // Gateway fields now live in Settings → Payments; passed through unchanged
-  // until Phase 2 moves them to payment_gateways.
+  // Old gateway fields (now in Settings → Payments) pass through unchanged
+  // until the deprecated billing_config columns are dropped.
   const { enabled, provider, mode, currency, keyId } = initial;
-  const [gstin, setGstin] = useState(initial.gstin);
-  const [taxRate, setTaxRate] = useState(String(initial.taxRate));
-  const [pricesIncludeTax, setPricesIncludeTax] = useState(initial.pricesIncludeTax);
+  const [gstRegistered, setGstRegistered] = useState<boolean | null>(initial.gstRegistered);
   const [companyName, setCompanyName] = useState(initial.companyName);
   const [companyAddress, setCompanyAddress] = useState(initial.companyAddress);
+  const [pan, setPan] = useState(initial.pan);
+  const [gstin, setGstin] = useState(initial.gstin);
+  const [sacCode, setSacCode] = useState(initial.sacCode);
+  const [taxRate, setTaxRate] = useState(String(initial.taxRate));
+  const [pricesIncludeTax, setPricesIncludeTax] = useState(initial.pricesIncludeTax);
   const [invoicePrefix, setInvoicePrefix] = useState(initial.invoicePrefix);
   const sv = useSaver();
+
+  const profile = {
+    gstRegistered,
+    companyName,
+    companyAddress,
+    pan,
+    gstin,
+    sacCode,
+    taxRate: Number(taxRate),
+    pricesIncludeTax,
+    invoicePrefix,
+  };
+  const missing = billingMissing(profile);
+  const ready = missing.length === 0;
+  // Inline format checks (only once something is typed).
+  const panError = pan.trim() && !isValidPan(pan) ? "5 letters, 4 digits, 1 letter (e.g. ABCDE1234F)." : "";
+  const gstinError = gstin.trim() && !isValidGstin(gstin) ? "Not a valid GSTIN. Check all 15 characters." : "";
+  const sacError = sacCode.trim() && !isValidSac(sacCode) ? "Six digits starting with 99." : "";
+
+  const choice = (value: boolean, label: string) => (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={gstRegistered === value}
+      onClick={() => setGstRegistered(value)}
+      className={cn(
+        "min-h-10 rounded-lg px-4 text-sm font-medium transition-colors",
+        gstRegistered === value ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+      )}
+    >
+      {label}
+    </button>
+  );
+
   return (
     <section className="rounded-2xl border bg-card p-4 md:p-5">
-      <h2 className="text-sm font-medium">Billing</h2>
-      {/* Gateways (on/off, mode, keys) moved to Settings → Payments. */}
-      <SubHead>Tax</SubHead>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="GSTIN" hint="15-character GST number (optional)">
-          <Input value={gstin} onChange={(e) => setGstin(e.target.value.toUpperCase())} placeholder="22AAAAA0000A1Z5" className="font-mono" />
-        </Field>
-        <Field label="Tax rate (%)" hint="GST percentage applied to plans">
-          <Input type="number" min={0} max={100} value={taxRate} onChange={(e) => setTaxRate(e.target.value)} />
-        </Field>
+      <div className="flex flex-wrap items-center gap-2">
+        <h2 className="text-sm font-medium">Billing</h2>
+        <Badge variant={ready ? "success" : "warning"}>{ready ? "Ready" : "Incomplete"}</Badge>
       </div>
-      <div className="mt-3">
-        <Toggle checked={pricesIncludeTax} onChange={setPricesIncludeTax} label="Plan prices include tax" hint="Off = tax is added on top at checkout" />
+      {!ready && (
+        <p className="mt-2 rounded-lg bg-status-shortlisted/50 px-3 py-2 text-xs text-status-shortlisted-foreground">
+          Online payment stays off until this is complete. Users request plans through support meanwhile. Still
+          needed: {missing.join(", ")}.
+        </p>
+      )}
+
+      <SubHead>GST registered</SubHead>
+      <div role="radiogroup" aria-label="GST registered" className="inline-flex rounded-xl bg-muted/70 p-1">
+        {choice(true, "Yes")}
+        {choice(false, "No")}
       </div>
 
-      <SubHead>Invoicing</SubHead>
-      <div className="space-y-3">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Company name" hint="Shown on invoices">
-            <Input value={companyName} onChange={(e) => setCompanyName(e.target.value)} />
-          </Field>
-          <Field label="Invoice number prefix" hint="e.g. JOB-0001">
-            <Input value={invoicePrefix} onChange={(e) => setInvoicePrefix(e.target.value)} />
-          </Field>
-        </div>
-        <Field label="Company address" hint="Appears on GST invoices">
-          <textarea className={textareaCls} value={companyAddress} onChange={(e) => setCompanyAddress(e.target.value)} />
-        </Field>
-      </div>
+      {gstRegistered !== null && (
+        <>
+          <SubHead>Business</SubHead>
+          <div className="space-y-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Business name" hint="As registered; shown on invoices">
+                <Input value={companyName} onChange={(e) => setCompanyName(e.target.value)} />
+              </Field>
+              <Field label="Invoice number prefix" hint="e.g. JOB- gives JOB-000123">
+                <Input value={invoicePrefix} onChange={(e) => setInvoicePrefix(e.target.value)} maxLength={12} />
+              </Field>
+            </div>
+            <Field label="Business address" hint="Full postal address, shown on invoices">
+              <textarea className={textareaCls} value={companyAddress} onChange={(e) => setCompanyAddress(e.target.value)} />
+            </Field>
+          </div>
+
+          <SubHead>{gstRegistered ? "GST" : "Tax"}</SubHead>
+          {gstRegistered ? (
+            <div className="space-y-3">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="GSTIN" hint="15 characters, from your GST certificate">
+                  <Input
+                    value={gstin}
+                    onChange={(e) => setGstin(e.target.value.toUpperCase().replace(/\s/g, ""))}
+                    maxLength={15}
+                    aria-invalid={!!gstinError}
+                    className="font-mono"
+                  />
+                  {gstinError && <span className="block text-[11px] text-destructive">{gstinError}</span>}
+                </Field>
+                <Field label="SAC code" hint="6-digit service code for what you sell (ask your CA)">
+                  <Input
+                    value={sacCode}
+                    onChange={(e) => setSacCode(e.target.value.replace(/\D/g, ""))}
+                    maxLength={6}
+                    inputMode="numeric"
+                    aria-invalid={!!sacError}
+                    className="font-mono"
+                  />
+                  {sacError && <span className="block text-[11px] text-destructive">{sacError}</span>}
+                </Field>
+                <Field label="GST rate (%)" hint="Usually 18 for software services">
+                  <Input type="number" min={1} max={100} value={taxRate} onChange={(e) => setTaxRate(e.target.value)} className="w-32" />
+                </Field>
+              </div>
+              <Toggle
+                checked={pricesIncludeTax}
+                onChange={setPricesIncludeTax}
+                label="Plan prices include GST"
+                hint="Off = GST is added on top of the plan price at checkout"
+              />
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="PAN" hint="10 characters, e.g. ABCDE1234F">
+                  <Input
+                    value={pan}
+                    onChange={(e) => setPan(e.target.value.toUpperCase().replace(/\s/g, ""))}
+                    maxLength={10}
+                    aria-invalid={!!panError}
+                    className="font-mono"
+                  />
+                  {panError && <span className="block text-[11px] text-destructive">{panError}</span>}
+                </Field>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                No GST is charged. Invoices are commercial invoices that say &ldquo;Not registered under GST law;
+                no tax collected.&rdquo;
+              </p>
+            </div>
+          )}
+        </>
+      )}
 
       <SaveRow
         busy={sv.busy}
@@ -531,7 +638,15 @@ function BillingCard({ initial }: { initial: AdminSettings["billing"] }) {
           sv.save(() =>
             updateBillingAction({
               enabled, provider, mode, currency, keyId,
-              gstin, taxRate: Number(taxRate), pricesIncludeTax, companyName, companyAddress, invoicePrefix,
+              gstRegistered,
+              pan,
+              gstin,
+              sacCode,
+              taxRate: Number(taxRate),
+              pricesIncludeTax,
+              companyName,
+              companyAddress,
+              invoicePrefix,
             }),
           )
         }

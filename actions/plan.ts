@@ -8,10 +8,11 @@
 import { and, asc, eq, gt } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/current-user";
-import { billingConfig, plans, resumes, user } from "@/db/schema";
+import { plans, resumes, user } from "@/db/schema";
 import { activeLeadCount, usageThisMonth } from "@/lib/entitlements";
 import { toPublicPlan } from "@/lib/pricing";
-import type { CurrentPlanInfo, OfferPlan, TaxSettings } from "@/lib/billing-model";
+import { billingReady, type CurrentPlanInfo, type OfferPlan, type TaxSettings } from "@/lib/billing-model";
+import { getBillingProfile } from "@/lib/billing-data";
 
 export interface MyPlanDetails {
   name: string;
@@ -97,6 +98,8 @@ export interface PlanOptions {
    *  plus their own paid plan for renewal even when it isn't listed. Cheapest first. */
   offers: OfferPlan[];
   tax: TaxSettings;
+  /** Billing is complete. Without it online payment stays off (request flow). */
+  billingReady: boolean;
 }
 
 /** What the plan picker (Settings → Plan, Upgrade Plan) needs. Never offers a
@@ -110,7 +113,7 @@ export async function getPlanOptionsAction(): Promise<PlanOptions | null> {
     .from(user)
     .where(eq(user.id, u.id));
   const [cur] = row?.planId ? await db.select().from(plans).where(eq(plans.id, row.planId)) : [];
-  const [billing] = await db.select().from(billingConfig).limit(1);
+  const billing = await getBillingProfile();
 
   const listed = await db
     .select()
@@ -136,6 +139,11 @@ export async function getPlanOptionsAction(): Promise<PlanOptions | null> {
     },
     expired: !!expiresAt && expiresAt.getTime() < Date.now(),
     offers,
-    tax: { taxRate: billing?.taxRate ?? 18, pricesIncludeTax: billing?.pricesIncludeTax ?? false },
+    tax: {
+      gstRegistered: billing.gstRegistered === true,
+      taxRate: billing.taxRate,
+      pricesIncludeTax: billing.pricesIncludeTax,
+    },
+    billingReady: billingReady(billing),
   };
 }

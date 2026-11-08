@@ -26,7 +26,7 @@ export function PlanChooser({
   const [loading, setLoading] = useState(true);
   const [chosen, setChosen] = useState<{ plan: OfferPlan; period: BillingPeriod } | null>(null);
   const [open, setOpen] = useState(false);
-  const online = useMockPayments().razorpay.enabled; // PHASE 1: real gateway state in Phase 3
+  const gatewayOn = useMockPayments().razorpay.enabled; // PHASE 1: real gateway state in Phase 3
 
   const load = useCallback(() => {
     getPlanOptionsAction()
@@ -57,7 +57,9 @@ export function PlanChooser({
         period={chosen?.period ?? "monthly"}
         current={options.current}
         tax={options.tax}
-        online={online}
+        // Rule: online payment needs a gateway on AND Billing complete;
+        // otherwise users request the plan through support.
+        online={gatewayOn && options.billingReady}
         onPaid={() => {
           setOpen(false);
           load();

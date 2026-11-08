@@ -809,7 +809,13 @@ export const billingConfig = pgTable("billing_config", {
   keyId: text("key_id"),
   /** @deprecated moved to payment_gateways (0054); drop next release. */
   keySecretCiphertext: text("key_secret_ciphertext"),
+  // "GST registered": null = not chosen yet (online payment stays off until
+  // Billing is complete), false = not registered (no GST; PAN on a commercial
+  // invoice), true = registered (GSTIN, rate, SAC; tax invoice).
+  gstRegistered: boolean("gst_registered"),
+  pan: text("pan"),
   gstin: text("gstin"),
+  sacCode: text("sac_code"),
   taxRate: integer("tax_rate").notNull().default(18),
   pricesIncludeTax: boolean("prices_include_tax").notNull().default(false),
   companyName: text("company_name"),
@@ -890,6 +896,9 @@ export const paymentOrders = pgTable(
     gatewayPaymentId: text("gateway_payment_id"),
     // How the user paid, from the gateway (upi, card, netbanking, wallet…).
     method: text("method"),
+    // Seller + tax details at payment time (lib/billing-model BillingSnapshot),
+    // so later Billing changes never alter a payment or its invoice.
+    billingSnapshot: jsonb("billing_snapshot"),
     failureReason: text("failure_reason"),
     paidAt: timestamp("paid_at", { withTimezone: true }),
     failedAt: timestamp("failed_at", { withTimezone: true }),

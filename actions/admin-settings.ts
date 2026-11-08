@@ -27,6 +27,7 @@ import {
   smtpConfig,
   user,
 } from "@/db/schema";
+import { isValidGstin, isValidPan, isValidSac } from "@/lib/billing-model";
 
 type Result = { ok: true } | { ok: false; error: string };
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -283,7 +284,10 @@ export async function updateBillingAction(input: unknown): Promise<Result> {
       currency: z.enum(["INR", "USD"]),
       keyId: z.string().optional().default(""),
       keySecret: z.string().optional().default(""),
-      gstin: z.string().optional().default(""),
+      gstRegistered: z.boolean().nullable().optional().default(null),
+      pan: z.string().max(10).optional().default(""),
+      gstin: z.string().max(15).optional().default(""),
+      sacCode: z.string().max(6).optional().default(""),
       taxRate: z.number().int().min(0, "Tax rate 0–100.").max(100, "Tax rate 0–100."),
       pricesIncludeTax: z.boolean(),
       companyName: z.string().optional().default(""),
@@ -294,14 +298,24 @@ export async function updateBillingAction(input: unknown): Promise<Result> {
   if (!p.success) return fail(p.error);
   const v = p.data;
   if (v.enabled && !v.keyId.trim()) return { ok: false, error: "Enter the gateway key ID." };
-  if (v.gstin.trim() && v.gstin.trim().length !== 15) return { ok: false, error: "A GSTIN is 15 characters." };
+  // Partial details may be saved (filled in over time); whatever is entered
+  // must be well-formed. Completeness only decides whether online payment runs.
+  const gstin = v.gstin.trim().toUpperCase();
+  const pan = v.pan.trim().toUpperCase();
+  const sacCode = v.sacCode.trim();
+  if (gstin && !isValidGstin(gstin)) return { ok: false, error: "That GSTIN isn't valid. Check all 15 characters." };
+  if (pan && !isValidPan(pan)) return { ok: false, error: "That PAN isn't valid. It's 5 letters, 4 digits, 1 letter." };
+  if (sacCode && !isValidSac(sacCode)) return { ok: false, error: "A SAC code for services is 6 digits starting with 99." };
   const data: Record<string, unknown> = {
     enabled: v.enabled,
     provider: v.provider,
     mode: v.mode,
     currency: v.currency,
     keyId: v.keyId || null,
-    gstin: v.gstin || null,
+    gstRegistered: v.gstRegistered,
+    pan: pan || null,
+    gstin: gstin || null,
+    sacCode: sacCode || null,
     taxRate: v.taxRate,
     pricesIncludeTax: v.pricesIncludeTax,
     companyName: v.companyName || null,

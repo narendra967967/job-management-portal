@@ -29,10 +29,16 @@ function keyIdError(keyId: string, mode: "test" | "live"): string {
   return "";
 }
 
-export function PaymentsCard() {
+export function PaymentsCard({ billingMissing }: { billingMissing: string[] }) {
   const { razorpay } = useMockPayments();
   return (
     <div className="space-y-4">
+      {billingMissing.length > 0 && (
+        <p className="rounded-lg bg-status-shortlisted/50 px-3 py-2.5 text-xs text-status-shortlisted-foreground">
+          Billing isn&rsquo;t complete, so online payment stays off even with a gateway on, and users request plans
+          through support. Still needed in Settings → Billing: {billingMissing.join(", ")}.
+        </p>
+      )}
       <div className="flex justify-end">
         <button
           type="button"
