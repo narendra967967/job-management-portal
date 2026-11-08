@@ -34,6 +34,7 @@ import {
   type OrderStatus,
 } from "@/lib/billing-model";
 import { cn, formatDateTime } from "@/lib/utils";
+import { resendReceiptAction } from "@/actions/admin-payments";
 
 const STATUS_VARIANT: Record<OrderStatus, "success" | "danger" | "warning" | "neutral"> = {
   paid: "success",
@@ -76,13 +77,13 @@ export function OrderDetailsDialog({
     }
   }
 
-  function resendReceipt() {
-    // PHASE 1: sample data. Phase 3 re-sends the payment receipt email.
+  async function resendReceipt() {
+    if (!order) return;
     setResending(true);
-    setTimeout(() => {
-      setResending(false);
-      toast.success(`Receipt sent to ${order?.user?.email ?? "the user"}`);
-    }, 700);
+    const res = await resendReceiptAction({ orderId: order.id });
+    setResending(false);
+    if (res.ok) toast.success(`Receipt sent to ${order.user?.email ?? "the user"}`);
+    else toast.error(res.error);
   }
 
   const o = order;
@@ -140,7 +141,10 @@ export function OrderDetailsDialog({
 
               <div className="grid gap-4 md:grid-cols-2">
                 <Section icon={User} title="Customer">
-                  <Row label="Name">{o.user?.name ?? "Deleted user"}</Row>
+                  <Row label="Name">
+                    {o.user?.name || "–"}
+                    {o.userDeleted && <span className="text-muted-foreground"> (account deleted)</span>}
+                  </Row>
                   <Row label="Email">
                     <span className="break-all">{o.user?.email ?? "–"}</span>
                   </Row>
@@ -197,7 +201,7 @@ export function OrderDetailsDialog({
 
             {/* Footer */}
             <div className="flex flex-wrap items-center gap-2 border-t border-border bg-muted/30 px-5 py-3">
-              {o.user?.email && (
+              {o.user?.email && !o.userDeleted && (
                 <Link
                   href={`/jmp-admin/users?q=${encodeURIComponent(o.user.email)}`}
                   className={buttonVariants({ variant: "outline", className: "min-h-9" })}

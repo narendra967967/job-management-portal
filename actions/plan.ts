@@ -11,8 +11,9 @@ import { getSessionUser } from "@/lib/current-user";
 import { plans, resumes, user } from "@/db/schema";
 import { activeLeadCount, usageThisMonth } from "@/lib/entitlements";
 import { toPublicPlan } from "@/lib/pricing";
-import { billingReady, type CurrentPlanInfo, type OfferPlan, type TaxSettings } from "@/lib/billing-model";
+import type { CurrentPlanInfo, OfferPlan, TaxSettings } from "@/lib/billing-model";
 import { getBillingProfile } from "@/lib/billing-data";
+import { currentPlanInfo, onlinePaymentAvailable, taxOf } from "@/lib/payments/orders";
 
 export interface MyPlanDetails {
   name: string;
@@ -98,8 +99,9 @@ export interface PlanOptions {
    *  plus their own paid plan for renewal even when it isn't listed. Cheapest first. */
   offers: OfferPlan[];
   tax: TaxSettings;
-  /** Billing is complete. Without it online payment stays off (request flow). */
-  billingReady: boolean;
+  /** A gateway is on AND Billing is complete: "Pay" runs checkout. Otherwise
+   *  the user requests the plan through support. */
+  online: boolean;
 }
 
 /** What the plan picker (Settings → Plan, Upgrade Plan) needs. Never offers a
@@ -108,12 +110,12 @@ export async function getPlanOptionsAction(): Promise<PlanOptions | null> {
   const u = await getSessionUser();
   if (!u) return null;
 
-  const [row] = await db
-    .select({ planId: user.planId, planExpiresAt: user.planExpiresAt })
-    .from(user)
-    .where(eq(user.id, u.id));
-  const [cur] = row?.planId ? await db.select().from(plans).where(eq(plans.id, row.planId)) : [];
-  const billing = await getBillingProfile();
+  const [current, billing, online] = await Promise.all([
+    currentPlanInfo(u.id),
+    getBillingProfile(),
+    onlinePaymentAvailable(),
+  ]);
+  const [cur] = current.planId ? await db.select().from(plans).where(eq(plans.id, current.planId)) : [];
 
   const listed = await db
     .select()
@@ -126,24 +128,11 @@ export async function getPlanOptionsAction(): Promise<PlanOptions | null> {
     offers.sort((a, b) => a.monthlyPrice - b.monthlyPrice || a.yearlyPrice - b.yearlyPrice);
   }
 
-  const expiresAt = row?.planExpiresAt ?? null;
   return {
-    current: {
-      planId: cur?.id ?? null,
-      name: cur?.name ?? "",
-      isFree: cur?.isFree ?? true,
-      monthlyPrice: cur?.monthlyPrice ?? 0,
-      yearlyPrice: cur?.yearlyPrice ?? 0,
-      expiresAt: expiresAt ? expiresAt.toISOString() : null,
-      lastPeriod: null, // known once orders are recorded (Phase 2)
-    },
-    expired: !!expiresAt && expiresAt.getTime() < Date.now(),
+    current,
+    expired: !!current.expiresAt && new Date(current.expiresAt).getTime() < Date.now(),
     offers,
-    tax: {
-      gstRegistered: billing.gstRegistered === true,
-      taxRate: billing.taxRate,
-      pricesIncludeTax: billing.pricesIncludeTax,
-    },
-    billingReady: billingReady(billing),
+    tax: taxOf(billing),
+    online,
   };
 }

@@ -16,17 +16,22 @@ const GUIDE_FRAME_HOSTS = [
 // inline bootstrap scripts (a nonce-based CSP via middleware would remove it, at
 // the cost of rendering every page dynamically). Everything else is locked to
 // our own origin, except Google reCAPTCHA (script + its iframe) on the sign-in
-// pages: no other third-party scripts, no framing of our pages, no plugins.
+// pages and Razorpay Checkout (its script, its payment window iframe and its
+// API calls) for plan payments: no other third-party scripts, no framing of
+// our pages, no plugins.
 const RECAPTCHA_HOSTS = "https://www.google.com https://www.gstatic.com https://recaptcha.google.com";
+const RAZORPAY_SCRIPT = "https://checkout.razorpay.com";
+const RAZORPAY_FRAMES = "https://api.razorpay.com https://checkout.razorpay.com";
+const RAZORPAY_CONNECT = "https://api.razorpay.com https://lumberjack.razorpay.com";
 const CSP = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline' ${RECAPTCHA_HOSTS}`,
+  `script-src 'self' 'unsafe-inline' ${RECAPTCHA_HOSTS} ${RAZORPAY_SCRIPT}`,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https:", // guide images may be any https URL
   "media-src 'self' https:", // guide <video>
   "font-src 'self' data:",
-  `connect-src 'self' ${RECAPTCHA_HOSTS}`, // fetch + support-chat EventSource; AI/Gmail calls are server-side
-  `frame-src ${GUIDE_FRAME_HOSTS.join(" ")} ${RECAPTCHA_HOSTS}`,
+  `connect-src 'self' ${RECAPTCHA_HOSTS} ${RAZORPAY_CONNECT}`, // fetch + support-chat EventSource; AI/Gmail calls are server-side
+  `frame-src ${GUIDE_FRAME_HOSTS.join(" ")} ${RECAPTCHA_HOSTS} ${RAZORPAY_FRAMES}`,
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",
@@ -40,7 +45,8 @@ const SECURITY_HEADERS = [
   { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
   {
     key: "Permissions-Policy",
-    value: "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()",
+    // payment: Razorpay's window may use the Payment Request API (cards/UPI).
+    value: 'camera=(), microphone=(), geolocation=(), payment=(self "https://api.razorpay.com" "https://checkout.razorpay.com"), usb=(), browsing-topics=()',
   },
   // Production builds only: dev needs eval/websockets for hot reload, and HSTS
   // is meaningless on http://localhost. Preprod and prod are HTTPS-only.
@@ -56,7 +62,16 @@ const nextConfig: NextConfig = {
   // Don't advertise the framework (X-Powered-By: Next.js).
   poweredByHeader: false,
   async headers() {
-    return [{ source: "/:path*", headers: SECURITY_HEADERS }];
+    return [
+      { source: "/:path*", headers: SECURITY_HEADERS },
+      // Pages with plan checkout: Razorpay opens bank / 3-D Secure pages in a
+      // popup that reports back to its window, which "same-origin" would cut
+      // off. Listed after the default so it wins for these paths.
+      ...["/upgrade", "/settings"].map((source) => ({
+        source,
+        headers: [{ key: "Cross-Origin-Opener-Policy", value: "same-origin-allow-popups" }],
+      })),
+    ];
   },
   // Emit a self-contained server (.next/standalone/server.js) so the Docker
   // runtime image only needs Node + the traced deps — no full node_modules.

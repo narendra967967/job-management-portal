@@ -60,6 +60,26 @@ export function accessState(u: { status: string; planExpiresAt: Date | null }): 
   return "ok";
 }
 
+/** Paths an expired user (limited mode) may still open: Upgrade Plan, Help &
+ *  support, guides, and Settings (which itself shows only Help + Account). */
+export const LIMITED_MODE_PATHS = ["/upgrade", "/settings", "/support", "/guides"];
+
+export function allowedInLimitedMode(pathname: string): boolean {
+  return LIMITED_MODE_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+}
+
+/** The signed-in user's id for FEATURE actions (leads, AI, notes…): refuses
+ *  when the plan has expired (limited mode) or the account is deactivated.
+ *  Account, help and payment actions use getCurrentUserId / getSessionUser. */
+export async function getActiveUserId(): Promise<string> {
+  const u = await getSessionUser();
+  if (!u) redirect("/login");
+  const state = accessState(u);
+  if (state === "expired") throw new Error("Your plan has ended. Pick a plan on Upgrade Plan to keep going.");
+  if (state === "deactivated") throw new Error("This account is deactivated.");
+  return u.id;
+}
+
 /** The signed-in admin's id, redirecting to the admin login when the session is
  *  missing or the account isn't an admin. Use in admin loaders + Server Actions. */
 export async function requireAdmin(): Promise<string> {

@@ -7,12 +7,12 @@
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { gmailConfig as gmailConfigT } from "@/db/schema";
-import { getCurrentUserId } from "@/lib/current-user";
+import { getActiveUserId } from "@/lib/current-user";
 import { runSyncForUser, type SyncResult } from "@/lib/gmail-sync";
 import { parseInput } from "@/lib/schemas";
 
 export async function syncMyGmailAction(): Promise<SyncResult> {
-  const userId = await getCurrentUserId();
+  const userId = await getActiveUserId();
   return runSyncForUser(userId);
 }
 
@@ -21,7 +21,7 @@ export async function syncMyGmailAction(): Promise<SyncResult> {
  * user's gmail_config row (it may not exist yet for a brand-new user).
  */
 export async function setSyncPausedAction(paused: boolean): Promise<void> {
-  const userId = await getCurrentUserId();
+  const userId = await getActiveUserId();
   const value = parseInput(z.boolean(), paused);
   const syncPausedAt = value ? new Date() : null;
   await db

@@ -1,5 +1,5 @@
 // Orders & Payments (Sales & Revenue): plan purchases and their payment status.
-// Admin-gated. PHASE 1: the client shows sample data.
+// Admin-gated; the client loads orders for the chosen dates.
 
 import { requireAdmin } from "@/lib/current-user";
 import { OrdersClient } from "@/components/admin/orders/orders-client";

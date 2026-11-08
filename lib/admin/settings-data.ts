@@ -21,6 +21,8 @@ import { getIntakeConfig, loadSenders } from "@/lib/email-intake-data";
 import { getRetentionConfig } from "@/lib/retention";
 import type { RetentionConfig } from "@/lib/retention-model";
 import type { EmailIntakeConfig, InboundSender } from "@/lib/email-intake-model";
+import { listGatewaySettings } from "@/lib/payments/gateways";
+import type { GatewaySettings } from "@/lib/billing-model";
 
 export interface AdminSettings {
   profile: { name: string; email: string; mobile: string };
@@ -91,6 +93,8 @@ export interface AdminSettings {
     replyTo: string;
   };
   retention: RetentionConfig;
+  /** Settings → Payments (no secrets, only whether each is set). */
+  gateways: GatewaySettings[];
   intake: {
     config: EmailIntakeConfig;
     senders: InboundSender[];
@@ -100,7 +104,7 @@ export interface AdminSettings {
 }
 
 export async function loadAdminSettings(adminId: string): Promise<AdminSettings> {
-  const [u, gen, sec, cron, bill, ai, smtp, branding, intakeConfig, senders, google, retention] = await Promise.all([
+  const [u, gen, sec, cron, bill, ai, smtp, branding, intakeConfig, senders, google, retention, gateways] = await Promise.all([
     db.select({ name: user.name, email: user.email, mobile: user.mobile }).from(user).where(eq(user.id, adminId)).limit(1),
     db.select().from(appSettings).limit(1),
     db.select().from(securityConfig).limit(1),
@@ -113,6 +117,7 @@ export async function loadAdminSettings(adminId: string): Promise<AdminSettings>
     loadSenders(),
     db.select({ n: countDistinct(account.userId) }).from(account).where(eq(account.providerId, "google")),
     getRetentionConfig(),
+    listGatewaySettings(),
   ]);
   const g = gen[0];
   const s = sec[0];
@@ -195,6 +200,7 @@ export async function loadAdminSettings(adminId: string): Promise<AdminSettings>
       replyTo: m?.replyTo ?? "",
     },
     retention,
+    gateways,
     intake: {
       config: { ...intakeConfig, gmailToggledBy: await toggledByName(intakeConfig.gmailToggledBy) },
       senders,

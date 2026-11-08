@@ -23,7 +23,8 @@ import {
 import { ContactSupportProvider, SupportIconButton } from "@/components/support/contact-support";
 import { SupportWidget } from "@/components/support/support-widget";
 import { redirect } from "next/navigation";
-import { getSessionUser, accessState } from "@/lib/current-user";
+import { headers } from "next/headers";
+import { getSessionUser, accessState, allowedInLimitedMode } from "@/lib/current-user";
 import { guardMaintenance } from "@/lib/maintenance";
 import { getAppName } from "@/lib/branding";
 import { loadWorkspace } from "@/lib/queries";
@@ -35,6 +36,7 @@ import { Suspense } from "react";
 import { OnboardingTour } from "@/components/onboarding/onboarding-tour";
 import { tourDue } from "@/lib/tour";
 import { NotLimited } from "@/components/billing/not-limited";
+import { LimitedModeProvider } from "@/lib/access-mode";
 import { FreshPage } from "@/lib/nav-reset";
 
 // Per-user, session-gated routes — never statically prerendered (no DB at build).
@@ -50,13 +52,20 @@ export default async function DashboardLayout({
 }) {
   // Maintenance mode takes the whole user side offline (admin panel stays up).
   await guardMaintenance();
-  // Gate on the admin-managed account state: deactivated / expired users can sign
-  // in but don't reach the dashboard.
+  // Gate on the account state: deactivated users can sign in but don't reach
+  // the dashboard. Expired users get limited mode: only Upgrade Plan, Help &
+  // support, guides and Settings (Help + Account) open; feature Server Actions
+  // refuse them too (getActiveUserId).
   const u = await getSessionUser();
   if (!u) redirect("/login");
   const state = accessState(u);
   if (state === "deactivated") redirect("/deactivated");
-  if (state === "expired") redirect("/renew");
+  const limited = state === "expired";
+  if (limited) {
+    // Set by middleware for every dashboard route.
+    const path = (await headers()).get("x-pathname");
+    if (path && !allowedInLimitedMode(path)) redirect("/upgrade");
+  }
   const [workspace, appName, career, showTour] = await Promise.all([
     loadWorkspace(u.id),
     getAppName(),
@@ -67,8 +76,11 @@ export default async function DashboardLayout({
     // App shell: full-height flex. On mobile the header + bottom nav are
     // fixed-height flex children and only <main> scrolls, so the bottom nav is
     // always pinned to the visible bottom (no reliance on position:fixed).
+    <LimitedModeProvider limited={limited}>
     <WorkspaceProvider initial={workspace}>
-    <AutoSync />
+    <NotLimited>
+      <AutoSync />
+    </NotLimited>
     <ContactSupportProvider>
     <AddLeadProvider>
     <div className="app-glass relative isolate flex h-dvh flex-col overflow-hidden md:flex-row">
@@ -140,5 +152,6 @@ export default async function DashboardLayout({
     </AddLeadProvider>
     </ContactSupportProvider>
     </WorkspaceProvider>
+    </LimitedModeProvider>
   );
 }

@@ -5,11 +5,11 @@
 // page (variant "upgrade": every paid plan).
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { PlanOffers, visibleOffers } from "@/components/billing/plan-offers";
 import { CheckoutDialog } from "@/components/billing/checkout-dialog";
 import { getPlanOptionsAction, type PlanOptions } from "@/actions/plan";
 import type { BillingPeriod, OfferPlan } from "@/lib/billing-model";
-import { useMockPayments } from "@/lib/payments-mock";
 
 export function PlanChooser({
   variant,
@@ -26,7 +26,7 @@ export function PlanChooser({
   const [loading, setLoading] = useState(true);
   const [chosen, setChosen] = useState<{ plan: OfferPlan; period: BillingPeriod } | null>(null);
   const [open, setOpen] = useState(false);
-  const gatewayOn = useMockPayments().razorpay.enabled; // PHASE 1: real gateway state in Phase 3
+  const router = useRouter();
 
   const load = useCallback(() => {
     getPlanOptionsAction()
@@ -59,10 +59,11 @@ export function PlanChooser({
         tax={options.tax}
         // Rule: online payment needs a gateway on AND Billing complete;
         // otherwise users request the plan through support.
-        online={gatewayOn && options.billingReady}
+        online={options.online}
         onPaid={() => {
           setOpen(false);
           load();
+          router.refresh(); // plan chip, limited mode
           onChanged?.();
         }}
       />

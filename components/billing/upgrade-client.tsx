@@ -6,7 +6,6 @@
 import { useRouter } from "next/navigation";
 import { ShieldCheck } from "lucide-react";
 import { PlanChooser } from "@/components/billing/plan-chooser";
-import { PaymentsPreviewBar } from "@/components/billing/payments-preview-bar";
 import { useLimitedMode } from "@/lib/access-mode";
 
 export function UpgradeClient() {
@@ -15,7 +14,6 @@ export function UpgradeClient() {
 
   return (
     <div className="mx-auto max-w-5xl">
-      <PaymentsPreviewBar />
       <h1 className="text-lg font-semibold tracking-tight">{limited ? "Your plan has ended" : "Upgrade your plan"}</h1>
       <p className="mt-1 text-sm text-muted-foreground">
         {limited
@@ -31,7 +29,11 @@ export function UpgradeClient() {
       <div className="mt-5">
         <PlanChooser
           variant="upgrade"
-          onChanged={() => router.push("/leads")}
+          // The layout re-reads the plan (unlocks limited mode), then Leads.
+          onChanged={() => {
+            router.refresh();
+            router.push("/leads");
+          }}
           empty={
             <p className="rounded-xl bg-muted/50 px-4 py-6 text-center text-sm text-muted-foreground">
               No plans are available to buy right now. Contact support and we&rsquo;ll sort it out.

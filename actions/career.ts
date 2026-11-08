@@ -8,7 +8,7 @@
 import { eq } from "drizzle-orm";
 import type { z } from "zod";
 import { db } from "@/lib/db";
-import { getCurrentUserId } from "@/lib/current-user";
+import { getActiveUserId } from "@/lib/current-user";
 import { careerProfiles, certifications, educations, workExperiences } from "@/db/schema";
 import { loadCareerProfile } from "@/lib/career-data";
 import { parseInput } from "@/lib/schemas";
@@ -17,7 +17,7 @@ import { SECTION_SCHEMAS, type CareerProfile, type SectionKey } from "@/lib/care
 type Result = { ok: true; profile: CareerProfile } | { ok: false; error: string };
 
 export async function getCareerProfileAction(): Promise<CareerProfile> {
-  return loadCareerProfile(await getCurrentUserId());
+  return loadCareerProfile(await getActiveUserId());
 }
 
 const SECTIONS = Object.keys(SECTION_SCHEMAS) as SectionKey[];
@@ -30,7 +30,7 @@ async function upsertProfile(userId: string, set: Partial<typeof careerProfiles.
 }
 
 export async function saveCareerSectionAction(section: SectionKey, values: unknown): Promise<Result> {
-  const userId = await getCurrentUserId();
+  const userId = await getActiveUserId();
   try {
     if (!SECTIONS.includes(section)) throw new Error("Unknown section.");
     switch (section) {

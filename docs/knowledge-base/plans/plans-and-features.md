@@ -34,4 +34,4 @@ When a feature is off, users see it locked with "On higher plans" or "isn't on y
 
 ## Payments
 
-There's no self-serve checkout yet. The user's **Upgrade your plan** button, shown only when a higher-priced plan exists, opens a support request instead. An admin then changes their plan in Users. The Billing section in admin Settings holds payment provider and tax details for when checkout is built.
+Users buy plans themselves from Settings → Plan or the Upgrade Plan page. They pay online when a gateway is on in Settings → Payments and Billing is complete; otherwise each plan offers **Request this plan**, a support ticket you handle by changing their plan in Users. Free plans are never offered for sale. The details are in "How online plan payments work".

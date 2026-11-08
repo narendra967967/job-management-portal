@@ -11,7 +11,7 @@ import { isUniqueViolation } from "@/lib/db-errors";
 import { activeLeadCount, getPlanLimits, leadLimitMessage } from "@/lib/entitlements";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { getCurrentUserId } from "@/lib/current-user";
+import { getCurrentUserId, getActiveUserId } from "@/lib/current-user";
 import {
   addContactSchema,
   addReminderSchema,
@@ -129,7 +129,7 @@ export async function setLeadStatusAction(
   status: LeadStatus,
   closeOutcome: CloseOutcome | null = null,
 ) {
-  const userId = await getCurrentUserId();
+  const userId = await getActiveUserId();
   const input = parseInput(leadStatusSchema, { leadId, status, closeOutcome });
   const next = input.status as LeadStatus;
   await db.transaction(async (tx) => {
@@ -196,7 +196,7 @@ export async function setLeadTopChoiceAction(
   leadId: string,
   topChoice: boolean,
 ): Promise<{ autoStatus: AutoStatusChange | null }> {
-  const userId = await getCurrentUserId();
+  const userId = await getActiveUserId();
   const input = parseInput(topChoiceSchema, { leadId, topChoice });
   return db.transaction(async (tx) => {
     const [row] = await tx
@@ -222,7 +222,7 @@ export async function undoAutoStatusAction(
   from: LeadStatus,
   to: LeadStatus,
 ): Promise<void> {
-  const userId = await getCurrentUserId();
+  const userId = await getActiveUserId();
   const a = parseInput(leadStatusSchema, { leadId, status: from, closeOutcome: null });
   const b = parseInput(leadStatusSchema, { leadId, status: to, closeOutcome: null });
   await db
@@ -250,7 +250,7 @@ export async function undoAutoStatusAction(
 
 /** Undo a move from a card's automatic message. The rule won't touch the lead again. */
 export async function undoAutoActionAction(id: string): Promise<void> {
-  const userId = await getCurrentUserId();
+  const userId = await getActiveUserId();
   const actionId = parseInput(zId, id);
   await db.transaction(async (tx) => {
     const [action] = await tx
@@ -283,7 +283,7 @@ export async function undoAutoActionAction(id: string): Promise<void> {
  * foreign keys, so deleting the lead rows is enough. Scoped to the current user.
  */
 export async function deleteLeadsAction(ids: string[]) {
-  const userId = await getCurrentUserId();
+  const userId = await getActiveUserId();
   const clean = parseInput(deleteLeadsSchema, ids);
   await db
     .delete(leadsT)
@@ -329,7 +329,7 @@ export async function createLeadAction(input: {
     connectionType: ConnectionType;
   };
 }): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
-  const userId = await getCurrentUserId();
+  const userId = await getActiveUserId();
 
   let data: CreateLeadInput;
   try {
@@ -418,7 +418,7 @@ export async function updateLeadAction(
   leadId: string,
   input: EditLeadInput,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const userId = await getCurrentUserId();
+  const userId = await getActiveUserId();
 
   let data: EditLeadInput;
   try {
@@ -485,7 +485,7 @@ export async function addContactAction(input: {
   connectionType: ConnectionType;
   aiParsed: boolean;
 }) {
-  const userId = await getCurrentUserId();
+  const userId = await getActiveUserId();
   const data = parseInput(addContactSchema, input);
   return db.transaction(async (tx) => {
     await assertOwned(tx, userId, { leadId: data.leadId });
@@ -514,7 +514,7 @@ export async function updateContactAction(
     connectionType: ConnectionType;
   },
 ) {
-  const userId = await getCurrentUserId();
+  const userId = await getActiveUserId();
   const contactId = parseInput(zId, id);
   const data = parseInput(updateContactSchema, patch);
   await db
@@ -529,7 +529,7 @@ export async function updateContactAction(
 }
 
 export async function deleteContactAction(id: string) {
-  const userId = await getCurrentUserId();
+  const userId = await getActiveUserId();
   const contactId = parseInput(zId, id);
   await db
     .delete(contactsT)
@@ -546,7 +546,7 @@ export async function markSentAction(input: {
   draftBody: string;
   timeZone?: string;
 }): Promise<{ autoStatus: AutoStatusChange | null }> {
-  const userId = await getCurrentUserId();
+  const userId = await getActiveUserId();
   const data = parseInput(markSentSchema, input);
   return db.transaction(async (tx) => {
     // The contact must be the user's AND belong to this lead.
@@ -648,7 +648,7 @@ export async function addReminderManualAction(input: {
   outreachMessageId: string | null;
   timeZone?: string;
 }) {
-  const userId = await getCurrentUserId();
+  const userId = await getActiveUserId();
   const data = parseInput(addReminderSchema, input);
   await db.transaction(async (tx) => {
     await assertOwned(tx, userId, {
@@ -690,7 +690,7 @@ export async function setReminderOutcomeAction(
   outcome: ReminderOutcome,
   timeZone?: string,
 ): Promise<{ nextFollowUp: { dueDate: string; number: number } | null }> {
-  const userId = await getCurrentUserId();
+  const userId = await getActiveUserId();
   const data = parseInput(reminderOutcomeSchema, { id, outcome, timeZone });
   const next = data.outcome as ReminderOutcome;
   const done = next !== "pending";
@@ -804,7 +804,7 @@ export async function snoozeReminderAction(
   newDueDate: string,
   timeZone?: string,
 ) {
-  const userId = await getCurrentUserId();
+  const userId = await getActiveUserId();
   const data = parseInput(snoozeReminderSchema, { id, newDueDate, timeZone });
   await db.transaction(async (tx) => {
     await tx
@@ -823,7 +823,7 @@ export async function snoozeReminderAction(
 }
 
 export async function deleteReminderAction(id: string) {
-  const userId = await getCurrentUserId();
+  const userId = await getActiveUserId();
   const reminderId = parseInput(zId, id);
   await db.transaction(async (tx) => {
     await tx
@@ -838,7 +838,7 @@ export async function deleteReminderAction(id: string) {
 /* ---------------- tasks ---------------- */
 
 export async function completeTaskAction(id: string) {
-  const userId = await getCurrentUserId();
+  const userId = await getActiveUserId();
   const taskId = parseInput(zId, id);
   await db.transaction(async (tx) => {
     const [task] = await tx

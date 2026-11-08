@@ -8,7 +8,7 @@
 import { and, eq } from "drizzle-orm";
 import { ZodError } from "zod";
 import { db } from "@/lib/db";
-import { getCurrentUserId } from "@/lib/current-user";
+import { getActiveUserId } from "@/lib/current-user";
 import { resumeAtsChecks, resumes } from "@/db/schema";
 import { getFeatureAccess, PREMIUM_REQUIRED } from "@/lib/entitlements";
 import { userHasAiKey, AI_NOT_CONFIGURED } from "@/lib/ai";
@@ -18,7 +18,7 @@ import { MIN_RESUME_CHARS, profileHash, resumeHash, runAtsCheck } from "@/lib/at
 import type { AtsCheckView, AtsOverview, AtsResult } from "@/lib/ats-model";
 
 export async function getAtsOverviewAction(): Promise<AtsOverview> {
-  const userId = await getCurrentUserId();
+  const userId = await getActiveUserId();
   const [access, hasAiKey, profile, rows] = await Promise.all([
     getFeatureAccess(userId),
     userHasAiKey(userId),
@@ -63,7 +63,7 @@ function friendlyAtsError(err: unknown): string {
 export async function runAtsCheckAction(
   resumeId: string,
 ): Promise<{ ok: true; check: AtsCheckView } | { ok: false; error: string }> {
-  const userId = await getCurrentUserId();
+  const userId = await getActiveUserId();
   if (typeof resumeId !== "string" || !/^[0-9a-f-]{36}$/i.test(resumeId)) {
     return { ok: false, error: "Résumé not found." };
   }

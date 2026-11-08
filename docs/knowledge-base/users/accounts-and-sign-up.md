@@ -27,7 +27,7 @@ Admin **Users** marks anyone still unconfirmed with *not verified* next to their
 | What they see | Cause |
 |---|---|
 | Your email isn't confirmed yet | They haven't used their link. That sign-in just sent a new one |
-| Your plan has expired | Their plan's expiry passed. Renew it in admin Users |
+| Everything locked except Upgrade Plan ("Your plan has ended") | Their plan's expiry passed, so they're in limited mode. They can buy a plan there, or you renew it in admin Users |
 | A deactivated notice | An admin deactivated them. They can ask to be reactivated from that page |
 | The maintenance page | Maintenance mode is on in admin Settings → General, which blocks every user |
 | A security check error | reCAPTCHA is failing. See the reCAPTCHA lockout runbook |

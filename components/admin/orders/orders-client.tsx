@@ -6,8 +6,8 @@
 // action menu per row, pagination, and filters. The date range is required and
 // defaults to the last 7 days; the stat boxes double as status filters.
 //
-// PHASE 1: sample data (lib/payments-mock.ts). Phase 3 loads real orders and
-// filters in the database.
+// The date range is loaded from the server (listOrdersAction); the other
+// filters work on that range in the browser.
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Copy, Download, Eye, MoreHorizontal, Search, X } from "lucide-react";
@@ -31,8 +31,7 @@ import {
   type GatewayId,
   type OrderStatus,
 } from "@/lib/billing-model";
-import { mockOrders } from "@/lib/payments-mock";
-import { useMounted } from "@/lib/use-mounted";
+import { listOrdersAction } from "@/actions/admin-payments";
 import { cn, formatDateTime } from "@/lib/utils";
 
 const STATUS_VARIANT: Record<OrderStatus, "success" | "danger" | "warning" | "neutral"> = {
@@ -66,8 +65,10 @@ function csvCell(v: string | number | null | undefined): string {
 }
 
 export function OrdersClient() {
-  const mounted = useMounted(); // sample timestamps use the clock
-  const rows = useMemo(() => (mounted ? mockOrders() : []), [mounted]);
+  const [rows, setRows] = useState<AdminOrderRow[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [capped, setCapped] = useState(false);
+  const mounted = loaded;
 
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<OrderStatus | "all">("all");
@@ -91,6 +92,22 @@ export function OrdersClient() {
   useEffect(() => {
     if (!rangeError) setRange({ from: fromInput, to: toInput });
   }, [fromInput, toInput, rangeError]);
+
+  // Load the range: the viewer's local day bounds, as instants.
+  useEffect(() => {
+    let live = true;
+    const from = new Date(`${range.from}T00:00:00`);
+    const to = new Date(`${range.to}T23:59:59.999`);
+    listOrdersAction({ from: from.toISOString(), to: to.toISOString() }).then((res) => {
+      if (!live) return;
+      setRows(res.rows);
+      setCapped(res.capped);
+      setLoaded(true);
+    });
+    return () => {
+      live = false;
+    };
+  }, [range]);
 
   // Everything inside the date range: the stat boxes count from this.
   const inRange = useMemo(
@@ -265,11 +282,11 @@ export function OrdersClient() {
             className="h-9 w-[9.5rem]"
           />
         </label>
-        <span className="ml-auto self-center rounded-md border border-dashed border-amber-400 bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
-          Sample data
-        </span>
       </div>
       {rangeError && <p className="-mt-2 text-xs text-destructive">{rangeError}</p>}
+      {capped && (
+        <p className="-mt-2 text-xs text-muted-foreground">Showing the newest 5,000 orders in this range. Narrow the dates to see the rest.</p>
+      )}
 
       {/* Stat boxes: click to filter by that status, click again to clear */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">

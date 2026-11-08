@@ -4,11 +4,10 @@
 // more are added as modules). Each has on/off (confirmed both ways), test/live
 // mode, the key ID, write-only secrets, the webhook URL to paste into the
 // gateway's dashboard, and Test connection. Spec: memory payments-plan.
-//
-// PHASE 1: sample data only (lib/payments-mock.ts) — nothing is saved to the
-// server yet, and the secrets typed here are NOT stored anywhere.
+// Secrets are write-only: saved encrypted, never sent back to the browser.
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Check, Copy, Eye, EyeOff, PlugZap } from "lucide-react";
 import { Button } from "@/components/admin/ui/button";
 import { Input } from "@/components/admin/ui/input";
@@ -16,7 +15,7 @@ import { Badge } from "@/components/admin/ui/badge";
 import { ConfirmDialog } from "@/components/admin/ui/confirm-dialog";
 import { Field, selectCls } from "@/components/admin/settings/form-bits";
 import { GATEWAY_LABELS, type GatewaySettings } from "@/lib/billing-model";
-import { resetMockPayments, updateMockGateway, useMockPayments } from "@/lib/payments-mock";
+import { saveGatewayAction, setGatewayEnabledAction, testGatewayAction } from "@/actions/admin-payments";
 import { useMounted } from "@/lib/use-mounted";
 import { formatDateTime } from "@/lib/utils";
 
@@ -29,8 +28,7 @@ function keyIdError(keyId: string, mode: "test" | "live"): string {
   return "";
 }
 
-export function PaymentsCard({ billingMissing }: { billingMissing: string[] }) {
-  const { razorpay } = useMockPayments();
+export function PaymentsCard({ gateways, billingMissing }: { gateways: GatewaySettings[]; billingMissing: string[] }) {
   return (
     <div className="space-y-4">
       {billingMissing.length > 0 && (
@@ -39,23 +37,18 @@ export function PaymentsCard({ billingMissing }: { billingMissing: string[] }) {
           through support. Still needed in Settings → Billing: {billingMissing.join(", ")}.
         </p>
       )}
-      <div className="flex justify-end">
-        <button
-          type="button"
-          onClick={resetMockPayments}
-          className="min-h-8 rounded-md border border-dashed border-amber-400 bg-amber-50 px-2 text-[11px] font-medium text-amber-900 dark:bg-amber-950/30 dark:text-amber-200"
-        >
-          Sample data · reset
-        </button>
-      </div>
       {/* Remount when the stored values change, so the form starts from them. */}
-      <GatewayCard key={`${razorpay.mode}|${razorpay.keyId}`} gateway={razorpay} />
+      {gateways.map((g) => (
+        <GatewayCard key={`${g.id}|${g.mode}|${g.keyId}`} gateway={g} />
+      ))}
     </div>
   );
 }
 
 function GatewayCard({ gateway: g }: { gateway: GatewaySettings }) {
   const mounted = useMounted();
+  const router = useRouter();
+  const [saving, setSaving] = useState(false);
   const [mode, setMode] = useState(g.mode);
   const [keyId, setKeyId] = useState(g.keyId);
   const [keySecret, setKeySecret] = useState("");
@@ -73,30 +66,34 @@ function GatewayCard({ gateway: g }: { gateway: GatewaySettings }) {
 
   const idError = keyIdError(keyId, mode);
 
-  function save(confirmedLive = false) {
+  async function save(confirmedLive = false) {
     if (idError) return setError(idError);
     if (mode === "live" && g.mode !== "live" && !confirmedLive) return setLiveOpen(true);
     setError("");
-    updateMockGateway({
-      mode,
-      keyId: keyId.trim(),
-      hasKeySecret: g.hasKeySecret || keySecret.trim().length > 0,
-      hasWebhookSecret: g.hasWebhookSecret || webhookSecret.trim().length > 0,
-    });
+    setSaving(true);
+    const res = await saveGatewayAction({ id: g.id, mode, keyId: keyId.trim(), keySecret, webhookSecret });
+    setSaving(false);
+    if (!res.ok) return setError(res.error);
     setKeySecret("");
     setWebhookSecret("");
     setSaved(true);
     setTimeout(() => setSaved(false), 1800);
+    router.refresh();
   }
 
-  function testConnection() {
+  async function testConnection() {
     setTesting(true);
-    setTimeout(() => {
-      const ok = !!g.keyId && g.hasKeySecret;
-      updateMockGateway({ lastTestOk: ok, lastTestAt: new Date().toISOString() });
-      if (!ok) setError("Save the key ID and key secret first, then test again.");
-      setTesting(false);
-    }, 900);
+    setError("");
+    const res = await testGatewayAction({ id: g.id });
+    setTesting(false);
+    if (!res.ok) setError(res.error);
+    router.refresh();
+  }
+
+  async function toggle() {
+    const res = await setGatewayEnabledAction({ id: g.id, enabled: !g.enabled });
+    if (!res.ok) setError(res.error);
+    router.refresh();
   }
 
   function requestSwitch() {
@@ -195,7 +192,9 @@ function GatewayCard({ gateway: g }: { gateway: GatewaySettings }) {
 
       {error && <p className="mt-3 text-xs text-destructive">{error}</p>}
       <div className="mt-4 flex flex-wrap items-center gap-3">
-        <Button onClick={() => save()}>Save changes</Button>
+        <Button onClick={() => save()} disabled={saving}>
+          {saving ? "Saving…" : "Save changes"}
+        </Button>
         {saved && <span className="text-xs text-status-applied-foreground">Saved</span>}
         <Button variant="outline" className="min-h-9" onClick={testConnection} disabled={testing}>
           <PlugZap className="size-4" aria-hidden />
@@ -221,7 +220,7 @@ function GatewayCard({ gateway: g }: { gateway: GatewaySettings }) {
         }
         confirmLabel={g.enabled ? "Turn off" : "Turn on"}
         destructive={g.enabled}
-        onConfirm={() => updateMockGateway({ enabled: !g.enabled })}
+        onConfirm={toggle}
       />
       <ConfirmDialog
         open={liveOpen}

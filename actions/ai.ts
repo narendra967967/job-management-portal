@@ -11,7 +11,7 @@ import { getLeadRules } from "@/lib/lead-rules";
 import { touchLead } from "@/lib/auto-status";
 import { db } from "@/lib/db";
 import { careerBriefFor } from "@/lib/career-data";
-import { getCurrentUserId } from "@/lib/current-user";
+import { getActiveUserId } from "@/lib/current-user";
 import { aiAddAllowance, getFeatureAccess, PREMIUM_REQUIRED, recordUsage } from "@/lib/entitlements";
 import {
   aiComplete,
@@ -65,7 +65,7 @@ function friendly(err: unknown): string {
 export async function testAiKeyAction(): Promise<
   { ok: true; model: string } | { ok: false; error: string }
 > {
-  const userId = await getCurrentUserId();
+  const userId = await getActiveUserId();
   try {
     await aiComplete(userId, "Reply with the single word OK.", "Test", 16, { timeoutMs: 20_000 });
   } catch (err) {
@@ -133,7 +133,7 @@ export async function saveJdAction(
   leadId: string,
   jdText: string,
 ): Promise<{ ok: true; autoStatus: AutoStatusChange | null } | { ok: false; error: string }> {
-  const userId = await getCurrentUserId();
+  const userId = await getActiveUserId();
   let text: string;
   try {
     ({ leadId, jdText: text } = parseInput(jdInputSchema, { leadId, jdText }));
@@ -166,7 +166,7 @@ export async function summarizeJdAction(
   | { ok: true; summary: string; autoStatus: AutoStatusChange | null }
   | { ok: false; error: string; autoStatus?: AutoStatusChange | null }
 > {
-  const userId = await getCurrentUserId();
+  const userId = await getActiveUserId();
   let text: string;
   try {
     ({ leadId, jdText: text } = parseInput(jdInputSchema, { leadId, jdText }));
@@ -217,7 +217,7 @@ const CONNECTION_TYPES = Object.keys(CONNECTION_TYPE_LABELS) as ConnectionType[]
 export async function structureContactAction(
   pastedText: string,
 ): Promise<{ ok: true; contact: ParsedContact } | { ok: false; error: string }> {
-  const userId = await getCurrentUserId();
+  const userId = await getActiveUserId();
   let text: string;
   try {
     text = parseInput(contactTextSchema, pastedText);
@@ -270,7 +270,7 @@ export async function draftOutreachAction(input: {
   kind: OutreachKind;
   resumeId?: string;
 }): Promise<{ ok: true; draft: string } | { ok: false; error: string }> {
-  const userId = await getCurrentUserId();
+  const userId = await getActiveUserId();
   if (!(await getFeatureAccess(userId)).aiDrafts) return { ok: false, error: PREMIUM_REQUIRED };
   try {
     input = parseInput(draftInputSchema, input) as typeof input;
@@ -340,7 +340,7 @@ export async function scoreFitAction(
   | { ok: true; score: number; rationale: string; autoStatus: AutoStatusChange | null }
   | { ok: false; error: string }
 > {
-  const userId = await getCurrentUserId();
+  const userId = await getActiveUserId();
   let input: { leadId: string; resumeId: string };
   try {
     input = parseInput(scoreFitSchema, { leadId, resumeId });
@@ -543,7 +543,7 @@ async function aiAddBlocked(userId: string): Promise<string | null> {
 export async function extractLeadFromTextAction(
   text: string,
 ): Promise<{ ok: true; lead: ExtractedLead } | { ok: false; error: string }> {
-  const userId = await getCurrentUserId();
+  const userId = await getActiveUserId();
   const blocked = await aiAddBlocked(userId);
   if (blocked) return { ok: false, error: blocked };
   let clean: string;
@@ -569,7 +569,7 @@ export async function extractLeadFromTextAction(
 export async function extractLeadFromImageAction(
   formData: FormData,
 ): Promise<{ ok: true; lead: ExtractedLead } | { ok: false; error: string }> {
-  const userId = await getCurrentUserId();
+  const userId = await getActiveUserId();
   const blocked = await aiAddBlocked(userId);
   if (blocked) return { ok: false, error: blocked };
 
@@ -622,7 +622,7 @@ export async function previewPromptAction(
   system: string,
   input: string,
 ): Promise<{ ok: true; output: string } | { ok: false; error: string }> {
-  const userId = await getCurrentUserId();
+  const userId = await getActiveUserId();
   let parsed: { system: string; input: string };
   try {
     parsed = parseInput(promptPreviewSchema, { system, input });
@@ -639,5 +639,5 @@ export async function previewPromptAction(
 
 /** "Add with AI" uses left this month, for the Add lead dialog (limit null = unlimited). */
 export async function getAiAddAllowanceAction(): Promise<{ limit: number | null; used: number; left: number | null }> {
-  return aiAddAllowance(await getCurrentUserId());
+  return aiAddAllowance(await getActiveUserId());
 }

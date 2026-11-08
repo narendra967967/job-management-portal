@@ -5,13 +5,14 @@ GitHub Actions was only in the original plan because Vercel's Hobby cron ran onc
 day; on our own EC2 box the OS scheduler is simpler, has no extra dependency, and
 keeps the secret on the host.
 
-There are two scheduled jobs, both protected by the bearer `CRON_SECRET` and both
+These scheduled jobs are all protected by the bearer `CRON_SECRET` and all
 safe to call repeatedly:
 
 | Job | Route | Schedule | Behavior |
 |-----|-------|----------|----------|
 | Gmail sync | `POST /api/cron/gmail-sync` | every 15 min | Each user syncs only if their own interval has elapsed; all syncs pause during admin **quiet hours**. |
 | Lead purge | `POST /api/cron/purge-leads` | daily | No-op unless **Lead retention** is enabled in admin Settings → Cron. Deletes stale leads, logs each run, and emails + notifies the user. |
+| Plan reminders | `POST /api/cron/plan-reminders` | daily, 10:00 IST (04:30 UTC) | Emails each user once a day in the last 7 days of their plan or free trial. A second run the same day sends nothing new; failed sends are retried. |
 
 ## Option A — EC2 crontab (recommended)
 

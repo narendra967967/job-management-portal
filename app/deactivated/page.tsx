@@ -12,6 +12,6 @@ export default async function DeactivatedPage() {
   if (!u) redirect("/login");
   const state = accessState(u);
   if (state === "ok") redirect("/leads");
-  if (state === "expired") redirect("/renew");
+  if (state === "expired") redirect("/upgrade");
   return <DeactivatedNotice name={u.name} />;
 }

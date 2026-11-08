@@ -14,6 +14,10 @@
 2-59/5 * * * *  /srv/jobtiva/cron-run.sh prod broadcasts    >> /srv/jobtiva/logs/cron.log 2>&1
 4-59/5 * * * *  /srv/jobtiva/cron-run.sh preprod broadcasts >> /srv/jobtiva/logs/cron.log 2>&1
 
+# Plan-ending reminders (last 7 days of a plan), daily at 04:30 UTC = 10:00 IST.
+30 4 * * *    /srv/jobtiva/cron-run.sh prod reminders    >> /srv/jobtiva/logs/cron.log 2>&1
+40 4 * * *    /srv/jobtiva/cron-run.sh preprod reminders >> /srv/jobtiva/logs/cron.log 2>&1
+
 # Stale-lead purge (no-op unless enabled in admin Settings) + Data retention (admin Settings).
 0 21 * * *    /srv/jobtiva/cron-run.sh prod purge    >> /srv/jobtiva/logs/cron.log 2>&1
 10 21 * * *   /srv/jobtiva/cron-run.sh preprod purge >> /srv/jobtiva/logs/cron.log 2>&1

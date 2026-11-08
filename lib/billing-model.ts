@@ -274,6 +274,8 @@ export interface AdminOrderRow {
   createdAt: string;
   paidAt: string | null;
   user: { name: string; email: string } | null;
+  /** The account was deleted since (name/email are the order's snapshot). */
+  userDeleted?: boolean;
   planName: string;
   period: BillingPeriod;
   kind: QuoteKind;

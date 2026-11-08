@@ -71,7 +71,7 @@ const SECTION = {
     id: "payments",
     label: "Payments",
     icon: Wallet,
-    render: (i: AdminSettings) => <PaymentsCard billingMissing={billingMissing({ ...i.billing, taxRate: i.billing.taxRate })} />,
+    render: (i: AdminSettings) => <PaymentsCard gateways={i.gateways} billingMissing={billingMissing({ ...i.billing, taxRate: i.billing.taxRate })} />,
   },
   email: { id: "email", label: "Email / SMTP", icon: Mail, render: (i: AdminSettings) => <EmailCard initial={i.smtp} /> },
   intake: { id: "intake", label: "Email intake", icon: Inbox, render: (i: AdminSettings) => <EmailIntakeCard initial={i.intake} /> },

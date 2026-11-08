@@ -1,10 +1,11 @@
 "use client";
 
-// Full-screen (no-scroll) notices shown when an admin has deactivated an account
-// or its plan has expired. Deactivated users can message the admin; both can log out.
+// Full-screen (no-scroll) notice shown when an admin has deactivated an account.
+// The user can message the admin or log out. (An expired plan isn't blocked
+// here: it gets limited mode with the Upgrade Plan page.)
 
 import { useState } from "react";
-import { Ban, Clock, LogOut, Mail, Send, CheckCircle2 } from "lucide-react";
+import { Ban, LogOut, Mail, Send, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -121,28 +122,6 @@ export function DeactivatedNotice({ name }: { name: string }) {
           )}
         </DialogContent>
       </Dialog>
-    </Shell>
-  );
-}
-
-export function RenewNotice({ name }: { name: string }) {
-  return (
-    <Shell>
-      <span className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-status-shortlisted text-status-shortlisted-foreground">
-        <Clock className="size-7" aria-hidden />
-      </span>
-      <h1 className="mt-5 text-xl font-semibold tracking-tight">Your plan has expired</h1>
-      <p className="mt-2 text-sm text-muted-foreground">
-        {name ? `${name}, your` : "Your"} subscription has run out. Renew to pick up right where you
-        left off — your data is safe and waiting.
-      </p>
-      <div className="mt-6 flex flex-col gap-2">
-        <Button className="h-11 w-full" disabled>Renew plan</Button>
-        <Button variant="outline" className="h-11 w-full gap-2 bg-white/60" onClick={() => signOutToHome()}>
-          <LogOut className="size-4" aria-hidden />
-          Log out
-        </Button>
-      </div>
     </Shell>
   );
 }

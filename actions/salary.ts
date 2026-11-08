@@ -8,7 +8,7 @@
 
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { getCurrentUserId } from "@/lib/current-user";
+import { getActiveUserId } from "@/lib/current-user";
 import { aiComplete, AI_NOT_CONFIGURED } from "@/lib/ai";
 import { getFeatureAccess, PREMIUM_REQUIRED } from "@/lib/entitlements";
 import { parseInput, zId } from "@/lib/schemas";
@@ -51,7 +51,7 @@ const SYSTEM = [
 ].join("\n");
 
 export async function generateSalaryInsightAction(leadId: string): Promise<Result> {
-  const userId = await getCurrentUserId();
+  const userId = await getActiveUserId();
   if (!(await getFeatureAccess(userId)).salaryInsight) {
     return { ok: false, error: PREMIUM_REQUIRED, locked: true };
   }

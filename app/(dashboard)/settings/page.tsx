@@ -73,7 +73,6 @@ import {
 import { buildGmailQuery } from "@/lib/use-gmail-settings";
 import { EmailForwardingCard } from "@/components/forwarding/email-forwarding-card";
 import { PlanChooser } from "@/components/billing/plan-chooser";
-import { PaymentsPreviewBar } from "@/components/billing/payments-preview-bar";
 import { useLimitedMode } from "@/lib/access-mode";
 import { EmailLogCard } from "@/components/forwarding/email-log-card";
 import { DangerZoneCard } from "@/components/account/danger-zone";
@@ -642,7 +641,6 @@ function PlanDetailsCard() {
       {/* Renew or move up: the plan picker + checkout (payments on) or a request (off). */}
       {plan && (
         <div className="mt-4 rounded-2xl border bg-card p-4 md:p-5">
-          <PaymentsPreviewBar />
           <h2 className="text-sm font-medium">{plan.isFree ? "Choose a plan" : "Renew or upgrade"}</h2>
           <div className="mt-3">
             <PlanChooser

@@ -5,8 +5,10 @@
 // current plan. With a payment gateway on, "Pay" runs the checkout; with none
 // on, "Request this plan" opens a prefilled support ticket instead.
 //
-// PHASE 1: payment is simulated (the preview bar picks the result). Phase 3
-// swaps simulatePayment() for the real Razorpay checkout.
+// "Pay": the server creates the order (it alone decides the amount), the
+// Razorpay window takes the payment, and the server verifies the signature and
+// the amount before the plan changes. Our dialog steps aside while Razorpay's
+// window is open, then shows the result.
 
 import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, CircleAlert, Loader2, Lock, Send } from "lucide-react";
@@ -22,17 +24,13 @@ import {
   type OfferPlan,
   type TaxSettings,
 } from "@/lib/billing-model";
-import { useMockPayments, type PreviewOutcome } from "@/lib/payments-mock";
+import { closeCheckoutAction, startCheckoutAction, verifyCheckoutAction } from "@/actions/payments";
+import { openRazorpay } from "@/lib/razorpay-checkout";
 
-type Status = "idle" | "paying" | "paid" | "cancelled" | "failed";
+type Status = "idle" | "starting" | "external" | "verifying" | "paid" | "cancelled" | "failed" | "error";
 
 const dateFmt = (iso: string) =>
   new Date(iso).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
-
-/** PHASE 1 ONLY: stands in for the Razorpay window. */
-function simulatePayment(outcome: PreviewOutcome): Promise<PreviewOutcome> {
-  return new Promise((resolve) => setTimeout(() => resolve(outcome), 1200));
-}
 
 export function CheckoutDialog({
   open,
@@ -50,18 +48,26 @@ export function CheckoutDialog({
   period: BillingPeriod;
   current: CurrentPlanInfo;
   tax: TaxSettings;
-  /** A payment gateway is switched on. */
+  /** A payment gateway is on and Billing is complete. */
   online: boolean;
   onPaid: () => void;
 }) {
   const { open: openSupport } = useContactSupport();
-  const mock = useMockPayments(); // PHASE 1
   const [status, setStatus] = useState<Status>("idle");
+  const [message, setMessage] = useState("");
+  const [paidUntil, setPaidUntil] = useState<string | null>(null);
+  // The server can switch this off (gateway turned off meanwhile).
+  const [canPayOnline, setCanPayOnline] = useState(online);
 
   // Fresh state each time the dialog opens for a plan.
   useEffect(() => {
-    if (open) setStatus("idle");
-  }, [open, plan?.id, period]);
+    if (open) {
+      setStatus("idle");
+      setMessage("");
+      setPaidUntil(null);
+      setCanPayOnline(online);
+    }
+  }, [open, plan?.id, period, online]);
 
   // Computed on open (client only), so dates use the viewer's clock.
   const q = useMemo(
@@ -73,9 +79,66 @@ export function CheckoutDialog({
   const title = q?.kind === "renew" ? `Renew ${plan.name}` : q?.kind === "upgrade" ? `Upgrade to ${plan.name}` : `Get ${plan.name}`;
 
   async function pay() {
-    setStatus("paying");
-    const result = await simulatePayment(mock.previewOutcome);
-    setStatus(result);
+    if (!plan) return;
+    setStatus("starting");
+    setMessage("");
+    const start = await startCheckoutAction({ planId: plan.id, period });
+    if (!start.ok) {
+      // Online payment went off meanwhile: show the request flow instead.
+      if (start.fallback) {
+        setCanPayOnline(false);
+        setStatus("idle");
+      } else {
+        setMessage(start.error);
+        setStatus("error");
+      }
+      return;
+    }
+    const c = start.checkout;
+    let failedReason: string | null = null;
+    setStatus("external");
+    const outcome = await openRazorpay({
+      key: c.keyId,
+      orderId: c.gatewayOrderId,
+      amount: c.amount,
+      currency: c.currency,
+      name: c.merchantName,
+      description: `${c.planName} plan, billed ${PERIOD_LABELS[c.period].toLowerCase()}`,
+      prefill: c.prefill,
+      // Razorpay lets the user retry in the same window; remember the reason.
+      onFailedAttempt: (reason) => {
+        failedReason = reason;
+        void closeCheckoutAction({ orderId: c.orderId, outcome: "failed", reason });
+      },
+    });
+
+    if (outcome.kind === "load-error") {
+      void closeCheckoutAction({ orderId: c.orderId, outcome: "failed", reason: "The payment window didn't load" });
+      setMessage("The payment window didn't load. Check your connection and try again.");
+      setStatus("error");
+      return;
+    }
+    if (outcome.kind === "dismissed") {
+      void closeCheckoutAction({ orderId: c.orderId, outcome: "cancelled" });
+      setStatus(failedReason ? "failed" : "cancelled");
+      setMessage(failedReason ?? "");
+      return;
+    }
+
+    setStatus("verifying");
+    const res = await verifyCheckoutAction({
+      orderId: c.orderId,
+      razorpayOrderId: outcome.orderId,
+      razorpayPaymentId: outcome.paymentId,
+      razorpaySignature: outcome.signature,
+    });
+    if (res.ok) {
+      setPaidUntil(res.expiresAt);
+      setStatus("paid");
+    } else {
+      setMessage(res.error);
+      setStatus("error");
+    }
   }
 
   function request() {
@@ -89,19 +152,20 @@ export function CheckoutDialog({
     onOpenChange(false);
   }
 
-  const busy = status === "paying";
+  const busy = status === "starting" || status === "external" || status === "verifying";
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !busy && onOpenChange(o)}>
+    // Hidden (not closed) while Razorpay's own window is up, so it can take focus.
+    <Dialog open={open && status !== "external"} onOpenChange={(o) => !busy && onOpenChange(o)}>
       <DialogContent className="sm:max-w-md">
-        {status === "paid" && q ? (
+        {status === "paid" && q && paidUntil ? (
           <div className="py-4 text-center">
             <CheckCircle2 className="mx-auto size-12 text-status-applied-foreground" aria-hidden />
             <DialogTitle className="mt-3 text-lg">
               {q.kind === "renew" ? `${plan.name} is renewed` : `You’re on ${plan.name}`}
             </DialogTitle>
             <DialogDescription className="mt-1.5">
-              Your plan is active until {dateFmt(q.expiresAt)}. We&rsquo;ve emailed you a receipt.
+              Your plan is active until {dateFmt(paidUntil)}. We&rsquo;ve emailed you a receipt.
             </DialogDescription>
             <Button className="mt-5 w-full" onClick={onPaid}>
               Done
@@ -162,17 +226,26 @@ export function CheckoutDialog({
                 {status === "failed" && (
                   <p role="alert" className="flex items-start gap-2 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">
                     <CircleAlert className="mt-px size-4 shrink-0" aria-hidden />
-                    The payment didn&rsquo;t go through, and you haven&rsquo;t been charged. Try again, or pick another
-                    payment method in the payment window.
+                    <span>
+                      The payment didn&rsquo;t go through{message ? ` (${message.replace(/.$/, "")})` : ""}. You
+                      haven&rsquo;t been charged. Try again, or pick another payment method in the payment window.
+                    </span>
+                  </p>
+                )}
+                {status === "error" && message && (
+                  <p role="alert" className="flex items-start gap-2 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                    <CircleAlert className="mt-px size-4 shrink-0" aria-hidden />
+                    {message}
                   </p>
                 )}
 
-                {online ? (
+                {canPayOnline ? (
                   <>
                     <Button className="w-full" onClick={pay} disabled={busy}>
                       {busy ? (
                         <>
-                          <Loader2 className="size-4 animate-spin" aria-hidden /> Opening secure payment…
+                          <Loader2 className="size-4 animate-spin" aria-hidden />
+                          {status === "verifying" ? "Confirming your payment…" : "Opening secure payment…"}
                         </>
                       ) : (
                         <>
