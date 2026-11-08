@@ -5,8 +5,8 @@
 // Both setups are kept, so switching back and forth loses nothing.
 // Secrets are write-only: saved encrypted, never sent back to the browser.
 
-import { useState } from "react";
-import { CheckCircle2, Eye, EyeOff, PlugZap, Send } from "lucide-react";
+import { useId, useState } from "react";
+import { CheckCircle2, ChevronDown, Eye, EyeOff, PlugZap, Send } from "lucide-react";
 import { Button } from "@/components/admin/ui/button";
 import { Input } from "@/components/admin/ui/input";
 import { Badge } from "@/components/admin/ui/badge";
@@ -58,14 +58,86 @@ export function EmailDeliverySection({ smtp, children }: { smtp: SmtpSummary; ch
         smtp={smtp}
         ses={delivery.ses}
       />
-      {children}
-      {/* Remount when the stored values change, so the form starts from them. */}
-      <SesCard
-        key={`${delivery.ses.region}|${delivery.ses.accessKeyId}|${delivery.ses.fromEmail}`}
-        ses={delivery.ses}
-        inUse={delivery.provider === "ses"}
-      />
+      <DeliveryAccordion
+        title="SMTP"
+        badge={<ServiceBadge inUse={delivery.provider === "smtp"} ready={smtpReady(smtp)} />}
+        defaultOpen={delivery.provider === "smtp"}
+      >
+        {children}
+      </DeliveryAccordion>
+      <DeliveryAccordion
+        title="Amazon SES"
+        badge={<ServiceBadge inUse={delivery.provider === "ses"} ready={sesMissing(delivery.ses).length === 0} />}
+        defaultOpen={delivery.provider === "ses"}
+        info={
+          <InfoTip label="Setting up Amazon SES">
+            In the AWS console: verify your domain in SES (it gives you DNS records to add), request production access
+            so you can email anyone, then create an IAM user that is only allowed to send email and make an access key
+            for it.
+          </InfoTip>
+        }
+      >
+        {/* Remount when the stored values change, so the form starts from them. */}
+        <SesCard key={`${delivery.ses.region}|${delivery.ses.accessKeyId}|${delivery.ses.fromEmail}`} ses={delivery.ses} />
+      </DeliveryAccordion>
     </div>
+  );
+}
+
+/* ---------------- accordion ---------------- */
+
+function ServiceBadge({ inUse, ready }: { inUse: boolean; ready: boolean }) {
+  if (inUse) return <Badge variant="success">In use</Badge>;
+  return <Badge variant={ready ? "neutral" : "warning"}>{ready ? "Ready" : "Not set up"}</Badge>;
+}
+
+/**
+ * One service's settings, folded away when not needed. The content stays
+ * mounted while closed, so anything typed survives folding.
+ */
+export function DeliveryAccordion({
+  title,
+  badge,
+  info,
+  defaultOpen,
+  children,
+}: {
+  title: string;
+  badge?: React.ReactNode;
+  info?: React.ReactNode;
+  defaultOpen: boolean;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  const id = useId();
+  return (
+    <section className="rounded-2xl border bg-card">
+      <div className="flex items-center gap-1 px-4 md:px-5">
+        <h2 className="min-w-0 flex-1 text-sm font-medium">
+          <button
+            type="button"
+            aria-expanded={open}
+            aria-controls={id}
+            onClick={() => setOpen((o) => !o)}
+            className="flex min-h-14 w-full items-center gap-2 text-left"
+          >
+            <ChevronDown
+              className={cn(
+                "size-4 shrink-0 text-muted-foreground transition-transform motion-reduce:transition-none",
+                !open && "-rotate-90",
+              )}
+              aria-hidden
+            />
+            <span>{title}</span>
+            {badge}
+          </button>
+        </h2>
+        {info}
+      </div>
+      <div id={id} hidden={!open} className="border-t px-4 py-4 md:px-5 md:pb-5">
+        {children}
+      </div>
+    </section>
   );
 }
 
@@ -152,7 +224,7 @@ function ProviderCard({ provider, smtp, ses }: { provider: EmailProvider; smtp: 
 
 /* ---------------- Amazon SES ---------------- */
 
-function SesCard({ ses, inUse }: { ses: SesSettings; inUse: boolean }) {
+function SesCard({ ses }: { ses: SesSettings }) {
   const mounted = useMounted();
   const [region, setRegion] = useState(ses.region);
   const [accessKeyId, setAccessKeyId] = useState(ses.accessKeyId);
@@ -223,20 +295,8 @@ function SesCard({ ses, inUse }: { ses: SesSettings; inUse: boolean }) {
   }
 
   return (
-    <section className="rounded-2xl border bg-card p-4 md:p-5">
-      <div className="flex flex-wrap items-center gap-2">
-        <h2 className="flex items-center gap-1 text-sm font-medium">
-          Amazon SES
-          <InfoTip label="Setting up Amazon SES">
-            In the AWS console: verify your domain in SES (it gives you DNS records to add), request production access
-            so you can email anyone, then create an IAM user that is only allowed to send email and make an access key
-            for it.
-          </InfoTip>
-        </h2>
-        <Badge variant={inUse ? "success" : "neutral"}>{inUse ? "In use" : "Not in use"}</Badge>
-      </div>
-
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+    <div>
+      <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Region" hint="Where your domain is verified in SES, e.g. ap-south-1">
           <Input
             value={region}
@@ -366,7 +426,7 @@ function SesCard({ ses, inUse }: { ses: SesSettings; inUse: boolean }) {
           <p className={cn("mt-2 text-xs", testMsg.ok ? "text-status-applied-foreground" : "text-destructive")}>{testMsg.text}</p>
         )}
       </div>
-    </section>
+    </div>
   );
 }
 

@@ -692,9 +692,9 @@ function EmailCard({ initial }: { initial: AdminSettings["smtp"] }) {
   }
 
   return (
-    <section className="rounded-2xl border bg-card p-4 md:p-5">
-      <h2 className="text-sm font-medium">SMTP</h2>
-      <label className="mt-4 flex cursor-pointer items-center gap-2 text-sm">
+    // Its card and heading come from the Email delivery accordion.
+    <div>
+      <label className="flex cursor-pointer items-center gap-2 text-sm">
         <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} className="size-4 cursor-pointer rounded border-input accent-primary" />
         Send emails via SMTP
       </label>
@@ -768,7 +768,7 @@ function EmailCard({ initial }: { initial: AdminSettings["smtp"] }) {
         <p className="mt-1.5 text-[11px] text-muted-foreground">Uses the saved settings above.</p>
         {testMsg && <p className="mt-2 text-xs text-muted-foreground">{testMsg}</p>}
       </div>
-    </section>
+    </div>
   );
 }
 
