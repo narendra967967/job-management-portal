@@ -692,7 +692,7 @@ function EmailCard({ initial }: { initial: AdminSettings["smtp"] }) {
   }
 
   return (
-    // Its card and heading come from the Email delivery accordion.
+    // Its card and heading come from the Email delivery tabs.
     <div>
       <label className="flex cursor-pointer items-center gap-2 text-sm">
         <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} className="size-4 cursor-pointer rounded border-input accent-primary" />

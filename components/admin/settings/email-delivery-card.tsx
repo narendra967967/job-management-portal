@@ -1,12 +1,12 @@
 "use client";
 
 // Admin → Settings → Email delivery: which service sends every email the app
-// sends (SMTP or Amazon SES), the SMTP card (unchanged) and the Amazon SES card.
+// sends (SMTP or Amazon SES), then each service's settings in its own tab.
 // Both setups are kept, so switching back and forth loses nothing.
 // Secrets are write-only: saved encrypted, never sent back to the browser.
 
 import { useId, useState } from "react";
-import { CheckCircle2, ChevronDown, Eye, EyeOff, PlugZap, Send } from "lucide-react";
+import { CheckCircle2, Eye, EyeOff, PlugZap, Send } from "lucide-react";
 import { Button } from "@/components/admin/ui/button";
 import { Input } from "@/components/admin/ui/input";
 import { Badge } from "@/components/admin/ui/badge";
@@ -58,33 +58,12 @@ export function EmailDeliverySection({ smtp, children }: { smtp: SmtpSummary; ch
         smtp={smtp}
         ses={delivery.ses}
       />
-      <DeliveryAccordion
-        title="SMTP"
-        badge={<ServiceBadge inUse={delivery.provider === "smtp"} ready={smtpReady(smtp)} />}
-        defaultOpen={delivery.provider === "smtp"}
-      >
-        {children}
-      </DeliveryAccordion>
-      <DeliveryAccordion
-        title="Amazon SES"
-        badge={<ServiceBadge inUse={delivery.provider === "ses"} ready={sesMissing(delivery.ses).length === 0} />}
-        defaultOpen={delivery.provider === "ses"}
-        info={
-          <InfoTip label="Setting up Amazon SES">
-            In the AWS console: verify your domain in SES (it gives you DNS records to add), request production access
-            so you can email anyone, then create an IAM user that is only allowed to send email and make an access key
-            for it.
-          </InfoTip>
-        }
-      >
-        {/* Remount when the stored values change, so the form starts from them. */}
-        <SesCard key={`${delivery.ses.region}|${delivery.ses.accessKeyId}|${delivery.ses.fromEmail}`} ses={delivery.ses} />
-      </DeliveryAccordion>
+      <ServiceTabs provider={delivery.provider} smtp={smtp} ses={delivery.ses} smtpContent={children} />
     </div>
   );
 }
 
-/* ---------------- accordion ---------------- */
+/* ---------------- tabs ---------------- */
 
 function ServiceBadge({ inUse, ready }: { inUse: boolean; ready: boolean }) {
   if (inUse) return <Badge variant="success">In use</Badge>;
@@ -92,52 +71,89 @@ function ServiceBadge({ inUse, ready }: { inUse: boolean; ready: boolean }) {
 }
 
 /**
- * One service's settings, folded away when not needed. The content stays
- * mounted while closed, so anything typed survives folding.
+ * SMTP and Amazon SES settings as two tabs, opening on the one in use. Both
+ * panels stay mounted, so anything typed survives switching tabs.
  */
-export function DeliveryAccordion({
-  title,
-  badge,
-  info,
-  defaultOpen,
-  children,
+function ServiceTabs({
+  provider,
+  smtp,
+  ses,
+  smtpContent,
 }: {
-  title: string;
-  badge?: React.ReactNode;
-  info?: React.ReactNode;
-  defaultOpen: boolean;
-  children: React.ReactNode;
+  provider: EmailProvider;
+  smtp: SmtpSummary;
+  ses: SesSettings;
+  smtpContent: React.ReactNode;
 }) {
-  const [open, setOpen] = useState(defaultOpen);
+  const [tab, setTab] = useState<EmailProvider>(provider);
   const id = useId();
+  const ready: Record<EmailProvider, boolean> = { smtp: smtpReady(smtp), ses: sesMissing(ses).length === 0 };
+  const tabs: EmailProvider[] = ["smtp", "ses"];
+
   return (
-    <section className="rounded-2xl border bg-card">
-      <div className="flex items-center gap-1 px-4 md:px-5">
-        <h2 className="min-w-0 flex-1 text-sm font-medium">
+    <div className="space-y-3">
+      <div role="tablist" aria-label="Email service settings" className="inline-flex rounded-xl bg-muted/70 p-1">
+        {tabs.map((t) => (
           <button
+            key={t}
+            id={`${id}-tab-${t}`}
             type="button"
-            aria-expanded={open}
-            aria-controls={id}
-            onClick={() => setOpen((o) => !o)}
-            className="flex min-h-14 w-full items-center gap-2 text-left"
+            role="tab"
+            aria-selected={tab === t}
+            aria-controls={`${id}-panel-${t}`}
+            onClick={() => setTab(t)}
+            onKeyDown={(e) => {
+              if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+              const next = tabs[(tabs.indexOf(t) + 1) % tabs.length];
+              setTab(next);
+              document.getElementById(`${id}-tab-${next}`)?.focus();
+            }}
+            tabIndex={tab === t ? 0 : -1}
+            className={cn(
+              "inline-flex min-h-11 items-center gap-2 rounded-lg px-4 text-sm font-medium transition-colors",
+              tab === t ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+            )}
           >
-            <ChevronDown
-              className={cn(
-                "size-4 shrink-0 text-muted-foreground transition-transform motion-reduce:transition-none",
-                !open && "-rotate-90",
-              )}
-              aria-hidden
-            />
-            <span>{title}</span>
-            {badge}
+            {PROVIDER_LABELS[t]}
+            {provider === t && (
+              <>
+                <span className="size-1.5 rounded-full bg-status-applied-foreground ring-2 ring-status-applied" aria-hidden />
+                <span className="sr-only">(in use)</span>
+              </>
+            )}
           </button>
-        </h2>
-        {info}
+        ))}
       </div>
-      <div id={id} hidden={!open} className="border-t px-4 py-4 md:px-5 md:pb-5">
-        {children}
-      </div>
-    </section>
+
+      {tabs.map((t) => (
+        <section
+          key={t}
+          id={`${id}-panel-${t}`}
+          role="tabpanel"
+          aria-labelledby={`${id}-tab-${t}`}
+          hidden={tab !== t}
+          className="rounded-2xl border bg-card p-4 md:p-5"
+        >
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <h2 className="text-sm font-medium">{PROVIDER_LABELS[t]}</h2>
+            <ServiceBadge inUse={provider === t} ready={ready[t]} />
+            {t === "ses" && (
+              <InfoTip label="Setting up Amazon SES">
+                In the AWS console: verify your domain in SES (it gives you DNS records to add), request production
+                access so you can email anyone, then create an IAM user that is only allowed to send email and make an
+                access key for it.
+              </InfoTip>
+            )}
+          </div>
+          {t === "smtp" ? (
+            smtpContent
+          ) : (
+            /* Remount when the stored values change, so the form starts from them. */
+            <SesCard key={`${ses.region}|${ses.accessKeyId}|${ses.fromEmail}`} ses={ses} />
+          )}
+        </section>
+      ))}
+    </div>
   );
 }
 
