@@ -52,6 +52,7 @@ import { EmailIntakeCard } from "@/components/admin/settings/email-intake-card";
 import { RetentionCard } from "@/components/admin/settings/retention-card";
 import { CaptchaCard } from "@/components/admin/settings/captcha-card";
 import { PaymentsCard } from "@/components/admin/settings/payments-card";
+import { EmailDeliverySection } from "@/components/admin/settings/email-delivery-card";
 import { Badge } from "@/components/admin/ui/badge";
 import { billingMissing, isValidGstin, isValidPan, isValidSac } from "@/lib/billing-model";
 
@@ -73,7 +74,16 @@ const SECTION = {
     icon: Wallet,
     render: (i: AdminSettings) => <PaymentsCard gateways={i.gateways} billingMissing={billingMissing({ ...i.billing, taxRate: i.billing.taxRate })} />,
   },
-  email: { id: "email", label: "Email / SMTP", icon: Mail, render: (i: AdminSettings) => <EmailCard initial={i.smtp} /> },
+  email: {
+    id: "email",
+    label: "Email delivery",
+    icon: Mail,
+    render: (i: AdminSettings) => (
+      <EmailDeliverySection smtp={i.smtp}>
+        <EmailCard initial={i.smtp} />
+      </EmailDeliverySection>
+    ),
+  },
   intake: { id: "intake", label: "Email intake", icon: Inbox, render: (i: AdminSettings) => <EmailIntakeCard initial={i.intake} /> },
   ai: { id: "ai", label: "AI", icon: Sparkles, render: (i: AdminSettings) => <AiCard initial={i.ai} /> },
   cron: { id: "cron", label: "Cron & schedule", icon: Clock, render: (i: AdminSettings) => <CronCard initial={i.cron} gmailEnabled={i.intake.config.gmailOAuthEnabled} /> },
@@ -655,7 +665,7 @@ function BillingCard({ initial }: { initial: AdminSettings["billing"] }) {
   );
 }
 
-/* ---------------- Application: Email / SMTP ---------------- */
+/* ---------------- Application: Email delivery → SMTP ---------------- */
 
 function EmailCard({ initial }: { initial: AdminSettings["smtp"] }) {
   const [enabled, setEnabled] = useState(initial.enabled);
@@ -683,7 +693,7 @@ function EmailCard({ initial }: { initial: AdminSettings["smtp"] }) {
 
   return (
     <section className="rounded-2xl border bg-card p-4 md:p-5">
-      <h2 className="text-sm font-medium">Email / SMTP</h2>
+      <h2 className="text-sm font-medium">SMTP</h2>
       <label className="mt-4 flex cursor-pointer items-center gap-2 text-sm">
         <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} className="size-4 cursor-pointer rounded border-input accent-primary" />
         Send emails via SMTP
