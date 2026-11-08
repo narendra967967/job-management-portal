@@ -84,7 +84,7 @@ const GROUPS: Group[] = [
     items: [
       { href: "/jmp-admin/broadcasts", label: "Broadcasts", icon: Megaphone },
       { href: "/jmp-admin/guides", label: "How-to guides", icon: GraduationCap },
-      { label: "Email templates", icon: Mails, soon: true },
+      { href: "/jmp-admin/email-templates", label: "Email templates", icon: Mails },
       { label: "Referrals", icon: Gift, soon: true },
     ],
   },
@@ -113,6 +113,7 @@ const TITLES: Record<string, string> = {
   "/jmp-admin/knowledge-base": "Knowledge base",
   "/jmp-admin/broadcasts": "Broadcasts",
   "/jmp-admin/broadcasts/new": "New broadcast",
+  "/jmp-admin/email-templates": "Email templates",
 };
 
 const KB_HREF = "/jmp-admin/knowledge-base";
@@ -260,7 +261,9 @@ export function AdminShell({
         ? "Knowledge base"
         : pathname.startsWith("/jmp-admin/broadcasts/")
           ? "Broadcast"
-          : "Admin");
+          : pathname.startsWith("/jmp-admin/email-templates/")
+            ? "Email template"
+            : "Admin");
 
   // Accordion: one group open at a time. The group holding the active page opens
   // on load and whenever navigation moves into it; opening another closes the rest.
