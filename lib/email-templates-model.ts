@@ -4,8 +4,8 @@
 // the senders.
 //
 // RULE: any new automatic email gets an entry here and its sender fills it, so
-// admins control its content. Broadcasts and the SMTP test email are the only
-// exceptions. Links (confirm, reset, …) are never part of the editable text:
+// admins control its content. Broadcasts and the SMTP and Amazon SES test emails
+// are the only exceptions. Links (confirm, reset, …) are never part of the editable text:
 // the sender makes them and the button carries them.
 
 import { z } from "zod";

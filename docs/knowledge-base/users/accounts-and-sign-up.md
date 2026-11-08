@@ -20,7 +20,7 @@ No account can sign in until its email is verified, and how that happens depends
 
 Anyone who lost or let a link run out only has to sign in again. With the right password, they're told their email isn't confirmed and a fresh link goes out, at most one every few minutes. Setting a new password through **Forgot password** verifies them too, since that link also proves they own the address.
 
-Admin **Users** marks anyone still unconfirmed with *not verified* next to their email. If the email never arrives, check admin Settings → Email / SMTP first, since nothing sends without it.
+Admin **Users** marks anyone still unconfirmed with *not verified* next to their email. If the email never arrives, check admin Settings → Email delivery first, since nothing sends without it.
 
 ## When a user can't get in
 

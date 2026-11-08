@@ -157,7 +157,7 @@ export async function sendEmailTemplateTestAction(
     if ("error" in prepared) return { ok: false, error: prepared.error };
     content = prepared.content;
   }
-  if (!(await isMailConfigured())) return { ok: false, error: "Email isn't set up yet. Add the SMTP details in Settings → Email / SMTP first." };
+  if (!(await isMailConfigured())) return { ok: false, error: "Email isn't set up yet. Set it up in Settings → Email delivery first." };
   const [me] = await db.select({ email: user.email }).from(user).where(eq(user.id, adminId));
   if (!me?.email) return { ok: false, error: "Your admin account has no email address." };
 
@@ -167,7 +167,7 @@ export async function sendEmailTemplateTestAction(
     await sendTemplateEmail(def.key, { to: me.email, values: samples, content, buttonUrl: siteUrl(), subjectPrefix: "[Test] " });
   } catch (e) {
     console.error("email template test failed", e);
-    return { ok: false, error: "The test email didn't send. Check the SMTP details in Settings → Email / SMTP." };
+    return { ok: false, error: "The test email didn't send. Check Settings → Email delivery." };
   }
   return { ok: true, to: me.email };
 }

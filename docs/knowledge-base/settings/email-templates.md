@@ -7,7 +7,7 @@ keywords: email template, email wording, edit email text, password reset email t
 
 Every email the app sends by itself lives under **Engagement → Email templates**: sign-in emails, confirmation codes, account notices, plan reminders, payment receipts, the old-leads cleanup notice, support replies and the reactivation request that comes to your own support inbox. There are 15, in six groups. Whatever you save there is what the next email uses. There's no publish step.
 
-Two kinds of email aren't here. Broadcasts are written each time you send one, and the SMTP test email in Settings is fixed.
+Two kinds of email aren't here. Broadcasts are written each time you send one, and the two test emails in Settings → Email delivery (SMTP and Amazon SES) are fixed.
 
 ## What you can change
 
@@ -34,7 +34,7 @@ The message editor is the same one How-to guides use. Images need a full web add
 
 ## Checking before you rely on it
 
-**Preview** shows the email in the branded layout with sample values filled in. **Test to me** emails it to your own admin address with "[Test]" in the subject, using the wording on screen even if you haven't saved it. It needs email set up in **Settings → Email / SMTP**. Send yourself a test after any real change. A preview can't show you how Gmail or Outlook will treat it.
+**Preview** shows the email in the branded layout with sample values filled in. **Test to me** emails it to your own admin address with "[Test]" in the subject, using the wording on screen even if you haven't saved it. It needs email set up in **Settings → Email delivery**. Send yourself a test after any real change. A preview can't show you how Gmail or Outlook will treat it.
 
 ## History and going back
 

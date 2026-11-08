@@ -4,13 +4,17 @@
 // which service sends the app's email. Every action checks for an admin and
 // validates on the server; the screen's checks are only a convenience.
 
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/current-user";
 import { emailDelivery } from "@/db/schema";
 import { encryptSecret } from "@/lib/crypto";
-import { getEmailDelivery, providersReady } from "@/lib/email-delivery";
+import { getEmailDelivery, getSesCredentials, providersReady } from "@/lib/email-delivery";
+import { getSesAccount, sesErrorMessage } from "@/lib/ses";
+import { sendAppEmail } from "@/lib/email";
+import { getAppName } from "@/lib/branding";
 import {
   PROVIDER_LABELS,
   accessKeyIdError,
@@ -96,19 +100,51 @@ export async function setEmailProviderAction(provider: unknown): Promise<Result>
   return { ok: true };
 }
 
-/** PHASE 2: connecting to SES comes in phase 3 with the AWS SDK. */
-const NOT_YET = "Connecting to Amazon SES comes in the next update. Your details are saved.";
-
+/** Reads the SES account with the saved details and keeps the result for the screen. */
 export async function testSesAction(): Promise<{ ok: true; account: SesAccountInfo } | { ok: false; error: string }> {
-  await requireAdmin();
-  const current = await getEmailDelivery();
-  if (!current.ses.hasSecret) return { ok: false, error: "Save the Amazon SES details first." };
-  return { ok: false, error: NOT_YET };
+  const adminId = await requireAdmin();
+  const creds = await getSesCredentials();
+  if (!creds) return { ok: false, error: "Save the Amazon SES details first." };
+  const now = new Date();
+  try {
+    const account = await getSesAccount(creds);
+    await db
+      .update(emailDelivery)
+      .set({ sesLastTestOk: true, sesLastTestAt: now, sesAccount: account, updatedBy: adminId })
+      .where(eq(emailDelivery.id, "app"));
+    revalidate();
+    return { ok: true, account };
+  } catch (e) {
+    await db
+      .update(emailDelivery)
+      .set({ sesLastTestOk: false, sesLastTestAt: now, sesAccount: null, updatedBy: adminId })
+      .where(eq(emailDelivery.id, "app"));
+    revalidate();
+    return { ok: false, error: sesErrorMessage(e, creds.region) };
+  }
 }
 
+/** Sends a short email through Amazon SES, even while SMTP is the service in use. */
 export async function sendSesTestAction(to: unknown): Promise<{ ok: true; to: string } | { ok: false; error: string }> {
   await requireAdmin();
   const p = z.string().trim().max(254).refine((v) => v && !emailError(v), "Enter the address to send the test to.").safeParse(to);
   if (!p.success) return { ok: false, error: p.error.issues[0]?.message ?? "Enter an email address." };
-  return { ok: false, error: NOT_YET };
+  if (!(await getSesCredentials())) return { ok: false, error: "Save the Amazon SES details first." };
+  const appName = await getAppName();
+  try {
+    await sendAppEmail({
+      via: "ses",
+      to: p.data,
+      subject: `${appName}: Amazon SES test email`,
+      heading: "Amazon SES is working",
+      lines: [
+        "This test came from Settings → Email delivery, sent through Amazon SES.",
+        "If it reached your inbox (and not spam), SES is ready to send your app's email.",
+      ],
+    });
+    return { ok: true, to: p.data };
+  } catch (e) {
+    const region = (await getEmailDelivery()).ses.region;
+    return { ok: false, error: sesErrorMessage(e, region) };
+  }
 }

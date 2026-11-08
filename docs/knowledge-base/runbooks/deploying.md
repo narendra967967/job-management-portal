@@ -41,7 +41,7 @@ Anything that touches an automatic email, its sender or Email templates gets its
 node --env-file=.env.local --require ./scripts/security/server-only-stub.cjs --import tsx scripts/security/email-templates-checks.mts
 ```
 
-It fails if an email can't be filled in, if saving would let a broken placeholder through, if unsafe HTML survives cleaning, or if any code sends email without going through a template (broadcasts and the SMTP test are the only ones allowed to). It also saves wording for one email for a moment to prove the fallback works, then puts back exactly what was there. Nothing is ever sent.
+It fails if an email can't be filled in, if saving would let a broken placeholder through, if unsafe HTML survives cleaning, or if any code sends email without going through a template (broadcasts and the two test emails in Settings → Email delivery are the only ones allowed to). It also saves wording for one email for a moment to prove the fallback works, then puts back exactly what was there. Nothing is ever sent.
 
 ## Promote, don't rebuild
 

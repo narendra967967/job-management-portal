@@ -183,6 +183,6 @@ export async function resendReceiptAction(raw: unknown): Promise<Result> {
     return { ok: true };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    return { ok: false, error: msg === SMTP_NOT_CONFIGURED ? "Email isn't set up yet (Settings → Email / SMTP)." : msg };
+    return { ok: false, error: msg === SMTP_NOT_CONFIGURED ? "Email isn't set up yet (Settings → Email delivery)." : msg };
   }
 }

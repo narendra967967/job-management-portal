@@ -361,7 +361,7 @@ export async function updateAiAction(input: unknown): Promise<Result> {
   return { ok: true };
 }
 
-/* ---------------- Email / SMTP ---------------- */
+/* ---------------- Email delivery: SMTP ---------------- */
 
 const emailSchema = z.object({
   enabled: z.boolean(),
@@ -409,9 +409,11 @@ export async function sendTestEmailAction(to: unknown): Promise<Result> {
   if (!p.success) return fail(p.error);
   const appName = await getAppName();
   try {
+    // Always through SMTP, even while Amazon SES is the service in use.
     await sendAppEmail({
+      via: "smtp",
       to: p.data,
-      subject: `${appName} — SMTP test email`,
+      subject: `${appName}: SMTP test email`,
       heading: "Your SMTP is working",
       lines: [
         "This is a test email from your admin settings.",
@@ -422,6 +424,6 @@ export async function sendTestEmailAction(to: unknown): Promise<Result> {
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     if (msg === SMTP_NOT_CONFIGURED) return { ok: false, error: "Save your SMTP settings first." };
-    return { ok: false, error: "Couldn't send — check the SMTP settings." };
+    return { ok: false, error: "Couldn't send. Check the SMTP settings." };
   }
 }

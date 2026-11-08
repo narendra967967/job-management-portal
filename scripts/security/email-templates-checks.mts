@@ -131,6 +131,7 @@ const SENDER_EXCEPTIONS = new Set([
   "lib/broadcasts-send.ts", // broadcasts are written per send
   "actions/admin-broadcasts.ts", // the broadcast test email
   "actions/admin-settings.ts", // the SMTP test email
+  "actions/admin-email-delivery.ts", // the Amazon SES test email
 ]);
 const sources = ["lib", "actions", "app", "components"].flatMap((d) => filesUnder(d, /\.(ts|tsx)$/));
 const bypass = sources.filter((f) => !SENDER_EXCEPTIONS.has(rel(f)) && /\bsendAppEmail\s*\(|\bsendMail\s*\(/.test(read(f)) && rel(f) !== "lib/mailer.ts");

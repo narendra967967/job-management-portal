@@ -135,7 +135,7 @@ English everywhere, including dates (October 31, 2026).
 - **Every automatic email goes through Email templates.** Any email the system sends on its own
   (now or added later) must be registered in admin Engagement → Email templates, with its
   placeholders and default wording, so admins control its content. Don't hard-code a new email's
-  text in its sender. Broadcasts and the SMTP test email are the only exceptions.
+  text in its sender. Broadcasts and the SMTP and Amazon SES test emails in Settings → Email delivery are the only exceptions.
 - Before calling a task done: type-checks pass, the screen(s) touched have been checked at
   375px and 768px, no secrets in the diff, and the commit message says what changed and why.
 

@@ -154,6 +154,8 @@ const answered: [string, string][] = [
   ["How do I change the text of the password reset email?", "wording of automatic emails"],
   ["Where do I edit the welcome email?", "email templates"],
   ["How do I refund a yearly plan?", "online plan payments"],
+  ["How do I switch email sending to Amazon SES?", "Amazon SES"],
+  ["SES test connection says sandbox", "Amazon SES"],
   ["discarding a lead", "discarding"],
   ["leads disappearing from the list", "stale"],
   ["please tell me how to roll back a deploy", "deploy"],

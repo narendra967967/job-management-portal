@@ -261,7 +261,7 @@ export async function runBroadcasts(): Promise<BroadcastRunResult> {
   } finally {
     running = false;
   }
-  if (result.paused === "no-smtp") console.warn("[broadcasts] paused: email isn't set up (Settings → Email / SMTP)");
+  if (result.paused === "no-smtp") console.warn("[broadcasts] paused: email isn't set up (Settings → Email delivery)");
   return result;
 }
 

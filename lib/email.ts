@@ -6,7 +6,8 @@ import "server-only";
 // plain-text fallback. Use sendAppEmail() everywhere; reach for sendMail()
 // directly only when you need full control of the raw HTML.
 
-import { sendMail, isMailConfigured, SMTP_NOT_CONFIGURED } from "@/lib/mailer";
+import { sendMail, sendMailWith, isMailConfigured, SMTP_NOT_CONFIGURED } from "@/lib/mailer";
+import type { EmailProvider } from "@/lib/email-delivery-model";
 import { getAppName, getSupportEmail } from "@/lib/branding";
 
 export { isMailConfigured, SMTP_NOT_CONFIGURED };
@@ -36,6 +37,8 @@ export interface AppEmailOptions {
   text?: string;
   /** Extra headers, e.g. List-Unsubscribe on promotional email. */
   headers?: Record<string, string>;
+  /** Send with this service instead of the chosen one (the test emails in Settings → Email delivery). */
+  via?: EmailProvider;
 }
 
 function esc(s: string): string {
@@ -130,5 +133,6 @@ export async function sendAppEmail(opts: AppEmailOptions): Promise<void> {
     return;
   }
   const { html, text } = await renderAppEmail(opts);
-  await sendMail({ to: opts.to, subject: opts.subject, html, text, headers: opts.headers });
+  const mail = { to: opts.to, subject: opts.subject, html, text, headers: opts.headers };
+  await (opts.via ? sendMailWith(opts.via, mail) : sendMail(mail));
 }

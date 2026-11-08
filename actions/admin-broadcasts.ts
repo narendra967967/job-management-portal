@@ -179,9 +179,9 @@ export async function sendTestBroadcastAction(input: BroadcastInput): Promise<{ 
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    if (msg === SMTP_NOT_CONFIGURED) return { ok: false, error: "Email isn't set up yet. Add the mail server in Settings → Email / SMTP." };
+    if (msg === SMTP_NOT_CONFIGURED) return { ok: false, error: "Email isn't set up yet. Set it up in Settings → Email delivery." };
     console.error("[broadcasts] test send failed:", msg);
-    return { ok: false, error: "The test email didn't send. Check Settings → Email / SMTP." };
+    return { ok: false, error: "The test email didn't send. Check Settings → Email delivery." };
   }
   return { ok: true, to: me.email };
 }

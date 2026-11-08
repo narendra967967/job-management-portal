@@ -11,7 +11,7 @@ The email names the date the plan ends and, if they have any, how many job leads
 
 It stops by itself once they renew, because their new expiry is no longer within 7 days. Admin accounts and deactivated users never get it.
 
-These are account emails, so there's no unsubscribe link. They go through the SMTP settings in Settings → Email / SMTP. If email isn't set up, the send is recorded as failed and retried on the next run.
+These are account emails, so there's no unsubscribe link. They go out through the service chosen in Settings → Email delivery. If email isn't set up, the send is recorded as failed and retried on the next run.
 
 ## When they go out
 

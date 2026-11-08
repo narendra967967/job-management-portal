@@ -37,16 +37,6 @@ interface SmtpSummary {
   fromEmail: string;
 }
 
-/** PHASE 2: the choice is saved, but the mailer only reads it once SES sending is connected (phase 3). */
-function PendingBanner() {
-  return (
-    <p className="rounded-lg border border-dashed border-primary/30 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
-      Email still goes out through SMTP for now. Your Amazon SES details and choice are saved, and SES takes over once
-      it&apos;s connected.
-    </p>
-  );
-}
-
 export function EmailDeliverySection({
   smtp,
   delivery,
@@ -58,7 +48,6 @@ export function EmailDeliverySection({
 }) {
   return (
     <div className="space-y-4">
-      <PendingBanner />
       {/* A fresh card when readiness changes, so an old "not set up" message goes. */}
       <ProviderCard
         key={`${delivery.provider}|${sesMissing(delivery.ses).length}|${smtpReady(smtp)}`}
