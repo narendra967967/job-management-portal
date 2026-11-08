@@ -5,7 +5,7 @@
 
 import { z } from "zod";
 import { userHasAiKey } from "@/lib/ai";
-import { getCurrentUserId } from "@/lib/current-user";
+import { getCurrentUserId, getActiveUserId } from "@/lib/current-user";
 import { getFeatureAccess } from "@/lib/entitlements";
 import {
   getIntakeConfig,
@@ -48,7 +48,7 @@ export async function resetMyForwardingAction(): Promise<MyForwardingState> {
 
 /** The user's own on/off switch. Off drops incoming mail; setup is kept. */
 export async function setMyForwardingEnabledAction(input: unknown): Promise<MyForwardingState> {
-  const userId = await getCurrentUserId();
+  const userId = await getActiveUserId();
   const { enabled } = z.object({ enabled: z.boolean() }).parse(input);
   const [config, forwarding] = await Promise.all([getIntakeConfig(), setForwardingEnabled(userId, enabled)]);
   return { forwardingEnabled: config.forwardingEnabled, forwarding };
@@ -56,7 +56,7 @@ export async function setMyForwardingEnabledAction(input: unknown): Promise<MyFo
 
 /** "I've verified it in Gmail" — Gmail never tells us, so the user does. */
 export async function confirmMyForwardingAction(): Promise<MyForwardingState> {
-  const userId = await getCurrentUserId();
+  const userId = await getActiveUserId();
   await markForwardingConfirmed(userId);
   return getMyForwardingAction();
 }

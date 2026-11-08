@@ -7,7 +7,7 @@
 import type { LeadRules } from "@/lib/lead-rules-model";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { getCurrentUserId } from "@/lib/current-user";
+import { getCurrentUserId, getActiveUserId } from "@/lib/current-user";
 import { encryptSecret } from "@/lib/crypto";
 import { revokeGoogleAccess } from "@/lib/gmail";
 import { storeResumeFile, readResumeFile, deleteResumeFile } from "@/lib/storage";
@@ -69,7 +69,7 @@ export async function updateFollowUpsAction(input: {
   maxFollowUps: number;
   leadRules: LeadRules;
 }) {
-  const userId = await getCurrentUserId();
+  const userId = await getActiveUserId();
   const { reminderIntervalDays, staleLeadDays, autoStatus, maxFollowUps, leadRules } = parseInput(
     followUpsSchema,
     input,
@@ -95,7 +95,7 @@ export async function setPromoOptOutAction(optOut: boolean) {
 /* ---------------- default resume ---------------- */
 
 export async function setDefaultResumeAction(id: string) {
-  const userId = await getCurrentUserId();
+  const userId = await getActiveUserId();
   const resumeId = parseInput(zId, id);
   await db.transaction(async (tx) => {
     // Exactly one default per user (also enforced by a partial unique index).
@@ -123,7 +123,7 @@ export async function updateAiSettingsAction(input: {
   provider: AiProvider;
   model: string;
 }) {
-  const userId = await getCurrentUserId();
+  const userId = await getActiveUserId();
   const { provider, model } = parseInput(aiProviderSchema, input);
   await upsertSettings(userId, {
     aiProvider: provider,
@@ -132,7 +132,7 @@ export async function updateAiSettingsAction(input: {
 }
 
 export async function saveAiKeyAction(plainKey: string) {
-  const userId = await getCurrentUserId();
+  const userId = await getActiveUserId();
   const key = parseInput(aiKeySchema, plainKey);
   await upsertSettings(userId, {
     aiKeyCiphertext: encryptSecret(key),
@@ -151,7 +151,7 @@ export async function updateAiPromptsAction(input: {
   draft: string;
   score: string;
 }) {
-  const userId = await getCurrentUserId();
+  const userId = await getActiveUserId();
   const { summary, draft, score } = parseInput(aiPromptsSchema, input);
   if (!(await getFeatureAccess(userId)).customPrompts && (summary.trim() || draft.trim() || score.trim())) {
     throw new Error(PREMIUM_REQUIRED);
@@ -167,7 +167,7 @@ export async function updateAiPromptsAction(input: {
 
 /** Read a resume's pasted text for editing in Settings. */
 export async function getResumeTextAction(id: string): Promise<string> {
-  const userId = await getCurrentUserId();
+  const userId = await getActiveUserId();
   const resumeId = parseInput(zId, id);
   const [r] = await db
     .select({ text: resumesT.resumeText })
@@ -178,7 +178,7 @@ export async function getResumeTextAction(id: string): Promise<string> {
 
 /** Save a resume's pasted text. */
 export async function updateResumeTextAction(id: string, text: string) {
-  const userId = await getCurrentUserId();
+  const userId = await getActiveUserId();
   const resumeId = parseInput(zId, id);
   const clean = parseInput(resumeTextSchema, text);
   await db
@@ -190,7 +190,7 @@ export async function updateResumeTextAction(id: string, text: string) {
 /* ---------------- sync schedule ---------------- */
 
 export async function updateSyncIntervalAction(hours: number) {
-  const userId = await getCurrentUserId();
+  const userId = await getActiveUserId();
   const h = parseInput(syncIntervalSchema, hours);
   await upsertSettings(userId, { syncIntervalHours: h });
 }
@@ -198,7 +198,7 @@ export async function updateSyncIntervalAction(hours: number) {
 /* ---------------- ingestion issues ---------------- */
 
 export async function clearIngestErrorsAction() {
-  const userId = await getCurrentUserId();
+  const userId = await getActiveUserId();
   await db.delete(errorsT).where(eq(errorsT.userId, userId));
 }
 
@@ -210,7 +210,7 @@ export async function updateGmailConfigAction(input: {
   subjectKeywords: string;
   lookbackDays: number;
 }) {
-  const userId = await getCurrentUserId();
+  const userId = await getActiveUserId();
   const parsed = parseInput(gmailConfigSchema, input);
   const set = {
     senders: parsed.senders,
@@ -245,7 +245,7 @@ export async function disconnectGoogleAction() {
 export async function uploadResumeAction(
   formData: FormData,
 ): Promise<{ ok: true; resumeId: string } | { ok: false; error: string }> {
-  const userId = await getCurrentUserId();
+  const userId = await getActiveUserId();
   const file = formData.get("file");
   const label = parseInput(
     z.string().trim().min(1, "Give this résumé a name.").max(120),
@@ -336,7 +336,7 @@ export async function getResumeFileAction(id: string): Promise<
 }
 
 export async function renameResumeAction(id: string, label: string) {
-  const userId = await getCurrentUserId();
+  const userId = await getActiveUserId();
   const resumeId = parseInput(zId, id);
   const cleanLabel = parseInput(
     z.string().trim().min(1, "Give this resume a name.").max(120),
@@ -349,7 +349,7 @@ export async function renameResumeAction(id: string, label: string) {
 }
 
 export async function deleteResumeAction(id: string) {
-  const userId = await getCurrentUserId();
+  const userId = await getActiveUserId();
   const resumeId = parseInput(zId, id);
 
   // Remove the stored bytes first (best-effort); DB rows cascade below.
