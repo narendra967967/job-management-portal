@@ -79,7 +79,7 @@ const SECTION = {
     label: "Email delivery",
     icon: Mail,
     render: (i: AdminSettings) => (
-      <EmailDeliverySection smtp={i.smtp}>
+      <EmailDeliverySection smtp={i.smtp} delivery={i.delivery}>
         <EmailCard initial={i.smtp} />
       </EmailDeliverySection>
     ),

@@ -6,6 +6,7 @@
 // Secrets are write-only: saved encrypted, never sent back to the browser.
 
 import { useId, useState } from "react";
+import { useRouter } from "next/navigation";
 import { CheckCircle2, Eye, EyeOff, PlugZap, Send } from "lucide-react";
 import { Button } from "@/components/admin/ui/button";
 import { Input } from "@/components/admin/ui/input";
@@ -26,7 +27,7 @@ import {
   type SesAccountInfo,
   type SesSettings,
 } from "@/lib/email-delivery-model";
-import { saveSes, sendSesTest, setProvider, testSes, useEmailDelivery } from "@/lib/email-delivery-mock";
+import { saveSesAction, sendSesTestAction, setEmailProviderAction, testSesAction } from "@/actions/admin-email-delivery";
 import { useMounted } from "@/lib/use-mounted";
 import { cn, formatDateTime } from "@/lib/utils";
 
@@ -36,21 +37,28 @@ interface SmtpSummary {
   fromEmail: string;
 }
 
-/** PHASE 1: the Amazon SES parts don't change how email is sent yet. */
-function SampleBanner() {
+/** PHASE 2: the choice is saved, but the mailer only reads it once SES sending is connected (phase 3). */
+function PendingBanner() {
   return (
     <p className="rounded-lg border border-dashed border-primary/30 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
-      Sample data while this is being built. Choosing Amazon SES here doesn&apos;t change how email is sent yet.
+      Email still goes out through SMTP for now. Your Amazon SES details and choice are saved, and SES takes over once
+      it&apos;s connected.
     </p>
   );
 }
 
-export function EmailDeliverySection({ smtp, children }: { smtp: SmtpSummary; children: React.ReactNode }) {
-  const delivery = useEmailDelivery();
-  if (!delivery) return null;
+export function EmailDeliverySection({
+  smtp,
+  delivery,
+  children,
+}: {
+  smtp: SmtpSummary;
+  delivery: { provider: EmailProvider; ses: SesSettings };
+  children: React.ReactNode;
+}) {
   return (
     <div className="space-y-4">
-      <SampleBanner />
+      <PendingBanner />
       {/* A fresh card when readiness changes, so an old "not set up" message goes. */}
       <ProviderCard
         key={`${delivery.provider}|${sesMissing(delivery.ses).length}|${smtpReady(smtp)}`}
@@ -148,8 +156,7 @@ function ServiceTabs({
           {t === "smtp" ? (
             smtpContent
           ) : (
-            /* Remount when the stored values change, so the form starts from them. */
-            <SesCard key={`${ses.region}|${ses.accessKeyId}|${ses.fromEmail}`} ses={ses} />
+            <SesCard ses={ses} />
           )}
         </section>
       ))}
@@ -160,6 +167,7 @@ function ServiceTabs({
 /* ---------------- which service sends ---------------- */
 
 function ProviderCard({ provider, smtp, ses }: { provider: EmailProvider; smtp: SmtpSummary; ses: SesSettings }) {
+  const router = useRouter();
   const [choosing, setChoosing] = useState<EmailProvider | null>(null);
   const [error, setError] = useState("");
   const missing = sesMissing(ses);
@@ -230,8 +238,9 @@ function ProviderCard({ provider, smtp, ses }: { provider: EmailProvider; smtp: 
         confirmLabel={`Use ${choosing ? PROVIDER_LABELS[choosing] : ""}`}
         onConfirm={async () => {
           if (!choosing) return;
-          const res = await setProvider(choosing);
-          if (!res.ok) setError(res.error);
+          const res = await setEmailProviderAction(choosing);
+          if (!res.ok) return setError(res.error);
+          router.refresh();
         }}
       />
     </section>
@@ -241,6 +250,7 @@ function ProviderCard({ provider, smtp, ses }: { provider: EmailProvider; smtp: 
 /* ---------------- Amazon SES ---------------- */
 
 function SesCard({ ses }: { ses: SesSettings }) {
+  const router = useRouter();
   const mounted = useMounted();
   const [region, setRegion] = useState(ses.region);
   const [accessKeyId, setAccessKeyId] = useState(ses.accessKeyId);
@@ -282,12 +292,13 @@ function SesCard({ ses }: { ses: SesSettings }) {
     }
     setError("");
     setSaving(true);
-    const res = await saveSes({ region, accessKeyId, secretAccessKey: secret, fromName, fromEmail, replyTo });
+    const res = await saveSesAction({ region, accessKeyId, secretAccessKey: secret, fromName, fromEmail, replyTo });
     setSaving(false);
     if (!res.ok) return setError(res.error);
     setSecret("");
     setSaved(true);
     setTimeout(() => setSaved(false), 1800);
+    router.refresh();
   }
 
   async function testConnection() {
@@ -295,9 +306,10 @@ function SesCard({ ses }: { ses: SesSettings }) {
     if (sesMissing(ses).length) return setError(`Save the details first. Still needed: ${sesMissing(ses).join(", ")}.`);
     setError("");
     setTesting(true);
-    const res = await testSes();
+    const res = await testSesAction();
     setTesting(false);
     if (!res.ok) setError(res.error);
+    router.refresh();
   }
 
   async function sendTest() {
@@ -305,7 +317,7 @@ function SesCard({ ses }: { ses: SesSettings }) {
     if (emailError(testTo) || !testTo.trim()) return setTestMsg({ ok: false, text: "Enter the address to send the test to." });
     if (sesMissing(ses).length) return setTestMsg({ ok: false, text: "Save the Amazon SES details first." });
     setTestBusy(true);
-    const res = await sendSesTest(testTo.trim());
+    const res = await sendSesTestAction(testTo.trim());
     setTestBusy(false);
     setTestMsg(res.ok ? { ok: true, text: `Test email sent to ${res.to} through Amazon SES.` } : { ok: false, text: res.error });
   }

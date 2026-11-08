@@ -23,6 +23,7 @@ import type { RetentionConfig } from "@/lib/retention-model";
 import type { EmailIntakeConfig, InboundSender } from "@/lib/email-intake-model";
 import { listGatewaySettings } from "@/lib/payments/gateways";
 import type { GatewaySettings } from "@/lib/billing-model";
+import { getEmailDelivery, type EmailDeliveryState } from "@/lib/email-delivery";
 
 export interface AdminSettings {
   profile: { name: string; email: string; mobile: string };
@@ -92,6 +93,8 @@ export interface AdminSettings {
     fromName: string;
     replyTo: string;
   };
+  /** Settings → Email delivery: the service that sends, and the SES details (no secret). */
+  delivery: EmailDeliveryState;
   retention: RetentionConfig;
   /** Settings → Payments (no secrets, only whether each is set). */
   gateways: GatewaySettings[];
@@ -104,7 +107,7 @@ export interface AdminSettings {
 }
 
 export async function loadAdminSettings(adminId: string): Promise<AdminSettings> {
-  const [u, gen, sec, cron, bill, ai, smtp, branding, intakeConfig, senders, google, retention, gateways] = await Promise.all([
+  const [u, gen, sec, cron, bill, ai, smtp, branding, intakeConfig, senders, google, retention, gateways, delivery] = await Promise.all([
     db.select({ name: user.name, email: user.email, mobile: user.mobile }).from(user).where(eq(user.id, adminId)).limit(1),
     db.select().from(appSettings).limit(1),
     db.select().from(securityConfig).limit(1),
@@ -118,6 +121,7 @@ export async function loadAdminSettings(adminId: string): Promise<AdminSettings>
     db.select({ n: countDistinct(account.userId) }).from(account).where(eq(account.providerId, "google")),
     getRetentionConfig(),
     listGatewaySettings(),
+    getEmailDelivery(),
   ]);
   const g = gen[0];
   const s = sec[0];
@@ -199,6 +203,7 @@ export async function loadAdminSettings(adminId: string): Promise<AdminSettings>
       fromName: m?.fromName ?? "",
       replyTo: m?.replyTo ?? "",
     },
+    delivery,
     retention,
     gateways,
     intake: {

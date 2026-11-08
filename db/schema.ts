@@ -1571,3 +1571,38 @@ export const emailTemplateVersions = pgTable(
   },
   (t) => [index("email_template_versions_key_idx").on(t.templateKey, t.createdAt)],
 );
+
+/* ---------------- email delivery ---------------- */
+
+export const emailProvider = pgEnum("email_provider", ["smtp", "ses"]);
+
+/**
+ * Which service sends the app's email, and the Amazon SES details (single
+ * "app" row; SMTP keeps its own smtp_config row). Spec: memory amazon-ses.
+ * The SES secret is encrypted like the SMTP password and never leaves the server.
+ */
+export const emailDelivery = pgTable("email_delivery", {
+  id: text("id").primaryKey().default("app"),
+  provider: emailProvider("provider").notNull().default("smtp"),
+  sesRegion: text("ses_region").notNull().default(""),
+  sesAccessKeyId: text("ses_access_key_id").notNull().default(""),
+  sesSecretCiphertext: text("ses_secret_ciphertext"),
+  sesFromName: text("ses_from_name").notNull().default(""),
+  sesFromEmail: text("ses_from_email").notNull().default(""),
+  sesReplyTo: text("ses_reply_to").notNull().default(""),
+  // Last Test connection, and what SES reported about the account then.
+  sesLastTestOk: boolean("ses_last_test_ok"),
+  sesLastTestAt: timestamp("ses_last_test_at", { withTimezone: true }),
+  sesAccount: jsonb("ses_account").$type<{
+    productionAccess: boolean;
+    sendingEnabled: boolean;
+    max24HourSend: number;
+    sentLast24Hours: number;
+    maxSendRate: number;
+  }>(),
+  updatedBy: text("updated_by").references(() => user.id, { onDelete: "set null" }),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date()),
+});
