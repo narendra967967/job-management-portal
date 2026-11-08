@@ -1,0 +1,1 @@
+ALTER TABLE "retention_config" ADD COLUMN "broadcast_queue_days" integer DEFAULT 90 NOT NULL;

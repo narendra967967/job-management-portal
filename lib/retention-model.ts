@@ -9,7 +9,8 @@ export type RetentionKey =
   | "leadPurgeLogDays"
   | "notificationDays"
   | "autoActionDays"
-  | "kbConversationDays";
+  | "kbConversationDays"
+  | "broadcastQueueDays";
 
 export type RetentionConfig = Record<RetentionKey, number>;
 
@@ -70,6 +71,14 @@ export const RETENTION_TYPES: RetentionType[] = [
     min: 90,
     max: 1095,
     default: 365,
+  },
+  {
+    key: "broadcastQueueDays",
+    label: "Broadcast email lists",
+    hint: "Who each broadcast was emailed to, and whether it arrived · the totals on the broadcast stay",
+    min: 30,
+    max: 365,
+    default: 90,
   },
   {
     key: "kbConversationDays",

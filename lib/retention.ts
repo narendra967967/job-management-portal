@@ -3,10 +3,11 @@ import "server-only";
 // Applies admin Settings → Data retention: deletes log-like rows older than
 // each type's window. Called by the daily purge cron (/api/cron/purge-leads).
 
-import { and, isNull, lt } from "drizzle-orm";
+import { and, inArray, isNull, lt, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   actionCodes,
+  broadcastRecipients,
   gmailIngestErrors,
   gmailProcessedMessages,
   inboundEmailLog,
@@ -69,6 +70,21 @@ export async function runRetention(): Promise<Record<RetentionKey, number>> {
     autoActionDays: await trimAutoActions(c.autoActionDays),
     kbConversationDays: await removed(
       db.delete(kbConversations).where(lt(kbConversations.updatedAt, cutoff(c.kbConversationDays))).returning({ id: kbConversations.id }),
+    ),
+    // Only lists of broadcasts that are done; one still sending keeps its queue.
+    broadcastQueueDays: await removed(
+      db
+        .delete(broadcastRecipients)
+        .where(
+          and(
+            lt(broadcastRecipients.createdAt, cutoff(c.broadcastQueueDays)),
+            inArray(
+              broadcastRecipients.broadcastId,
+              sql`(select id from broadcasts where status in ('sent', 'canceled'))`,
+            ),
+          ),
+        )
+        .returning({ id: broadcastRecipients.id }),
     ),
   };
 }

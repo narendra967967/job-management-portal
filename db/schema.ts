@@ -1156,6 +1156,7 @@ export const retentionConfig = pgTable("retention_config", {
   notificationDays: integer("notification_days").notNull().default(90),
   autoActionDays: integer("auto_action_days").notNull().default(365),
   kbConversationDays: integer("kb_conversation_days").notNull().default(60),
+  broadcastQueueDays: integer("broadcast_queue_days").notNull().default(90),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .defaultNow()

@@ -1,7 +1,7 @@
 ---
 title: How online plan payments work
 category: Plans and billing
-summary: Users pay for plans through Razorpay only when a gateway is turned on in Settings → Payments AND Billing is complete. Otherwise every plan shows "Request this plan" instead. A payment is confirmed on the server before the plan changes, and each one appears in Orders & payments.
+summary: Users pay through Razorpay only when a gateway is on in Settings → Payments and Billing is complete; otherwise plans show "Request this plan". Each payment is confirmed on the server before the plan changes and listed in Orders & payments.
 keywords: checkout, razorpay, pay, buy plan, payment failed, payment not showing, request this plan, fallback, receipt, orders, webhook, upgrade credit, renew
 ---
 

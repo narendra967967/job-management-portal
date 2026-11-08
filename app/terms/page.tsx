@@ -23,7 +23,7 @@ export default async function TermsPage() {
     captchaSiteKey(),
   ]);
   return (
-    <LegalLayout title="Terms & conditions" updated="October 25, 2026">
+    <LegalLayout title="Terms & conditions" updated="November 8, 2026">
       <p>
         These Terms &amp; Conditions (&ldquo;Terms&rdquo;) apply to your use of {appName} (the
         &ldquo;Service&rdquo;). By creating an account or using the Service, you agree to them. If you
@@ -48,6 +48,11 @@ export default async function TermsPage() {
           Some actions, such as resetting your leads or asking us to delete your account, are confirmed
           with a one-time code sent to your email. Keep access to your email secure; anyone who can read it may be
           able to confirm these actions.
+        </li>
+        <li>
+          While you have an account we may send you important messages about it or the Service, such as
+          planned downtime, and you can&rsquo;t opt out of those. Promotional messages are optional, and you
+          can turn them off in Settings → Notifications or from any promotional email.
         </li>
       </ul>
 

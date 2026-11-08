@@ -33,7 +33,7 @@ export default async function PrivacyPage() {
   ]);
   const contact = supportEmail || "our support address";
   return (
-    <LegalLayout title="Privacy policy" updated="November 2, 2026">
+    <LegalLayout title="Privacy policy" updated="November 8, 2026">
       <p>
         This Privacy Policy explains what information {appName} (&ldquo;we&rdquo;, &ldquo;us&rdquo;) collects
         when you use our job search tracker (the &ldquo;Service&rdquo;), how we use it and how we keep it
@@ -233,6 +233,27 @@ export default async function PrivacyPage() {
         No method of storage is perfectly secure, but we work to keep your information safe.
       </p>
 
+      <h2>Messages from us</h2>
+      <p>
+        Now and then we send messages to everyone with an account, in the app, by email, or both. They
+        come in two kinds:
+      </p>
+      <ul>
+        <li>
+          <strong>Important:</strong> things that affect your account or the Service, like planned downtime
+          or a change to this policy. These always reach you while you have an account.
+        </li>
+        <li>
+          <strong>Promotional:</strong> new features, tips and offers. You can turn these off in Settings →
+          Notifications, or with the unsubscribe link at the bottom of any promotional email, which works
+          without signing in.
+        </li>
+      </ul>
+      <p>
+        We only email addresses that have been confirmed. For each email we keep a record of who it went
+        to and whether it arrived, for the period given under Data retention.
+      </p>
+
       <h2>Sharing</h2>
       <p>
         We do <strong>not</strong> sell your personal information. We share data only with the service
@@ -247,6 +268,10 @@ export default async function PrivacyPage() {
         <li>Stop forwarding at any time by removing your Gmail filter; reset your address in Settings.</li>
         {gmailOn && <li>Disconnect Google at any time to revoke Gmail access.</li>}
         <li>See every email that reached your forwarding address in Settings → Email log.</li>
+        <li>
+          Turn off promotional messages in Settings → Notifications, or from the unsubscribe link in any
+          promotional email.
+        </li>
         <li>
           Delete all your leads and everything attached to them at any time (Settings → Account → Reset
           leads), after downloading a copy if you wish.
@@ -265,8 +290,9 @@ export default async function PrivacyPage() {
         Service are deleted automatically: the email delivery log after {days(retention.inboundLogDays)},
         ingestion issues after {days(retention.ingestIssueDays)}, the message IDs used to avoid importing
         an email twice after {days(retention.processedLedgerDays)}, notifications after{" "}
-        {days(retention.notificationDays)}, and the history of automatic status changes on your leads after{" "}
-        {days(retention.autoActionDays)}, except changes you undid, which stay with the lead.
+        {days(retention.notificationDays)}, the record of who our messages were emailed to after{" "}
+        {days(retention.broadcastQueueDays)}, and the history of automatic status changes on your leads
+        after {days(retention.autoActionDays)}, except changes you undid, which stay with the lead.
         {gmailOn ? " Disconnecting Google stops all further reading of your mailbox." : ""} Confirmation
         codes expire shortly and are then deleted. When you reset your leads they are deleted
         right away. When you ask us to delete your account, we delete your data, including résumé

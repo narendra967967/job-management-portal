@@ -149,6 +149,8 @@ const answered: [string, string][] = [
   ["How do I view the app logs on the server?", "Everyday server"],
   ["Nobody can sign in, what do I do?", "reCAPTCHA"],
   ["Why did the knowledge base answer without AI?", "knowledge base agent"],
+  ["How do I email all users about planned downtime?", "every user"],
+  ["How does a user unsubscribe from promotional emails?", "broadcasts"],
   ["discarding a lead", "discarding"],
   ["leads disappearing from the list", "stale"],
   ["please tell me how to roll back a deploy", "deploy"],

@@ -1,7 +1,7 @@
 ---
 title: Plan-ending reminder emails
 category: Plans and billing
-summary: Users get one email a day in the last 7 days of their plan or free trial, around 10:00 IST. Each one mentions how many leads they're tracking and suggests the next plan up. They stop once the user renews. Admin → Renewals shows who's ending soon and every reminder sent.
+summary: Users get one email a day in the last 7 days of their plan or free trial, around 10:00 IST, with their lead count and the next plan up. They stop once the user renews. Admin → Renewals shows who's ending soon and every reminder sent.
 keywords: reminder, renewal email, plan ending, expiry email, upsell, trial ending, 7 days, no unsubscribe, renewals page, who is expiring, limited mode list, did the reminder go out
 ---
 

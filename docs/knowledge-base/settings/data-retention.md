@@ -16,6 +16,7 @@ keywords: retention, data retention, delete logs, how long, notifications, email
 | Notifications | The bell, read or not | 90 | 7 to 365 |
 | Automatic move history | Why the system moved a lead, on its card and Timeline | 365 | 90 to 1095 |
 | Knowledge base conversations | Admins' chats with the agent, from the last message | 60 | 7 to 365 |
+| Broadcast email lists | Who each broadcast was emailed to and whether it arrived. Only finished or canceled broadcasts; the totals on the broadcast stay | 90 | 30 to 365 |
 
 Two have reasons behind their limits:
 
