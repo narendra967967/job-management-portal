@@ -66,6 +66,12 @@ export default async function PrivacyPage() {
         {gmailOn && (
           <li><strong>Gmail data:</strong> if you connect Google, we read email in your Gmail account to find and parse your LinkedIn job-alert messages (see below).</li>
         )}
+        <li>
+          <strong>Payments:</strong> when you buy a plan, the plan and billing period, the amounts
+          (including any GST), the date, your receipt number, our payment provider&rsquo;s order and payment
+          references, and the kind of method you used, such as UPI or card. Your card, UPI and bank details
+          go straight to our payment provider, Razorpay. We never see or store them.
+        </li>
         <li><strong>Usage data:</strong> basic technical logs needed to operate and secure the Service.</li>
         <li>
           <strong>Confirmation codes:</strong> when you reset your leads or ask to delete your account, we
@@ -116,6 +122,10 @@ export default async function PrivacyPage() {
           <strong>Gmail&rsquo;s confirmation email:</strong> when you add your address in Gmail, Google sends
           a confirmation email to it. We show it to you in Settings so you can approve forwarding, and
           delete it once forwarding is confirmed or you reset your address.
+        </li>
+        <li>
+          <strong>While your plan has ended:</strong> emails that arrive are logged but not read, and
+          nothing from them is kept.
         </li>
         <li>
           <strong>Stopping:</strong> remove the filter (or forwarding) in Gmail at any time. Resetting your
@@ -235,8 +245,13 @@ export default async function PrivacyPage() {
 
       <h2>Messages from us</h2>
       <p>
-        Now and then we send messages to everyone with an account, in the app, by email, or both. They
-        come in two kinds:
+        Some emails are part of having an account, so they can&rsquo;t be turned off: payment receipts,
+        and a reminder each day during the last week before your plan or free trial ends. The reminders
+        stop as soon as you renew.
+      </p>
+      <p>
+        Now and then we also send messages to everyone with an account, in the app, by email, or both.
+        They come in two kinds:
       </p>
       <ul>
         <li>
@@ -258,8 +273,10 @@ export default async function PrivacyPage() {
       <p>
         We do <strong>not</strong> sell your personal information. We share data only with the service
         providers we need to run {appName}, such as {gmailOn ? "Google (for Gmail access you authorize), " : ""}
-        the AI provider you use and our hosting and email providers, and only as far as needed to
-        deliver the Service or comply with the law.
+        the AI provider you use, Razorpay (to take payments, under{" "}
+        <a href="https://razorpay.com/privacy/" target="_blank" rel="noopener noreferrer">its privacy policy</a>) and our
+        hosting and email providers, and only as far as needed to deliver the Service or comply with the
+        law.
       </p>
 
       <h2>Your choices and rights</h2>
@@ -298,7 +315,9 @@ export default async function PrivacyPage() {
         right away. When you ask us to delete your account, we delete your data, including résumé
         files and everything taken from your job-alert emails, within 30 days and email you when
         it&rsquo;s done. Copies in backups expire within a further 30 days. We keep only an anonymized record that your
-        request was handled, and limited records that the law requires.
+        request was handled, and limited records that the law requires. Those include payment records
+        (the payment details above, with the name and email on the account when you paid), which we
+        keep for as long as tax and accounting law requires, even after your account is deleted.
       </p>
 
       <h2>Changes to this policy</h2>

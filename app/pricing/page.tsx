@@ -1,7 +1,8 @@
 // Public pricing page. Plans come from the DB (admin Plans & Pricing → "Show on
 // pricing page", active only), so prices, limits and the comparison always match
-// what the app enforces. No payments yet: everyone starts on the free trial and
-// changes plan from Settings → Plan (an upgrade request).
+// what the app enforces. Everyone starts on the free trial and buys a plan from
+// Settings → Plan: online (Razorpay) when a gateway is on and Billing is
+// complete, otherwise as a request to support. The FAQ follows those settings.
 
 import { Check } from "lucide-react";
 import { SiteHeader } from "@/components/marketing/site-header";
@@ -16,6 +17,8 @@ import { getPricingPlans, getUserPlanId } from "@/lib/pricing";
 import { getSessionUserId } from "@/lib/current-user";
 import { absoluteUrl, siteUrl } from "@/lib/site-url";
 import { orList } from "@/lib/plan-highlights";
+import { onlinePaymentAvailable } from "@/lib/payments/orders";
+import { getBillingProfile } from "@/lib/billing-data";
 import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
@@ -48,13 +51,15 @@ const EVERY_PLAN = [
 ];
 
 export default async function PricingPage() {
-  const [appName, tagline, signupAllowed, sessionId, freeStart, plans] = await Promise.all([
+  const [appName, tagline, signupAllowed, sessionId, freeStart, plans, online, billing] = await Promise.all([
     getAppName(),
     getTagline(),
     isRegistrationOpen(),
     getSessionUserId(),
     freeStartLabel(),
     getPricingPlans(),
+    onlinePaymentAvailable(),
+    getBillingProfile(),
   ]);
   const loggedIn = !!sessionId;
   const currentPlanId = await getUserPlanId(sessionId);
@@ -71,21 +76,27 @@ export default async function PricingPage() {
         ? `No. Every new account starts with a ${freeStart.label} and you don't enter any payment details to begin.`
         : "No. You can start on the free plan without entering any payment details.",
     },
-    ...(trial
-      ? [
-          {
-            q: "What happens when my free trial ends?",
-            a: `Your leads, contacts and notes stay in your account. To keep using ${appName}, choose a paid plan and you'll pick up exactly where you left off.`,
-          },
-        ]
-      : []),
     {
-      q: "How do I upgrade or pay?",
-      a: `Open Settings, go to Plan and choose Upgrade. Tell us which plan and billing period you want, and our team will get back to you to complete the payment and switch your plan.`,
+      q: trial ? "What happens when my free trial or plan ends?" : "What happens when my plan ends?",
+      a: `You can still sign in, but everything apart from choosing a plan, help and your account settings is locked until you pick one. Your leads, contacts and notes stay exactly as they are. Job alerts that arrive while your plan has ended aren't imported, so if you don't want a gap, renew before it runs out. We email you a reminder each day in the last week.`,
+    },
+    {
+      q: "How do I pay?",
+      a: online
+        ? "Go to Settings → Plan, pick a plan and a monthly or yearly term, and pay online with UPI, a card or another method shown in the payment window. Payments go through Razorpay, and your plan changes as soon as the payment is confirmed. We email you a receipt."
+        : "Go to Settings → Plan and choose the plan and billing period you want. Send the request, and our team will get back to you to complete the payment and switch your plan.",
+    },
+    {
+      q: "Does my plan renew automatically?",
+      a: "No. We never charge you automatically. Your plan runs for the month or year you paid for, and you renew when you're ready. Renewing early doesn't cost you any days, because the new term starts when the current one ends.",
     },
     {
       q: "Can I change plans later?",
-      a: "Yes. You can move up or down between plans, or switch between monthly and yearly billing, by sending a request from Settings → Plan.",
+      a: "Yes. You can upgrade at any time from Settings → Plan, and the unused part of your current paid plan is turned into extra days on the new one. Switching the same plan between monthly and yearly takes effect when your current term ends. To move to a smaller plan, choose it once your current plan has ended.",
+    },
+    {
+      q: "Can I get a refund?",
+      a: "Plans can't be refunded once they've started, so check the plan and total before you pay. If a payment goes wrong, for example you're charged twice or your plan doesn't change after paying, contact us and we'll refund the extra payment in full once we've checked it. The details are in our refund and cancellation policy.",
     },
     {
       q: "Is AI usage included in the price?",
@@ -99,10 +110,17 @@ export default async function PricingPage() {
           },
         ]
       : []),
-    {
-      q: "Which currency are prices in?",
-      a: "Prices are shown in Indian rupees (₹).",
-    },
+    billing.gstRegistered
+      ? {
+          q: "Which currency are prices in, and is GST included?",
+          a: billing.pricesIncludeTax
+            ? "Prices are in Indian rupees (₹) and already include GST."
+            : `Prices are in Indian rupees (₹). GST at ${billing.taxRate}% is added at checkout, and you see the full total before you pay.`,
+        }
+      : {
+          q: "Which currency are prices in?",
+          a: "Prices are shown in Indian rupees (₹).",
+        },
   ];
 
   const url = siteUrl();

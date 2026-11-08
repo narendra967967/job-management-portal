@@ -2,7 +2,7 @@
 title: How online plan payments work
 category: Plans and billing
 summary: Users pay through Razorpay only when a gateway is on in Settings → Payments and Billing is complete; otherwise plans show "Request this plan". Each payment is confirmed on the server before the plan changes and listed in Orders & payments.
-keywords: checkout, razorpay, pay, buy plan, payment failed, payment not showing, request this plan, fallback, receipt, orders, webhook, upgrade credit, renew
+keywords: checkout, razorpay, pay, buy plan, payment failed, payment not showing, request this plan, fallback, receipt, orders, webhook, upgrade credit, renew, refund, money back, charged twice, cancel plan, auto renew
 ---
 
 Two things have to be true before users see a **Pay** button: a gateway is turned on in admin **Settings → Payments**, and admin **Settings → Billing** shows **Ready**. If either is missing, checkout quietly falls back to **Request this plan**, which opens a support ticket so you can sort the payment out by hand. Settings → Payments warns you when Billing is the thing holding it up.
@@ -44,3 +44,9 @@ The paid user gets a "Payment received" email with the receipt. A user can start
 Admin **Orders & payments** lists every attempt: Paid, Pending (window opened, not paid), Failed (with the reason), and Cancelled (window closed). The details window has **Resend receipt** for paid orders, **Open in Razorpay** and **View user**. An order keeps the user's name and email even if the account is deleted later.
 
 If a user says they paid but their plan didn't change, find the order here first. A Paid order means the plan was applied. A Pending one with a payment in Razorpay usually means the webhook isn't set up or its secret doesn't match.
+
+## Refunds
+
+The public policy (the /refunds page, linked in the footer and from checkout, and summed up in Terms) is simple: plans don't renew automatically, so there's nothing to cancel, and a plan isn't refundable once it starts. Payment errors are the exception: a double charge, a payment that went through without the plan being applied, or a different amount from the one shown. Those are refunded in full after you check them.
+
+There's no refund button in the app yet. Check the order in **Orders & payments**, then use **Open in Razorpay** and refund it from Razorpay's dashboard. The order stays **Paid** in our records. If the refund means the user shouldn't keep the plan, for example a double charge on a renewal, change their plan or end date in admin **Users**. Reply to their ticket once it's sent; banks usually take 5 to 7 working days to show it.

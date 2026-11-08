@@ -257,6 +257,12 @@ export function CheckoutDialog({
                     <p className="text-center text-[11px] text-muted-foreground">
                       Payments are handled securely by Razorpay. We never see your card or UPI details.
                     </p>
+                    <p className="text-center text-[11px] text-muted-foreground">
+                      Plans don&rsquo;t renew automatically and can&rsquo;t be refunded once they start.{" "}
+                      <a href="/refunds" target="_blank" rel="noopener" className="underline underline-offset-2 hover:text-foreground">
+                        Refund policy
+                      </a>
+                    </p>
                   </>
                 ) : (
                   <>

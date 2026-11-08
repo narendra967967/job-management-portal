@@ -34,6 +34,7 @@ export function SiteFooter({ appName, tagline }: { appName: string; tagline?: st
           <ul className="mt-3 space-y-2 text-sm">
             <li><Link href="/privacy" className="text-muted-foreground hover:text-foreground">Privacy policy</Link></li>
             <li><Link href="/terms" className="text-muted-foreground hover:text-foreground">Terms &amp; conditions</Link></li>
+            <li><Link href="/refunds" className="text-muted-foreground hover:text-foreground">Refund policy</Link></li>
           </ul>
         </div>
       </div>

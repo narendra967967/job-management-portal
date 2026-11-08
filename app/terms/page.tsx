@@ -10,7 +10,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const appName = await getAppName();
   return {
     title: "Terms & conditions",
-    description: `The terms for using ${appName}: your account, plans, email forwarding, AI features, acceptable use and how to close your account.`,
+    description: `The terms for using ${appName}: your account, plans and payments, email forwarding, AI features, acceptable use and how to close your account.`,
     alternates: { canonical: "/terms" },
   };
 }
@@ -61,10 +61,47 @@ export default async function TermsPage() {
         New accounts start with a free trial. When it ends, you need a paid plan to keep using the
         Service. Some features depend on your plan. For example, salary insights, the résumé ATS check
         and personal notes are available only on plans that include them, and some plans limit how many
-        active leads or résumés you can keep. Plan details are shown in the app;
-        for any paid plan, the price, billing period and renewal terms are shown before you buy. If your
-        plan expires, access to the Service pauses until it is renewed; your data is kept in the meantime.
+        active leads or résumés you can keep. Plan details are shown in the app.
       </p>
+      <p>
+        When a plan ends, you can still sign in, but the Service is limited to choosing a plan, help and
+        your account settings until you pick one. Your data is kept in the meantime. New job alerts
+        aren&rsquo;t imported while your plan has ended, and those that arrive during that time aren&rsquo;t
+        imported later.
+      </p>
+
+      <h2>Payments</h2>
+      <ul>
+        <li>
+          Before you pay, we show the plan, the billing period, the dates it covers and the total, including
+          GST where it applies. Prices are in Indian rupees.
+        </li>
+        <li>
+          Payments are handled by our payment provider, Razorpay, whose terms also apply. We never see or
+          store your card, UPI or bank details.
+        </li>
+        <li>
+          Plans don&rsquo;t renew automatically, and we never charge you without you starting the payment.
+          We remind you by email in the last week of your plan.
+        </li>
+        <li>
+          Renewing before your plan ends adds the new term after the current one, so you don&rsquo;t lose any
+          days. Moving to a different plan before a paid plan ends starts the new plan right away, and the
+          unused value of the old one is added to it as extra days.
+        </li>
+        <li>
+          Your new plan starts once the payment is confirmed. If you&rsquo;re charged and your plan
+          doesn&rsquo;t change, contact us with your receipt number.
+        </li>
+        <li>
+          Plans aren&rsquo;t refundable once they&rsquo;ve started, except for payment errors such as a double
+          charge. See our <a href="/refunds">Refund &amp; cancellation policy</a>.
+        </li>
+        <li>
+          If online payment isn&rsquo;t available, you can ask for a plan from Settings, and we&rsquo;ll help
+          you complete the payment.
+        </li>
+      </ul>
 
       <h2>Email forwarding</h2>
       <ul>
