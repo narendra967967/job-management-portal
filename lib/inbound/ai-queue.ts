@@ -18,6 +18,7 @@ import { AI_READER_SYSTEM, aiReaderPrompt, draftsFromAiReply } from "@/lib/inbou
 import { ingestAlertDrafts } from "@/lib/lead-ingest";
 import { getIntakeConfig, isForwardingOn } from "@/lib/email-intake-data";
 import type { InboundStatus } from "@/lib/email-intake-model";
+import { intakePausedReason } from "@/lib/intake-pause";
 
 const MAX_ATTEMPTS = 3;
 const LOCK_MS = 5 * 60_000; // a claimed row is free again after this (crash-safe)
@@ -96,6 +97,12 @@ async function processJob(job: QueueRow) {
     // Turned off while this email waited: no AI call, no leads.
     if (!(await isForwardingOn(job.userId))) {
       await finish(job, "rejected", "Forwarding turned off");
+      return;
+    }
+    // Plan ended while it waited: no AI call, no leads.
+    const paused = await intakePausedReason(job.userId);
+    if (paused) {
+      await finish(job, "paused", paused);
       return;
     }
     const { aiMaxJobs } = await getIntakeConfig();

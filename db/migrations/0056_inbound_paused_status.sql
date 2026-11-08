@@ -1,0 +1,1 @@
+ALTER TYPE "public"."inbound_status" ADD VALUE 'paused';

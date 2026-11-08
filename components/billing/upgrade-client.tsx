@@ -23,7 +23,8 @@ export function UpgradeClient() {
       {limited && (
         <p className="mt-3 flex items-center gap-2 rounded-xl bg-status-applied/50 px-3 py-2.5 text-xs text-status-applied-foreground">
           <ShieldCheck className="size-4 shrink-0" aria-hidden />
-          Your leads, contacts and settings are safe. They&rsquo;re all waiting for you.
+          Your leads, contacts and settings are safe. New job alerts are on hold until you pick a plan, then they
+          start coming in again.
         </p>
       )}
       <div className="mt-5">

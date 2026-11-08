@@ -1057,6 +1057,8 @@ export const inboundStatus = pgEnum("inbound_status", [
   "duplicate",
   "gmail_code",
   "queued",
+  // Plan ended / account deactivated: accepted but not read (lib/intake-pause).
+  "paused",
 ]);
 
 export const inboundParser = pgEnum("inbound_parser", ["linkedin", "none", "naukri", "timesjobs", "glassdoor", "theladders"]);

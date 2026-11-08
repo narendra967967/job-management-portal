@@ -41,6 +41,7 @@ import { enqueueAiRead } from "@/lib/inbound/ai-queue";
 import { forwardedOriginal } from "@/lib/inbound/hand-forward";
 import { matchSender, signedFor } from "@/lib/inbound/trust";
 import { confirmationText, describeConfirmationEmail, gmailConfirmation } from "@/lib/inbound/gmail-confirmation";
+import { intakePausedReason } from "@/lib/intake-pause";
 
 /** aiJobId: an email queued for the AI reader — the route runs it after answering. */
 export type SmtpOutcome = { code: 250 | 451 | 550; message: string; aiJobId?: string };
@@ -204,6 +205,7 @@ export async function processInbound(raw: Buffer, recipient: string): Promise<Sm
 
   await markReceived(userId);
   const base = { userId, fromAddress: from, fromDomain, site: fromDomain, signingDomain: vouched, sizeBytes: raw.length, messageId };
+  if (await pausedForPlan(base, "")) return { code: 250, message: "Accepted" };
   if (!(await claimMessage(userId, messageId))) {
     await log({ ...base, status: "duplicate", reason: "Already processed" });
     return { code: 250, message: "Accepted" };
@@ -212,6 +214,17 @@ export async function processInbound(raw: Buffer, recipient: string): Promise<Sm
 }
 
 /* ---------------- shared steps ---------------- */
+
+/** Plan ended or account deactivated: log it as paused and read nothing.
+ *  Checked BEFORE the message is claimed, so the same alert forwarded again
+ *  by hand after renewing isn't refused as a duplicate. Mail is still
+ *  accepted (250) so Gmail never sees a bounce. */
+async function pausedForPlan(base: LogBase, label: string): Promise<boolean> {
+  const paused = await intakePausedReason(base.userId);
+  if (!paused) return false;
+  await log({ ...base, status: "paused", reason: `${label}${paused}` });
+  return true;
+}
 
 /** A verified email arrived — forwarding works. */
 async function markReceived(userId: string) {
@@ -343,6 +356,7 @@ async function handForwarded(ctx: {
   await markReceived(userId);
   // The site is the original's (e.g. timesjobs.com), not the user's own domain.
   const base = { userId, fromAddress: from, fromDomain, site: domainOf(original.from), signingDomain: vouched, sizeBytes: raw.length, messageId };
+  if (await pausedForPlan(base, "Hand-forwarded · ")) return { code: 250, message: "Accepted" };
   if (!(await claimMessage(userId, messageId))) {
     await log({ ...base, status: "duplicate", reason: "Hand-forwarded · already processed" });
     return { code: 250, message: "Accepted" };

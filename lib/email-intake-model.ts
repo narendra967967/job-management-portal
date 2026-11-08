@@ -50,7 +50,7 @@ export interface InboundSender {
   enabled: boolean;
 }
 
-export type InboundStatus = "accepted" | "rejected" | "unsupported" | "duplicate" | "gmail_code" | "queued";
+export type InboundStatus = "accepted" | "rejected" | "unsupported" | "duplicate" | "gmail_code" | "queued" | "paused";
 
 export const INBOUND_STATUS_LABELS: Record<InboundStatus, string> = {
   accepted: "Accepted",
@@ -59,6 +59,7 @@ export const INBOUND_STATUS_LABELS: Record<InboundStatus, string> = {
   duplicate: "Duplicate",
   gmail_code: "Gmail confirmation",
   queued: "Reading with AI",
+  paused: "Paused",
 };
 
 /** One row of the user-side Email log — no admin-only technical detail. */
@@ -115,6 +116,8 @@ export function userReason(status: InboundStatus, reason: string): string {
     "Empty confirmation email": "Gmail's confirmation email had no link",
     "No reader for this sender": "Jobtiva can't read this site's alerts on its own",
     "No job cards found": "Jobtiva couldn't find any jobs in this email on its own",
+    "Paused: plan ended": "Arrived while your plan had ended, so it wasn't read",
+    "Paused: account deactivated": "Arrived while your account was deactivated, so it wasn't read",
   };
   if (status === "gmail_code") return "Gmail forwarding confirmation";
   // The AI reader's failures carry provider details the user can't act on.

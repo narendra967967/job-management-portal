@@ -32,6 +32,7 @@ import { parseLinkedInAlert } from "@/lib/linkedin-parser";
 import { ingestAlertDrafts } from "@/lib/lead-ingest";
 import { isWithinQuietHours } from "@/lib/quiet-hours";
 import { isGmailOAuthEnabled } from "@/lib/email-intake-data";
+import { intakePausedReason } from "@/lib/intake-pause";
 
 const SWITCHED_OFF: SyncResult = {
   connected: false,
@@ -66,6 +67,12 @@ export async function runSyncForUser(userId: string): Promise<SyncResult> {
   if (pause?.pausedAt) {
     return { connected: true, paused: true, fetched: 0, inserted: 0, renewed: 0, errors: 0, message: "Sync is paused." };
   }
+  // Plan ended / account deactivated: skip, keep the cursor; it resumes when
+  // the plan is active again (lib/intake-pause).
+  const planPause = await intakePausedReason(userId);
+  if (planPause) {
+    return { connected: true, paused: true, fetched: 0, inserted: 0, renewed: 0, errors: 0, message: `${planPause}.` };
+  }
 
   let accessToken: string;
   try {
@@ -96,8 +103,12 @@ export async function runSyncForUser(userId: string): Promise<SyncResult> {
     .where(eq(syncStateT.userId, userId));
 
   // First run backfills the lookback window; later runs fetch only what's new.
+  // After a long pause (user pause or plan ended) the catch-up never reaches
+  // further back than the lookback window, so renewing doesn't flood the
+  // leads with months-old alerts.
   let query = buildGmailQuery(cfg);
-  if (state?.lastSyncedAt) {
+  const lookbackStart = cfg.lookbackDays > 0 ? Date.now() - cfg.lookbackDays * 86_400_000 : 0;
+  if (state?.lastSyncedAt && state.lastSyncedAt.getTime() > lookbackStart) {
     const epoch = Math.floor(state.lastSyncedAt.getTime() / 1000) - 3600; // 1h overlap
     query = `${buildGmailQuery({ ...cfg, lookbackDays: 0 })} after:${epoch}`;
   }

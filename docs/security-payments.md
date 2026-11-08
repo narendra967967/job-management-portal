@@ -52,11 +52,12 @@ account control). L6 covers it.
 
 ## Dependencies (`npm audit --omit=dev`)
 
-- **better-auth 1.7.5:** one critical, one high and one low advisory, all fixed in 1.7.7 (latest
-  1.7.18). **None apply here:** the critical one needs the Magic Link plugin, the high one the OAuth
-  Proxy plugin, and the low one database-backed rate limits. This app uses only `nextCookies()`,
-  and its rate limits are kept in memory. Upgrading is still recommended; not done in this phase
-  because it changes the login library.
+- **better-auth 1.7.5 → 1.7.18 (upgraded).** 1.7.5 had one critical, one high and one low
+  advisory, all fixed in 1.7.7. None applied here: the critical one needs the Magic Link plugin, the
+  high one the OAuth Proxy plugin, and the low one database-backed rate limits (this app uses only
+  `nextCookies()` and keeps rate limits in memory). Upgraded anyway. No schema change: every field
+  1.7.18 expects is already in `db/auth-schema.ts`. The full check run was repeated on the new
+  version (sign-in for user and admin is part of it).
 - **mailauth → joi (high):** a slow-regex denial of service in `string().email({ multiple: true })`.
   It belongs to email forwarding (DKIM checks in `mail-in`), not payments. Follow-up: check
   whether mailauth reaches that path with sender-controlled input, or pin a fixed version.
@@ -73,9 +74,10 @@ account control). L6 covers it.
   when no checkout is open.
 - **The webhook reads the whole body before the 256 KB check.** Nginx's `client_max_body_size`
   (8 MB) bounds it in production.
-- **Background intake keeps running for expired users.** Forwarded alerts and the Gmail sync
-  still add leads while a user is in limited mode, so nothing is lost when they renew. Flagged to
-  the owner to confirm that's wanted.
+- **Lead intake pauses in limited mode** (owner decision, 2026-11-08). Forwarded alerts are
+  accepted but logged as Paused and not read (checked before the message is marked processed, so
+  a hand re-forward after renewing still works); queued AI reads are dropped; Gmail sync skips
+  the user and resumes from its cursor, capped at the lookback window. See `lib/intake-pause.ts`.
 - **Not covered here:** a live Razorpay webhook from Razorpay's servers (preprod only, since
   Razorpay can't reach localhost). The real checkout window was tested by the owner on 2026-11-08
   in test mode: the payment went through, the order was Paid, and the plan renewed.

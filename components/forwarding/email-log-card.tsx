@@ -98,6 +98,7 @@ const STATUS_TONE: Record<InboundStatus, string> = {
   duplicate: "bg-muted text-muted-foreground",
   gmail_code: "bg-status-new text-status-new-foreground",
   queued: "bg-ai-muted text-ai",
+  paused: "bg-muted text-muted-foreground",
 };
 
 /** Status names as users see them (admin wording is a bit more technical). */

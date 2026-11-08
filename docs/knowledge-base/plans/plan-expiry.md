@@ -21,6 +21,8 @@ What stays open:
 
 The Upgrade Plan page is headed "Your plan has ended" and tells them their leads, contacts and settings are safe. Nothing is deleted while a user is in limited mode.
 
+New leads stop too. Forwarded job alerts are still accepted, so Gmail doesn't start bouncing them, but they show as **Paused** in the Email log and aren't read. Gmail sync skips the user. The moment they're on a plan again it all restarts: forwarded alerts are read as they arrive, and Gmail sync carries on from where it stopped, reaching back no further than their lookback window, so a long gap doesn't flood them with old alerts. The same pause applies to a deactivated account.
+
 ## Getting them back in
 
 If online payment is on (see "How online plan payments work"), the user picks a plan and pays, and the menus open again as soon as the payment is confirmed. If it's off, each plan offers **Request this plan**, which opens a support ticket. You then renew or switch their plan in admin **Users**, by renewing for a number of days (30 by default) or picking another plan.
