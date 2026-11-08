@@ -20,8 +20,9 @@ import { db } from "@/lib/db";
 import { account, emailIntakeConfig, session, user, verification } from "@/db/schema";
 import { hashPassword, verifyPassword } from "@/lib/password";
 import { provisionUserDefaults } from "@/lib/provision";
-import { sendAppEmail, SMTP_NOT_CONFIGURED } from "@/lib/email";
-import { getAppName } from "@/lib/branding";
+import { SMTP_NOT_CONFIGURED } from "@/lib/email";
+import { sendTemplateEmail } from "@/lib/email-templates";
+import { greetingName } from "@/lib/email-templates-model";
 import { getSessionLengthSeconds } from "@/lib/session-length";
 
 // Read once at init: drives BOTH the DB session expiry and the cookie max-age so
@@ -82,7 +83,6 @@ export const auth = betterAuth({
     // Admin-provisioned accounts that have never logged in get a WELCOME email
     // (with the same set-password link); existing users get the reset copy.
     sendResetPassword: async ({ user: recipient, url }) => {
-      const appName = await getAppName();
       let isNew = false;
       try {
         const [row] = await db
@@ -93,31 +93,13 @@ export const auth = betterAuth({
       } catch {
         isNew = false;
       }
-      const content = isNew
-        ? {
-            subject: `Welcome to ${appName}: set your password`,
-            heading: `Welcome to ${appName}`,
-            lines: [
-              `Hi ${recipient.name || "there"}, an administrator created an account for you on ${appName}.`,
-              `Your login ID is ${recipient.email}.`,
-              "Click below to set your password and sign in. This link expires in 1 hour. If it does, use “Forgot password” on the sign-in page to get a new one.",
-            ],
-            button: { label: "Set your password", url },
-            footerNote:
-              "Once you're signed in, you can change your password anytime from Settings → Account.",
-          }
-        : {
-            subject: `Reset your ${appName} password`,
-            heading: "Reset your password",
-            lines: [
-              `We received a request to reset your ${appName} password.`,
-              "Click the button below to choose a new one. This link expires in 1 hour.",
-            ],
-            button: { label: "Reset your password", url },
-            footerNote: "If you didn't request this, you can safely ignore this email.",
-          };
+      // Wording: admin Engagement → Email templates.
       try {
-        await sendAppEmail({ to: recipient.email, ...content });
+        await sendTemplateEmail(isNew ? "welcome_set_password" : "reset_password", {
+          to: recipient.email,
+          values: { user_name: greetingName(recipient.name), user_email: recipient.email },
+          buttonUrl: url,
+        });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         if (msg === SMTP_NOT_CONFIGURED) {
@@ -152,18 +134,15 @@ export const auth = betterAuth({
       const last = verifySentAt.get(key) ?? 0;
       if (Date.now() - last < VERIFY_RESEND_MS) return;
       verifySentAt.set(key, Date.now());
-      const appName = await getAppName();
       try {
-        await sendAppEmail({
+        await sendTemplateEmail("verify_email", {
           to: recipient.email,
-          subject: `Verify your email for ${appName}`,
-          heading: "Confirm your email",
-          lines: [
-            `Hi ${recipient.name || "there"}, welcome to ${appName}!`,
-            `Confirm your email address to activate your account. This link works for ${VERIFY_LINK_HOURS} hours, and signing in sends a new one if it runs out.`,
-          ],
-          button: { label: "Verify email", url },
-          footerNote: "If you didn't create this account, you can safely ignore this email.",
+          values: {
+            user_name: greetingName(recipient.name),
+            user_email: recipient.email,
+            link_hours: String(VERIFY_LINK_HOURS),
+          },
+          buttonUrl: url,
         });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);

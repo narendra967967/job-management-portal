@@ -8,6 +8,7 @@ import { desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { emailTemplates, emailTemplateVersions, user } from "@/db/schema";
 import { getAppName } from "@/lib/branding";
+import { sendAppEmail } from "@/lib/email";
 import { sanitizeGuideHtml } from "@/lib/guide-html";
 import {
   EMAIL_TEMPLATES,
@@ -19,6 +20,7 @@ import {
   templateProblems,
   type EmailTemplateContent,
   type EmailTemplateDef,
+  type EmailTemplateKey,
   type TemplateState,
   type TemplateVersion,
 } from "@/lib/email-templates-model";
@@ -125,6 +127,7 @@ export interface RenderedTemplate {
   subject: string;
   heading: string;
   bodyHtml: string;
+  appName: string;
   /** Null when the email has no button; the sender adds the link. */
   buttonLabel: string | null;
   footerNote: string;
@@ -145,6 +148,7 @@ export async function renderTemplate(
   // sendAppEmail escapes these, so they're filled as plain text.
   const text = (s: string) => fillTemplate(def, s, all, "text").replace(/\s+/g, " ").trim();
   return {
+    appName: all.app_name,
     subject: text(c.subject),
     heading: text(c.heading),
     bodyHtml: fillTemplate(def, emailBodyHtml(c.bodyHtml), all, "html"),
@@ -152,3 +156,90 @@ export async function renderTemplate(
     footerNote: text(c.footerNote),
   };
 }
+
+/** Plain-text copy of email HTML, for the text part of the message. */
+export function emailHtmlToText(html: string): string {
+  return html
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<li[^>]*>/gi, "- ")
+    .replace(/<\/(p|div|h[1-6]|li|tr|blockquote|table|ul|ol|pre)>/gi, "\n")
+    .replace(/<\/t[dh]>/gi, "  ")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#(\d+);/g, (_, n: string) => String.fromCodePoint(Number(n)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, n: string) => String.fromCodePoint(parseInt(n, 16)))
+    .replace(/&amp;/g, "&")
+    .split("\n")
+    .map((l) => l.replace(/[ \t]+/g, " ").trim())
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+export interface TemplateEmailOptions {
+  to: string;
+  /** Placeholder values; app_name is filled in when missing. */
+  values?: Record<string, string>;
+  /** Where the button goes. Without it the email has no button. */
+  buttonUrl?: string;
+  headers?: Record<string, string>;
+  /** Wording to use instead of the saved one (the editor's test email). */
+  content?: EmailTemplateContent;
+  subjectPrefix?: string;
+}
+
+/**
+ * Sends one automatic email with the wording admins set in Email templates.
+ * Every automatic email goes through here; throws like sendAppEmail
+ * (SMTP_NOT_CONFIGURED when email isn't set up).
+ */
+export async function sendTemplateEmail(key: EmailTemplateKey, opts: TemplateEmailOptions): Promise<void> {
+  const def = templateByKey(key);
+  if (!def) throw new Error(`Unknown email template "${key}"`);
+  // A sender that forgets a value leaves a gap in the email; say so in the log.
+  const missing = def.placeholders.filter((ph) => ph.key !== "app_name" && opts.values?.[ph.key] === undefined);
+  if (missing.length) {
+    console.warn(`[email-templates] "${key}" sent without ${missing.map((ph) => `{{${ph.key}}}`).join(", ")}`);
+  }
+  const r = await renderTemplate(def, opts.values ?? {}, opts.content);
+  const button = r.buttonLabel && opts.buttonUrl ? { label: r.buttonLabel, url: opts.buttonUrl } : undefined;
+  const subject = `${opts.subjectPrefix ?? ""}${r.subject}`;
+  const text = [
+    r.heading,
+    emailHtmlToText(r.bodyHtml),
+    button ? `${button.label}: ${button.url}` : "",
+    r.footerNote,
+    `- ${r.appName}`,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+  await sendAppEmail({
+    to: opts.to,
+    subject,
+    heading: r.heading || undefined,
+    bodyHtml: r.bodyHtml,
+    button,
+    footerNote: r.footerNote || undefined,
+    text,
+    headers: opts.headers,
+  });
+}
+
+const escHtml = (s: string) =>
+  s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+/**
+ * A block placeholder value made of plain sentences: one styled paragraph each,
+ * escaped, so a plan or user name can't add markup. Empty sentences are dropped.
+ */
+export const paragraphsBlock = (...sentences: (string | null | undefined | false)[]) =>
+  sentences
+    .filter((s): s is string => !!s && !!s.trim())
+    .map((s) => `<p style="${STYLES.p}">${escHtml(s)}</p>`)
+    .join("");
+
+/** Escapes text going into a block value the sender builds by hand. */
+export { escHtml as escapeEmailText };

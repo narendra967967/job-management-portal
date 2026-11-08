@@ -30,7 +30,8 @@ import {
   type RazorpayCreds,
   type RazorpayPayment,
 } from "@/lib/payments/razorpay";
-import { sendAppEmail } from "@/lib/email";
+import { sendTemplateEmail } from "@/lib/email-templates";
+import { greetingName } from "@/lib/email-templates-model";
 import { absoluteUrl } from "@/lib/site-url";
 import { getAppName } from "@/lib/branding";
 
@@ -347,15 +348,16 @@ export async function sendReceipt(orderId: string): Promise<void> {
         `<tr><td style="padding:7px 0;border-bottom:1px solid #E5E7EB;color:#6B7280;">${esc(k)}</td><td style="padding:7px 0;border-bottom:1px solid #E5E7EB;color:#111827;text-align:right;font-weight:${k === "Total paid" ? "bold" : "normal"};">${esc(v)}</td></tr>`,
     )
     .join("")}</table>`;
-  const first = o.userName.split(" ")[0] || "there";
-  const intro = `Hi ${first}, thanks for your payment. Your ${o.planName} plan is active${o.termEndsAt ? ` until ${dateOnly(o.termEndsAt)}` : ""}.`;
-  await sendAppEmail({
+  // Wording: admin Engagement → Email templates ("Payment received").
+  await sendTemplateEmail("payment_received", {
     to: o.userEmail,
-    subject: `Payment received: ${o.planName} plan`,
-    heading: "Payment received",
-    bodyHtml: `<p style="margin:0 0 14px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;color:#374151;">${esc(intro)}</p>${table}`,
-    text: `${intro}\n\n${rows.map(([k, v]) => `${k}: ${v}`).join("\n")}`,
-    button: { label: "See your plan", url: absoluteUrl("/settings?tab=plan") },
-    footerNote: "Keep this email as your payment receipt.",
+    values: {
+      user_name: greetingName(o.userName),
+      plan_name: o.planName,
+      active_until: o.termEndsAt ? dateOnly(o.termEndsAt) : "the end of its term",
+      total_paid: money(o.totalAmount),
+      receipt_details: table,
+    },
+    buttonUrl: absoluteUrl("/settings?tab=plan"),
   });
 }

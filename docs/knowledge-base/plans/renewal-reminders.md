@@ -17,7 +17,7 @@ These are account emails, so there's no unsubscribe link. They go through the SM
 
 The server's scheduled job calls the reminders once a day at 10:00 IST. Running it twice on the same day doesn't send anything twice, because each user, plan end date and day is only ever sent once. If a day is missed, the user gets the next day's email as usual. Missed days aren't caught up.
 
-There's one wording for now. A section to preview and edit email templates is planned.
+The wording is editable in **Engagement → Email templates** as "Your plan ends soon". The sentences about lead count and the suggested plan are written by the app, because they change with each person.
 
 ## Checking on it in admin Renewals
 

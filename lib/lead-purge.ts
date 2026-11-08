@@ -10,7 +10,9 @@ import { and, eq, inArray, lt } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { cronConfig, jobLeads as leadsT, leadPurgeLog, user as userT } from "@/db/schema";
 import { LEAD_STATUS_LABELS, type LeadStatus } from "@/lib/types";
-import { sendAppEmail, SMTP_NOT_CONFIGURED } from "@/lib/email";
+import { SMTP_NOT_CONFIGURED } from "@/lib/email";
+import { sendTemplateEmail } from "@/lib/email-templates";
+import { greetingName } from "@/lib/email-templates-model";
 import { createNotification } from "@/lib/notifications";
 
 export interface PurgeUserResult {
@@ -52,21 +54,17 @@ async function emailUser(
         `<tr><td style="padding:4px 12px 4px 0;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#374151;">${labelFor(s)}</td><td style="padding:4px 0;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#111827;font-weight:bold;">${n}</td></tr>`,
     )
     .join("");
-  const policyStatuses = statuses.map(labelFor).join(", ");
-  const bodyHtml = `
-    <p style="margin:0 0 14px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;color:#374151;">As part of routine database cleanup, <strong>${total}</strong> old lead${total === 1 ? "" : "s"} w${total === 1 ? "as" : "ere"} removed from your account.</p>
-    <table cellpadding="0" cellspacing="0" style="margin:0 0 14px;">${rows}</table>
-    <p style="margin:0 0 6px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.6;color:#6b7280;">Policy: leads marked <strong>${policyStatuses}</strong> with no activity for <strong>${days}+ days</strong> are removed automatically.</p>
-    <p style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.6;color:#6b7280;">This is a preset system policy that keeps the workspace tidy — no action is needed on your part.</p>
-  `;
-
   try {
-    await sendAppEmail({
+    // Wording: admin Engagement → Email templates ("Old leads cleared").
+    await sendTemplateEmail("old_leads_cleared", {
       to: u.email,
-      subject: "Old leads cleared from your account",
-      heading: "Automatic cleanup of old leads",
-      bodyHtml,
-      text: `${total} old leads were removed from your account as part of routine cleanup. Policy: leads marked ${policyStatuses} with no activity for ${days}+ days are removed automatically. This is a preset system policy — no action needed.`,
+      values: {
+        user_name: greetingName(u.name),
+        leads_removed: `${total} old ${total === 1 ? "lead" : "leads"}`,
+        removed_by_status: `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 14px;">${rows}</table>`,
+        statuses: statuses.map(labelFor).join(", "),
+        days: String(days),
+      },
     });
     return true;
   } catch (e) {

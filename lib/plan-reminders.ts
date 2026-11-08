@@ -14,67 +14,58 @@ import { activeLeadCount } from "@/lib/entitlements";
 import { toPublicPlan, type PublicPlan } from "@/lib/pricing";
 import { upgradeSentence } from "@/lib/plan-highlights";
 import { formatPrice } from "@/lib/billing-model";
-import { sendAppEmail, SMTP_NOT_CONFIGURED } from "@/lib/email";
+import { SMTP_NOT_CONFIGURED } from "@/lib/email";
+import { paragraphsBlock, sendTemplateEmail } from "@/lib/email-templates";
+import { greetingName } from "@/lib/email-templates-model";
 import { absoluteUrl } from "@/lib/site-url";
-import { getAppName } from "@/lib/branding";
 
 const DAY_MS = 86_400_000;
 
 const longDate = (d: Date) =>
   d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "Asia/Kolkata" });
 
-export interface ReminderEmail {
-  subject: string;
-  heading: string;
-  lines: string[];
-  button: { label: string; url: string };
-  footerNote: string;
-}
-
-/** The reminder for one user on one day. Pure apart from the URLs. */
-export function reminderEmail(args: {
-  appName: string;
+/**
+ * The reminder's values for one user on one day. Wording: admin Engagement →
+ * Email templates ("Your plan ends soon"); the sentences that depend on the
+ * user's situation are written here and fill its leads_line / upgrade_line.
+ */
+export function reminderValues(args: {
   firstName: string;
   plan: PublicPlan;
   expiresAt: Date;
   daysLeft: number;
   activeLeads: number;
   upsell: PublicPlan | null;
-}): ReminderEmail {
-  const { appName, firstName, plan, expiresAt, daysLeft, activeLeads, upsell } = args;
+}): { values: Record<string, string>; buttonUrl: string } {
+  const { firstName, plan, expiresAt, daysLeft, activeLeads, upsell } = args;
   const trial = plan.isFree;
-  const what = trial ? "free trial" : `${plan.name} plan`;
-  const when = daysLeft === 1 ? "tomorrow" : `in ${daysLeft} days`;
 
-  const lines = [
-    `Hi ${firstName}, your ${what} ends on ${longDate(expiresAt)}.`,
+  const leads =
     activeLeads > 0
       ? `You're tracking ${activeLeads.toLocaleString("en-IN")} job ${activeLeads === 1 ? "lead" : "leads"} right now. ${
           trial ? "Pick a plan" : "Renew"
         } before then and nothing changes: your leads, contacts and reminders stay right where they are.`
-      : `${trial ? "Pick a plan" : "Renew"} before then to keep everything running without a break.`,
-  ];
+      : `${trial ? "Pick a plan" : "Renew"} before then to keep everything running without a break.`;
+  let upgrade: string | null = null;
   if (upsell) {
     const adds = upgradeSentence([plan, upsell], 3);
     const price = upsell.monthlyPrice > 0 ? ` It's ${formatPrice(upsell.monthlyPrice, upsell.currency)} a month.` : "";
-    lines.push(
-      trial
-        ? `${adds || `${upsell.name} is our most popular next step.`}${price}`
-        : `Thinking about more room? ${adds || `${upsell.name} gives you more.`}${price} If you upgrade now, the days left on your current plan count toward it.`,
-    );
+    upgrade = trial
+      ? `${adds || `${upsell.name} is our most popular next step.`}${price}`
+      : `Thinking about more room? ${adds || `${upsell.name} gives you more.`}${price} If you upgrade now, the days left on your current plan count toward it.`;
   }
-  lines.push(
-    `If it does run out, you can still sign in to ${appName}, but everything apart from your plan and account settings stays locked until you pick a plan.`,
-  );
 
   return {
-    subject: `Your ${what} ends ${when}`,
-    heading: `Your ${what} ends ${when}`,
-    lines,
-    button: trial
-      ? { label: "Choose a plan", url: absoluteUrl("/upgrade") }
-      : { label: upsell ? "Renew or upgrade" : "Renew my plan", url: absoluteUrl("/settings?tab=plan") },
-    footerNote: "We send this once a day during the last week of your plan, and stop as soon as you renew.",
+    values: {
+      user_name: firstName,
+      plan_label: trial ? "free trial" : `${plan.name} plan`,
+      ends_on: longDate(expiresAt),
+      ends_when: daysLeft === 1 ? "tomorrow" : `in ${daysLeft} days`,
+      leads_line: paragraphsBlock(leads),
+      upgrade_line: paragraphsBlock(upgrade),
+      button_text: trial ? "Choose a plan" : upsell ? "Renew or upgrade" : "Renew my plan",
+    },
+    buttonUrl: trial ? absoluteUrl("/upgrade") : absoluteUrl("/settings?tab=plan"),
   };
 }
 
@@ -87,7 +78,6 @@ export interface ReminderRunResult {
 
 export async function runPlanReminders(now = new Date()): Promise<ReminderRunResult> {
   const result: ReminderRunResult = { due: 0, sent: 0, failed: 0, skipped: 0 };
-  const appName = await getAppName();
 
   // Plans ending within 7 days, for active non-admin accounts.
   const due = await db
@@ -146,9 +136,8 @@ export async function runPlanReminders(now = new Date()): Promise<ReminderRunRes
     // The next plan up: cheapest listed plan priced above this one.
     const upsell = paidOffers.find((p) => p.id !== plan.id && p.monthlyPrice > plan.monthlyPrice) ?? null;
 
-    const email = reminderEmail({
-      appName,
-      firstName: u.name.split(" ")[0] || "there",
+    const email = reminderValues({
+      firstName: greetingName(u.name),
       plan,
       expiresAt,
       daysLeft,
@@ -158,7 +147,7 @@ export async function runPlanReminders(now = new Date()): Promise<ReminderRunRes
 
     let error: string | null = null;
     try {
-      await sendAppEmail({ to: u.email, ...email });
+      await sendTemplateEmail("plan_ending", { to: u.email, ...email });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       error = msg === SMTP_NOT_CONFIGURED ? "Email (SMTP) isn't set up" : msg.slice(0, 500);

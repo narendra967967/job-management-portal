@@ -8,7 +8,9 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { getSessionUser, accessState } from "@/lib/current-user";
 import { appSettings, user } from "@/db/schema";
-import { sendAppEmail, SMTP_NOT_CONFIGURED } from "@/lib/email";
+import { SMTP_NOT_CONFIGURED } from "@/lib/email";
+import { sendTemplateEmail } from "@/lib/email-templates";
+import { sanitizeRichText } from "@/lib/sanitize";
 import { createSupportTicket } from "@/lib/tickets";
 
 const schema = z.object({
@@ -38,23 +40,19 @@ export async function requestReactivationAction(input: unknown): Promise<{ ok: b
   const to = await adminRecipient();
   if (!to) return { ok: false, error: "No admin contact is set up yet. Please try again later." };
 
-  // The rich-text HTML is the user's own message; it's emailed, not rendered in the
-  // app. Fall back to the escaped plain text when empty.
-  const bodyHtml = parsed.data.html?.trim() || `<p>${esc(parsed.data.message)}</p>`;
-  const subject = `Reactivation request — ${u.name || u.email}`;
-  const detailsHtml = `
-    <p style="margin:0 0 14px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;color:#374151;"><strong>${esc(u.name)}</strong> has requested their account be reactivated.</p>
-    <table cellpadding="4" style="border-collapse:collapse;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#374151">
-      <tr><td><strong>Name</strong></td><td>${esc(u.name)}</td></tr>
-      <tr><td><strong>Email</strong></td><td>${esc(u.email)}</td></tr>
-      <tr><td><strong>Mobile</strong></td><td>${esc(u.mobile ?? "—")}</td></tr>
-      <tr><td><strong>User ID</strong></td><td>${esc(u.id)}</td></tr>
-      <tr><td><strong>Requested</strong></td><td>${esc(new Date().toISOString())}</td></tr>
-    </table>
-    <p style="margin:16px 0 8px;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#111827"><strong>Message</strong></p>
-    ${bodyHtml}
-  `;
-  const text = `${u.name} (${u.email}) requests account reactivation.\n\n${parsed.data.message}`;
+  // The user's own rich text, cleaned before it goes into the email; the
+  // escaped plain text when there's none.
+  const bodyHtml = (parsed.data.html?.trim() && sanitizeRichText(parsed.data.html)) || `<p>${esc(parsed.data.message)}</p>`;
+  const subject = `Reactivation request: ${u.name || u.email}`;
+  const cell = "padding:4px 12px 4px 0;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#374151;";
+  const row = (k: string, v: string) => `<tr><td style="${cell}"><strong>${k}</strong></td><td style="${cell}">${esc(v)}</td></tr>`;
+  const detailsHtml = `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 14px;border-collapse:collapse;">${[
+    row("Name", u.name),
+    row("Email", u.email),
+    row("Mobile", u.mobile ?? "Not given"),
+    row("User ID", u.id),
+    row("Requested", new Date().toISOString()),
+  ].join("")}</table>`;
 
   // Record it as a support ticket for the admin Tickets inbox (best-effort — the
   // email below is the primary notification).
@@ -73,7 +71,16 @@ export async function requestReactivationAction(input: unknown): Promise<{ ok: b
   }
 
   try {
-    await sendAppEmail({ to, subject, heading: "Account reactivation request", bodyHtml: detailsHtml, text });
+    // Wording: admin Engagement → Email templates ("Reactivation request (to your support inbox)").
+    await sendTemplateEmail("reactivation_request", {
+      to,
+      values: {
+        user_name: u.name || u.email,
+        user_email: u.email,
+        user_details: detailsHtml,
+        message: `<div style="margin:0 0 14px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;color:#374151;">${bodyHtml}</div>`,
+      },
+    });
     return { ok: true };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

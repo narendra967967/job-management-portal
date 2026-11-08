@@ -42,8 +42,26 @@ export interface EmailTemplateContent {
   footerNote: string;
 }
 
+/** Every automatic email. A new one gets a key here and an entry in EMAIL_TEMPLATES. */
+export type EmailTemplateKey =
+  | "verify_email"
+  | "welcome_set_password"
+  | "reset_password"
+  | "code_reset_leads"
+  | "code_delete_account"
+  | "leads_reset_done"
+  | "deletion_received"
+  | "deletion_canceled"
+  | "account_deleted"
+  | "plan_ending"
+  | "payment_received"
+  | "old_leads_cleared"
+  | "ticket_received"
+  | "ticket_resolved"
+  | "reactivation_request";
+
 export interface EmailTemplateDef {
-  key: string;
+  key: EmailTemplateKey;
   group: EmailTemplateGroup;
   name: string;
   /** When it goes out, in a few words. */
@@ -547,3 +565,6 @@ export interface TemplateVersion {
 export interface TemplateRow extends TemplateState {
   def: EmailTemplateDef;
 }
+
+/** {{user_name}}: the first word of the user's name, or "there" ("Hi there"). */
+export const greetingName = (name?: string | null) => name?.trim().split(/\s+/)[0] || "there";

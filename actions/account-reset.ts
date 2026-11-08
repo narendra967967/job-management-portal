@@ -23,7 +23,8 @@ import {
   tasks,
 } from "@/db/schema";
 import { issueActionCode, verifyActionCode } from "@/lib/action-codes";
-import { sendAppEmail } from "@/lib/email";
+import { sendTemplateEmail } from "@/lib/email-templates";
+import { greetingName } from "@/lib/email-templates-model";
 
 export interface ResetSummary {
   leads: number;
@@ -119,7 +120,7 @@ export async function exportLeadsCsvAction(): Promise<{ filename: string; csv: s
 export async function sendResetCodeAction(confirmText: string): Promise<{ ok: true } | { ok: false; error: string }> {
   const u = await me();
   if (confirmText !== "RESET") return { ok: false, error: "Type RESET in capitals to continue." };
-  return issueActionCode(u.id, u.email, "reset_leads");
+  return issueActionCode(u.id, u.email, "reset_leads", u.name);
 }
 
 /** Step 3: correct code → delete everything lead-related in one transaction. */
@@ -148,15 +149,10 @@ export async function resetLeadsAction(code: string): Promise<{ ok: true; delete
   }
 
   // Confirmation email — best effort; the reset itself is done.
-  sendAppEmail({
+  // Wording: admin Engagement → Email templates.
+  sendTemplateEmail("leads_reset_done", {
     to: u.email,
-    subject: "Your leads have been reset",
-    heading: "Your leads have been reset",
-    lines: [
-      `We permanently deleted ${deleted} ${deleted === 1 ? "lead" : "leads"} and everything attached to them, as you asked.`,
-      "Your account, profile, résumés, settings and email forwarding are unchanged — new job alerts will keep arriving as fresh leads.",
-      "If you didn't do this, change your password and contact support right away.",
-    ],
+    values: { user_name: greetingName(u.name), leads_deleted: `${deleted} ${deleted === 1 ? "lead" : "leads"}` },
   }).catch((e) => console.error("[reset-leads] confirmation email failed:", e instanceof Error ? e.message : e));
 
   revalidatePath("/", "layout");

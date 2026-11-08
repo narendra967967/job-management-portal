@@ -16,7 +16,9 @@ import {
   type Ticket,
   type TicketReply,
 } from "@/lib/tickets";
-import { sendAppEmail, SMTP_NOT_CONFIGURED } from "@/lib/email";
+import { SMTP_NOT_CONFIGURED } from "@/lib/email";
+import { sendTemplateEmail } from "@/lib/email-templates";
+import { greetingName } from "@/lib/email-templates-model";
 import { richTextToPlain } from "@/lib/sanitize";
 import { createNotification } from "@/lib/notifications";
 import { publish } from "@/lib/support-events";
@@ -56,16 +58,11 @@ async function sendResolvedEmail(ticket: Ticket): Promise<void> {
     convo += block(label(r.author), r.body, fmt(r.createdAt));
   }
 
-  const textParts = [`You wrote (${fmt(ticket.createdAt)}):`, richTextToPlain(ticket.message)];
-  for (const r of ticket.replies) textParts.push(`${label(r.author)} (${fmt(r.createdAt)}):`, richTextToPlain(r.body));
-
   try {
-    await sendAppEmail({
+    // Wording: admin Engagement → Email templates ("Your request has been resolved").
+    await sendTemplateEmail("ticket_resolved", {
       to: ticket.email,
-      subject: `Resolved: ${ticket.subject}`,
-      heading: "Your request has been resolved",
-      bodyHtml: `<p style="margin:0 0 14px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;color:#374151;">Hi ${esc(ticket.name || "there")}, we've marked your request &ldquo;<strong>${esc(ticket.subject)}</strong>&rdquo; as resolved. Here&rsquo;s the full conversation for your records:</p>${convo}<p style="margin:14px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#6b7280;">Still need help? Just contact support again and we&rsquo;ll reopen it.</p>`,
-      text: `Your request "${ticket.subject}" has been resolved. Full conversation:\n\n${textParts.join("\n\n")}`,
+      values: { user_name: greetingName(ticket.name), ticket_subject: ticket.subject, conversation: convo },
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

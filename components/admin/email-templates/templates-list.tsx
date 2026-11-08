@@ -37,16 +37,6 @@ import {
 import { useMounted } from "@/lib/use-mounted";
 import { cn, formatDateTime } from "@/lib/utils";
 
-/** PHASE 2: until the senders read these templates, say that saved wording isn't live yet. */
-export function PendingBanner() {
-  return (
-    <p className="rounded-lg border border-dashed border-primary/30 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
-      Emails still go out with their built-in wording for now. What you save here is kept and takes over once the
-      switch-over is finished.
-    </p>
-  );
-}
-
 export function WordingBadge({ edited }: { edited: boolean }) {
   return <Badge variant={edited ? "warning" : "neutral"}>{edited ? "Edited" : "Default"}</Badge>;
 }
@@ -93,8 +83,6 @@ export function TemplatesList({ appName, states }: { appName: string; states: Te
 
   return (
     <div className="mx-auto max-w-5xl space-y-4">
-      <PendingBanner />
-
       <div className="grid grid-cols-2 gap-2 sm:max-w-sm">
         <StatBox
           label="Edited"

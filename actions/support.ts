@@ -22,7 +22,8 @@ import {
 import { TICKET_CATEGORIES, type Ticket, type TicketReply, type UserTicketSummary } from "@/lib/tickets-model";
 import { publish } from "@/lib/support-events";
 import { sanitizeRichText, richTextToPlain } from "@/lib/sanitize";
-import { sendAppEmail } from "@/lib/email";
+import { sendTemplateEmail } from "@/lib/email-templates";
+import { greetingName } from "@/lib/email-templates-model";
 
 type Result = { ok: true } | { ok: false; error: string };
 
@@ -79,15 +80,14 @@ export async function submitSupportTicketAction(input: unknown): Promise<Result>
   // Confirmation email (best-effort — the ticket is already filed).
   try {
     const safeHtml = sanitizeRichText(v.message);
-    await sendAppEmail({
+    // Wording: admin Engagement → Email templates ("We got your request").
+    await sendTemplateEmail("ticket_received", {
       to: u.email,
-      subject: `We got your request: ${v.subject}`,
-      heading: "Thanks — we've received your request",
-      bodyHtml: `<p style="margin:0 0 14px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;color:#374151;">Our team will review it and reply from your account. You can follow the conversation anytime under <strong>Settings &rarr; Help &amp; support</strong>.</p>
-        <p style="margin:0 0 6px;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#111827;"><strong>Your message</strong></p>
-        <div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;color:#374151;">${safeHtml}</div>`,
-      text: `Thanks — we've received your request. Follow the conversation under Settings → Help & support.\n\nYour message:\n${richTextToPlain(v.message)}`,
-      footerNote: "You're receiving this because you contacted support from your account.",
+      values: {
+        user_name: greetingName(u.name),
+        ticket_subject: v.subject,
+        your_message: `<div style="margin:0 0 14px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;color:#374151;">${safeHtml}</div>`,
+      },
     });
   } catch {
     // Non-fatal: the ticket is filed regardless.

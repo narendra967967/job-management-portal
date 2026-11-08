@@ -17,7 +17,8 @@ import { and, desc, eq, inArray, isNotNull, isNull, ne } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { resumes, supportTickets, ticketReplies, user } from "@/db/schema";
 import { deleteResumeFile } from "@/lib/storage";
-import { sendAppEmail } from "@/lib/email";
+import { sendTemplateEmail } from "@/lib/email-templates";
+import { greetingName } from "@/lib/email-templates-model";
 
 export const DELETION_CATEGORY = "deletion";
 export const DELETION_SOURCE = "account-deletion";
@@ -93,15 +94,9 @@ export async function deleteUserCompletely(userId: string): Promise<{ ok: true }
 
   // Final confirmation, for users who asked to be deleted.
   if (requested) {
-    sendAppEmail({
-      to: u.email,
-      subject: "Your account has been deleted",
-      heading: "Your account has been deleted",
-      lines: [
-        `Hi ${u.name || "there"}, as you asked, we've permanently deleted your account and all its data — leads, contacts, résumés, profile and settings.`,
-        "This can't be undone. You're welcome to sign up again any time.",
-      ],
-    }).catch((e) => console.error("[account-deletion] final email failed:", e instanceof Error ? e.message : e));
+    // Wording: admin Engagement → Email templates.
+    sendTemplateEmail("account_deleted", { to: u.email, values: { user_name: greetingName(u.name) } })
+      .catch((e) => console.error("[account-deletion] final email failed:", e instanceof Error ? e.message : e));
   }
   return { ok: true };
 }

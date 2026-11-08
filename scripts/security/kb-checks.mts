@@ -151,13 +151,15 @@ const answered: [string, string][] = [
   ["Why did the knowledge base answer without AI?", "knowledge base agent"],
   ["How do I email all users about planned downtime?", "every user"],
   ["How does a user unsubscribe from promotional emails?", "broadcasts"],
+  ["How do I change the text of the password reset email?", "wording of automatic emails"],
+  ["Where do I edit the welcome email?", "email templates"],
+  ["How do I refund a yearly plan?", "online plan payments"],
   ["discarding a lead", "discarding"],
   ["leads disappearing from the list", "stale"],
   ["please tell me how to roll back a deploy", "deploy"],
   ["my lead vanished, where did it go?", "stale"],
 ];
 const unanswered = [
-  "How do I refund a yearly plan?",
   "How do I export all users to a spreadsheet?",
   "What is the company's office address?",
   "Can I change the color theme to dark mode?",

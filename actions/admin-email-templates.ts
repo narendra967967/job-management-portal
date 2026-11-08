@@ -11,9 +11,9 @@ import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/current-user";
 import { emailTemplates, emailTemplateVersions, user } from "@/db/schema";
 import { sanitizeGuideHtml } from "@/lib/guide-html";
-import { isMailConfigured, sendAppEmail } from "@/lib/email";
+import { isMailConfigured } from "@/lib/email";
 import { siteUrl } from "@/lib/site-url";
-import { renderTemplate } from "@/lib/email-templates";
+import { sendTemplateEmail } from "@/lib/email-templates";
 import {
   EMAIL_TEMPLATES,
   TEMPLATE_VERSIONS_KEPT,
@@ -163,16 +163,8 @@ export async function sendEmailTemplateTestAction(
 
   const { app_name: _sampleName, ...samples } = sampleValues(def);
   void _sampleName;
-  const r = await renderTemplate(def, samples, content);
   try {
-    await sendAppEmail({
-      to: me.email,
-      subject: `[Test] ${r.subject}`,
-      heading: r.heading || undefined,
-      bodyHtml: r.bodyHtml,
-      button: r.buttonLabel ? { label: r.buttonLabel, url: siteUrl() } : undefined,
-      footerNote: r.footerNote || undefined,
-    });
+    await sendTemplateEmail(def.key, { to: me.email, values: samples, content, buttonUrl: siteUrl(), subjectPrefix: "[Test] " });
   } catch (e) {
     console.error("email template test failed", e);
     return { ok: false, error: "The test email didn't send. Check the SMTP details in Settings → Email / SMTP." };

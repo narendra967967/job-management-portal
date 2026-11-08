@@ -2,7 +2,7 @@
 title: Everyday server tasks: logs, settings changes, memory
 category: Runbooks
 summary: Run everything as the deploy user in /srv/jobtiva. The containers are app-prod, app-preprod, postgres and mail-in. Changing an env file needs docker compose up -d, not restart, to take effect.
-keywords: server, logs, docker compose, env file, restart, memory, disk, ssh, deploy user, psql, mail-in
+keywords: server, logs, app logs, view logs, see the logs, docker compose, env file, restart, memory, disk, ssh, deploy user, psql, mail-in
 ---
 
 Everything runs as the `deploy` user from `/srv/jobtiva`. Become it with `sudo -iu deploy`; the default `ubuntu` user can't open that folder.

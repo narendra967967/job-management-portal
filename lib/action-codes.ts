@@ -8,7 +8,9 @@ import { createHmac, randomInt, timingSafeEqual } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { actionCodes } from "@/db/schema";
-import { sendAppEmail, SMTP_NOT_CONFIGURED } from "@/lib/email";
+import { SMTP_NOT_CONFIGURED } from "@/lib/email";
+import { sendTemplateEmail } from "@/lib/email-templates";
+import { greetingName, type EmailTemplateKey } from "@/lib/email-templates-model";
 
 export type ActionCodePurpose = "reset_leads" | "delete_account";
 
@@ -16,18 +18,15 @@ const TTL_MS = 10 * 60_000;
 const RESEND_MS = 60_000;
 export const MAX_CODE_ATTEMPTS = 5;
 
-const COPY: Record<ActionCodePurpose, { subject: string; heading: string; what: string }> = {
-  reset_leads: {
-    subject: "Your code to reset your leads",
-    heading: "Confirm resetting your leads",
-    what: "permanently delete all your leads and everything attached to them",
-  },
-  delete_account: {
-    subject: "Your code to request account deletion",
-    heading: "Confirm your account deletion request",
-    what: "send a request to delete your account and all its data",
-  },
+// Wording: admin Engagement → Email templates.
+const TEMPLATE: Record<ActionCodePurpose, EmailTemplateKey> = {
+  reset_leads: "code_reset_leads",
+  delete_account: "code_delete_account",
 };
+
+/** The code as it appears in the email: large and spaced out. */
+const codeBlock = (code: string) =>
+  `<p style="margin:16px 0;font-family:Arial,Helvetica,sans-serif;font-size:28px;font-weight:700;letter-spacing:6px;color:#111827;">${code}</p>`;
 
 function hash(userId: string, purpose: ActionCodePurpose, code: string): string {
   const secret = process.env.BETTER_AUTH_SECRET;
@@ -42,6 +41,7 @@ export async function issueActionCode(
   userId: string,
   email: string,
   purpose: ActionCodePurpose,
+  name?: string | null,
 ): Promise<Result> {
   const [existing] = await db
     .select({ createdAt: actionCodes.createdAt })
@@ -60,7 +60,6 @@ export async function issueActionCode(
     .values({ userId, purpose, ...values })
     .onConflictDoUpdate({ target: [actionCodes.userId, actionCodes.purpose], set: values });
 
-  const c = COPY[purpose];
   // Development only: reserved test domains can't receive mail — log the code
   // instead of bouncing an email through the real SMTP account.
   if (process.env.NODE_ENV !== "production" && /\.(test|localhost|example|invalid)$/i.test(email)) {
@@ -68,14 +67,9 @@ export async function issueActionCode(
     return { ok: true };
   }
   try {
-    await sendAppEmail({
+    await sendTemplateEmail(TEMPLATE[purpose], {
       to: email,
-      subject: c.subject,
-      heading: c.heading,
-      bodyHtml: `<p>Use this code to ${c.what}:</p>
-<p style="font-size:28px;font-weight:700;letter-spacing:6px;margin:16px 0">${code}</p>
-<p>It expires in 10 minutes. If you didn't ask for this, ignore this email and change your password.</p>`,
-      text: `Use this code to ${c.what}: ${code}\n\nIt expires in 10 minutes. If you didn't ask for this, ignore this email and change your password.`,
+      values: { user_name: greetingName(name), code: codeBlock(code), minutes: String(TTL_MS / 60_000) },
     });
   } catch (e) {
     await db.delete(actionCodes).where(and(eq(actionCodes.userId, userId), eq(actionCodes.purpose, purpose)));

@@ -16,7 +16,7 @@ import { ConfirmDialog } from "@/components/admin/ui/confirm-dialog";
 import { HtmlEditor } from "@/components/admin/guides/html-editor";
 import { InfoTip } from "@/components/ui/info-tip";
 import { TemplatePreview } from "@/components/admin/email-templates/template-preview";
-import { PendingBanner, WordingBadge, sendTest } from "@/components/admin/email-templates/templates-list";
+import { WordingBadge, sendTest } from "@/components/admin/email-templates/templates-list";
 import {
   resetEmailTemplatesAction,
   restoreEmailTemplateVersionAction,
@@ -170,7 +170,6 @@ export function TemplateEditor({
 
   return (
     <div className="mx-auto max-w-5xl space-y-4">
-      <PendingBanner />
       <div className="flex flex-wrap items-center gap-2">
         <Link
           href="/jmp-admin/email-templates"

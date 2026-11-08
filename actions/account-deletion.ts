@@ -13,7 +13,8 @@ import { getSessionUser } from "@/lib/current-user";
 import { supportTickets, ticketReplies } from "@/db/schema";
 import { issueActionCode, verifyActionCode } from "@/lib/action-codes";
 import { createSupportTicket } from "@/lib/tickets";
-import { sendAppEmail } from "@/lib/email";
+import { sendTemplateEmail } from "@/lib/email-templates";
+import { greetingName } from "@/lib/email-templates-model";
 import { ticketRef } from "@/lib/tickets-model";
 import { DELETION_CATEGORY, DELETION_SOURCE, openDeletionRequest } from "@/lib/account-deletion";
 
@@ -39,7 +40,7 @@ export async function getDeletionRequestAction(): Promise<DeletionRequestState |
 export async function sendDeletionCodeAction(): Promise<Result> {
   const u = await me();
   if (await openDeletionRequest(u.id)) return { ok: false, error: "You've already asked for your account to be deleted." };
-  return issueActionCode(u.id, u.email, "delete_account");
+  return issueActionCode(u.id, u.email, "delete_account", u.name);
 }
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -65,15 +66,10 @@ export async function requestDeletionAction(code: unknown, reason: unknown): Pro
   });
   const [t] = await db.select({ number: supportTickets.number }).from(supportTickets).where(eq(supportTickets.id, id));
 
-  sendAppEmail({
+  // Wording: admin Engagement → Email templates.
+  sendTemplateEmail("deletion_received", {
     to: u.email,
-    subject: "We've received your account deletion request",
-    heading: "Deletion request received",
-    lines: [
-      `We've received your request to delete your account (${t ? ticketRef(t.number) : "support ticket"}).`,
-      "Our team will delete your account and all its data, and email you when it's done. Until then you can keep using it.",
-      "Changed your mind? Cancel the request in Settings → Account.",
-    ],
+    values: { user_name: greetingName(u.name), ticket_number: t ? ticketRef(t.number) : "your support ticket" },
   }).catch((e) => console.error("[account-deletion] receipt email failed:", e instanceof Error ? e.message : e));
 
   revalidatePath("/settings");
@@ -92,14 +88,9 @@ export async function cancelDeletionRequestAction(): Promise<Result> {
       .where(eq(supportTickets.id, t.id));
   });
 
-  sendAppEmail({
+  sendTemplateEmail("deletion_canceled", {
     to: u.email,
-    subject: "Thanks for staying with us",
-    heading: "Thanks for staying",
-    lines: [
-      `Hi ${u.name || "there"}, you've canceled your account deletion request (${ticketRef(t.number)}) — your account and all your data stay exactly as they are.`,
-      "We're glad you're staying. If something wasn't working for you, just reply from Help & support — we'd love to make it better.",
-    ],
+    values: { user_name: greetingName(u.name), ticket_number: ticketRef(t.number) },
   }).catch((e) => console.error("[account-deletion] thank-you email failed:", e instanceof Error ? e.message : e));
 
   revalidatePath("/settings");
