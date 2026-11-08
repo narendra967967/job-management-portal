@@ -53,6 +53,32 @@ Self-signup's 5-per-hour limit read the same header.
 **Verified:** B22/B23 send 8 attempts from one `X-Real-IP` with a different made-up `X-Forwarded-For` each
 time. Attempts 1–5 get 401 and 6–8 get 429, on both `/api/auth` and `/api/admin-auth`.
 
+### Dependencies: joi under mailauth (checked 2026-11-08)
+
+**Finding:** `npm audit --omit=dev` flags `joi` 18.3.0 as high (GHSA-4528-x5fx-h6hg). With
+`string().email({ multiple: true })`, joi splits the input on a separator regex that takes quadratic time
+on crafted input. Fixed in joi 18.3.1. It reaches us only through `mailauth` 8.0.4, which pins `joi`
+at exactly 18.3.0 (`npm ls joi` shows no other path). 8.0.4 is also the latest mailauth on npm, so there is
+no fixed release to move to yet.
+
+**Not reachable.** The slow split is inside joi's `email` rule and runs only when `multiple` is set.
+mailauth never builds an `email` schema. Its only joi schemas, the same in `dist/esm` and `dist/cjs`, are:
+
+| File | Schema | Input |
+|---|---|---|
+| `tools.js` | `Joi.string().base64({ paddingRequired: false })` | the `p=` public key from a DKIM DNS record |
+| `spf/index.js` | `Joi.string().domain({ allowUnicode: false, tlds: false })` | the SPF domain |
+| `bimi/index.js` | `Joi.string().uri({ scheme: ['https'] })` | BIMI record URLs (we call `authenticate` with `disableBimi: true`, so this never runs) |
+
+None of these touches the `email` rule, so a sender has no way to feed the From or any other header into
+the vulnerable split. Our own code doesn't import joi either.
+
+**Decision:** no change. npm's suggested fix, mailauth 4.9.2, would roll back four major versions of the
+library that checks our DKIM/ARC signatures, which is worse than an advisory we can't trigger. If we want
+the audit line gone, an `overrides` entry pinning `joi` to `^18.3.1` (a patch bump inside the same major)
+is the low-risk option. After adding it, re-run the A1–A9 checks in `scripts/security/forwarding-checks.mts`.
+Otherwise, drop the note once mailauth ships with a fixed joi.
+
 ## Server follow-up (after deploying)
 
 1. Update `/etc/nginx/snippets/jobtiva-proxy.conf` to `proxy_set_header X-Forwarded-For $remote_addr;`
