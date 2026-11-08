@@ -6,6 +6,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowLeft, Eye, History, Mail, RotateCcw, Save } from "lucide-react";
 import { Card } from "@/components/admin/ui/card";
 import { Button } from "@/components/admin/ui/button";
@@ -15,51 +16,60 @@ import { ConfirmDialog } from "@/components/admin/ui/confirm-dialog";
 import { HtmlEditor } from "@/components/admin/guides/html-editor";
 import { InfoTip } from "@/components/ui/info-tip";
 import { TemplatePreview } from "@/components/admin/email-templates/template-preview";
-import { SampleBanner, WordingBadge } from "@/components/admin/email-templates/templates-list";
-import { resetTemplate, saveTemplate, useTemplateRow, type TemplateVersion } from "@/lib/email-templates-mock";
+import { PendingBanner, WordingBadge, sendTest } from "@/components/admin/email-templates/templates-list";
+import {
+  resetEmailTemplatesAction,
+  restoreEmailTemplateVersionAction,
+  saveEmailTemplateAction,
+} from "@/actions/admin-email-templates";
 import {
   BUTTON_MAX,
   FOOTER_MAX,
   HEADING_MAX,
   SUBJECT_MAX,
   sameContent,
+  templateByKey,
   templateProblems,
   type EmailTemplateContent,
   type TemplateField,
   type TemplatePlaceholder,
+  type TemplateProblem,
+  type TemplateState,
+  type TemplateVersion,
 } from "@/lib/email-templates-model";
 import { useMounted } from "@/lib/use-mounted";
 import { cn, formatDateTime } from "@/lib/utils";
 
 type TextField = "subject" | "heading" | "buttonLabel" | "footerNote";
 
-export function TemplateEditor({ templateKey, appName }: { templateKey: string; appName: string }) {
+export function TemplateEditor({
+  state,
+  versions,
+  appName,
+}: {
+  state: TemplateState;
+  versions: TemplateVersion[];
+  appName: string;
+}) {
+  const router = useRouter();
   const mounted = useMounted();
-  const row = useTemplateRow(templateKey);
-  const [draft, setDraft] = useState<EmailTemplateContent | null>(null);
+  const def = templateByKey(state.key)!;
+  const [draft, setDraft] = useState<EmailTemplateContent>(state.content);
   const [errors, setErrors] = useState<Partial<Record<TemplateField, string[]>>>({});
+  const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState<EmailTemplateContent | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
   const [restoring, setRestoring] = useState<TemplateVersion | null>(null);
   const lastField = useRef<TextField | "bodyHtml" | null>(null);
   const inputs = useRef<Partial<Record<TextField, HTMLInputElement | null>>>({});
 
-  // Start from what's saved once the browser's copy has loaded.
-  useEffect(() => {
-    if (mounted && row && !draft) setDraft(row.content);
-  }, [mounted, row, draft]);
-
-  const dirty = !!draft && !!row && !sameContent(draft, row.content);
+  const dirty = !sameContent(draft, state.content);
   useEffect(() => {
     if (!dirty) return;
     const warn = (e: BeforeUnloadEvent) => e.preventDefault();
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty]);
-
-  if (!row) return null;
-  const def = row.def;
-  if (!draft) return <SampleBanner />;
 
   const set = (field: TemplateField, value: string) => {
     setDraft({ ...draft, [field]: value });
@@ -94,19 +104,44 @@ export function TemplateEditor({ templateKey, appName }: { templateKey: string; 
     });
   }
 
-  function check(): boolean {
-    const problems = templateProblems(def, draft!);
+  function showProblems(problems: TemplateProblem[]): boolean {
     const next: Partial<Record<TemplateField, string[]>> = {};
     for (const p of problems) (next[p.field] ??= []).push(p.message);
     setErrors(next);
     if (problems.length) toast.error("Fix the highlighted fields first.");
     return problems.length === 0;
   }
+  const check = () => showProblems(templateProblems(def, draft));
+
+  /** Runs a server change, then shows the wording it stored (cleaned HTML included). */
+  async function run(
+    action: () => ReturnType<typeof saveEmailTemplateAction>,
+    done: string,
+  ) {
+    setBusy(true);
+    const res = await action();
+    setBusy(false);
+    if (!res.ok) {
+      if (res.problems) showProblems(res.problems);
+      else toast.error(res.error);
+      return;
+    }
+    setDraft(res.content);
+    setErrors({});
+    toast.success(done);
+    router.refresh();
+  }
 
   function save() {
     if (!check()) return;
-    saveTemplate(def.key, draft!);
-    toast.success("Saved");
+    void run(() => saveEmailTemplateAction(def.key, draft), "Saved");
+  }
+
+  async function test() {
+    if (!check()) return;
+    setBusy(true);
+    await sendTest(def.key, draft);
+    setBusy(false);
   }
 
   const text = (field: TextField, label: string, max: number, hint: string) => (
@@ -135,7 +170,7 @@ export function TemplateEditor({ templateKey, appName }: { templateKey: string; 
 
   return (
     <div className="mx-auto max-w-5xl space-y-4">
-      <SampleBanner />
+      <PendingBanner />
       <div className="flex flex-wrap items-center gap-2">
         <Link
           href="/jmp-admin/email-templates"
@@ -148,7 +183,7 @@ export function TemplateEditor({ templateKey, appName }: { templateKey: string; 
 
       <Card className="flex flex-wrap items-center gap-x-3 gap-y-1 p-4">
         <h2 className="text-base font-semibold">{def.name}</h2>
-        <WordingBadge edited={row.edited} />
+        <WordingBadge edited={state.edited} />
         <p className="w-full text-xs text-muted-foreground">
           {def.trigger} · sent to {def.recipient === "user" ? "the user" : "your support inbox"}
         </p>
@@ -209,22 +244,22 @@ export function TemplateEditor({ templateKey, appName }: { templateKey: string; 
           </Card>
 
           <div className="grid gap-2">
-            <Button onClick={save} disabled={!dirty}>
+            <Button onClick={save} disabled={!dirty || busy}>
               <Save className="size-4" aria-hidden />
-              Save changes
+              {busy ? "Working…" : "Save changes"}
             </Button>
             <div className="grid grid-cols-2 gap-2">
               <Button variant="outline" onClick={() => setPreview(draft)}>
                 <Eye className="size-4" aria-hidden />
                 Preview
               </Button>
-              <Button variant="outline" onClick={() => check() && toast.success("Test sent to your admin email")}>
+              <Button variant="outline" onClick={() => void test()} disabled={busy}>
                 <Mail className="size-4" aria-hidden />
                 Test to me
               </Button>
             </div>
-            {row.edited && (
-              <Button variant="outline" onClick={() => setConfirmReset(true)}>
+            {state.edited && (
+              <Button variant="outline" onClick={() => setConfirmReset(true)} disabled={busy}>
                 <RotateCcw className="size-4" aria-hidden />
                 Reset to default
               </Button>
@@ -236,20 +271,32 @@ export function TemplateEditor({ templateKey, appName }: { templateKey: string; 
               <History className="size-4 text-muted-foreground" aria-hidden />
               Earlier versions
             </h2>
-            {row.versions.length === 0 ? (
+            {versions.length === 0 ? (
               <p className="text-xs text-muted-foreground">None yet. Each save keeps the wording it replaces, up to 5.</p>
             ) : (
               <ul className="divide-y">
-                {row.versions.map((v, i) => (
-                  <li key={`${v.savedAt}-${i}`} className="flex items-center gap-2 py-1.5">
+                {versions.map((v) => (
+                  <li key={v.id} className="flex items-center gap-2 py-1.5">
                     <span className="min-w-0 flex-1 text-xs">
-                      <span className="block">{mounted ? formatDateTime(v.savedAt) : ""}</span>
-                      <span className="block text-muted-foreground">{v.savedBy}</span>
+                      {v.isDefault ? (
+                        <span className="block">Built-in default</span>
+                      ) : (
+                        <>
+                          <span className="block">{mounted ? formatDateTime(v.savedAt) : ""}</span>
+                          <span className="block text-muted-foreground">{v.savedBy ?? "A removed admin"}</span>
+                        </>
+                      )}
                     </span>
                     <Button variant="ghost" size="sm" className="min-h-11 sm:min-h-7" onClick={() => setPreview(v.content)}>
                       View
                     </Button>
-                    <Button variant="outline" size="sm" className="min-h-11 sm:min-h-7" onClick={() => setRestoring(v)}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="min-h-11 sm:min-h-7"
+                      disabled={busy}
+                      onClick={() => setRestoring(v)}
+                    >
                       Restore
                     </Button>
                   </li>
@@ -269,12 +316,12 @@ export function TemplateEditor({ templateKey, appName }: { templateKey: string; 
         title="Reset to the default wording?"
         description="The current wording is kept in Earlier versions, so you can restore it."
         confirmLabel="Reset to default"
-        onConfirm={() => {
-          resetTemplate(def.key);
-          setDraft(def.defaults);
-          setErrors({});
-          toast.success("Back to the default wording");
-        }}
+        onConfirm={() =>
+          void run(async () => {
+            const res = await resetEmailTemplatesAction([def.key]);
+            return res.ok ? { ok: true as const, content: def.defaults } : res;
+          }, "Back to the default wording")
+        }
       />
       <ConfirmDialog
         open={!!restoring}
@@ -283,11 +330,7 @@ export function TemplateEditor({ templateKey, appName }: { templateKey: string; 
         description="It replaces the current wording, which is kept in Earlier versions."
         confirmLabel="Restore"
         onConfirm={() => {
-          if (!restoring) return;
-          saveTemplate(def.key, restoring.content);
-          setDraft(restoring.content);
-          setErrors({});
-          toast.success("Version restored");
+          if (restoring) void run(() => restoreEmailTemplateVersionAction(def.key, restoring.id), "Version restored");
         }}
       />
     </div>

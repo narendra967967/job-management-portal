@@ -26,16 +26,23 @@ import {
   useRowSelection,
 } from "@/components/admin/ui/data-table";
 import { TemplatePreview } from "@/components/admin/email-templates/template-preview";
-import { resetTemplate, useTemplateRows, type TemplateRow } from "@/lib/email-templates-mock";
-import { EMAIL_TEMPLATE_GROUPS, type EmailTemplateGroup } from "@/lib/email-templates-model";
+import { resetEmailTemplatesAction, sendEmailTemplateTestAction } from "@/actions/admin-email-templates";
+import {
+  EMAIL_TEMPLATES,
+  EMAIL_TEMPLATE_GROUPS,
+  type EmailTemplateGroup,
+  type TemplateRow,
+  type TemplateState,
+} from "@/lib/email-templates-model";
 import { useMounted } from "@/lib/use-mounted";
 import { cn, formatDateTime } from "@/lib/utils";
 
-/** PHASE 1: every Email templates screen says the edits don't reach real emails yet. */
-export function SampleBanner() {
+/** PHASE 2: until the senders read these templates, say that saved wording isn't live yet. */
+export function PendingBanner() {
   return (
     <p className="rounded-lg border border-dashed border-primary/30 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
-      Sample data while this is being built. Edits here don&apos;t change any real email yet.
+      Emails still go out with their built-in wording for now. What you save here is kept and takes over once the
+      switch-over is finished.
     </p>
   );
 }
@@ -44,10 +51,23 @@ export function WordingBadge({ edited }: { edited: boolean }) {
   return <Badge variant={edited ? "warning" : "neutral"}>{edited ? "Edited" : "Default"}</Badge>;
 }
 
-export function TemplatesList({ appName }: { appName: string }) {
+/** Emails a test copy to the signed-in admin, with sample values filled in. */
+export async function sendTest(key: string, input?: Parameters<typeof sendEmailTemplateTestAction>[1]) {
+  const res = await sendEmailTemplateTestAction(key, input);
+  if (res.ok) toast.success(`Test sent to ${res.to}`);
+  else toast.error(res.error);
+}
+
+export function TemplatesList({ appName, states }: { appName: string; states: TemplateState[] }) {
   const router = useRouter();
   const mounted = useMounted();
-  const rows = useTemplateRows();
+  const rows: TemplateRow[] = useMemo(() => {
+    const byKey = new Map(states.map((s) => [s.key, s]));
+    return EMAIL_TEMPLATES.flatMap((def) => {
+      const s = byKey.get(def.key);
+      return s ? [{ ...s, def }] : [];
+    });
+  }, [states]);
   const [query, setQuery] = useState("");
   const [group, setGroup] = useState<EmailTemplateGroup | "all">("all");
   const [wording, setWording] = useState<"all" | "edited" | "default">("all");
@@ -73,7 +93,7 @@ export function TemplatesList({ appName }: { appName: string }) {
 
   return (
     <div className="mx-auto max-w-5xl space-y-4">
-      <SampleBanner />
+      <PendingBanner />
 
       <div className="grid grid-cols-2 gap-2 sm:max-w-sm">
         <StatBox
@@ -155,7 +175,7 @@ export function TemplatesList({ appName }: { appName: string }) {
                 <WordingBadge edited={r.edited} />
               </td>
               <td className="px-3 py-2.5 text-xs text-muted-foreground">
-                {mounted && r.updatedAt ? `${formatDateTime(r.updatedAt)} · ${r.updatedBy}` : "Never"}
+                {!r.updatedAt ? "Never" : mounted ? [formatDateTime(r.updatedAt), r.updatedBy].filter(Boolean).join(" · ") : ""}
               </td>
               <td className="px-3 py-2 text-right">
                 <RowActions label={r.def.name}>
@@ -165,7 +185,7 @@ export function TemplatesList({ appName }: { appName: string }) {
                   <DropdownMenuItem onClick={() => setPreview(r)}>
                     <Eye /> Preview
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => toast.success("Test sent to your admin email")}>
+                  <DropdownMenuItem onClick={() => void sendTest(r.def.key)}>
                     <Mail /> Send test to me
                   </DropdownMenuItem>
                   {r.edited && (
@@ -207,10 +227,12 @@ export function TemplatesList({ appName }: { appName: string }) {
         title={resetting?.length === 1 ? `Reset “${resetting[0].def.name}” to default?` : `Reset ${resetting?.length ?? 0} emails to default?`}
         description="They go back to the built-in wording. The current wording is kept in each email's history, so you can restore it."
         confirmLabel="Reset to default"
-        onConfirm={() => {
-          for (const r of resetting ?? []) resetTemplate(r.def.key);
-          toast.success(resetting?.length === 1 ? "Back to the default wording" : `${resetting?.length} emails back to default`);
+        onConfirm={async () => {
+          const res = await resetEmailTemplatesAction((resetting ?? []).map((r) => r.def.key));
+          if (!res.ok) return void toast.error(res.error);
+          toast.success(res.reset === 1 ? "Back to the default wording" : `${res.reset} emails back to default`);
           selection.clear();
+          router.refresh();
         }}
       />
     </div>

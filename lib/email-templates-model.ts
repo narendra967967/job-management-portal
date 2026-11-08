@@ -8,6 +8,8 @@
 // exceptions. Links (confirm, reset, …) are never part of the editable text:
 // the sender makes them and the button carries them.
 
+import { z } from "zod";
+
 export type EmailTemplateGroup = "Sign-in" | "Confirmation codes" | "Account" | "Plans and payments" | "Leads" | "Support";
 
 export const EMAIL_TEMPLATE_GROUPS: EmailTemplateGroup[] = [
@@ -508,3 +510,40 @@ export const sameContent = (a: EmailTemplateContent, b: EmailTemplateContent) =>
   a.bodyHtml === b.bodyHtml &&
   (a.buttonLabel ?? "") === (b.buttonLabel ?? "") &&
   a.footerNote === b.footerNote;
+
+/* ---------------- saved state (DB rows, as the admin screens get them) ---------------- */
+
+
+/** Shape check for wording coming in from the editor (templateProblems does the rest). */
+export const emailTemplateContentSchema = z.object({
+  subject: z.string().max(SUBJECT_MAX * 2),
+  heading: z.string().max(HEADING_MAX * 2),
+  bodyHtml: z.string().max(BODY_MAX * 2),
+  buttonLabel: z.string().max(BUTTON_MAX * 2).nullable(),
+  footerNote: z.string().max(FOOTER_MAX * 2),
+});
+
+/** One email's current wording. */
+export interface TemplateState {
+  key: string;
+  content: EmailTemplateContent;
+  /** The wording differs from the built-in default. */
+  edited: boolean;
+  /** Last save or reset, and who did it. */
+  updatedAt: string | null;
+  updatedBy: string | null;
+}
+
+/** Wording an email had before a save or reset. */
+export interface TemplateVersion {
+  id: string;
+  content: EmailTemplateContent;
+  savedAt: string;
+  savedBy: string | null;
+  /** The built-in wording, kept when the first edit replaced it. */
+  isDefault: boolean;
+}
+
+export interface TemplateRow extends TemplateState {
+  def: EmailTemplateDef;
+}

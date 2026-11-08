@@ -407,6 +407,13 @@
       "when": 1794126156765,
       "tag": "0057_retention_broadcast_queue",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1794137193345,
+      "tag": "0058_email_templates",
+      "breakpoints": true
     }
   ]
 }

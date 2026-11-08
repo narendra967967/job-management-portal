@@ -1530,3 +1530,44 @@ export const kbQuestions = pgTable(
   },
   (t) => [uniqueIndex("kb_questions_normalized_uq").on(t.normalized)],
 );
+
+/* ---------------- email templates ---------------- */
+
+/**
+ * The wording an admin saved for one automatic email. The emails themselves,
+ * their placeholders and built-in wording live in lib/email-templates-model.ts;
+ * `key` is one of those. `content` null (or no row) means the built-in wording.
+ * Kept as JSON because it's always read and written as one piece.
+ */
+export const emailTemplates = pgTable("email_templates", {
+  key: text("key").primaryKey(),
+  content: jsonb("content").$type<{
+    subject: string;
+    heading: string;
+    bodyHtml: string;
+    buttonLabel: string | null;
+    footerNote: string;
+  }>(),
+  updatedBy: text("updated_by").references(() => user.id, { onDelete: "set null" }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Wording an email had before a save or reset; the newest 5 per email are kept. */
+export const emailTemplateVersions = pgTable(
+  "email_template_versions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    templateKey: text("template_key").notNull(),
+    content: jsonb("content")
+      .notNull()
+      .$type<{ subject: string; heading: string; bodyHtml: string; buttonLabel: string | null; footerNote: string }>(),
+    // The built-in wording, saved when the first edit replaced it.
+    isDefault: boolean("is_default").notNull().default(false),
+    // Who saved this wording and when it was saved.
+    savedBy: text("saved_by").references(() => user.id, { onDelete: "set null" }),
+    savedAt: timestamp("saved_at", { withTimezone: true }).notNull(),
+    // When it was replaced: the history's order, newest first.
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("email_template_versions_key_idx").on(t.templateKey, t.createdAt)],
+);
