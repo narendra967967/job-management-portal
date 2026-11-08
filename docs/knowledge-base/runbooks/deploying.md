@@ -33,6 +33,16 @@ node --env-file=.env.local --require ./scripts/security/server-only-stub.cjs --i
 
 It confirms every knowledge base page and action needs an admin, that every article parses and holds nothing shaped like a secret, that odd search input is safe, and that a set of known questions still finds the right article. Add `APP_URL=http://127.0.0.1:3100` with a production build running there to also check the pages turn signed-out visitors away. It never calls the AI. When an article changes enough that a known question finds something else, update the list in the script.
 
+## Before deploying changes to emails
+
+Anything that touches an automatic email, its sender or Email templates gets its own check:
+
+```bash
+node --env-file=.env.local --require ./scripts/security/server-only-stub.cjs --import tsx scripts/security/email-templates-checks.mts
+```
+
+It fails if an email can't be filled in, if saving would let a broken placeholder through, if unsafe HTML survives cleaning, or if any code sends email without going through a template (broadcasts and the SMTP test are the only ones allowed to). It also saves wording for one email for a moment to prove the fallback works, then puts back exactly what was there. Nothing is ever sent.
+
 ## Promote, don't rebuild
 
 To release what preprod tested, fast-forward `prod` to it with `git merge --ff-only preprod`. The commit is the same, so the exact image that ran on preprod goes live without being rebuilt.
