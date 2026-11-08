@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { LegalLayout } from "@/components/marketing/legal-layout";
 import { getAppName, getSupportEmail } from "@/lib/branding";
+import { getPublicBusiness } from "@/lib/billing-data";
+import { BusinessAddress } from "@/components/marketing/business-address";
 
 // Refund & cancellation policy (owner decision 2026-11-08): plans don't
 // renew automatically, aren't refundable once started, and payment errors are
@@ -18,7 +20,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function RefundsPage() {
-  const [appName, supportEmail] = await Promise.all([getAppName(), getSupportEmail()]);
+  const [appName, supportEmail, business] = await Promise.all([getAppName(), getSupportEmail(), getPublicBusiness()]);
   const email = supportEmail ? <a href={`mailto:${supportEmail}`}>{supportEmail}</a> : <span>our support address</span>;
   return (
     <LegalLayout title="Refund & cancellation policy" updated="November 8, 2026">
@@ -68,6 +70,7 @@ export default async function RefundsPage() {
         it&rsquo;s worth waiting a few minutes first: a payment confirmed late by your bank still updates
         your plan on its own.
       </p>
+      {business && <BusinessAddress business={business} />}
     </LegalLayout>
   );
 }

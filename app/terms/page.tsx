@@ -3,6 +3,8 @@ import { LegalLayout } from "@/components/marketing/legal-layout";
 import { getAppName, getSupportEmail } from "@/lib/branding";
 import { isGmailOAuthEnabled } from "@/lib/email-intake-data";
 import { captchaSiteKey } from "@/lib/captcha";
+import { getPublicBusiness } from "@/lib/billing-data";
+import { BusinessAddress } from "@/components/marketing/business-address";
 
 export const dynamic = "force-dynamic";
 
@@ -16,11 +18,12 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function TermsPage() {
-  const [appName, supportEmail, gmailOn, captchaKey] = await Promise.all([
+  const [appName, supportEmail, gmailOn, captchaKey, business] = await Promise.all([
     getAppName(),
     getSupportEmail(),
     isGmailOAuthEnabled(),
     captchaSiteKey(),
+    getPublicBusiness(),
   ]);
   return (
     <LegalLayout title="Terms & conditions" updated="November 8, 2026">
@@ -203,6 +206,7 @@ export default async function TermsPage() {
         Questions about these Terms? Contact us at{" "}
         {supportEmail ? <a href={`mailto:${supportEmail}`}>{supportEmail}</a> : <span>our support address</span>}.
       </p>
+      {business && <BusinessAddress business={business} />}
     </LegalLayout>
   );
 }

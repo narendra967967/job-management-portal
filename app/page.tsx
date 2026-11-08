@@ -39,6 +39,8 @@ import { getSessionUserId } from "@/lib/current-user";
 import { isGmailOAuthEnabled, supportedSiteExamples } from "@/lib/email-intake-data";
 import { absoluteUrl, siteUrl } from "@/lib/site-url";
 import type { Metadata } from "next";
+import { getPublicBusiness } from "@/lib/billing-data";
+import { BusinessAddress } from "@/components/marketing/business-address";
 
 export const dynamic = "force-dynamic";
 
@@ -73,7 +75,7 @@ const BOARD: { label: string; count: number; cards: { role: string; co: string; 
 ];
 
 export default async function LandingPage() {
-  const [appName, tagline, signupAllowed, supportEmail, sessionId, gmailOn, sites, freeStart, pricingPlans] = await Promise.all([
+  const [appName, tagline, signupAllowed, supportEmail, sessionId, gmailOn, sites, freeStart, pricingPlans, business] = await Promise.all([
     getAppName(),
     getTagline(),
     isRegistrationOpen(),
@@ -83,6 +85,7 @@ export default async function LandingPage() {
     supportedSiteExamples(),
     freeStartLabel(),
     getPricingPlans(),
+    getPublicBusiness(),
   ]);
   const upgrade = upgradeSentence(pricingPlans);
   const trial = freeStart.trialDays > 0;
@@ -474,6 +477,7 @@ export default async function LandingPage() {
               ) : (
                 <p className="text-sm text-muted-foreground">Reach us any time through the app&apos;s Help &amp; support.</p>
               )}
+              {business && <BusinessAddress business={business} className="glass mt-1 rounded-xl px-4 py-3 text-left" />}
             </div>
           </div>
         </section>

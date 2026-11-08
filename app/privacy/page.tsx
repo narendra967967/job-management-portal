@@ -4,6 +4,8 @@ import { getAppName, getSupportEmail } from "@/lib/branding";
 import { isGmailOAuthEnabled, supportedSiteExamples } from "@/lib/email-intake-data";
 import { getRetentionConfig } from "@/lib/retention";
 import { captchaSiteKey } from "@/lib/captcha";
+import { getPublicBusiness } from "@/lib/billing-data";
+import { BusinessAddress } from "@/components/marketing/business-address";
 
 // The Gmail / Google Limited Use section shows only while "Connect Gmail" is
 // switched on (admin), the reCAPTCHA line only while the check is on; retention periods come from admin Settings → Data
@@ -23,13 +25,14 @@ export async function generateMetadata(): Promise<Metadata> {
 const days = (n: number) => `${n} ${n === 1 ? "day" : "days"}`;
 
 export default async function PrivacyPage() {
-  const [appName, supportEmail, gmailOn, sites, retention, captchaKey] = await Promise.all([
+  const [appName, supportEmail, gmailOn, sites, retention, captchaKey, business] = await Promise.all([
     getAppName(),
     getSupportEmail(),
     isGmailOAuthEnabled(),
     supportedSiteExamples(),
     getRetentionConfig(),
     captchaSiteKey(),
+    getPublicBusiness(),
   ]);
   const contact = supportEmail || "our support address";
   return (
@@ -328,6 +331,7 @@ export default async function PrivacyPage() {
         Questions about this policy? Contact us at{" "}
         {supportEmail ? <a href={`mailto:${supportEmail}`}>{supportEmail}</a> : <span>{contact}</span>}.
       </p>
+      {business && <BusinessAddress business={business} />}
     </LegalLayout>
   );
 }
