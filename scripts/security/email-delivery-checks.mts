@@ -5,9 +5,9 @@
 //
 // APP_URL (e.g. http://127.0.0.1:3000) adds the signed-out HTTP checks.
 // Amazon SES is never contacted: the script starts its own stand-in for the SES
-// API and points the SDK at it. It saves test SES details (AWS's published
-// example key, not a real credential) for a moment and puts back exactly what
-// was in email_delivery before. Nothing is ever delivered.
+// API and points the SDK at it. It saves made-up SES details (assembled at run
+// time, so secret scanners don't mistake them for keys) for a moment and puts
+// back exactly what was in email_delivery before. Nothing is ever delivered.
 // Prints PASS/FAIL per check and exits non-zero on any FAIL.
 
 import { readFileSync } from "node:fs";
@@ -21,8 +21,13 @@ if (process.env.NODE_ENV === "production") {
 }
 
 const APP = process.env.APP_URL ?? "";
-const EXAMPLE_KEY_ID = "AKIAIOSFODNN7EXAMPLE";
-const EXAMPLE_SECRET = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY";
+// Made-up credentials, built from pieces so no key-shaped text sits in the repo
+// (GitHub secret scanning flagged an earlier literal test value as a leaked key).
+const FAKE_ID_BODY = "TESTONLYNOTAKEY0"; // 16 characters
+const fakeKeyId = (prefix: string) => [prefix.slice(0, 2), prefix.slice(2), FAKE_ID_BODY].join("");
+const EXAMPLE_KEY_ID = fakeKeyId("AKIA");
+const SECRET_MARKER = "NotARealSecret";
+const EXAMPLE_SECRET = `TestOnly${SECRET_MARKER}`.padEnd(40, "0");
 let failures = 0;
 
 function check(id: string, name: string, ok: boolean, detail = "") {
@@ -85,7 +90,7 @@ const accepts = (patch: object) => model.sesInputSchema.safeParse({ ...good, ...
 check("D1", "complete SES details are accepted", accepts({}));
 check("D1", "an empty secret is accepted (keeps the saved one)", accepts({ secretAccessKey: "" }));
 check("D1", "a made-up region is refused", !accepts({ region: "mumbai" }));
-check("D1", "a temporary ASIA key is refused", !accepts({ accessKeyId: "ASIAIOSFODNN7EXAMPLE" }));
+check("D1", "a temporary ASIA key is refused", !accepts({ accessKeyId: fakeKeyId("ASIA") }));
 check("D1", "a short key ID is refused", !accepts({ accessKeyId: "AKIA123" }));
 check("D1", "a secret of the wrong length is refused", !accepts({ secretAccessKey: "short" }));
 check("D1", "a bad from email is refused", !accepts({ fromEmail: "not-an-email" }));
@@ -147,9 +152,9 @@ try {
      values ('app', 'ses', 'ap-south-1', $1, $2, 'Jobtiva', 'noreply@example.com', 'support@example.com')`,
     [EXAMPLE_KEY_ID, ciphertext],
   );
-  check("D3", "the secret is stored encrypted", !ciphertext.includes("EXAMPLEKEY") && decryptSecret(ciphertext) === EXAMPLE_SECRET);
+  check("D3", "the secret is stored encrypted", !ciphertext.includes(SECRET_MARKER) && decryptSecret(ciphertext) === EXAMPLE_SECRET);
   const screen = JSON.stringify(await getEmailDelivery());
-  check("D3", "the admin screen never gets the secret", !screen.includes("EXAMPLEKEY") && !screen.includes(ciphertext.slice(0, 16)));
+  check("D3", "the admin screen never gets the secret", !screen.includes(SECRET_MARKER) && !screen.includes(ciphertext.slice(0, 16)));
   check("D3", "the screen is told a secret is saved", (await getEmailDelivery()).ses.hasSecret);
   check("D3", "the mailer follows the choice", (await getEmailProvider()) === "ses" && (await isMailConfigured()));
 
@@ -166,8 +171,8 @@ try {
   const sent = seen.find((r) => r.url.startsWith("/v2/email/outbound-emails"));
   check("D4", "the email went to SES", !!sent);
   const raw = sent ? Buffer.from(JSON.parse(sent.body).Content.Raw.Data, "base64").toString("utf8") : "";
-  check("D4", "the request is signed for SES in the saved region", /Credential=AKIAIOSFODNN7EXAMPLE\/\d{8}\/ap-south-1\/ses\/aws4_request/.test(sent?.auth ?? ""));
-  check("D4", "the secret never leaves the server", seen.every((r) => !JSON.stringify(r).includes("EXAMPLEKEY")));
+  check("D4", "the request is signed for SES in the saved region", new RegExp(`Credential=${EXAMPLE_KEY_ID}/\\d{8}/ap-south-1/ses/aws4_request`).test(sent?.auth ?? ""));
+  check("D4", "the secret never leaves the server", seen.every((r) => !JSON.stringify(r).includes(SECRET_MARKER)));
   check("D4", "From carries the name", /^From: Jobtiva <noreply@example\.com>/m.test(raw));
   check("D4", "Reply-To is sent", /^Reply-To: support@example\.com/m.test(raw));
   check("D4", "unsubscribe headers survive", /^List-Unsubscribe: <https:\/\/example\.com\/u>/m.test(raw) && /^List-Unsubscribe-Post:/m.test(raw));
