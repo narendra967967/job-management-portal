@@ -182,7 +182,7 @@ export function ForwardingBlock({ data, range }: BlockProps) {
 
 /* ---------------- email delivery ---------------- */
 
-export function EmailDeliveryBlock({ data }: BlockProps) {
+export function EmailDeliveryBlock({ data, range }: BlockProps) {
   const e = data.emailDelivery;
   const q = e.sesQuota;
   const quotaPct = q && q.max > 0 ? q.used / q.max : 0;
@@ -209,8 +209,13 @@ export function EmailDeliveryBlock({ data }: BlockProps) {
           <Meter value={q.used} max={q.max} label="Amazon SES quota used today" tone={quotaPct > 0.9 ? "bad" : quotaPct > 0.7 ? "warn" : "default"} />
         </div>
       )}
-      <StatRow label="Sent" value={formatCount(e.sent)} />
-      <StatRow label="Failed" value={formatCount(e.failed)} tone={e.failed > 0 ? "bad" : "good"} />
+      <StatRow label="Sent" value={formatCount(e.sent)} href={links.sentEmails({ status: "sent", from: range.from, to: range.to })} />
+      <StatRow
+        label="Failed"
+        value={formatCount(e.failed)}
+        tone={e.failed > 0 ? "bad" : "good"}
+        href={links.sentEmails({ status: "failed", from: range.from, to: range.to })}
+      />
       {e.byChannel.length > 1 && (
         <div className="mt-2 border-t pt-2">
           <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">By channel</p>

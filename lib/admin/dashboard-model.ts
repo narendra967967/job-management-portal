@@ -138,6 +138,9 @@ export const links = {
     `/jmp-admin/inbound-log${q({ status: f.status, from: f.from, to: f.to })}`,
   kbUnanswered: () => "/jmp-admin/knowledge-base/unanswered",
   settings: (section: string) => `/jmp-admin/settings${q({ section })}`,
+  /** status: sent or failed. channel: as stored, e.g. "Amazon SES". kind: template, broadcast or test. */
+  sentEmails: (f: { status?: string; channel?: string; kind?: string; from?: string; to?: string } = {}) =>
+    `/jmp-admin/sent-emails${q({ status: f.status, channel: f.channel, kind: f.kind, from: f.from, to: f.to })}`,
 };
 
 /* ---------------- onboarding funnel ---------------- */

@@ -17,6 +17,7 @@ import {
   Users,
   BookOpen,
   MailOpen,
+  Send,
   Tag,
   CreditCard,
   TrendingUp,
@@ -93,6 +94,7 @@ const GROUPS: Group[] = [
     label: "Monitoring",
     items: [
       { href: "/jmp-admin/inbound-log", label: "Inbound email log", icon: MailOpen },
+      { href: "/jmp-admin/sent-emails", label: "Sent emails", icon: Send },
       { label: "Scheduled jobs", icon: Timer, soon: true },
       { label: "Activity log", icon: ScrollText, soon: true },
     ],
@@ -108,6 +110,7 @@ const TITLES: Record<string, string> = {
   "/jmp-admin/renewals": "Renewals",
   "/jmp-admin/guides": "How-to guides",
   "/jmp-admin/inbound-log": "Inbound email log",
+  "/jmp-admin/sent-emails": "Sent emails",
   "/jmp-admin/guides/new": "New guide",
   "/jmp-admin/settings": "Settings",
   "/jmp-admin/knowledge-base": "Knowledge base",
