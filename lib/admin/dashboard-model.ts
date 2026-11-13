@@ -226,6 +226,65 @@ export const BLOCKS = [
 
 export type BlockId = (typeof BLOCKS)[number]["id"];
 
+/** A block name that is unique on the page (tiles share titles with bigger blocks). */
+export function blockLabel(id: BlockId): string {
+  const title = BLOCKS.find((b) => b.id === id)!.title;
+  return id.startsWith("tile-") ? `${title} tile` : title;
+}
+
+/* ---------------- layout (order + hidden blocks) ---------------- */
+
+export interface DashboardLayout {
+  order: BlockId[];
+  hidden: BlockId[];
+}
+
+/**
+ * Where the layout is kept until phase 6 moves it to the database (per admin).
+ * Holds "o=id,id,…&h=id,id".
+ */
+export const LAYOUT_COOKIE = "jobtiva_admin_layout";
+
+export function defaultLayout(): DashboardLayout {
+  return { order: BLOCKS.map((b) => b.id), hidden: [] };
+}
+
+function isBlockId(v: string): v is BlockId {
+  return BLOCKS.some((b) => b.id === v);
+}
+
+/**
+ * Clean up a saved layout: drop ids that no longer exist, and put blocks added
+ * since it was saved back in their default place.
+ */
+export function normalizeLayout(l: { order: string[]; hidden: string[] }): DashboardLayout {
+  const order = [...new Set(l.order.filter(isBlockId))];
+  const ids = BLOCKS.map((b) => b.id);
+  ids.forEach((id, i) => {
+    if (order.includes(id)) return;
+    // Insert after the nearest earlier default neighbour that's already placed.
+    const before = ids.slice(0, i).reverse().find((x) => order.includes(x));
+    order.splice(before ? order.indexOf(before) + 1 : 0, 0, id);
+  });
+  return { order, hidden: [...new Set(l.hidden.filter(isBlockId))] };
+}
+
+export function parseLayout(value: string | undefined | null): DashboardLayout {
+  if (!value) return defaultLayout();
+  const sp = new URLSearchParams(value);
+  const list = (k: string) => (sp.get(k) ?? "").split(",").filter(Boolean);
+  return normalizeLayout({ order: list("o"), hidden: list("h") });
+}
+
+export function serializeLayout(l: DashboardLayout): string {
+  return new URLSearchParams({ o: l.order.join(","), h: l.hidden.join(",") }).toString();
+}
+
+export function isDefaultLayout(l: DashboardLayout): boolean {
+  const d = defaultLayout();
+  return l.hidden.length === 0 && l.order.join() === d.order.join();
+}
+
 /* ---------------- data ---------------- */
 
 export interface TimeSeries {

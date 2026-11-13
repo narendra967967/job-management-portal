@@ -1,14 +1,30 @@
 "use client";
 
 // The admin dashboard: period switch, Needs attention, then the blocks in the
-// order of BLOCKS (lib/admin/dashboard-model). Phase 6 lets each admin reorder
-// and hide blocks; the registry and sizes below are already shaped for that.
+// admin's own order (BLOCKS in lib/admin/dashboard-model is the default). Edit
+// dashboard lets them reorder and hide blocks.
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { FlaskConical } from "lucide-react";
+import { Check, FlaskConical, LayoutGrid, RotateCcw } from "lucide-react";
+import { Button } from "@/components/admin/ui/button";
 import { VizStyle } from "@/components/admin/ui/charts";
-import { BLOCKS, periodRange, type BlockId, type BlockSize, type DashboardData, type PeriodSel } from "@/lib/admin/dashboard-model";
+import { InfoTip } from "@/components/ui/info-tip";
+import {
+  BLOCKS,
+  LAYOUT_COOKIE,
+  blockLabel,
+  defaultLayout,
+  isDefaultLayout,
+  periodRange,
+  serializeLayout,
+  type BlockId,
+  type BlockSize,
+  type DashboardData,
+  type DashboardLayout,
+  type PeriodSel,
+} from "@/lib/admin/dashboard-model";
 import { cn } from "@/lib/utils";
 import {
   ActiveUsersBlock,
@@ -32,6 +48,7 @@ import {
   SupportBlock,
   SystemBlock,
 } from "./blocks-ops";
+import { EditableGrid, HiddenTray } from "./editable-grid";
 import { NeedsAttention } from "./needs-attention";
 import { PeriodSwitch } from "./period-switch";
 
@@ -66,31 +83,105 @@ const SPAN: Record<BlockSize, string> = {
   full: "sm:col-span-2 xl:col-span-12",
 };
 
+const SIZE = Object.fromEntries(BLOCKS.map((b) => [b.id, b.size])) as Record<BlockId, BlockSize>;
+const spanOf = (id: BlockId) => SPAN[SIZE[id]];
+
 /** Blocks that only make sense in some setups. */
 function shown(id: BlockId, data: DashboardData): boolean {
   if (id === "gmail") return data.gmail.enabled;
   return true;
 }
 
-export function DashboardView({ data, sel, sample }: { data: DashboardData; sel: PeriodSel; sample?: { quiet: boolean } }) {
+// PHASE 6 (UI first): the layout is kept in a cookie for now, so the server can
+// draw the saved order with no jump on load. The database step moves it to a
+// per-admin row that follows the admin across devices.
+function saveLayout(l: DashboardLayout) {
+  document.cookie = `${LAYOUT_COOKIE}=${encodeURIComponent(serializeLayout(l))}; path=/jmp-admin; max-age=31536000; samesite=lax`;
+}
+
+export function DashboardView({
+  data,
+  sel,
+  layout: initialLayout,
+  sample,
+}: {
+  data: DashboardData;
+  sel: PeriodSel;
+  layout: DashboardLayout;
+  sample?: { quiet: boolean };
+}) {
   const range = periodRange(sel);
-  const blocks = BLOCKS.filter((b) => shown(b.id, data));
+  const [layout, setLayout] = useState(initialLayout);
+  const [editing, setEditing] = useState(false);
+  const change = (next: DashboardLayout) => {
+    setLayout(next);
+    saveLayout(next);
+  };
+  const visible = layout.order.filter((id) => shown(id, data) && !layout.hidden.includes(id));
+  const hidden = layout.hidden.filter((id) => shown(id, data));
+  const render = (id: BlockId) => {
+    const Block = RENDER[id];
+    return <Block data={data} range={range} />;
+  };
+
   return (
     <div className="space-y-4">
       <VizStyle />
       {sample && <SampleBanner quiet={sample.quiet} />}
-      <PeriodSwitch sel={sel} generatedAt={data.generatedAt} />
+      <PeriodSwitch
+        sel={sel}
+        generatedAt={data.generatedAt}
+        extra={
+          !editing && (
+            <Button variant="outline" size="sm" className="h-11 gap-1.5 sm:h-9" onClick={() => setEditing(true)}>
+              <LayoutGrid className="size-4" aria-hidden />
+              Edit dashboard
+            </Button>
+          )
+        }
+      />
+      {editing && (
+        <div className="sticky top-0 z-30 flex flex-wrap items-center gap-2 rounded-xl border border-primary/40 bg-card/95 px-3 py-2 shadow-sm backdrop-blur">
+          <p className="flex items-center gap-1.5 text-sm font-semibold">
+            Editing layout
+            <InfoTip label="About editing the layout">
+              Drag a block by its handle, or use the arrows. Hidden blocks wait at the bottom of the page. Needs attention always
+              stays on top. Changes save as you go.
+            </InfoTip>
+          </p>
+          <div className="ml-auto flex gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-11 gap-1.5 sm:h-9"
+              disabled={isDefaultLayout(layout)}
+              onClick={() => change(defaultLayout())}
+            >
+              <RotateCcw className="size-4" aria-hidden />
+              Reset to default
+            </Button>
+            <Button size="sm" className="h-11 gap-1.5 sm:h-9" onClick={() => setEditing(false)}>
+              <Check className="size-4" aria-hidden />
+              Done
+            </Button>
+          </div>
+        </div>
+      )}
       <NeedsAttention items={data.attention} />
-      <div className="grid grid-flow-row-dense grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-12">
-        {blocks.map((b) => {
-          const Block = RENDER[b.id];
-          return (
-            <section key={b.id} aria-label={b.title} className={cn("min-w-0", SPAN[b.size])}>
-              <Block data={data} range={range} />
+      {editing ? (
+        <>
+          <EditableGrid layout={layout} visible={visible} spanOf={spanOf} render={render} onChange={change} />
+          <HiddenTray hidden={hidden} onShow={(id) => change({ ...layout, hidden: layout.hidden.filter((h) => h !== id) })} />
+        </>
+      ) : (
+        <div className="grid grid-flow-row-dense grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-12">
+          {visible.map((id) => (
+            <section key={id} aria-label={blockLabel(id)} className={cn("min-w-0", spanOf(id))}>
+              {render(id)}
             </section>
-          );
-        })}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -20,7 +20,7 @@ function remember(sel: PeriodSel) {
   document.cookie = `${PERIOD_COOKIE}=${encodeURIComponent(v.toString())}; path=/jmp-admin; max-age=31536000; samesite=lax`;
 }
 
-export function PeriodSwitch({ sel, generatedAt }: { sel: PeriodSel; generatedAt: string }) {
+export function PeriodSwitch({ sel, generatedAt, extra }: { sel: PeriodSel; generatedAt: string; extra?: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -121,6 +121,7 @@ export function PeriodSwitch({ sel, generatedAt }: { sel: PeriodSel; generatedAt
         >
           <RefreshCw className={cn("size-4", pending && "animate-spin")} aria-hidden />
         </Button>
+        {extra}
       </div>
     </div>
   );
