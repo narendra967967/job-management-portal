@@ -198,7 +198,11 @@ export function ActiveUsersBlock({ data }: BlockProps) {
 export function PlansBlock({ data }: BlockProps) {
   return (
     <BlockCard title="Plan distribution" href={links.users()}>
-      <DonutChart data={data.planMix} centerLabel="Users" hrefs={data.planMix.map((p) => links.users({ plan: p.plan }))} />
+      <DonutChart
+        data={data.planMix}
+        centerLabel="Users"
+        hrefs={data.planMix.map((p) => (p.plan === "expired" ? links.users({ expiry: "expired" }) : links.users({ plan: p.plan })))}
+      />
     </BlockCard>
   );
 }
@@ -311,7 +315,7 @@ export function IncompleteOrdersBlock({ data, range }: BlockProps) {
     <BlockCard
       title="Unfinished orders"
       icon={ReceiptText}
-      href={links.orders({ status: "created,failed", from: range.from, to: range.to })}
+      href={links.orders({ status: "unfinished", from: range.from, to: range.to })}
       info="Orders that were started but never paid, and payments that failed. A sudden jump usually means a checkout problem, such as wrong gateway keys or a price."
     >
       <StatRow

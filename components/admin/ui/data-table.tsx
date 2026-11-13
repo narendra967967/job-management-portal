@@ -296,3 +296,25 @@ export function StatBox({
     </button>
   );
 }
+
+/* ---------------- active filter chip ---------------- */
+
+/**
+ * A filter that came in with the link (e.g. from a dashboard number) and has no
+ * control of its own on the page. Shows what's applied; × removes it.
+ */
+export function FilterChip({ label, onClear }: { label: string; onClear: () => void }) {
+  return (
+    <span className="inline-flex min-h-11 items-center gap-1 rounded-full border border-primary/40 bg-primary/5 py-1 pr-1 pl-3 text-xs font-medium sm:min-h-9">
+      {label}
+      <button
+        type="button"
+        onClick={onClear}
+        aria-label={`Remove filter: ${label}`}
+        className="inline-flex size-9 items-center justify-center rounded-full text-muted-foreground hover:bg-primary/10 hover:text-foreground sm:size-7"
+      >
+        <X className="size-3.5" aria-hidden />
+      </button>
+    </span>
+  );
+}

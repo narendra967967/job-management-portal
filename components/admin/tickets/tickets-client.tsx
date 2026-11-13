@@ -52,6 +52,8 @@ import {
 } from "@/lib/tickets-model";
 import { cn } from "@/lib/utils";
 import { toast } from "@/components/admin/ui/toast";
+import { FilterChip } from "@/components/admin/ui/data-table";
+import { pick, useInitialQuery, useQuerySync } from "@/lib/admin/url-filters";
 
 const selectCls =
   "h-9 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
@@ -63,7 +65,9 @@ const STATUS_BADGE: Record<TicketStatus, "warning" | "neutral" | "success"> = {
   resolved: "success",
 };
 
-const STATUS_FILTERS: ("all" | TicketStatus)[] = ["all", "open", "in_progress", "resolved"];
+type StatusFilter = "all" | "unresolved" | TicketStatus;
+const STATUS_FILTERS: StatusFilter[] = ["all", "unresolved", "open", "in_progress", "resolved"];
+const statusFilterLabel = (s: StatusFilter) => (s === "all" ? "All statuses" : s === "unresolved" ? "Not resolved" : TICKET_STATUS_LABELS[s]);
 
 function fmt(iso: string): string {
   return new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
@@ -141,11 +145,24 @@ export function TicketsClient({ initial, priorityUserIds = [] }: { initial: Tick
   // props (e.g. after a status change or delete triggers router.refresh()).
   const [tickets, setTickets] = useState<Ticket[]>(initial);
   useEffect(() => setTickets(initial), [initial]);
-  const [query, setQuery] = useState("");
-  const [fStatus, setFStatus] = useState<"all" | TicketStatus>("all");
-  const [fCategory, setFCategory] = useState("all");
+  // Filters can arrive in the link (dashboard numbers, bookmarks) and stay in it:
+  // ?q=&status=&category=&waiting=<hours>&open=<ticket id>
+  const sp = useInitialQuery();
+  const [query, setQuery] = useState(sp.get("q") ?? "");
+  const [fStatus, setFStatus] = useState<StatusFilter>(() =>
+    sp.get("status") === "open,in_progress" ? "unresolved" : pick(sp.get("status"), STATUS_FILTERS, "all"),
+  );
+  const [fCategory, setFCategory] = useState(() => pick(sp.get("category"), ["all", ...Object.keys(TICKET_CATEGORY_LABELS)], "all"));
+  const [waitingHours, setWaitingHours] = useState(() => {
+    const n = Number(sp.get("waiting"));
+    return Number.isInteger(n) && n > 0 && n <= 24 * 365 ? n : 0;
+  });
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [activeId, setActiveId] = useState<string | null>(null);
+  useQuerySync(
+    { q: query.trim(), status: fStatus, category: fCategory, waiting: waitingHours ? String(waitingHours) : "", open: activeId },
+    { status: "all", category: "all" },
+  );
   const [reply, setReply] = useState("");
   const [busy, setBusy] = useState(false);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
@@ -166,8 +183,9 @@ export function TicketsClient({ initial, priorityUserIds = [] }: { initial: Tick
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return tickets.filter((t) => {
-      if (fStatus !== "all" && t.status !== fStatus) return false;
+      if (fStatus === "unresolved" ? t.status === "resolved" : fStatus !== "all" && t.status !== fStatus) return false;
       if (fCategory !== "all" && t.category !== fCategory) return false;
+      if (waitingHours && (t.status === "resolved" || Date.now() - new Date(t.createdAt).getTime() < waitingHours * 3_600_000)) return false;
       if (
         q &&
         ![t.subject, t.name, t.email, ticketRef(t.number), String(t.number)].some((v) =>
@@ -177,7 +195,7 @@ export function TicketsClient({ initial, priorityUserIds = [] }: { initial: Tick
         return false;
       return true;
     });
-  }, [tickets, query, fStatus, fCategory]);
+  }, [tickets, query, fStatus, fCategory, waitingHours]);
 
   const active = activeId ? (tickets.find((t) => t.id === activeId) ?? null) : null;
 
@@ -230,6 +248,13 @@ export function TicketsClient({ initial, priorityUserIds = [] }: { initial: Tick
       prev.map((t) => (t.id === id ? { ...t, lastReadByAdminAt: now, lastDeliveredToAdminAt: now } : t)),
     );
   }
+
+  // ?open=<id> (e.g. a row in the dashboard's "Waiting on you") opens that ticket.
+  useEffect(() => {
+    const id = sp.get("open");
+    if (id && tickets.some((t) => t.id === id)) openTicket(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Keep the chat scrolled to the latest message when a ticket opens or a reply lands.
   const activeReplyCount = active?.replies.length ?? 0;
@@ -377,9 +402,9 @@ export function TicketsClient({ initial, priorityUserIds = [] }: { initial: Tick
           <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
           <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search #, subject, name, email…" className="h-9 pl-8" />
         </div>
-        <select className={selectCls} value={fStatus} onChange={(e) => setFStatus(e.target.value as "all" | TicketStatus)} aria-label="Filter status">
+        <select className={selectCls} value={fStatus} onChange={(e) => setFStatus(e.target.value as StatusFilter)} aria-label="Filter status">
           {STATUS_FILTERS.map((s) => (
-            <option key={s} value={s}>{s === "all" ? "All statuses" : TICKET_STATUS_LABELS[s]}</option>
+            <option key={s} value={s}>{statusFilterLabel(s)}</option>
           ))}
         </select>
         <select className={selectCls} value={fCategory} onChange={(e) => setFCategory(e.target.value)} aria-label="Filter category">
@@ -388,6 +413,12 @@ export function TicketsClient({ initial, priorityUserIds = [] }: { initial: Tick
             <option key={c} value={c}>{label}</option>
           ))}
         </select>
+        {waitingHours > 0 && (
+          <FilterChip
+            label={`Waiting over ${waitingHours < 48 ? `${waitingHours} h` : `${Math.round(waitingHours / 24)} days`}`}
+            onClear={() => setWaitingHours(0)}
+          />
+        )}
         <span className="ml-auto text-sm text-muted-foreground">
           {filtered.length} of {tickets.length}
         </span>

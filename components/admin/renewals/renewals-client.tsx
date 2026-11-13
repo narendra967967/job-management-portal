@@ -38,6 +38,7 @@ import {
   type RenewalRow,
 } from "@/actions/admin-renewals";
 import { cn, formatDateTime } from "@/lib/utils";
+import { pick, replaceQuery, useInitialQuery, useQuerySync } from "@/lib/admin/url-filters";
 
 const DAY_MS = 86_400_000;
 
@@ -89,7 +90,12 @@ async function copyText(value: string, what: string) {
 }
 
 export function RenewalsClient() {
-  const [tab, setTab] = useState<Tab>("upcoming");
+  // ?tab=reminders opens the log; the Upcoming filters live in the link too.
+  const sp = useInitialQuery();
+  const [tab, setTab] = useState<Tab>(() => pick(sp.get("tab"), ["upcoming", "reminders"] as const, "upcoming"));
+  useEffect(() => {
+    replaceQuery(tab === "upcoming" ? { tab: null } : { tab, due: null, kind: null, plan: null, q: null });
+  }, [tab]);
   // "See reminders" on an Upcoming row opens the log searched for that user.
   const [logQuery, setLogQuery] = useState("");
 
@@ -139,10 +145,13 @@ function Upcoming({ onSeeReminders }: { onSeeReminders: (email: string) => void 
   const [rows, setRows] = useState<RenewalRow[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [capped, setCapped] = useState(false);
-  const [query, setQuery] = useState("");
-  const [plan, setPlan] = useState("all");
-  const [kind, setKind] = useState<Kind>("all");
-  const [win, setWin] = useState<Window>("7");
+  // ?due=7|30|90|ended&kind=&plan=&q= (dashboard numbers, bookmarks)
+  const sp = useInitialQuery();
+  const [query, setQuery] = useState(sp.get("q") ?? "");
+  const [plan, setPlan] = useState(sp.get("plan") || "all");
+  const [kind, setKind] = useState<Kind>(() => pick(sp.get("kind"), ["all", "paid", "trial"] as const, "all"));
+  const [win, setWin] = useState<Window>(() => pick(sp.get("due") === "expired" ? "ended" : sp.get("due"), ["7", "30", "90", "ended"] as const, "7"));
+  useQuerySync({ q: query.trim(), plan, kind, due: win }, { plan: "all", kind: "all", due: "7" });
 
   useEffect(() => {
     listRenewalsAction().then((res) => {
@@ -213,6 +222,7 @@ function Upcoming({ onSeeReminders }: { onSeeReminders: (email: string) => void 
         </select>
         <select aria-label="Plan" className={tableSelectCls} value={plan} onChange={(e) => setPlan(e.target.value)}>
           <option value="all">All plans</option>
+          {plan !== "all" && !plans.includes(plan) && <option value={plan}>{plan}</option>}
           {plans.map((p) => (
             <option key={p} value={p}>
               {p}

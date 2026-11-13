@@ -28,6 +28,7 @@ import { CategoryBadge, ChannelIcons, StatusBadge, selectCls } from "@/component
 import { BROADCAST_STATUS_LABELS, type Broadcast, type BroadcastStatus } from "@/lib/broadcasts-model";
 import { cancelBroadcastAction, deleteBroadcastAction, duplicateBroadcastAction } from "@/actions/admin-broadcasts";
 import { useMounted } from "@/lib/use-mounted";
+import { pick, useInitialQuery, useQuerySync } from "@/lib/admin/url-filters";
 import { cn, formatDateTime } from "@/lib/utils";
 
 /** The one date that matters for each state. */
@@ -63,8 +64,13 @@ type Pending = { kind: "cancel" | "delete"; items: Broadcast[] } | null;
 export function BroadcastsList({ broadcasts: raw }: { broadcasts: Broadcast[] }) {
   const mounted = useMounted();
   const router = useRouter();
-  const [query, setQuery] = useState("");
-  const [status, setStatus] = useState<BroadcastStatus | "all">("all");
+  // ?status=&q= in the link (dashboard, bookmarks), kept in step as they change.
+  const sp = useInitialQuery();
+  const [query, setQuery] = useState(sp.get("q") ?? "");
+  const [status, setStatus] = useState<BroadcastStatus | "all">(() =>
+    pick(sp.get("status"), ["all", ...(Object.keys(BROADCAST_STATUS_LABELS) as BroadcastStatus[])], "all"),
+  );
+  useQuerySync({ q: query.trim(), status }, { status: "all" });
   const [pending, setPending] = useState<Pending>(null);
   const [busy, setBusy] = useState(false);
 

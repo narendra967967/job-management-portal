@@ -110,21 +110,28 @@ const q = (params: Record<string, string | undefined>) => {
  * phase 2; until then they open unfiltered.
  */
 export const links = {
-  users: (f: { joinedFrom?: string; joinedTo?: string; signedInFrom?: string; signedInTo?: string; plan?: string; step?: string; status?: string } = {}) =>
+  /** plan: a plan id, "paid" or "free". expiry: "soon", "expired" or "none". step: a FUNNEL_STEPS key. */
+  users: (
+    f: { joinedFrom?: string; joinedTo?: string; signedInFrom?: string; signedInTo?: string; plan?: string; expiry?: string; step?: FunnelKey; status?: string } = {},
+  ) =>
     `/jmp-admin/users${q({
       joinedFrom: f.joinedFrom,
       joinedTo: f.joinedTo,
       signedInFrom: f.signedInFrom,
       signedInTo: f.signedInTo,
       plan: f.plan,
+      expiry: f.expiry,
       step: f.step,
       status: f.status,
     })}`,
+  /** status: open, in_progress, resolved or unresolved. waitingHours: unresolved and older than this. */
   tickets: (f: { status?: string; waitingHours?: number; open?: string } = {}) =>
     `/jmp-admin/tickets${q({ status: f.status, waiting: f.waitingHours ? String(f.waitingHours) : undefined, open: f.open })}`,
+  /** status: paid, failed, created, cancelled or unfinished (created + failed). plan: plan name. mode: live or test. */
   orders: (f: { status?: string; from?: string; to?: string; plan?: string; mode?: string } = {}) =>
     `/jmp-admin/orders${q({ status: f.status, from: f.from, to: f.to, plan: f.plan, mode: f.mode })}`,
-  renewals: (f: { due?: "7" | "30" | "expired" } = {}) => `/jmp-admin/renewals${q({ due: f.due })}`,
+  /** due: 7, 30 or 90 days ahead, or "ended" (plans that ended, now in limited mode). */
+  renewals: (f: { due?: "7" | "30" | "90" | "ended" } = {}) => `/jmp-admin/renewals${q({ due: f.due })}`,
   broadcasts: (f: { status?: string; id?: string } = {}) =>
     f.id ? `/jmp-admin/broadcasts/${f.id}` : `/jmp-admin/broadcasts${q({ status: f.status })}`,
   inbound: (f: { status?: string; from?: string; to?: string } = {}) =>
@@ -132,6 +139,66 @@ export const links = {
   kbUnanswered: () => "/jmp-admin/knowledge-base/unanswered",
   settings: (section: string) => `/jmp-admin/settings${q({ section })}`,
 };
+
+/* ---------------- onboarding funnel ---------------- */
+
+export const FUNNEL_STEPS = [
+  { key: "signed-up", label: "Signed up" },
+  { key: "verified", label: "Verified email" },
+  { key: "forwarding", label: "Set up forwarding" },
+  { key: "ai-key", label: "Added AI key" },
+  { key: "resume", label: "Added a résumé" },
+  { key: "leads", label: "Saved 5+ leads" },
+  { key: "paid", label: "Paid" },
+] as const;
+
+export type FunnelKey = (typeof FUNNEL_STEPS)[number]["key"];
+
+/** What the funnel needs to know about one user. */
+export interface FunnelFacts {
+  emailVerified: boolean;
+  /** At least one forwarded job alert arrived. */
+  forwardingReceived: boolean;
+  hasAiKey: boolean;
+  hasResume: boolean;
+  leads: number;
+  /** On a paid plan (expired or not counts: they did pay). */
+  paid: boolean;
+}
+
+export function isFunnelKey(v: unknown): v is FunnelKey {
+  return FUNNEL_STEPS.some((s) => s.key === v);
+}
+
+export function reachedStep(key: FunnelKey, f: FunnelFacts): boolean {
+  switch (key) {
+    case "signed-up":
+      return true;
+    case "verified":
+      return f.emailVerified;
+    case "forwarding":
+      return f.forwardingReceived;
+    case "ai-key":
+      return f.hasAiKey;
+    case "resume":
+      return f.hasResume;
+    case "leads":
+      return f.leads >= 5;
+    case "paid":
+      return f.paid;
+  }
+}
+
+/** Reached this step but not the next one (the last step: reached it). */
+export function stoppedAt(key: FunnelKey, f: FunnelFacts): boolean {
+  const i = FUNNEL_STEPS.findIndex((s) => s.key === key);
+  const next = FUNNEL_STEPS[i + 1];
+  return reachedStep(key, f) && (!next || !reachedStep(next.key, f));
+}
+
+export function funnelLabel(key: FunnelKey): string {
+  return FUNNEL_STEPS.find((s) => s.key === key)!.label;
+}
 
 /* ---------------- block registry (order + size; phase 6 makes it editable) ---------------- */
 
@@ -184,7 +251,7 @@ export interface Delta {
 }
 
 export interface FunnelStep {
-  key: string;
+  key: FunnelKey;
   label: string;
   value: number;
 }

@@ -45,7 +45,7 @@ export function SupportBlock({ data }: BlockProps) {
     <BlockCard
       title="Support"
       icon={LifeBuoy}
-      href={links.tickets({ status: "open,in_progress" })}
+      href={links.tickets({ status: "unresolved" })}
       info="The averages cover tickets opened in the selected period. First reply counts your first answer, not the user's own follow-ups."
     >
       <div className="grid gap-4 lg:grid-cols-[13rem_minmax(0,1fr)]">
@@ -121,7 +121,7 @@ export function RenewalsBlock({ data }: BlockProps) {
         label="Expired in last 30 days"
         value={formatCount(r.expired30)}
         tone={r.expired30 > 0 ? "bad" : "good"}
-        href={links.renewals({ due: "expired" })}
+        href={links.renewals({ due: "ended" })}
       />
       <p className="mt-3 mb-1 border-t pt-3 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">Next due</p>
       {r.next.length > 0 ? (

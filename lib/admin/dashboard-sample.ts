@@ -7,6 +7,7 @@
 
 import type { Point } from "@/components/admin/ui/charts";
 import {
+  FUNNEL_STEPS,
   links,
   periodRange,
   type AttentionItem,
@@ -67,9 +68,9 @@ export function sampleDashboard(sel: PeriodSel, quiet = false): DashboardData {
   const attention: AttentionItem[] = quiet
     ? []
     : [
-        { key: "tickets-waiting", severity: "critical", count: 3, text: "3 tickets waiting more than 24 hours", href: links.tickets({ status: "open,in_progress", waitingHours: 24 }) },
+        { key: "tickets-waiting", severity: "critical", count: 3, text: "3 tickets waiting more than 24 hours", href: links.tickets({ status: "unresolved", waitingHours: 24 }) },
         { key: "failed-payments", severity: "critical", count: failed, text: `${failed} payments failed in the last 7 days`, href: links.orders({ status: "failed" }) },
-        { key: "expired-plans", severity: "warning", count: 4, text: "4 paid plans expired in the last 7 days without renewal", href: links.renewals({ due: "expired" }) },
+        { key: "expired-plans", severity: "warning", count: 4, text: "4 paid plans expired in the last 7 days without renewal", href: links.renewals({ due: "ended" }) },
         { key: "deletion-requests", severity: "warning", count: 1, text: "1 account deletion request", href: links.tickets({ status: "open" }) },
         { key: "ai-queue", severity: "warning", count: 12, text: "12 job alerts waiting in the AI reading queue for over an hour", href: links.inbound({ status: "queued" }) },
         { key: "broadcast-failed", severity: "info", count: 6, text: "6 emails failed in the last broadcast", href: links.broadcasts({ id: "sample-broadcast" }) },
@@ -97,9 +98,8 @@ export function sampleDashboard(sel: PeriodSel, quiet = false): DashboardData {
       orders: Math.round(31 * scale + 2),
       byMonth: newUsers.monthly.map((p, i) => ({ label: p.label, value: Math.round((40_000 + i * 14_000 + r() * 12_000) / 100) * 10_000 })),
       byPlan: [
-        { label: "Pro yearly", value: Math.round(revenueTotal * 0.46) },
-        { label: "Pro monthly", value: Math.round(revenueTotal * 0.38) },
-        { label: "Starter monthly", value: Math.round(revenueTotal * 0.16) },
+        { label: "Pro", value: Math.round(revenueTotal * 0.78) },
+        { label: "Starter", value: Math.round(revenueTotal * 0.22) },
       ],
       currency: "INR",
     },
@@ -113,15 +113,7 @@ export function sampleDashboard(sel: PeriodSel, quiet = false): DashboardData {
       { label: "Starter", value: 44, plan: "starter" },
       { label: "Expired", value: 68, plan: "expired" },
     ],
-    funnel: [
-      { key: "signed-up", label: "Signed up", value: joined },
-      { key: "verified", label: "Verified email", value: Math.round(joined * 0.91) },
-      { key: "forwarding", label: "Set up forwarding", value: Math.round(joined * 0.62) },
-      { key: "ai-key", label: "Added AI key", value: Math.round(joined * 0.41) },
-      { key: "resume", label: "Added a résumé", value: Math.round(joined * 0.37) },
-      { key: "leads", label: "Saved 5+ leads", value: Math.round(joined * 0.3) },
-      { key: "paid", label: "Paid", value: Math.round(joined * 0.17) },
-    ],
+    funnel: FUNNEL_STEPS.map((s, i) => ({ ...s, value: Math.round(joined * [1, 0.91, 0.62, 0.41, 0.37, 0.3, 0.17][i]) })),
     support: {
       open: quiet ? 1 : 5,
       inProgress: quiet ? 0 : 3,

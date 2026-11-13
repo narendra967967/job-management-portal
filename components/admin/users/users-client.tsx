@@ -58,8 +58,19 @@ import { cn } from "@/lib/utils";
 import { useMounted } from "@/lib/use-mounted";
 import { timeAgo } from "@/lib/email-intake-model";
 import { resetUserForwardingAction } from "@/actions/admin-email-intake";
+import { FilterChip } from "@/components/admin/ui/data-table";
+import { dateParam, pick, rangeLabel, useInitialQuery, useQuerySync } from "@/lib/admin/url-filters";
+import { funnelLabel, isFunnelKey, stoppedAt, type FunnelKey } from "@/lib/admin/dashboard-model";
 
 const initials = (n: string) => n.split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase();
+
+/** An ISO time falls on a local day within [from, to] (either end may be open). */
+function inDays(iso: string, r: { from: string; to: string }) {
+  const d = new Date(iso);
+  const p = (n: number) => String(n).padStart(2, "0");
+  const day = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  return (!r.from || day >= r.from) && (!r.to || day <= r.to);
+}
 
 function daysUntil(iso: string) {
   return Math.ceil((new Date(iso + "T00:00:00").getTime() - Date.now()) / 86400000);
@@ -101,10 +112,37 @@ export function UsersClient({
   const router = useRouter();
   const users = initialUsers;
 
-  const [query, setQuery] = useState(initialQuery);
-  const [fStatus, setFStatus] = useState("all");
-  const [fPlan, setFPlan] = useState("all");
-  const [fExpiry, setFExpiry] = useState("all");
+  // Filters can arrive in the link (dashboard numbers, bookmarks) and are kept
+  // in it as they change: ?q=&status=&plan=&expiry=&joinedFrom=&joinedTo=
+  // &signedInFrom=&signedInTo=&step=
+  const sp = useInitialQuery();
+  const [query, setQuery] = useState(sp.get("q") ?? initialQuery);
+  const [fStatus, setFStatus] = useState(() => pick(sp.get("status"), ["all", "active", "inactive"] as const, "all"));
+  const [fPlan, setFPlan] = useState(() => {
+    const p = sp.get("plan");
+    return p === "paid" || p === "free" || plans.some((o) => o.id === p) ? (p as string) : "all";
+  });
+  const [fExpiry, setFExpiry] = useState(() => pick(sp.get("expiry"), ["all", "soon", "expired", "none"] as const, "all"));
+  const [joined, setJoined] = useState({ from: dateParam(sp.get("joinedFrom")), to: dateParam(sp.get("joinedTo")) });
+  const [signedIn, setSignedIn] = useState({ from: dateParam(sp.get("signedInFrom")), to: dateParam(sp.get("signedInTo")) });
+  const [step, setStep] = useState<FunnelKey | null>(() => {
+    const v = sp.get("step");
+    return isFunnelKey(v) ? v : null;
+  });
+  useQuerySync(
+    {
+      q: query.trim(),
+      status: fStatus,
+      plan: fPlan,
+      expiry: fExpiry,
+      joinedFrom: joined.from,
+      joinedTo: joined.to,
+      signedInFrom: signedIn.from,
+      signedInTo: signedIn.to,
+      step,
+    },
+    { status: "all", plan: "all", expiry: "all" },
+  );
   const [pageSize, setPageSize] = useState(10);
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -142,7 +180,21 @@ export function UsersClient({
     return users.filter((u) => {
       if (q && !u.name.toLowerCase().includes(q) && !u.email.toLowerCase().includes(q)) return false;
       if (fStatus !== "all" && u.status !== fStatus) return false;
-      if (fPlan !== "all" && u.planId !== fPlan) return false;
+      if (fPlan === "paid" ? u.planFree : fPlan === "free" ? !u.planFree : fPlan !== "all" && u.planId !== fPlan) return false;
+      if ((joined.from || joined.to) && !inDays(u.createdAt, joined)) return false;
+      if ((signedIn.from || signedIn.to) && !(u.lastLoginAt && inDays(u.lastLoginAt, signedIn))) return false;
+      if (
+        step &&
+        !stoppedAt(step, {
+          emailVerified: u.emailVerified,
+          forwardingReceived: !!u.forwarding?.firstReceivedAt,
+          hasAiKey: u.hasAiKey,
+          hasResume: u.hasResume,
+          leads: u.leads,
+          paid: !u.planFree,
+        })
+      )
+        return false;
       if (fExpiry !== "all") {
         const d = u.expiresAt ? daysUntil(u.expiresAt) : null;
         if (fExpiry === "none" && u.expiresAt !== null) return false;
@@ -151,9 +203,9 @@ export function UsersClient({
       }
       return true;
     });
-  }, [users, query, fStatus, fPlan, fExpiry]);
+  }, [users, query, fStatus, fPlan, fExpiry, joined, signedIn, step]);
 
-  useEffect(() => setPage(1), [query, fStatus, fPlan, fExpiry, pageSize]);
+  useEffect(() => setPage(1), [query, fStatus, fPlan, fExpiry, joined, signedIn, step, pageSize]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
   const current = Math.min(page, pageCount);
@@ -289,18 +341,20 @@ export function UsersClient({
           <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
           <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search name or email…" className="h-9 pl-8" />
         </div>
-        <select className={selectCls} value={fStatus} onChange={(e) => setFStatus(e.target.value)} aria-label="Filter status">
+        <select className={selectCls} value={fStatus} onChange={(e) => setFStatus(e.target.value as typeof fStatus)} aria-label="Filter status">
           <option value="all">All statuses</option>
           <option value="active">Active</option>
           <option value="inactive">Inactive</option>
         </select>
         <select className={selectCls} value={fPlan} onChange={(e) => setFPlan(e.target.value)} aria-label="Filter plan">
           <option value="all">All plans</option>
+          <option value="paid">Any paid plan</option>
+          <option value="free">Free plans</option>
           {plans.map((p) => (
             <option key={p.id} value={p.id}>{p.name}</option>
           ))}
         </select>
-        <select className={selectCls} value={fExpiry} onChange={(e) => setFExpiry(e.target.value)} aria-label="Filter expiry">
+        <select className={selectCls} value={fExpiry} onChange={(e) => setFExpiry(e.target.value as typeof fExpiry)} aria-label="Filter expiry">
           <option value="all">Any expiry</option>
           <option value="soon">Expiring ≤30d</option>
           <option value="expired">Expired</option>
@@ -311,6 +365,18 @@ export function UsersClient({
           Add user
         </Button>
       </div>
+
+      {(joined.from || joined.to || signedIn.from || signedIn.to || step) && (
+        <div className="flex flex-wrap items-center gap-2" aria-label="Filters from the link">
+          {(joined.from || joined.to) && (
+            <FilterChip label={`Joined ${rangeLabel(joined.from, joined.to)}`} onClear={() => setJoined({ from: "", to: "" })} />
+          )}
+          {(signedIn.from || signedIn.to) && (
+            <FilterChip label={`Signed in ${rangeLabel(signedIn.from, signedIn.to)}`} onClear={() => setSignedIn({ from: "", to: "" })} />
+          )}
+          {step && <FilterChip label={`Stopped at: ${funnelLabel(step)}`} onClear={() => setStep(null)} />}
+        </div>
+      )}
 
       {/* Bulk action bar */}
       {selCount > 0 && (

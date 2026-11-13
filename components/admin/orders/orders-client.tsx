@@ -32,6 +32,7 @@ import {
   type OrderStatus,
 } from "@/lib/billing-model";
 import { listOrdersAction } from "@/actions/admin-payments";
+import { dateParam, pick, useInitialQuery, useQuerySync } from "@/lib/admin/url-filters";
 import { cn, formatDateTime } from "@/lib/utils";
 
 const STATUS_VARIANT: Record<OrderStatus, "success" | "danger" | "warning" | "neutral"> = {
@@ -52,6 +53,9 @@ function ymd(d: Date): string {
   const p = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
+type StatusFilter = OrderStatus | "all" | "unfinished";
+const STATUS_FILTERS: StatusFilter[] = ["all", "unfinished", "created", "paid", "failed", "cancelled"];
+
 function defaultRange() {
   const to = new Date();
   const from = new Date();
@@ -70,13 +74,24 @@ export function OrdersClient() {
   const [capped, setCapped] = useState(false);
   const mounted = loaded;
 
-  const [query, setQuery] = useState("");
-  const [status, setStatus] = useState<OrderStatus | "all">("all");
-  const [plan, setPlan] = useState("all");
-  const [gateway, setGateway] = useState("all");
-  const [fromInput, setFromInput] = useState(() => defaultRange().from);
-  const [toInput, setToInput] = useState(() => defaultRange().to);
-  const [range, setRange] = useState(defaultRange);
+  // Filters can arrive in the link (dashboard numbers, bookmarks) and stay in it:
+  // ?q=&status=&plan=&gateway=&mode=&from=&to=
+  const sp = useInitialQuery();
+  const linkRange = (() => {
+    const from = dateParam(sp.get("from"));
+    const to = dateParam(sp.get("to"));
+    return from && to && from <= to ? { from, to } : defaultRange();
+  })();
+  const [query, setQuery] = useState(sp.get("q") ?? "");
+  const [status, setStatus] = useState<StatusFilter>(() =>
+    sp.get("status") === "created,failed" ? "unfinished" : pick(sp.get("status"), STATUS_FILTERS, "all"),
+  );
+  const [plan, setPlan] = useState(sp.get("plan") || "all");
+  const [gateway, setGateway] = useState(sp.get("gateway") || "all");
+  const [mode, setMode] = useState(() => pick(sp.get("mode"), ["all", "live", "test"] as const, "all"));
+  const [fromInput, setFromInput] = useState(linkRange.from);
+  const [toInput, setToInput] = useState(linkRange.to);
+  const [range, setRange] = useState(linkRange);
   const [pageSize, setPageSize] = useState(10);
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -122,17 +137,22 @@ export function OrdersClient() {
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return inRange.filter((r) => {
-      if (status !== "all" && r.status !== status) return false;
+      if (status === "unfinished" ? r.status !== "created" && r.status !== "failed" : status !== "all" && r.status !== status) return false;
       if (plan !== "all" && r.planName !== plan) return false;
       if (gateway !== "all" && r.gateway !== gateway) return false;
+      if (mode !== "all" && r.mode !== mode) return false;
       if (!needle) return true;
       return [r.user?.name, r.user?.email, r.planName, r.gatewayOrderId, r.gatewayPaymentId]
         .filter(Boolean)
         .some((v) => (v as string).toLowerCase().includes(needle));
     });
-  }, [inRange, query, status, plan, gateway]);
+  }, [inRange, query, status, plan, gateway, mode]);
 
-  useEffect(() => setPage(1), [query, status, plan, gateway, range, pageSize]);
+  useEffect(() => setPage(1), [query, status, plan, gateway, mode, range, pageSize]);
+  useQuerySync(
+    { q: query.trim(), status, plan, gateway, mode, from: range.from, to: range.to },
+    { status: "all", plan: "all", gateway: "all", mode: "all" },
+  );
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
   const current = Math.min(page, pageCount);
@@ -234,8 +254,9 @@ export function OrdersClient() {
             className="h-9 pl-8"
           />
         </div>
-        <select aria-label="Status" className={selectCls} value={status} onChange={(e) => setStatus(e.target.value as OrderStatus | "all")}>
+        <select aria-label="Status" className={selectCls} value={status} onChange={(e) => setStatus(e.target.value as StatusFilter)}>
           <option value="all">All statuses</option>
+          <option value="unfinished">Unfinished (pending or failed)</option>
           {(Object.keys(ORDER_STATUS_LABELS) as OrderStatus[]).map((s) => (
             <option key={s} value={s}>
               {ORDER_STATUS_LABELS[s]}
@@ -244,14 +265,21 @@ export function OrdersClient() {
         </select>
         <select aria-label="Plan" className={selectCls} value={plan} onChange={(e) => setPlan(e.target.value)}>
           <option value="all">All plans</option>
+          {plan !== "all" && !plans.includes(plan) && <option value={plan}>{plan}</option>}
           {plans.map((p) => (
             <option key={p} value={p}>
               {p}
             </option>
           ))}
         </select>
+        <select aria-label="Payment mode" className={selectCls} value={mode} onChange={(e) => setMode(e.target.value as typeof mode)}>
+          <option value="all">Live and test</option>
+          <option value="live">Live payments</option>
+          <option value="test">Test payments</option>
+        </select>
         <select aria-label="Gateway" className={selectCls} value={gateway} onChange={(e) => setGateway(e.target.value)}>
           <option value="all">All gateways</option>
+          {gateway !== "all" && !gateways.includes(gateway) && <option value={gateway}>{GATEWAY_LABELS[gateway as GatewayId] ?? gateway}</option>}
           {gateways.map((g) => (
             <option key={g} value={g}>
               {GATEWAY_LABELS[g as GatewayId] ?? g}
