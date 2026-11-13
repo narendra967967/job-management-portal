@@ -44,7 +44,7 @@ It sits inside the existing app and account. It doesn't change how the job track
 
 | # | Decision |
 |---|---|
-| D14 | Interviewer onboarding collects name, photo, headline, current role, company, years of experience, bio, skills, categories, languages and timezone (required), with education and detailed history optional. The rest of the fields are settled at UI time. **PAN and bank details at onboarding**; the bank account is verified before the first payout. |
+| D14 | Interviewer onboarding collects name, photo, headline, current role, company, years of experience, bio, skills, categories, languages and timezone (required), with education and detailed history optional. The rest of the fields are settled at UI time. At onboarding: **full address** (city, state, PIN code), **GSTIN or PAN** (one required; a GSTIN supplies the PAN) and **bank details**; the bank account is verified before the first payout. See `docs/gst/spec.md` (G7, G10). |
 | D15 | "Hide company name" is allowed on the public profile; admin still sees it. |
 | D16 | Admin can approve, reject, ask for more information (the form reopens with admin's note at the top), suspend or deactivate. Only approved interviewers can publish and take bookings. |
 | D17 | Approved interviewers **publish services freely**; admin can unpublish. Admin sets price limits, allowed durations (15, 30, 45, 60, 90) and how many services each interviewer may have. No free services and no packages for now. |
@@ -60,7 +60,7 @@ It sits inside the existing app and account. It doesn't change how the job track
 | D22 | Starting checkout creates a **pending booking that holds the slot for 10 minutes** (admin setting). The candidate sees the countdown and can return to My bookings to pay the same pending booking. The slot is checked again the moment payment starts. When time runs out, the hold expires and the slot is free again. |
 | D23 | **Paid but no booking** (the hold expired and the slot was taken while the payment went through): the candidate gets a **full refund automatically**, and a support ticket is logged so admin sees it. No offer of another slot. |
 | D24 | A paid booking is **confirmed instantly**. The interviewer can't decline it. |
-| D25 | The candidate's form: target role, experience level, resume, job description ("General preparation" allowed) and topics, all required. Name and email come from the account. |
+| D25 | The candidate's form: target role, experience level, resume, job description ("General preparation" allowed) and topics, all required. Name and email come from the account. Before the first payment of any kind, the candidate also fills in **billing details** (address with city, state and PIN code; optional GSTIN or PAN), saved to their profile (`docs/gst/spec.md` G7, G9). |
 | D26 | **Resume access:** the interviewer sees the resume from booking until the evaluation is submitted, with a hard stop 2 days after the interview. The candidate agrees to this when booking. |
 | D27 | Interviewers and candidates **never see each other's email or phone**. Contact happens in the meeting. |
 
@@ -79,7 +79,7 @@ It sits inside the existing app and account. It doesn't change how the job track
 | # | Decision |
 |---|---|
 | D33 | **Model B: Jobtiva sells the interview.** The candidate buys from Jobtiva; Jobtiva pays the interviewer as a freelancer. Subject to the CA's confirmation. |
-| D34 | Jobtiva isn't GST-registered today. **Every price shown is the final price, GST included.** Each booking records whether GST applied at the time it was made. Once registered, the interviewer's share is worked out on the price minus GST. |
+| D34 | Jobtiva isn't GST-registered today. **Every price shown is the final price, GST included.** Each booking records whether GST applied at the time it was made. Once registered, the interviewer's share is worked out on the price minus GST. All GST behavior (the system-wide switch, the split by state, invoices, credit notes, the admin GST panel) is defined in **`docs/gst/spec.md`**, built before Release 2. |
 | D35 | **Jobtiva's share** depends on whether this is the candidate's first booking **with that interviewer** (first-time %) or a repeat (returning %). Both are admin settings. Jobtiva pays the payment gateway's fee from its own share. |
 | D36 | **Every money rule is an admin setting, and the settings in force are saved onto each booking when it's made.** Changing a setting never changes past bookings. |
 | D37 | **Wallet stages:** Upcoming (booked) → Earned (locked) → Withdrawable → Paid out. Earned becomes Withdrawable automatically **only** when the interviewer submits the evaluation, after a dispute window (48 hours by default). The only other way is an admin release with a written note. |
@@ -288,7 +288,7 @@ tables are added to Data retention.
 
 | When | Action |
 |---|---|
-| Before Release 2 | **CA:** confirm Model B; when GST registration becomes mandatory (turnover counts the full booking price under Model B); TDS on interviewer payouts; what a candidate's invoice must show |
+| Before Release 2 | **CA:** confirm Model B; when GST registration becomes mandatory (turnover counts the full booking price under Model B); TDS on interviewer payouts; what a candidate's invoice must show; the GST questions in `docs/gst/spec.md` section 7 |
 | Before Release 2 | **Lawyer:** Interviewer Agreement; booking cancellation and refund policy, including the 50% candidate charge; Privacy Policy additions |
 | Start early (approval takes time) | **Apply for RazorpayX** (current account, business KYC) |
 | At Release 2's first phase | **Google Workspace Base 14-day trial** on jobtiva.in for the Meet test (D28); buy only if it passes |
@@ -310,6 +310,11 @@ rollout**, user side before admin, checked at 375 and 768 px, with an owner chec
 | 3. Wiring | Module AI key; the interviewer loop with pacing and wrap-up; evaluation; allowance and purchase; resume within 15 minutes; usage and cost; "Prepare for this interview" on leads |
 | 4. Safety | Check script (access, allowance can't be bypassed, evaluation schema, purchase idempotency); knowledge-base articles |
 | 5. Content and rollout | Landing page and homepage links; Privacy line for AI interviews; emails registered; you deploy preprod → prod |
+
+### Between the releases: GST and invoices
+
+The system-wide GST work in `docs/gst/spec.md` (switch, admin GST panel, billing details, tax split by state,
+invoices and credit notes, reports) is built after Release 1 and before Release 2.
 
 ### Release 2: human mock interviews
 
