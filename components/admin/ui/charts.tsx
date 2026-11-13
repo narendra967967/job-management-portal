@@ -10,7 +10,9 @@
 // the app's own light/dark mode. Series hues come from the validated dataviz
 // reference palette, swapped under `.dark` to their dark-surface steps.
 
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 // Validated categorical palette (dataviz reference instance). Light order passes
@@ -52,6 +54,28 @@ function niceMax(max: number) {
   return step * pow;
 }
 
+/**
+ * Draw charts at their real width, so text stays 10px on a phone instead of
+ * being scaled down with the whole picture. Falls back to 680 before mount.
+ */
+function useChartWidth(): [React.RefObject<HTMLDivElement | null>, number] {
+  const ref = useRef<HTMLDivElement>(null);
+  const [w, setW] = useState(680);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([e]) => setW(Math.max(260, Math.round(e.contentRect.width))));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return [ref, w];
+}
+
+/** Show every nth x label, counted from the newest, so labels never overlap. */
+function labelStep(slot: number, slanted: boolean) {
+  return Math.max(1, Math.ceil((slanted ? 14 : 30) / Math.max(slot, 1)));
+}
+
 function fmt(n: number) {
   return n >= 1000 ? `${(n / 1000).toFixed(n % 1000 === 0 ? 0 : 1)}k` : `${n}`;
 }
@@ -64,15 +88,17 @@ export function AreaChart({
   data,
   unit = "",
   className,
+  onSelect,
 }: {
   data: Point[];
   unit?: string;
   className?: string;
+  /** Click a point (e.g. open the matching rows). */
+  onSelect?: (index: number) => void;
 }) {
   const gid = useId().replace(/:/g, "");
   const [active, setActive] = useState<number | null>(null);
-
-  const W = 680;
+  const [box, W] = useChartWidth();
   const H = 260;
   const padL = 40;
   const padR = 16;
@@ -90,11 +116,12 @@ export function AreaChart({
   const y = (v: number) => padT + plotH - (plotH * v) / top;
 
   const line = data.map((d, i) => `${x(i)},${y(d.value)}`).join(" ");
+  const step = labelStep(plotW / Math.max(data.length - 1, 1), dense);
   const area = `${padL},${padT + plotH} ${line} ${x(data.length - 1)},${padT + plotH}`;
   const ticks = [0, 0.25, 0.5, 0.75, 1].map((t) => top * t);
 
   return (
-    <div className={cn("admin-viz w-full", className)}>
+    <div ref={box} className={cn("admin-viz w-full", className)}>
       <svg
         viewBox={`0 0 ${W} ${H}`}
         className="h-auto w-full"
@@ -144,6 +171,7 @@ export function AreaChart({
         {/* x labels (rotated 45° when dense) */}
         {data.map((d, i) => {
           const ly = dense ? H - padB + 6 : H - 8;
+          if ((data.length - 1 - i) % step !== 0) return null;
           return (
             <text
               key={i}
@@ -211,6 +239,8 @@ export function AreaChart({
             height={plotH}
             fill="transparent"
             onMouseEnter={() => setActive(i)}
+            onClick={onSelect ? () => onSelect(i) : undefined}
+            style={onSelect ? { cursor: "pointer" } : undefined}
           />
         ))}
       </svg>
@@ -226,14 +256,25 @@ export function BarChart({
   data,
   unit = "",
   className,
+  label,
+  overlay,
+  onSelect,
+  formatValue,
 }: {
   data: Point[];
   unit?: string;
   className?: string;
+  /** Name of the bar series; shown in the legend when there's an overlay. */
+  label?: string;
+  /** A second series drawn as a line over the bars (same labels, same scale). */
+  overlay?: { data: Point[]; label: string };
+  /** Click a bar (e.g. open the matching rows). */
+  onSelect?: (index: number) => void;
+  /** Tooltip value format, e.g. money. Defaults to "1.2k unit". */
+  formatValue?: (n: number) => string;
 }) {
   const [active, setActive] = useState<number | null>(null);
-
-  const W = 680;
+  const [box, W] = useChartWidth();
   const H = 260;
   const padL = 40;
   const padR = 16;
@@ -245,14 +286,16 @@ export function BarChart({
   const plotW = W - padL - padR;
   const plotH = H - padT - padB;
 
-  const top = niceMax(Math.max(...data.map((d) => d.value), 0));
+  const top = niceMax(Math.max(...data.map((d) => d.value), ...(overlay?.data.map((d) => d.value) ?? []), 0));
   const slot = plotW / data.length;
+  const cxAt = (i: number) => padL + slot * i + slot / 2;
+  const step = labelStep(slot, dense);
   const barW = Math.min(slot * 0.6, 48);
   const y = (v: number) => padT + plotH - (plotH * v) / top;
   const ticks = [0, 0.25, 0.5, 0.75, 1].map((t) => top * t);
 
   return (
-    <div className={cn("admin-viz w-full", className)}>
+    <div ref={box} className={cn("admin-viz w-full", className)}>
       <svg
         viewBox={`0 0 ${W} ${H}`}
         className="h-auto w-full"
@@ -288,7 +331,8 @@ export function BarChart({
             <g
               key={i}
               onMouseEnter={() => setActive(i)}
-              style={{ cursor: "default" }}
+              onClick={onSelect ? () => onSelect(i) : undefined}
+              style={{ cursor: onSelect ? "pointer" : "default" }}
             >
               <rect
                 x={cx - slot / 2}
@@ -307,6 +351,7 @@ export function BarChart({
                 opacity={active === null || active === i ? 1 : 0.5}
               />
               <text
+                display={(data.length - 1 - i) % step !== 0 ? "none" : undefined}
                 x={cx}
                 y={dense ? H - padB + 6 : H - 8}
                 textAnchor={dense ? "end" : "middle"}
@@ -320,16 +365,50 @@ export function BarChart({
           );
         })}
 
+        {overlay && (
+          <g pointerEvents="none">
+            <polyline
+              points={overlay.data.map((d, i) => `${cxAt(i)},${y(d.value)}`).join(" ")}
+              fill="none"
+              stroke="var(--series-2)"
+              strokeWidth={2}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
+            {overlay.data.map((d, i) => (
+              <circle key={i} cx={cxAt(i)} cy={y(d.value)} r={active === i ? 4.5 : 3} fill="var(--series-2)" stroke="var(--card)" strokeWidth={2} />
+            ))}
+          </g>
+        )}
+
         {active !== null && (
           <Tooltip
-            x={padL + slot * active + slot / 2}
+            x={cxAt(active)}
             y={y(data[active].value)}
             plotW={W}
             title={data[active].label}
-            value={`${fmt(data[active].value)}${unit ? ` ${unit}` : ""}`}
+            value={
+              formatValue
+                ? formatValue(data[active].value)
+                : overlay
+                ? `${fmt(data[active].value)} ${label ?? unit} · ${fmt(overlay.data[active]?.value ?? 0)} ${overlay.label}`
+                : `${fmt(data[active].value)}${unit ? ` ${unit}` : ""}`
+            }
           />
         )}
       </svg>
+      {overlay && (
+        <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+          <li className="flex items-center gap-1.5">
+            <span className="size-2.5 rounded-[3px]" style={{ background: "var(--series-1)" }} aria-hidden />
+            {label ?? unit}
+          </li>
+          <li className="flex items-center gap-1.5">
+            <span className="h-0.5 w-3 rounded-full" style={{ background: "var(--series-2)" }} aria-hidden />
+            {overlay.label}
+          </li>
+        </ul>
+      )}
     </div>
   );
 }
@@ -342,12 +421,16 @@ export function DonutChart({
   data,
   centerLabel,
   className,
+  hrefs,
 }: {
   data: Point[];
   centerLabel?: string;
   className?: string;
+  /** Where each slice leads; the legend rows become links. */
+  hrefs?: (string | undefined)[];
 }) {
   const [active, setActive] = useState<number | null>(null);
+  const router = useRouter();
   const total = data.reduce((s, d) => s + d.value, 0);
 
   const size = 180;
@@ -400,7 +483,8 @@ export function DonutChart({
             strokeDashoffset={s.dashOffset}
             strokeLinecap="butt"
             onMouseEnter={() => setActive(s.i)}
-            style={{ transition: "stroke-width 120ms" }}
+            onClick={hrefs?.[s.i] ? () => router.push(hrefs[s.i]!) : undefined}
+            style={{ transition: "stroke-width 120ms", cursor: hrefs?.[s.i] ? "pointer" : undefined }}
           />
         ))}
         {/* Center total (counter-rotate to upright) */}
@@ -430,13 +514,10 @@ export function DonutChart({
       <ul className="w-full space-y-1.5">
         {data.map((d, i) => {
           const pct = total > 0 ? Math.round((d.value / total) * 100) : 0;
-          return (
-            <li
-              key={d.label}
-              className="flex items-center gap-2 text-sm"
-              onMouseEnter={() => setActive(i)}
-              onMouseLeave={() => setActive(null)}
-            >
+          const href = hrefs?.[i];
+          const row = "flex items-center gap-2 text-sm";
+          const inner = (
+            <>
               <span
                 className="size-2.5 shrink-0 rounded-[3px]"
                 style={{ background: SERIES_VARS[i % SERIES_VARS.length] }}
@@ -449,6 +530,17 @@ export function DonutChart({
               <span className="w-8 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
                 {pct}%
               </span>
+            </>
+          );
+          return (
+            <li key={d.label} onMouseEnter={() => setActive(i)} onMouseLeave={() => setActive(null)}>
+              {href ? (
+                <Link href={href} className={cn(row, "-mx-2 min-h-11 rounded-lg px-2 hover:bg-muted/60")}>
+                  {inner}
+                </Link>
+              ) : (
+                <div className={row}>{inner}</div>
+              )}
             </li>
           );
         })}
