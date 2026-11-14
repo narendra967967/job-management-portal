@@ -24,6 +24,7 @@ import {
   type DashboardData,
   type DayRange,
   type FunnelFacts,
+  type JobRun,
   type TimeSeries,
 } from "@/lib/admin/dashboard-model";
 import { getEmailDelivery, getEmailProvider, getSesCredentials, providersReady } from "@/lib/email-delivery";
@@ -398,6 +399,27 @@ export async function loadDashboard(range: DayRange, tz: string, today: string):
   const sesConfigured = !!(delivery.ses.region && delivery.ses.accessKeyId && delivery.ses.hasSecret);
   const account = provider === "ses" && sesConfigured ? await sesAccount(delivery.ses.account) : null;
 
+  /* ---- scheduled jobs (System block and Needs attention) ---- */
+  const jobs: JobRun[] = JOBS.map((j) => {
+    const r = jobRows.find((x) => x.job === j.key);
+    const lastRunAt = r ? isoOrNull(r.last_finished_at) : null;
+    return {
+      key: j.key,
+      label: j.label,
+      every: j.every,
+      lastRunAt,
+      ok: r ? r.last_ok === true : null,
+      error: r?.last_error ? String(r.last_error) : undefined,
+      failuresInARow: num(r?.failures_in_a_row),
+      late: isLate(lastRunAt, j.lateAfterMin, now),
+    };
+  });
+  // A failed job is reported as failed, not also as late. Jobs that have never
+  // run (a fresh environment) aren't flagged.
+  const failedJobs = jobs.filter((j) => j.ok === false);
+  const lateJobs = jobs.filter((j) => j.ok === true && j.late);
+  const names = (list: JobRun[]) => list.map((j) => j.label).join(", ");
+
   /* ---- needs attention ---- */
   const a = attention;
   const last7 = { from: addDays(today, -6), to: today };
@@ -409,6 +431,16 @@ export async function loadDashboard(range: DayRange, tz: string, today: string):
     count: 1,
     text: "Email isn't set up, so the app can't send any",
     href: links.settings("email"),
+  });
+  add(failedJobs.length > 0, {
+    key: "jobs-failed",
+    severity: "critical",
+    count: failedJobs.length,
+    text:
+      failedJobs.length === 1
+        ? `${failedJobs[0].label} failed on its last run`
+        : `${failedJobs.length} scheduled jobs failed on their last run: ${names(failedJobs)}`,
+    href: links.systemBlock(),
   });
   add(num(a.tickets_waiting) > 0, {
     key: "tickets-waiting",
@@ -430,6 +462,16 @@ export async function loadDashboard(range: DayRange, tz: string, today: string):
     count: 1,
     text: "Forwarding is turned off, so no job alerts come in",
     href: links.settings("intake"),
+  });
+  add(lateJobs.length > 0, {
+    key: "jobs-late",
+    severity: "warning",
+    count: lateJobs.length,
+    text:
+      lateJobs.length === 1
+        ? `${lateJobs[0].label} hasn't run on schedule`
+        : `${lateJobs.length} scheduled jobs haven't run on schedule: ${names(lateJobs)}`,
+    href: links.systemBlock(),
   });
   add(num(a.expired_plans) > 0, {
     key: "expired-plans",
@@ -577,20 +619,7 @@ export async function loadDashboard(range: DayRange, tz: string, today: string):
       resumeBytes: num(storage.resume_bytes),
       resumeFiles: num(storage.resume_files),
       assetBytes: num(storage.asset_bytes),
-      jobs: JOBS.map((j) => {
-        const r = jobRows.find((x) => x.job === j.key);
-        const lastRunAt = r ? isoOrNull(r.last_finished_at) : null;
-        return {
-          key: j.key,
-          label: j.label,
-          every: j.every,
-          lastRunAt,
-          ok: r ? r.last_ok === true : null,
-          error: r?.last_error ? String(r.last_error) : undefined,
-          failuresInARow: num(r?.failures_in_a_row),
-          late: isLate(lastRunAt, j.lateAfterMin, now),
-        };
-      }),
+      jobs,
     },
   };
 }

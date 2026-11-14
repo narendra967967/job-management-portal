@@ -8,7 +8,7 @@ growing**. Every number on it opens the page that holds those rows, already filt
 
 | Block | Decision | Links to |
 |---|---|---|
-| Needs attention | New. Top of the page, always shown, can't be hidden. Lines appear only when something needs the admin; a quiet day shows "All clear". | The page that fixes each item, filtered |
+| Needs attention | New. Top of the page, always shown, can't be hidden. Lines appear only when something needs the admin; a quiet day shows "All clear". Added November 15, 2026 by owner decision: scheduled jobs that failed on their last run (urgent) or are late (warning). | The page that fixes each item, filtered; job lines open the System block |
 | Total users (tile) | Keep | Users, joined in period |
 | Signed in (tile) | Replaces "Active users": people who signed in during the period. Deactivated accounts move to Needs attention. | Users, signed in during period |
 | Paid users (tile) | New: users on a paid plan now, and the share of the period's sign-ups who paid | Users, paid plans |

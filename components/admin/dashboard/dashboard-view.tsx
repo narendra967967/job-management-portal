@@ -209,7 +209,7 @@ export function DashboardView({
       ) : (
         <div className="grid grid-flow-row-dense grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-12">
           {visible.map((id) => (
-            <section key={id} aria-label={blockLabel(id)} className={cn("min-w-0", spanOf(id))}>
+            <section key={id} id={`block-${id}`} aria-label={blockLabel(id)} className={cn("min-w-0 scroll-mt-4", spanOf(id))}>
               {render(id)}
             </section>
           ))}

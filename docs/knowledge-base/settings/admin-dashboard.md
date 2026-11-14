@@ -34,7 +34,9 @@ It covers people who signed up in the period: Signed up, Verified email, Set up 
 
 ## Needs attention
 
-This strip shows only what needs you, most urgent first, and says "All clear" otherwise. It covers email not set up, tickets waiting more than 24 hours, failed payments in the last 7 days, forwarding switched off, paid plans that ended in the last 7 days without renewal, account deletion requests, job alerts stuck in the AI queue for over an hour, failing Gmail syncs, Amazon SES still in the sandbox, failed emails in the last broadcast, unanswered knowledge base questions, and accounts deactivated in the last 7 days. It can't be moved or hidden.
+This strip shows only what needs you, most urgent first, and says "All clear" otherwise. It covers email not set up, scheduled jobs that failed on their last run (urgent) or haven't run on schedule, tickets waiting more than 24 hours, failed payments in the last 7 days, forwarding switched off, paid plans that ended in the last 7 days without renewal, account deletion requests, job alerts stuck in the AI queue for over an hour, failing Gmail syncs, Amazon SES still in the sandbox, failed emails in the last broadcast, unanswered knowledge base questions, and accounts deactivated in the last 7 days. It can't be moved or hidden.
+
+A job line opens the System block further down, where each job's error is shown. If you've hidden System with Edit dashboard, the line still appears but has nowhere to go, so show the block again from the tray. A job that has never run, as on a fresh setup, isn't flagged.
 
 ## Other blocks
 

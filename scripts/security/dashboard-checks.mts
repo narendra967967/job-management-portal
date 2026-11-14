@@ -87,9 +87,10 @@ const sample = [
   model.links.kbUnanswered(),
   model.links.settings("email"),
   model.links.sentEmails({ status: "failed" }),
+  model.links.systemBlock(),
 ];
 for (const href of sample) {
-  const path = href.split("?")[0].replace("/jmp-admin/", "");
+  const path = href.split(/[?#]/)[0].replace("/jmp-admin/", "");
   check("S6", `link target ${path} exists`, existsSync(`${PANEL}/${path}/page.tsx`));
 }
 {
@@ -258,6 +259,44 @@ if (first) {
   check("D3", "System lists every scheduled job, in order", first.system.jobs.map((j) => j.key).join() === jobKeys.join());
   check("D3", "the funnel has every step", first.funnel.length === model.FUNNEL_STEPS.length);
   check("D3", "Needs attention links all open admin pages", first.attention.every((a) => !a.href || a.href.startsWith("/jmp-admin/")));
+  check("D3", "the System block can be linked to", read("components/admin/dashboard/dashboard-view.tsx").includes("id={`block-${id}`}") && model.links.systemBlock().endsWith("#block-system"));
+}
+
+// Failed and late scheduled jobs reach Needs attention.
+{
+  const before = (await pool.query("select * from job_runs")).rows;
+  const range = model.periodRange(model.parsePeriod({}), today);
+  const keys = async () => (await loadDashboard(range, tz, today)).attention;
+  try {
+    await pool.query("delete from job_runs");
+    // Jobs that have never run (a fresh environment) aren't flagged.
+    let att = await keys();
+    check("D4", "jobs that never ran aren't flagged", !att.some((a) => a.key.startsWith("jobs-")));
+    await pool.query(`insert into job_runs values
+      ('ai', now(), now(), true, null, 5, now(), 0),
+      ('broadcasts', now(), now(), false, 'boom', 5, null, 2),
+      ('reminders', now() - interval '3 days', now() - interval '3 days', true, null, 5, now() - interval '3 days', 0),
+      ('purge', now() - interval '3 days', now() - interval '3 days', false, 'boom', 5, null, 1)`);
+    att = await keys();
+    const failed = att.find((a) => a.key === "jobs-failed");
+    const late = att.find((a) => a.key === "jobs-late");
+    check("D4", "failed jobs are urgent and named", failed?.severity === "critical" && failed.count === 2 && failed.text.includes("Broadcast sender") && failed.text.includes("Daily cleanup"), failed?.text);
+    check("D4", "a job that failed isn't also reported late", late?.count === 1 && late.text.includes("Renewal reminders") && !late.text.includes("Daily cleanup"), late?.text);
+    check("D4", "both open the System block", failed?.href === model.links.systemBlock() && late?.href === model.links.systemBlock());
+    check("D4", "a healthy job isn't flagged", !att.some((a) => a.text.includes("AI alert reader")));
+    await pool.query("delete from job_runs where job <> 'broadcasts'");
+    att = await keys();
+    check("D4", "one failed job reads as a sentence", att.find((a) => a.key === "jobs-failed")?.text === "Broadcast sender failed on its last run");
+  } finally {
+    await pool.query("delete from job_runs");
+    for (const s of before) {
+      await pool.query(
+        "insert into job_runs (job, last_started_at, last_finished_at, last_ok, last_error, last_duration_ms, last_ok_at, failures_in_a_row) values ($1,$2,$3,$4,$5,$6,$7,$8)",
+        [s.job, s.last_started_at, s.last_finished_at, s.last_ok, s.last_error, s.last_duration_ms, s.last_ok_at, s.failures_in_a_row],
+      );
+    }
+    check("D4", "job runs put back as they were", (await pool.query("select count(*)::int n from job_runs")).rows[0].n === before.length, `${before.length} rows`);
+  }
 }
 
 /* ---------------- H: signed out (APP_URL only) ---------------- */

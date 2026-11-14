@@ -33,7 +33,9 @@ Look at the System block on the admin dashboard first. It lists the app's jobs w
 | Late | No run for 30 minutes (5-minute jobs), an hour (Gmail sync) or 26 hours (daily jobs) |
 | Not run | No run recorded in this environment yet |
 
-Failed only covers a run that stopped. A job that works through a problem itself, like one user's Gmail sync failing or one broadcast email bouncing, still shows OK; those show up in Gmail health, Sent emails and the broadcast. Late usually means the crontab isn't installed, or the app was down when the job was due.
+Failed only covers a run that stopped. A job that works through a problem itself, like one user's Gmail sync failing or one broadcast email bouncing, still shows OK; those show up in Gmail health, Sent emails and the broadcast. Late means a job that used to run has stopped: usually the crontab was changed or removed, or the app was down when the job was due. A crontab that was never installed shows every job as Not run instead.
+
+Failed and Late jobs also appear at the top of the dashboard under **Needs attention**, failed ones as urgent. Not run jobs don't, so on a new server check the System block yourself after the first hour.
 
 A run started with `cron-run.sh` by hand counts like any other. **Send now** on a broadcast doesn't, because it isn't the scheduled job.
 
