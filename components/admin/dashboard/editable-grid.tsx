@@ -122,16 +122,13 @@ function SortableBlock({
       aria-label={name}
       style={{ transform: CSS.Translate.toString(transform), transition }}
       className={cn(
-        "relative min-w-0 rounded-xl outline-2 outline-offset-2 outline-dashed outline-primary/40",
+        "relative flex min-w-0 flex-col rounded-xl outline-2 outline-offset-2 outline-dashed outline-primary/40",
         isDragging && "z-20 opacity-80 shadow-lg outline-primary",
         className,
       )}
     >
-      {/* The block itself can't be clicked while editing. */}
-      <div inert className="h-full select-none">
-        {children}
-      </div>
-      <div className="absolute top-1.5 right-1.5 z-10 flex items-center gap-0.5 rounded-lg border bg-card/95 p-0.5 shadow-sm backdrop-blur">
+      {/* Controls sit above the block, so they never cover its title or numbers. */}
+      <div className="mb-1.5 ml-auto flex w-fit items-center gap-0.5 rounded-lg border bg-card/95 p-0.5 shadow-sm backdrop-blur">
         <button
           ref={setActivatorNodeRef}
           type="button"
@@ -151,6 +148,10 @@ function SortableBlock({
         <button type="button" className={iconBtn} onClick={onHide} aria-label={`Hide ${name}`}>
           <EyeOff className="size-4" aria-hidden />
         </button>
+      </div>
+      {/* The block itself can't be clicked while editing. */}
+      <div inert className="min-h-0 flex-1 select-none">
+        {children}
       </div>
     </section>
   );

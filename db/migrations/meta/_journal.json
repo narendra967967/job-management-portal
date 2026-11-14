@@ -435,6 +435,13 @@
       "when": 1794675811632,
       "tag": "0061_job_runs",
       "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1794681929699,
+      "tag": "0062_admin_dashboard_layouts",
+      "breakpoints": true
     }
   ]
 }

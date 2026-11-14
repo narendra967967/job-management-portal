@@ -280,11 +280,7 @@ export interface DashboardLayout {
   hidden: BlockId[];
 }
 
-/**
- * Where the layout is kept until phase 6 moves it to the database (per admin).
- * Holds "o=id,id,…&h=id,id".
- */
-export const LAYOUT_COOKIE = "jobtiva_admin_layout";
+// Saved per admin in admin_dashboard_layouts (lib/admin/dashboard-layout.ts).
 
 export function defaultLayout(): DashboardLayout {
   return { order: BLOCKS.map((b) => b.id), hidden: [] };
@@ -308,17 +304,6 @@ export function normalizeLayout(l: { order: string[]; hidden: string[] }): Dashb
     order.splice(before ? order.indexOf(before) + 1 : 0, 0, id);
   });
   return { order, hidden: [...new Set(l.hidden.filter(isBlockId))] };
-}
-
-export function parseLayout(value: string | undefined | null): DashboardLayout {
-  if (!value) return defaultLayout();
-  const sp = new URLSearchParams(value);
-  const list = (k: string) => (sp.get(k) ?? "").split(",").filter(Boolean);
-  return normalizeLayout({ order: list("o"), hidden: list("h") });
-}
-
-export function serializeLayout(l: DashboardLayout): string {
-  return new URLSearchParams({ o: l.order.join(","), h: l.hidden.join(",") }).toString();
 }
 
 export function isDefaultLayout(l: DashboardLayout): boolean {

@@ -3,16 +3,15 @@ import { cookies } from "next/headers";
 import { requireAdmin } from "@/lib/current-user";
 import {
   DEFAULT_TZ,
-  LAYOUT_COOKIE,
   PERIOD_COOKIE,
   TZ_COOKIE,
   isTimeZone,
-  parseLayout,
   parsePeriod,
   periodRange,
   todayIn,
 } from "@/lib/admin/dashboard-model";
 import { loadDashboard } from "@/lib/admin/dashboard-data";
+import { getDashboardLayout } from "@/lib/admin/dashboard-layout";
 import { DashboardView } from "@/components/admin/dashboard/dashboard-view";
 
 // Admin dashboard (docs/admin-dashboard/spec.md). Figures are counted in the
@@ -24,7 +23,7 @@ export default async function AdminDashboardPage({
 }: {
   searchParams: Promise<{ period?: string; from?: string; to?: string }>;
 }) {
-  await requireAdmin();
+  const adminId = await requireAdmin();
   const sp = await searchParams;
   const jar = await cookies();
   // No ?period: open on the period this browser used last (parsePeriod validates it).
@@ -34,10 +33,8 @@ export default async function AdminDashboardPage({
   const tz = isTimeZone(tzCookie) ? tzCookie : DEFAULT_TZ;
   const today = todayIn(tz);
   const range = periodRange(sel, today);
-  // The admin's block order and hidden blocks. PHASE 6 UI: a cookie for now;
-  // the database step moves it to a per-admin row.
-  const layout = parseLayout(jar.get(LAYOUT_COOKIE)?.value);
-  const data = await loadDashboard(range, tz, today);
+  // This admin's own block order and hidden blocks (the default until they edit it).
+  const [layout, data] = await Promise.all([getDashboardLayout(adminId), loadDashboard(range, tz, today)]);
 
   return (
     // Suspense: the period switch reads useSearchParams.

@@ -1214,6 +1214,24 @@ export const jobRuns = pgTable("job_runs", {
   failuresInARow: integer("failures_in_a_row").notNull().default(0),
 });
 
+/**
+ * Each admin's own dashboard layout: block order and hidden blocks (Edit
+ * dashboard). No row means the default layout, so Reset to default deletes it
+ * and the admin keeps getting new blocks in their default place. Block ids are
+ * BLOCKS in lib/admin/dashboard-model.ts; unknown ones are dropped on read.
+ */
+export const adminDashboardLayouts = pgTable("admin_dashboard_layouts", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  blockOrder: jsonb("block_order").$type<string[]>().notNull(),
+  hidden: jsonb("hidden").$type<string[]>().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date()),
+});
+
 /** Emails waiting for the AI reader (no built-in reader, or it found no jobs,
  *  and the user has an AI key). Holds only what the AI needs — the email
  *  reduced to text with numbered link markers, and those links — and is

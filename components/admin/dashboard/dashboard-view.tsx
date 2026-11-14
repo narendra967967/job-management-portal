@@ -4,18 +4,18 @@
 // admin's own order (BLOCKS in lib/admin/dashboard-model is the default). Edit
 // dashboard lets them reorder and hide blocks.
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Check, LayoutGrid, RotateCcw } from "lucide-react";
 import { Button } from "@/components/admin/ui/button";
 import { VizStyle } from "@/components/admin/ui/charts";
+import { toast } from "@/components/admin/ui/toast";
 import { InfoTip } from "@/components/ui/info-tip";
+import { saveDashboardLayoutAction } from "@/actions/admin-dashboard";
 import {
   BLOCKS,
-  LAYOUT_COOKIE,
   blockLabel,
   defaultLayout,
   isDefaultLayout,
-  serializeLayout,
   type BlockId,
   type BlockSize,
   type DashboardData,
@@ -90,11 +90,34 @@ function shown(id: BlockId, data: DashboardData): boolean {
   return true;
 }
 
-// PHASE 6 (UI first): the layout is kept in a cookie for now, so the server can
-// draw the saved order with no jump on load. The database step moves it to a
-// per-admin row that follows the admin across devices.
-function saveLayout(l: DashboardLayout) {
-  document.cookie = `${LAYOUT_COOKIE}=${encodeURIComponent(serializeLayout(l))}; path=/jmp-admin; max-age=31536000; samesite=lax`;
+// The layout is saved to the admin's account (one row per admin), so it follows
+// them to any device. Moves come in bursts (arrow clicks), so saving waits a
+// moment for the last one; Done and leaving the page save straight away.
+const SAVE_DELAY_MS = 700;
+
+function useLayoutSaver() {
+  const pending = useRef<DashboardLayout | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flush = () => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+    const l = pending.current;
+    pending.current = null;
+    if (!l) return;
+    saveDashboardLayoutAction({ order: l.order, hidden: l.hidden })
+      .then((r) => {
+        if (!r.ok) toast.error(r.error);
+      })
+      .catch(() => toast.error("Couldn't save your layout. Try again."));
+  };
+  const save = (l: DashboardLayout) => {
+    pending.current = l;
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(flush, SAVE_DELAY_MS);
+  };
+  // Save anything still waiting when the admin leaves the dashboard.
+  useEffect(() => flush, []);
+  return { save, flush };
 }
 
 export function DashboardView({
@@ -115,9 +138,10 @@ export function DashboardView({
   const range = { from: dayRange.from, to: dayRange.to };
   const [layout, setLayout] = useState(initialLayout);
   const [editing, setEditing] = useState(false);
+  const saver = useLayoutSaver();
   const change = (next: DashboardLayout) => {
     setLayout(next);
-    saveLayout(next);
+    saver.save(next);
   };
   const visible = layout.order.filter((id) => shown(id, data) && !layout.hidden.includes(id));
   const hidden = layout.hidden.filter((id) => shown(id, data));
@@ -162,7 +186,14 @@ export function DashboardView({
               <RotateCcw className="size-4" aria-hidden />
               Reset to default
             </Button>
-            <Button size="sm" className="h-11 gap-1.5 sm:h-9" onClick={() => setEditing(false)}>
+            <Button
+              size="sm"
+              className="h-11 gap-1.5 sm:h-9"
+              onClick={() => {
+                saver.flush();
+                setEditing(false);
+              }}
+            >
               <Check className="size-4" aria-hidden />
               Done
             </Button>

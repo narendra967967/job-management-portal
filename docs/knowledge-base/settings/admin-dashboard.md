@@ -2,7 +2,7 @@
 title: What the admin dashboard numbers mean
 category: Settings and data
 summary: The dashboard counts customers only, for the period picked at the top (Last 30 days by default), in your own time zone. Revenue is live payments before GST. Every number opens the matching list, already filtered.
-keywords: dashboard, home, stats, metrics, kpi, numbers wrong, conversion, funnel, revenue, signed in, needs attention, period, edit layout, hide block, system, deployed commit, version, job failed, job late
+keywords: dashboard, home, stats, metrics, kpi, numbers wrong, conversion, funnel, revenue, signed in, needs attention, period, edit layout, hide block, system, deployed commit, version, job failed, job late, layout other device, layout reset, layout not saved
 ---
 
 Every number on the dashboard leaves admin accounts out, so it matches what customers did. Click any number and the list behind it opens with the same filter, including **Customers only** on the Users page.
@@ -44,4 +44,6 @@ This strip shows only what needs you, most urgent first, and says "All clear" ot
 
 ## Changing the layout
 
-**Edit dashboard** lets you drag blocks (on a laptop), move them with the arrows, hide them, and bring hidden ones back from the tray at the bottom. **Reset to default** undoes everything. For now the layout is saved in this browser only.
+**Edit dashboard** lets you drag blocks (on a laptop), move them with the arrows, hide them, and bring hidden ones back from the tray at the bottom. **Reset to default** undoes everything. Changes save as you make them.
+
+The layout belongs to your admin account, not the browser, so it follows you to your phone and any other device. Each admin has their own; changing yours never moves anything for another admin. Blocks added to the dashboard later appear in their usual place, even in a layout you've changed. If a change can't be saved, a message says so, and your next change saves the whole layout again.
