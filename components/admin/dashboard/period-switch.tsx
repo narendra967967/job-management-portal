@@ -11,7 +11,7 @@ import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/admin/ui/button";
 import { Input } from "@/components/admin/ui/input";
 import { timeAgo } from "@/lib/email-intake-model";
-import { PERIOD_COOKIE, PERIODS, ymd, type PeriodId, type PeriodSel } from "@/lib/admin/dashboard-model";
+import { PERIOD_COOKIE, PERIODS, TZ_COOKIE, ymd, type PeriodId, type PeriodSel } from "@/lib/admin/dashboard-model";
 import { useMounted } from "@/lib/use-mounted";
 import { cn } from "@/lib/utils";
 
@@ -20,7 +20,18 @@ function remember(sel: PeriodSel) {
   document.cookie = `${PERIOD_COOKIE}=${encodeURIComponent(v.toString())}; path=/jmp-admin; max-age=31536000; samesite=lax`;
 }
 
-export function PeriodSwitch({ sel, generatedAt, extra }: { sel: PeriodSel; generatedAt: string; extra?: React.ReactNode }) {
+export function PeriodSwitch({
+  sel,
+  generatedAt,
+  timeZone,
+  extra,
+}: {
+  sel: PeriodSel;
+  generatedAt: string;
+  /** The zone the server counted days in. */
+  timeZone: string;
+  extra?: React.ReactNode;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -53,6 +64,16 @@ export function PeriodSwitch({ sel, generatedAt, extra }: { sel: PeriodSel; gene
       setTo(sel.to ?? "");
     }
   }, [sel.id, sel.from, sel.to]);
+
+  // Tell the server this browser's time zone, so "today" and "last 7 days" match
+  // the admin's own calendar. If it counted in another zone, count again once.
+  useEffect(() => {
+    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (!zone) return;
+    document.cookie = `${TZ_COOKIE}=${encodeURIComponent(zone)}; path=/jmp-admin; max-age=31536000; samesite=lax`;
+    if (zone !== timeZone) start(() => router.refresh());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timeZone]);
 
   // Keep "Updated 3 min ago" honest while the page stays open.
   useEffect(() => {

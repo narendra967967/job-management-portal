@@ -28,7 +28,7 @@ import {
 import { timeAgo } from "@/lib/email-intake-model";
 import { ticketRef } from "@/lib/tickets-model";
 import { useMounted } from "@/lib/use-mounted";
-import { BlockCard, Empty, Meter, StatRow } from "./parts";
+import { BlockCard, Empty, Meter, Note, StatRow } from "./parts";
 import type { BlockProps } from "./blocks-growth";
 
 const ROW = "-mx-2 flex min-h-11 items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-muted/60";
@@ -121,7 +121,7 @@ export function RenewalsBlock({ data }: BlockProps) {
         label="Expired in last 30 days"
         value={formatCount(r.expired30)}
         tone={r.expired30 > 0 ? "bad" : "good"}
-        href={links.renewals({ due: "ended" })}
+        href={links.renewals({ due: "ended30" })}
       />
       <p className="mt-3 mb-1 border-t pt-3 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">Next due</p>
       {r.next.length > 0 ? (
@@ -209,18 +209,24 @@ export function EmailDeliveryBlock({ data, range }: BlockProps) {
           <Meter value={q.used} max={q.max} label="Amazon SES quota used today" tone={quotaPct > 0.9 ? "bad" : quotaPct > 0.7 ? "warn" : "default"} />
         </div>
       )}
-      <StatRow label="Sent" value={formatCount(e.sent)} href={links.sentEmails({ status: "sent", from: range.from, to: range.to })} />
-      <StatRow
-        label="Failed"
-        value={formatCount(e.failed)}
-        tone={e.failed > 0 ? "bad" : "good"}
-        href={links.sentEmails({ status: "failed", from: range.from, to: range.to })}
-      />
-      {e.byChannel.length > 1 && (
+      {e.log ? (
+        <>
+          <StatRow label="Sent" value={formatCount(e.log.sent)} href={links.sentEmails({ status: "sent", from: range.from, to: range.to })} />
+          <StatRow
+            label="Failed"
+            value={formatCount(e.log.failed)}
+            tone={e.log.failed > 0 ? "bad" : "good"}
+            href={links.sentEmails({ status: "failed", from: range.from, to: range.to })}
+          />
+        </>
+      ) : (
+        <Note>Sent and failed counts start once the sent-email log is on.</Note>
+      )}
+      {e.log && e.log.byChannel.length > 1 && (
         <div className="mt-2 border-t pt-2">
           <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">By channel</p>
           <ul className="mt-1 space-y-1 text-xs">
-            {e.byChannel.map((c) => (
+            {e.log.byChannel.map((c) => (
               <li key={c.channel} className="flex justify-between gap-2">
                 <span className="text-muted-foreground">{c.channel}</span>
                 <span className="tabular-nums">
@@ -325,8 +331,9 @@ export function SystemBlock({ data }: BlockProps) {
         </div>
         <div className="mt-2 border-t pt-2 lg:mt-0 lg:border-t-0 lg:pt-0">
           <p className="mb-1 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">Scheduled jobs, last run</p>
+          {!s.jobs && <Note>Job runs are recorded from the next update.</Note>}
           <ul>
-            {s.jobs.map((j) => (
+            {(s.jobs ?? []).map((j) => (
               <li key={j.key} className="flex min-h-9 items-center gap-2 text-sm">
                 <span className="min-w-0 flex-1 truncate text-muted-foreground" title={j.error}>
                   {j.label}

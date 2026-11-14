@@ -1,0 +1,45 @@
+---
+title: What the admin dashboard numbers mean
+category: Settings and data
+summary: The dashboard counts customers only, for the period picked at the top (Last 30 days by default), in your own time zone. Revenue is live payments before GST. Every number opens the matching list, already filtered.
+keywords: dashboard, home, stats, metrics, kpi, numbers wrong, conversion, funnel, revenue, signed in, needs attention, period, edit layout, hide block
+---
+
+Every number on the dashboard leaves admin accounts out, so it matches what customers did. Click any number and the list behind it opens with the same filter, including **Customers only** on the Users page.
+
+## The period
+
+The switch at the top sets the period: Today, Last 7 days, Last 30 days, Last 90 days, This month, Last month or Custom. Last 30 days is the default, and the dashboard remembers your last choice in this browser. Days follow your own time zone, which the browser sends the first time you open the page. Changes like "+12% vs previous period" compare against the same number of days just before.
+
+The charts keep their own Daily, Monthly and Yearly switch, because growth needs a longer view than the counts.
+
+## How the main figures are counted
+
+| Figure | Counts |
+|---|---|
+| Total users | Every customer account; the line under it is who joined in the period |
+| Signed in | Different people who signed in during the period |
+| Paid users | People on a paid plan that hasn't ended. The percentage is how many of the period's new sign-ups have made a live payment |
+| Revenue | Live payments received in the period, before GST. Test-mode payments never count |
+| Unfinished orders | Live orders started in the period and never paid, and payments that failed |
+| Plan distribution | Customers by plan. A paid plan that has ended shows as **Expired** |
+
+## The onboarding funnel
+
+It covers people who signed up in the period: Signed up, Verified email, Set up forwarding (a forwarded job alert has arrived), Added AI key, Added a résumé, Saved 5+ leads, and Paid. Each step shows how many reached it, and "stopped" is how many reached it but not the next step. Clicking a step lists exactly those people.
+
+## Support averages
+
+**Avg first reply** counts your first answer on each ticket opened in the period, not the user's own follow-ups. **Avg time to resolve** uses when a resolved ticket was last updated, so a reply after resolving makes it look longer than it was.
+
+## Needs attention
+
+This strip shows only what needs you, most urgent first, and says "All clear" otherwise. It covers email not set up, tickets waiting more than 24 hours, failed payments in the last 7 days, forwarding switched off, paid plans that ended in the last 7 days without renewal, account deletion requests, job alerts stuck in the AI queue for over an hour, failing Gmail syncs, Amazon SES still in the sandbox, failed emails in the last broadcast, unanswered knowledge base questions, and accounts deactivated in the last 7 days. It can't be moved or hidden.
+
+## Other blocks
+
+**Renewals** counts paid plans and free trials, the same as the Renewals page. **Forwarding health** shows the period's job-alert emails, and **Accepted** is accepted ÷ (accepted + rejected). **Email delivery** reads the Amazon SES quota from AWS, at most every 5 minutes. Sent and failed email counts, scheduled job runs and the deployed commit aren't recorded yet, and those blocks say so.
+
+## Changing the layout
+
+**Edit dashboard** lets you drag blocks (on a laptop), move them with the arrows, hide them, and bring hidden ones back from the tray at the bottom. **Reset to default** undoes everything. For now the layout is saved in this browser only.

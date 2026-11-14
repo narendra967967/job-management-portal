@@ -1,6 +1,6 @@
 // Admin dashboard: shapes, periods, block registry and filtered links. Client-safe.
-// Scope: docs/admin-dashboard/spec.md. The page fills a DashboardData; in phase 1
-// that comes from lib/admin/dashboard-sample.ts.
+// Scope: docs/admin-dashboard/spec.md. The page fills a DashboardData from
+// lib/admin/dashboard-data.ts (counted in the database).
 
 import type { Point } from "@/components/admin/ui/charts";
 import type { EmailProvider } from "@/lib/email-delivery-model";
@@ -53,39 +53,73 @@ export function parsePeriod(sp: { period?: string; from?: string; to?: string })
   return { id, from, to };
 }
 
-/** First and last day (inclusive, local) of a selection. */
-export function periodRange(sel: PeriodSel, now = new Date()): { from: string; to: string; days: number } {
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const back = (n: number) => new Date(today.getTime() - n * DAY);
-  let from = today;
-  let to = today;
+/** A YYYY-MM-DD date moved by n days (calendar maths, no time zone involved). */
+export function addDays(day: string, n: number): string {
+  const d = new Date(`${day}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Today's date (YYYY-MM-DD) in an IANA time zone. */
+export function todayIn(timeZone: string, now = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
+}
+
+export interface DayRange {
+  from: string;
+  to: string;
+  days: number;
+}
+
+/**
+ * First and last day (inclusive) of a selection. `today` is the viewer's date:
+ * the browser passes its own; the server passes todayIn(the viewer's zone).
+ */
+export function periodRange(sel: PeriodSel, today = ymd(new Date())): DayRange {
+  const span = (from: string, to: string): DayRange => ({
+    from,
+    to,
+    days: Math.max(1, Math.round((Date.parse(to) - Date.parse(from)) / DAY) + 1),
+  });
+  const firstOfMonth = `${today.slice(0, 8)}01`;
   switch (sel.id) {
     case "today":
-      break;
+      return span(today, today);
     case "7d":
-      from = back(6);
-      break;
+      return span(addDays(today, -6), today);
     case "30d":
-      from = back(29);
-      break;
+      return span(addDays(today, -29), today);
     case "90d":
-      from = back(89);
-      break;
+      return span(addDays(today, -89), today);
     case "month":
-      from = new Date(today.getFullYear(), today.getMonth(), 1);
-      break;
-    case "last-month":
-      from = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-      to = new Date(today.getFullYear(), today.getMonth(), 0);
-      break;
+      return span(firstOfMonth, today);
+    case "last-month": {
+      const end = addDays(firstOfMonth, -1);
+      return span(`${end.slice(0, 8)}01`, end);
+    }
     case "custom":
-      return {
-        from: sel.from ?? ymd(today),
-        to: sel.to ?? ymd(today),
-        days: Math.round((Date.parse(sel.to ?? "") - Date.parse(sel.from ?? "")) / DAY) + 1 || 1,
-      };
+      return span(sel.from ?? today, sel.to ?? today);
   }
-  return { from: ymd(from), to: ymd(to), days: Math.round((to.getTime() - from.getTime()) / DAY) + 1 };
+}
+
+/** The same number of days just before a range, for "vs previous period". */
+export function previousRange(r: DayRange): DayRange {
+  return { from: addDays(r.from, -r.days), to: addDays(r.from, -1), days: r.days };
+}
+
+/** Holds the viewer's IANA time zone so the server counts days the way they see them. */
+export const TZ_COOKIE = "jobtiva_admin_tz";
+/** Used until the browser has told us its zone (the app's quiet-hours default). */
+export const DEFAULT_TZ = "Asia/Kolkata";
+
+export function isTimeZone(v: unknown): v is string {
+  if (typeof v !== "string" || v.length > 64) return false;
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: v });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** "Last 30 days" or "Oct 1 – Oct 14, 2026" for custom. */
@@ -110,11 +144,15 @@ const q = (params: Record<string, string | undefined>) => {
  * phase 2; until then they open unfiltered.
  */
 export const links = {
-  /** plan: a plan id, "paid" or "free". expiry: "soon", "expired" or "none". step: a FUNNEL_STEPS key. */
+  /**
+   * plan: a plan id, "paid" or "free". expiry: "soon", "expired" or "none". step: a FUNNEL_STEPS key.
+   * Always customers only (role=user), like every number on the dashboard.
+   */
   users: (
     f: { joinedFrom?: string; joinedTo?: string; signedInFrom?: string; signedInTo?: string; plan?: string; expiry?: string; step?: FunnelKey; status?: string } = {},
   ) =>
     `/jmp-admin/users${q({
+      role: "user",
       joinedFrom: f.joinedFrom,
       joinedTo: f.joinedTo,
       signedInFrom: f.signedInFrom,
@@ -130,8 +168,8 @@ export const links = {
   /** status: paid, failed, created, cancelled or unfinished (created + failed). plan: plan name. mode: live or test. */
   orders: (f: { status?: string; from?: string; to?: string; plan?: string; mode?: string } = {}) =>
     `/jmp-admin/orders${q({ status: f.status, from: f.from, to: f.to, plan: f.plan, mode: f.mode })}`,
-  /** due: 7, 30 or 90 days ahead, or "ended" (plans that ended, now in limited mode). */
-  renewals: (f: { due?: "7" | "30" | "90" | "ended" } = {}) => `/jmp-admin/renewals${q({ due: f.due })}`,
+  /** due: 7, 30 or 90 days ahead, "ended30" (ended in the last 30 days) or "ended" (last 90). */
+  renewals: (f: { due?: "7" | "30" | "90" | "ended30" | "ended" } = {}) => `/jmp-admin/renewals${q({ due: f.due })}`,
   broadcasts: (f: { status?: string; id?: string } = {}) =>
     f.id ? `/jmp-admin/broadcasts/${f.id}` : `/jmp-admin/broadcasts${q({ status: f.status })}`,
   inbound: (f: { status?: string; from?: string; to?: string } = {}) =>
@@ -315,7 +353,10 @@ export interface Delta {
 export interface FunnelStep {
   key: FunnelKey;
   label: string;
+  /** People who reached this step. */
   value: number;
+  /** Of those, how many didn't reach the next one (what the Users link lists). */
+  stopped: number;
 }
 
 export interface WaitingTicket {
@@ -374,6 +415,7 @@ export interface DashboardData {
   newUsers: TimeSeries;
   newPaidUsers: TimeSeries;
   activeUsers: TimeSeries;
+  /** plan: a plan id, "free" (free plans and no plan) or "expired" (a paid plan that ended). */
   planMix: (Point & { plan: string })[];
   funnel: FunnelStep[];
   support: {
@@ -400,9 +442,8 @@ export interface DashboardData {
     ready: boolean;
     sesSandbox: boolean | null;
     sesQuota: { used: number; max: number } | null;
-    sent: number;
-    failed: number;
-    byChannel: { channel: string; sent: number; failed: number }[];
+    /** From the sent-email log (dashboard phase 4); null until it exists. */
+    log: { sent: number; failed: number; byChannel: { channel: string; sent: number; failed: number }[] } | null;
   };
   broadcasts: { next: BroadcastSummary | null; sending: BroadcastSummary | null; last: BroadcastSummary | null };
   gmail: { enabled: boolean; connected: number; totalUsers: number; lastSyncAt: string | null; ingestErrors: number; failingSyncs: number };
@@ -414,7 +455,8 @@ export interface DashboardData {
     resumeBytes: number;
     resumeFiles: number;
     assetBytes: number;
-    jobs: JobRun[];
+    /** Last run of each scheduled job (dashboard phase 5); null until they're recorded. */
+    jobs: JobRun[] | null;
   };
 }
 

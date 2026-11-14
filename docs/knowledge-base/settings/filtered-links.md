@@ -7,14 +7,14 @@ keywords: url, link, address bar, bookmark, share, deep link, query, filters gon
 
 The admin list pages keep their filters in the address bar. Pick a status, a plan or dates and the address changes with them, so the same view comes back after a reload, from a bookmark, or when another admin opens the link you sent.
 
-Some filters only ever arrive in a link, such as "joined between these dates" from a dashboard number. Those show as a small chip above the table. The × on the chip removes it.
+Some filters only ever arrive in a link, such as "joined between these dates" from a dashboard number. Those show as a small chip above the table. The × on the chip removes it. Links from the dashboard to Users also carry **Customers only**, because every dashboard number leaves admin accounts out.
 
 | Page | What the address keeps |
 |---|---|
-| Users | Search, status, plan (including **Any paid plan** and **Free plans**), expiry, joined dates, sign-in dates, and the onboarding step people stopped at |
+| Users | Search, status, plan (including **Any paid plan** and **Free plans**), expiry, joined dates, sign-in dates, the onboarding step people stopped at, and customers or admins only |
 | Support tickets | Search, status (including **Not resolved**), category, "waiting over" a number of hours, and the ticket that's open |
 | Orders & payments | Search, status (including **Unfinished**, meaning pending or failed), plan, live or test, gateway, and the dates |
-| Renewals | Which window (7, 30 or 90 days, or ended), plan type, plan and search. **Reminders sent** opens with `?tab=reminders` |
+| Renewals | Which window (7, 30 or 90 days, or ended in the last 30 or 90 days), plan type, plan and search. **Reminders sent** opens with `?tab=reminders` |
 | Broadcasts | Status and search |
 | Inbound email log | Dates, user, status and search |
 

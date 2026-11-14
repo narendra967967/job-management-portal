@@ -43,13 +43,16 @@ import { pick, replaceQuery, useInitialQuery, useQuerySync } from "@/lib/admin/u
 const DAY_MS = 86_400_000;
 
 type Tab = "upcoming" | "reminders";
-type Window = "7" | "30" | "90" | "ended";
+type Window = "7" | "30" | "90" | "ended30" | "ended";
 type Kind = "all" | "paid" | "trial";
+
+const isEnded = (w: Window) => w === "ended" || w === "ended30";
 
 const WINDOW_LABELS: Record<Window, string> = {
   "7": "Ending in 7 days",
   "30": "Ending in 30 days",
   "90": "Ending in 90 days",
+  ended30: "Ended in the last 30 days",
   ended: "Ended in the last 90 days",
 };
 
@@ -145,12 +148,12 @@ function Upcoming({ onSeeReminders }: { onSeeReminders: (email: string) => void 
   const [rows, setRows] = useState<RenewalRow[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [capped, setCapped] = useState(false);
-  // ?due=7|30|90|ended&kind=&plan=&q= (dashboard numbers, bookmarks)
+  // ?due=7|30|90|ended30|ended&kind=&plan=&q= (dashboard numbers, bookmarks)
   const sp = useInitialQuery();
   const [query, setQuery] = useState(sp.get("q") ?? "");
   const [plan, setPlan] = useState(sp.get("plan") || "all");
   const [kind, setKind] = useState<Kind>(() => pick(sp.get("kind"), ["all", "paid", "trial"] as const, "all"));
-  const [win, setWin] = useState<Window>(() => pick(sp.get("due") === "expired" ? "ended" : sp.get("due"), ["7", "30", "90", "ended"] as const, "7"));
+  const [win, setWin] = useState<Window>(() => pick(sp.get("due") === "expired" ? "ended" : sp.get("due"), ["7", "30", "90", "ended30", "ended"] as const, "7"));
   useQuerySync({ q: query.trim(), plan, kind, due: win }, { plan: "all", kind: "all", due: "7" });
 
   useEffect(() => {
@@ -163,7 +166,9 @@ function Upcoming({ onSeeReminders }: { onSeeReminders: (email: string) => void 
 
   const inWindow = (r: RenewalRow, w: Window) => {
     const left = new Date(r.expiresAt).getTime() - Date.now();
-    return w === "ended" ? left <= 0 : left > 0 && left <= Number(w) * DAY_MS;
+    if (w === "ended") return left <= 0;
+    if (w === "ended30") return left <= 0 && left > -30 * DAY_MS;
+    return left > 0 && left <= Number(w) * DAY_MS;
   };
 
   const filtered = useMemo(() => {
@@ -176,7 +181,7 @@ function Upcoming({ onSeeReminders }: { onSeeReminders: (email: string) => void 
       return !needle || r.name.toLowerCase().includes(needle) || r.email.toLowerCase().includes(needle);
     });
     // Ended: most recent first. Upcoming: soonest first.
-    return win === "ended" ? list.reverse() : list;
+    return isEnded(win) ? list.reverse() : list;
   }, [rows, query, plan, kind, win]);
 
   const selection = useRowSelection(filtered.map((r) => r.userId));
@@ -276,7 +281,7 @@ function Upcoming({ onSeeReminders }: { onSeeReminders: (email: string) => void 
             </th>
             <th className="px-4 py-2.5 font-medium">User</th>
             <th className="px-4 py-2.5 font-medium">Plan</th>
-            <th className="px-4 py-2.5 font-medium">{win === "ended" ? "Ended" : "Ends"}</th>
+            <th className="px-4 py-2.5 font-medium">{isEnded(win) ? "Ended" : "Ends"}</th>
             <th className="px-4 py-2.5 font-medium">Reminders</th>
             <th className="px-4 py-2.5 text-right font-medium">Action</th>
           </tr>
@@ -305,7 +310,7 @@ function Upcoming({ onSeeReminders }: { onSeeReminders: (email: string) => void 
               </td>
               <td className="px-4 py-2.5 whitespace-nowrap">
                 <span className="block">{dateOnly(r.expiresAt)}</span>
-                <span className={cn("block text-xs", win === "ended" ? "text-destructive" : "text-muted-foreground")}>
+                <span className={cn("block text-xs", isEnded(win) ? "text-destructive" : "text-muted-foreground")}>
                   {relative(r.expiresAt)}
                 </span>
               </td>
@@ -332,7 +337,7 @@ function Upcoming({ onSeeReminders }: { onSeeReminders: (email: string) => void 
           {loaded && filtered.length === 0 && (
             <tr>
               <td colSpan={6} className="px-4 py-10 text-center text-sm text-muted-foreground">
-                {win === "ended" ? "No plans ended in the last 90 days." : "No plans end in this window."}
+                {win === "ended" ? "No plans ended in the last 90 days." : win === "ended30" ? "No plans ended in the last 30 days." : "No plans end in this window."}
               </td>
             </tr>
           )}

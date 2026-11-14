@@ -1,563 +1,568 @@
 import "server-only";
 
-// Read side of the admin dashboard — real aggregates from the DB. Kept here so the
-// page stays a thin server component. Volumes are small (admin-scale: users, résumés,
-// fit scores), so time series are bucketed in JS from bounded queries rather than
-// with DB date functions — clearer and driver-agnostic.
+// Admin dashboard, read side (docs/admin-dashboard/spec.md, phase 3). Every
+// figure is counted in the database for the selected period, with days taken
+// in the viewer's own time zone. Customer metrics count role = 'user' only:
+// admins are operators, not customers.
 //
-// User-base metrics count ONLY role='user' accounts — admins are operators, not
-// customers, so they're excluded from totals, plan/status mixes, funnel, and the feed.
-//
-// Deliberately NO aggregate lead-volume analytics (total leads over time): that's
-// high-volume, per-user operational data, auto-pruned on a retention schedule.
-// Metrics stay user/usage/system focused.
+// Not here yet: the sent-email log (phase 4) and scheduled job runs and the
+// deployed commit (phase 5). Those fields come back null and the blocks say so.
 
-import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
+import { statfs } from "node:fs/promises";
+import { sql, type SQL } from "drizzle-orm";
 import { db } from "@/lib/db";
-import {
-  user,
-  session,
-  resumes,
-  resumeFiles,
-  appAssets,
-  fitScores,
-  plans,
-  gmailConfig,
-  gmailSyncState,
-  gmailIngestErrors,
-  supportTickets,
-  ticketReplies,
-} from "@/db/schema";
 import type { Point } from "@/components/admin/ui/charts";
-import pkg from "@/package.json";
+import {
+  FUNNEL_STEPS,
+  addDays,
+  links,
+  previousRange,
+  reachedStep,
+  stoppedAt,
+  type AttentionItem,
+  type BroadcastSummary,
+  type DashboardData,
+  type DayRange,
+  type FunnelFacts,
+  type TimeSeries,
+} from "@/lib/admin/dashboard-model";
+import { getEmailDelivery, getEmailProvider, getSesCredentials, providersReady } from "@/lib/email-delivery";
+import type { SesAccountInfo } from "@/lib/email-delivery-model";
+import { getSesAccount } from "@/lib/ses";
 
-const DAY = 86_400_000;
 
-export type Granularity = "daily" | "monthly" | "yearly";
-export interface TimeSeries {
-  daily: Point[];
-  monthly: Point[];
-  yearly: Point[];
+
+
+type Row = Record<string, unknown>;
+
+async function rows<T extends Row = Row>(q: SQL): Promise<T[]> {
+  const r = (await db.execute(q)) as unknown as { rows: T[] };
+  return r.rows;
+}
+async function one<T extends Row = Row>(q: SQL): Promise<T> {
+  return ((await rows<T>(q))[0] ?? {}) as T;
+}
+const num = (v: unknown) => Number(v ?? 0);
+const isoOrNull = (v: unknown) => (v ? new Date(v as string).toISOString() : null);
+
+/** Start of a day (inclusive) and of the day after the range (exclusive), as instants in the viewer's zone. */
+const startOf = (day: string, tz: string) => sql`((${day}::date)::timestamp at time zone ${tz})`;
+const endOf = (day: string, tz: string) => sql`(((${day}::date) + 1)::timestamp at time zone ${tz})`;
+const within = (col: SQL, r: DayRange, tz: string) => sql`${col} >= ${startOf(r.from, tz)} and ${col} < ${endOf(r.to, tz)}`;
+
+/* ---------------- time series ---------------- */
+
+const label = (day: string, opts: Intl.DateTimeFormatOptions) =>
+  new Date(`${day}T00:00:00Z`).toLocaleString("en-US", { ...opts, timeZone: "UTC" });
+
+/** Bucket keys and labels: last 30 days, last 12 months, last 5 years (viewer's calendar). */
+function buckets(today: string) {
+  const daily = Array.from({ length: 30 }, (_, i) => addDays(today, i - 29)).map((k) => ({ k, label: label(k, { month: "short", day: "numeric" }) }));
+  const [y, m] = today.split("-").map(Number);
+  const monthly = Array.from({ length: 12 }, (_, i) => {
+    const d = new Date(Date.UTC(y, m - 1 - (11 - i), 1));
+    const k = d.toISOString().slice(0, 7);
+    return { k, label: label(`${k}-01`, { month: "short" }) };
+  });
+  const yearly = Array.from({ length: 5 }, (_, i) => ({ k: String(y - 4 + i), label: String(y - 4 + i) }));
+  return { daily, monthly, yearly };
 }
 
-export interface StatCard {
-  key: string;
-  label: string;
-  value: string;
-  delta: string;
-}
-
-export interface ActivityItem {
-  who: string;
-  what: string;
-  when: string;
-}
-
-export interface SystemRow {
-  label: string;
-  value: string;
-  ok?: boolean;
-}
-
-export interface RecentTicket {
-  id: string;
-  number: number;
-  subject: string;
-  who: string;
-  status: "open" | "in_progress" | "resolved";
-  when: string;
-}
-
-export interface TicketStats {
-  total: number;
-  open: number;
-  statusMix: Point[];
-}
-
-export interface SlaStats {
-  firstResponse: string;
-  resolution: string;
-  openCount: number;
-  oldestOpen: string;
-  resolutionRate: number;
-}
-
-export interface FunnelStage {
-  label: string;
-  value: number;
-  pct: number;
-}
-
-export interface GmailHealth {
-  connected: number;
-  totalUsers: number;
-  lastSync: string;
-  ingestErrors: number;
-  failingSyncs: number;
-}
-
-export interface StorageStats {
-  resumeFiles: number;
-  resumeSize: string;
-  assetSize: string;
-  total: string;
-}
-
-export interface PlanExpiryAlert {
-  name: string;
-  plan: string;
-  when: string;
-  expired: boolean;
-  soon: boolean;
-}
-
-export interface PlanExpiry {
-  expired: number;
-  soon7: number;
-  soon30: number;
-  alerts: PlanExpiryAlert[];
-}
-
-export interface DashboardMetrics {
-  stats: StatCard[];
-  newUsers: TimeSeries;
-  aiScores: TimeSeries;
-  activeUsers: TimeSeries;
-  planMix: Point[];
-  statusMix: Point[];
-  funnel: FunnelStage[];
-  gmail: GmailHealth;
-  storage: StorageStats;
-  planExpiry: PlanExpiry;
-  ticketStats: TicketStats;
-  recentTickets: RecentTicket[];
-  sla: SlaStats;
-  activity: ActivityItem[];
-  system: SystemRow[];
-}
-
-function relativeTime(dt: Date): string {
-  const secs = Math.max(0, Math.floor((Date.now() - dt.getTime()) / 1000));
-  if (secs < 60) return "just now";
-  const mins = Math.floor(secs / 60);
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  if (days < 30) return `${days}d ago`;
-  const months = Math.floor(days / 30);
-  if (months < 12) return `${months}mo ago`;
-  return `${Math.floor(months / 12)}y ago`;
-}
-
-function humanBytes(n: number): string {
-  if (n < 1024) return `${n} B`;
-  const kb = n / 1024;
-  if (kb < 1024) return `${kb.toFixed(kb < 10 ? 1 : 0)} KB`;
-  const mb = kb / 1024;
-  if (mb < 1024) return `${mb.toFixed(mb < 10 ? 1 : 0)} MB`;
-  return `${(mb / 1024).toFixed(1)} GB`;
-}
-
-function humanDuration(ms: number): string {
-  if (ms <= 0) return "0m";
-  const mins = Math.round(ms / 60_000);
-  if (mins < 60) return `${mins}m`;
-  const hrs = Math.round(mins / 60);
-  if (hrs < 48) return `${hrs}h`;
-  return `${Math.round(hrs / 24)}d`;
-}
-
-// Fixed bucket windows for the three granularities (last 30 days / 12 months / 5 years).
-function buildBuckets(g: Granularity, now: Date): { label: string; start: number; end: number }[] {
-  const out: { label: string; start: number; end: number }[] = [];
-  if (g === "daily") {
-    const base = new Date(now);
-    base.setHours(0, 0, 0, 0);
-    for (let i = 29; i >= 0; i--) {
-      const d = new Date(base);
-      d.setDate(base.getDate() - i);
-      const s = d.getTime();
-      out.push({ label: d.toLocaleString("en-US", { month: "short", day: "numeric" }), start: s, end: s + DAY });
-    }
-  } else if (g === "monthly") {
-    for (let i = 11; i >= 0; i--) {
-      const start = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const end = new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
-      out.push({ label: start.toLocaleString("en-US", { month: "short" }), start: start.getTime(), end: end.getTime() });
-    }
-  } else {
-    for (let i = 4; i >= 0; i--) {
-      const y = now.getFullYear() - i;
-      out.push({ label: String(y), start: new Date(y, 0, 1).getTime(), end: new Date(y + 1, 0, 1).getTime() });
-    }
-  }
-  return out;
-}
-
-// Bucket timestamps into daily/monthly/yearly series. `dedupe` counts distinct uids
-// per bucket (for active-users), otherwise counts rows (signups, scores).
-function makeSeries(rows: { at: number; uid?: string }[], dedupe = false): TimeSeries {
-  const now = new Date();
-  const build = (g: Granularity): Point[] => {
-    const buckets = buildBuckets(g, now);
-    const sets = dedupe ? buckets.map(() => new Set<string>()) : null;
-    const counts = buckets.map(() => 0);
-    for (const r of rows) {
-      const idx = buckets.findIndex((b) => r.at >= b.start && r.at < b.end);
-      if (idx < 0) continue;
-      if (sets) sets[idx].add(r.uid ?? "");
-      else counts[idx] += 1;
-    }
-    return buckets.map((b, i) => ({ label: b.label, value: sets ? sets[i].size : counts[i] }));
+/**
+ * Count rows (or distinct users) of `source` per day, month and year. `source`
+ * must select `at` (timestamptz) and `uid`.
+ */
+async function timeSeries(source: SQL, distinct: boolean, tz: string, today: string): Promise<TimeSeries> {
+  const b = buckets(today);
+  const counter = distinct ? sql`count(distinct s.uid)` : sql`count(*)`;
+  const run = async (unit: "day" | "month" | "year", fmt: string, since: string, keys: { k: string; label: string }[]) => {
+    const r = await rows<{ k: string; n: number }>(sql`
+      select to_char(date_trunc(${unit}, s.at at time zone ${tz}), ${fmt}) as k, ${counter}::int as n
+      from (${source}) s
+      where s.at >= ${startOf(since, tz)}
+      group by 1`);
+    const by = new Map(r.map((x) => [x.k, num(x.n)]));
+    return keys.map(({ k, label }) => ({ label, value: by.get(k) ?? 0 }));
   };
-  return { daily: build("daily"), monthly: build("monthly"), yearly: build("yearly") };
+  const [daily, monthly, yearly] = await Promise.all([
+    run("day", "YYYY-MM-DD", b.daily[0].k, b.daily),
+    run("month", "YYYY-MM", `${b.monthly[0].k}-01`, b.monthly),
+    run("year", "YYYY", `${b.yearly[0].k}-01-01`, b.yearly),
+  ]);
+  return { daily, monthly, yearly };
 }
 
-const TICKET_STATUS_LABEL: Record<RecentTicket["status"], string> = {
-  open: "Open",
-  in_progress: "In progress",
-  resolved: "Resolved",
-};
+/* ---------------- Amazon SES account (live, cached briefly) ---------------- */
 
-const count = sql<number>`count(*)::int`;
-const countDistinctUser = sql<number>`count(distinct ${user.id})::int`;
-// User-base metrics count customers only, never admin/operator accounts.
-const onlyUsers = eq(user.role, "user");
+let sesCache: { at: number; value: SesAccountInfo | null } | null = null;
 
-export async function loadDashboardMetrics(): Promise<DashboardMetrics> {
+/** What SES says about the account right now, cached for 5 minutes; the last Test connection if AWS can't be reached. */
+async function sesAccount(stored: SesAccountInfo | null): Promise<SesAccountInfo | null> {
+  if (sesCache && Date.now() - sesCache.at < 5 * 60_000) return sesCache.value ?? stored;
+  const creds = await getSesCredentials();
+  if (!creds) return stored;
+  try {
+    const value = await Promise.race([
+      getSesAccount(creds),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), 4_000)),
+    ]);
+    sesCache = { at: Date.now(), value };
+    return value;
+  } catch {
+    sesCache = { at: Date.now(), value: null };
+    return stored;
+  }
+}
+
+async function diskSize(): Promise<number | null> {
+  try {
+    const s = await statfs("/");
+    return Number(s.blocks) * Number(s.bsize);
+  } catch {
+    return null;
+  }
+}
+
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
+/* ---------------- the loader ---------------- */
+
+export async function loadDashboard(range: DayRange, tz: string, today: string): Promise<DashboardData> {
+  const prev = previousRange(range);
   const now = Date.now();
-  const monthAgo = new Date(now - 30 * DAY);
-  const weekAgo = new Date(now - 7 * DAY);
-  const fiveYearsAgo = new Date(now - 5 * 366 * DAY);
+  const nowSql = sql`now()`;
 
   const [
-    totalUsersRows,
-    newUsersMonthRows,
-    activeUsersRows,
-    signedInWeekRows,
-    resumeRows,
-    resumeUserRows,
-    aiTotalRows,
-    aiRecentRows,
-    planMixRows,
-    statusMixRows,
-    userCreatedAt,
-    aiCreatedAt,
-    sessionRows,
-    gmailConnectedRows,
-    scoredUsersRows,
-    recentSignups,
-    recentResumes,
-    recentScores,
-    recentSyncs,
-    lastSyncRow,
-    ticketStatusRows,
-    recentTicketRows,
-    ticketRows,
-    firstReplyRows,
-    ingestErrorRows,
-    failingSyncRows,
-    resumeStorageRows,
-    assetStorageRows,
-    planExpiryRows,
-  ] = await Promise.all([
-    db.select({ n: count }).from(user).where(onlyUsers),
-    db.select({ n: count }).from(user).where(and(onlyUsers, sql`${user.createdAt} >= ${monthAgo}`)),
-    db.select({ n: count }).from(user).where(and(onlyUsers, eq(user.status, "active"))),
-    db.select({ n: count }).from(user).where(and(onlyUsers, sql`${user.lastLoginAt} >= ${weekAgo}`)),
-    db.select({ n: count }).from(resumes),
-    db.select({ n: sql<number>`count(distinct ${resumes.userId})::int` }).from(resumes),
-    db.select({ n: count }).from(fitScores),
-    db.select({ n: count }).from(fitScores).where(sql`${fitScores.createdAt} >= ${monthAgo}`),
-    db.select({ planId: user.planId, n: count }).from(user).where(onlyUsers).groupBy(user.planId),
-    db.select({ status: user.status, n: count }).from(user).where(onlyUsers).groupBy(user.status),
-    db.select({ createdAt: user.createdAt }).from(user).where(onlyUsers),
-    db.select({ createdAt: fitScores.createdAt }).from(fitScores),
-    db
-      .select({ createdAt: session.createdAt, uid: session.userId })
-      .from(session)
-      .innerJoin(user, eq(session.userId, user.id))
-      .where(and(onlyUsers, sql`${session.createdAt} >= ${fiveYearsAgo}`)),
-    db
-      .select({ n: countDistinctUser })
-      .from(gmailConfig)
-      .innerJoin(user, eq(gmailConfig.userId, user.id))
-      .where(and(onlyUsers, eq(gmailConfig.connected, true))),
-    db
-      .select({ n: countDistinctUser })
-      .from(fitScores)
-      .innerJoin(user, eq(fitScores.userId, user.id))
-      .where(onlyUsers),
-    db
-      .select({ name: user.name, createdAt: user.createdAt })
-      .from(user)
-      .where(onlyUsers)
-      .orderBy(desc(user.createdAt))
-      .limit(5),
-    db
-      .select({ name: user.name, createdAt: resumes.createdAt })
-      .from(resumes)
-      .innerJoin(user, eq(resumes.userId, user.id))
-      .orderBy(desc(resumes.createdAt))
-      .limit(5),
-    db
-      .select({ name: user.name, createdAt: fitScores.createdAt })
-      .from(fitScores)
-      .innerJoin(user, eq(fitScores.userId, user.id))
-      .orderBy(desc(fitScores.createdAt))
-      .limit(5),
-    db
-      .select({ name: user.name, syncedAt: gmailSyncState.lastSyncedAt })
-      .from(gmailSyncState)
-      .innerJoin(user, eq(gmailSyncState.userId, user.id))
-      .where(isNotNull(gmailSyncState.lastSyncedAt))
-      .orderBy(desc(gmailSyncState.lastSyncedAt))
-      .limit(5),
-    db
-      .select({ syncedAt: gmailSyncState.lastSyncedAt })
-      .from(gmailSyncState)
-      .where(isNotNull(gmailSyncState.lastSyncedAt))
-      .orderBy(desc(gmailSyncState.lastSyncedAt))
-      .limit(1),
-    db.select({ status: supportTickets.status, n: count }).from(supportTickets).groupBy(supportTickets.status),
-    db
-      .select({
-        id: supportTickets.id,
-        number: supportTickets.number,
-        subject: supportTickets.subject,
-        name: supportTickets.name,
-        status: supportTickets.status,
-        createdAt: supportTickets.createdAt,
-      })
-      .from(supportTickets)
-      .orderBy(desc(supportTickets.createdAt))
-      .limit(5),
-    db
-      .select({ id: supportTickets.id, status: supportTickets.status, createdAt: supportTickets.createdAt, updatedAt: supportTickets.updatedAt })
-      .from(supportTickets),
-    db
-      .select({ ticketId: ticketReplies.ticketId, first: sql<string>`min(${ticketReplies.createdAt})` })
-      .from(ticketReplies)
-      .groupBy(ticketReplies.ticketId),
-    db
-      .select({ n: count })
-      .from(gmailIngestErrors)
-      .innerJoin(user, eq(gmailIngestErrors.userId, user.id))
-      .where(and(onlyUsers, sql`${gmailIngestErrors.createdAt} >= ${monthAgo}`)),
-    db
-      .select({ n: countDistinctUser })
-      .from(gmailSyncState)
-      .innerJoin(user, eq(gmailSyncState.userId, user.id))
-      .where(and(onlyUsers, isNotNull(gmailSyncState.lastError))),
-    db
-      .select({ n: count, bytes: sql<string>`coalesce(sum(octet_length(${resumeFiles.data})), 0)::bigint` })
-      .from(resumeFiles),
-    db
-      .select({ bytes: sql<string>`coalesce(sum(octet_length(${appAssets.data})), 0)::bigint` })
-      .from(appAssets),
-    db
-      .select({ name: user.name, planId: user.planId, expiresAt: user.planExpiresAt })
-      .from(user)
-      .where(and(onlyUsers, isNotNull(user.planExpiresAt)))
-      .orderBy(user.planExpiresAt),
-  ]);
-
-  const totalUsers = totalUsersRows[0]?.n ?? 0;
-  const newUsersMonth = newUsersMonthRows[0]?.n ?? 0;
-  const activeUsers = activeUsersRows[0]?.n ?? 0;
-  const signedInWeek = signedInWeekRows[0]?.n ?? 0;
-  const resumeCount = resumeRows[0]?.n ?? 0;
-  const resumeUsers = resumeUserRows[0]?.n ?? 0;
-  const aiTotal = aiTotalRows[0]?.n ?? 0;
-  const aiRecent = aiRecentRows[0]?.n ?? 0;
-
-  const stats: StatCard[] = [
-    {
-      key: "users",
-      label: "Total users",
-      value: String(totalUsers),
-      delta: newUsersMonth > 0 ? `+${newUsersMonth} this month` : "no new this month",
-    },
-    {
-      key: "active",
-      label: "Active users",
-      value: String(activeUsers),
-      delta: `${signedInWeek} signed in this week`,
-    },
-    {
-      key: "resumes",
-      label: "Résumés stored",
-      value: String(resumeCount),
-      delta: resumeCount > 0 ? `across ${resumeUsers} user${resumeUsers === 1 ? "" : "s"}` : "none yet",
-    },
-    {
-      // fit_scores rows — one per (user, lead, resume); rescores overwrite, so this
-      // counts leads scored, the only AI signal we persist today.
-      key: "ai",
-      label: "AI scores (30d)",
-      value: String(aiRecent),
-      delta: `${aiTotal} all-time`,
-    },
-  ];
-
-  // --- Time series (daily / monthly / yearly) ---
-  const newUsersSeries = makeSeries(userCreatedAt.map((r) => ({ at: new Date(r.createdAt).getTime() })));
-  const aiScoresSeries = makeSeries(aiCreatedAt.map((r) => ({ at: new Date(r.createdAt).getTime() })));
-  const activeUsersSeries = makeSeries(
-    sessionRows.map((r) => ({ at: new Date(r.createdAt).getTime(), uid: r.uid })),
-    true,
-  );
-
-  // --- Plan distribution (users only) ---
-  const planNames = new Map((await db.select({ id: plans.id, name: plans.name }).from(plans)).map((p) => [p.id, p.name]));
-  const planMix: Point[] = planMixRows
-    .map((r) => ({ label: r.planId ? (planNames.get(r.planId) ?? "Unknown plan") : "No plan", value: r.n }))
-    .filter((p) => p.value > 0)
-    .sort((a, b) => b.value - a.value);
-
-  // --- Status mix (users only) ---
-  const statusMix: Point[] = statusMixRows
-    .map((r) => ({ label: r.status === "active" ? "Active" : r.status === "inactive" ? "Inactive" : r.status, value: r.n }))
-    .filter((p) => p.value > 0);
-
-  // --- Onboarding funnel (users only) ---
-  const gmailConnected = gmailConnectedRows[0]?.n ?? 0;
-  const scoredUsers = scoredUsersRows[0]?.n ?? 0;
-  const pct = (n: number) => (totalUsers > 0 ? Math.round((n / totalUsers) * 100) : 0);
-  const funnel: FunnelStage[] = [
-    { label: "Signed up", value: totalUsers, pct: 100 },
-    { label: "Gmail connected", value: gmailConnected, pct: pct(gmailConnected) },
-    { label: "Résumé added", value: resumeUsers, pct: pct(resumeUsers) },
-    { label: "Scored a lead", value: scoredUsers, pct: pct(scoredUsers) },
-  ];
-
-  // --- Tickets ---
-  const ticketTotal = ticketStatusRows.reduce((s, r) => s + r.n, 0);
-  const ticketOpen = ticketStatusRows.find((r) => r.status === "open")?.n ?? 0;
-  const ticketStatusMix: Point[] = (["open", "in_progress", "resolved"] as const)
-    .map((s) => ({ label: TICKET_STATUS_LABEL[s], value: ticketStatusRows.find((r) => r.status === s)?.n ?? 0 }))
-    .filter((p) => p.value > 0);
-  const ticketStats: TicketStats = { total: ticketTotal, open: ticketOpen, statusMix: ticketStatusMix };
-  const recentTickets: RecentTicket[] = recentTicketRows.map((t) => ({
-    id: t.id,
-    number: t.number,
-    subject: t.subject,
-    who: t.name || "Unknown",
-    status: t.status as RecentTicket["status"],
-    when: relativeTime(new Date(t.createdAt)),
-  }));
-
-  // --- Support SLA ---
-  const firstReplyAt = new Map(firstReplyRows.map((r) => [r.ticketId, new Date(r.first).getTime()]));
-  const firstResponseDurations: number[] = [];
-  const resolutionDurations: number[] = [];
-  const openAges: number[] = [];
-  let resolvedCount = 0;
-  for (const t of ticketRows) {
-    const created = new Date(t.createdAt).getTime();
-    const first = firstReplyAt.get(t.id);
-    if (first) firstResponseDurations.push(first - created);
-    if (t.status === "resolved") {
-      resolvedCount += 1;
-      // Approx: updatedAt is last activity; without later replies ≈ resolve time.
-      resolutionDurations.push(new Date(t.updatedAt).getTime() - created);
-    } else {
-      openAges.push(now - created);
-    }
-  }
-  const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
-  const sla: SlaStats = {
-    firstResponse: firstResponseDurations.length ? humanDuration(avg(firstResponseDurations)) : "—",
-    resolution: resolutionDurations.length ? humanDuration(avg(resolutionDurations)) : "—",
-    openCount: openAges.length,
-    oldestOpen: openAges.length ? humanDuration(Math.max(...openAges)) : "—",
-    resolutionRate: ticketTotal > 0 ? Math.round((resolvedCount / ticketTotal) * 100) : 0,
-  };
-
-  // --- Recent activity (merge of real timestamps, newest first) ---
-  type Ev = { who: string; what: string; at: number };
-  const events: Ev[] = [
-    ...recentSignups.map((r) => ({ who: r.name, what: "joined", at: new Date(r.createdAt).getTime() })),
-    ...recentResumes.map((r) => ({ who: r.name, what: "uploaded a résumé", at: new Date(r.createdAt).getTime() })),
-    ...recentScores.map((r) => ({ who: r.name, what: "scored a lead with AI", at: new Date(r.createdAt).getTime() })),
-    ...recentSyncs.map((r) => ({ who: r.name, what: "completed a Gmail sync", at: new Date(r.syncedAt as Date).getTime() })),
-  ];
-  const activity: ActivityItem[] = events
-    .sort((a, b) => b.at - a.at)
-    .slice(0, 6)
-    .map((e) => ({ who: e.who, what: e.what, when: relativeTime(new Date(e.at)) }));
-
-  // --- System snapshot ---
-  const appEnv = process.env.APP_ENV ?? (process.env.NODE_ENV === "production" ? "Production" : "Development");
-  const lastSync = lastSyncRow[0]?.syncedAt ? relativeTime(new Date(lastSyncRow[0].syncedAt as Date)) : "Never";
-
-  // --- Gmail health (users only; read-only Gmail integration) ---
-  const gmail: GmailHealth = {
-    connected: gmailConnected,
-    totalUsers,
-    lastSync,
-    ingestErrors: ingestErrorRows[0]?.n ?? 0,
-    failingSyncs: failingSyncRows[0]?.n ?? 0,
-  };
-
-  // --- Storage (bytes stored in Postgres; résumé files + app assets).
-  // Résumé bytes are the go-live candidate for moving to S3/R2 (see backlog). ---
-  const resumeBytes = Number(resumeStorageRows[0]?.bytes ?? 0);
-  const assetBytes = Number(assetStorageRows[0]?.bytes ?? 0);
-  const storage: StorageStats = {
-    resumeFiles: resumeStorageRows[0]?.n ?? 0,
-    resumeSize: humanBytes(resumeBytes),
-    assetSize: humanBytes(assetBytes),
-    total: humanBytes(resumeBytes + assetBytes),
-  };
-
-  // --- Plan expiry (users only; from user.planExpiresAt) ---
-  const d7 = now + 7 * DAY;
-  const d30 = now + 30 * DAY;
-  let expiredCount = 0;
-  let soon7 = 0;
-  let soon30 = 0;
-  const expiryAlerts: PlanExpiryAlert[] = [];
-  for (const r of planExpiryRows) {
-    const t = new Date(r.expiresAt as Date).getTime();
-    const isExpired = t < now;
-    if (isExpired) expiredCount += 1;
-    else {
-      if (t < d30) soon30 += 1;
-      if (t < d7) soon7 += 1;
-    }
-    expiryAlerts.push({
-      name: r.name,
-      plan: r.planId ? (planNames.get(r.planId) ?? "—") : "—",
-      when: isExpired ? `${humanDuration(now - t)} ago` : `in ${humanDuration(t - now)}`,
-      expired: isExpired,
-      soon: !isExpired && t < d7,
-    });
-  }
-  const planExpiry: PlanExpiry = { expired: expiredCount, soon7, soon30, alerts: expiryAlerts.slice(0, 5) };
-  const system: SystemRow[] = [
-    { label: "Environment", value: appEnv },
-    { label: "App version", value: `v${pkg.version}` },
-    { label: "Database", value: "Connected", ok: true },
-    { label: "Last Gmail sync", value: lastSync },
-  ];
-
-  return {
-    stats,
-    newUsers: newUsersSeries,
-    aiScores: aiScoresSeries,
-    activeUsers: activeUsersSeries,
-    planMix,
-    statusMix,
-    funnel,
+    users,
+    signedIn,
+    paid,
+    revenue,
+    revenueByPlan,
+    incomplete,
+    newUsers,
+    newPaidUsers,
+    activeUsers,
+    planRows,
+    cohort,
+    support,
+    waiting,
+    renewals,
+    nextRenewals,
+    forwarding,
+    topRejections,
+    broadcastRows,
     gmail,
     storage,
-    planExpiry,
-    ticketStats,
-    recentTickets,
-    sla,
-    activity,
-    system,
+    attention,
+    delivery,
+    provider,
+    ready,
+    disk,
+  ] = await Promise.all([
+    one(sql`
+      select count(*)::int as total,
+        count(*) filter (where ${within(sql`created_at`, range, tz)})::int as joined,
+        count(*) filter (where ${within(sql`created_at`, prev, tz)})::int as joined_prev
+      from "user" where role = 'user'`),
+    one(sql`
+      select count(distinct s.user_id) filter (where ${within(sql`s.created_at`, range, tz)})::int as now_n,
+        count(distinct s.user_id) filter (where ${within(sql`s.created_at`, prev, tz)})::int as prev_n
+      from session s join "user" u on u.id = s.user_id
+      where u.role = 'user' and s.created_at >= ${startOf(prev.from, tz)}`),
+    one(sql`
+      with cohort as (
+        select u.id, u.created_at,
+          exists (select 1 from payment_orders o where o.user_id = u.id and o.status = 'paid' and o.mode = 'live') as paid
+        from "user" u where u.role = 'user'
+      )
+      select
+        (select count(*)::int from "user" u left join plans p on p.id::text = u.plan_id
+          where u.role = 'user' and not coalesce(p.is_free, true)
+            and (u.plan_expires_at is null or u.plan_expires_at > now())) as paid_now,
+        count(*) filter (where ${within(sql`created_at`, range, tz)})::int as joined,
+        count(*) filter (where ${within(sql`created_at`, range, tz)} and paid)::int as joined_paid,
+        count(*) filter (where ${within(sql`created_at`, prev, tz)})::int as joined_prev,
+        count(*) filter (where ${within(sql`created_at`, prev, tz)} and paid)::int as joined_paid_prev
+      from cohort`),
+    one(sql`
+      select
+        coalesce(sum(base_amount) filter (where ${within(sql`paid_at`, range, tz)}), 0)::bigint as total,
+        count(*) filter (where ${within(sql`paid_at`, range, tz)})::int as orders,
+        coalesce(sum(base_amount) filter (where ${within(sql`paid_at`, prev, tz)}), 0)::bigint as prev,
+        count(*) filter (where ${within(sql`paid_at`, prev, tz)})::int as prev_orders,
+        max(currency) as currency
+      from payment_orders where status = 'paid' and mode = 'live' and paid_at >= ${startOf(prev.from, tz)}`),
+    rows<{ plan: string; amount: number }>(sql`
+      select plan_name as plan, sum(base_amount)::bigint as amount
+      from payment_orders
+      where status = 'paid' and mode = 'live' and ${within(sql`paid_at`, range, tz)}
+      group by 1 order by 2 desc`),
+    one(sql`
+      select
+        count(*) filter (where status = 'created')::int as unpaid,
+        count(*) filter (where status = 'failed')::int as failed,
+        (select max(failed_at) from payment_orders where status = 'failed' and mode = 'live') as last_failed
+      from payment_orders where mode = 'live' and ${within(sql`created_at`, range, tz)}`),
+    timeSeries(sql`select created_at as at, id as uid from "user" where role = 'user'`, false, tz, today),
+    timeSeries(
+      sql`select min(o.paid_at) as at, o.user_id as uid from payment_orders o join "user" u on u.id = o.user_id
+          where o.status = 'paid' and o.mode = 'live' and u.role = 'user' group by o.user_id`,
+      false,
+      tz,
+      today,
+    ),
+    timeSeries(sql`select s.created_at as at, s.user_id as uid from session s join "user" u on u.id = s.user_id where u.role = 'user'`, true, tz, today),
+    rows<{ pid: string | null; name: string | null; free: boolean; expired: boolean; n: number }>(sql`
+      select p.id::text as pid, p.name, coalesce(p.is_free, true) as free,
+        (u.plan_expires_at is not null and u.plan_expires_at < now() and not coalesce(p.is_free, true)) as expired,
+        count(*)::int as n
+      from "user" u left join plans p on p.id::text = u.plan_id
+      where u.role = 'user'
+      group by 1, 2, 3, 4`),
+    rows<{ verified: boolean; fwd: boolean; ai: boolean; resume: boolean; leads: number; free: boolean }>(sql`
+      select u.email_verified as verified,
+        (ia.first_received_at is not null) as fwd,
+        (us.ai_key_ciphertext is not null) as ai,
+        exists (select 1 from resumes r where r.user_id = u.id) as resume,
+        (select count(*)::int from job_leads l where l.user_id = u.id) as leads,
+        coalesce(p.is_free, true) as free
+      from "user" u
+      left join inbound_addresses ia on ia.user_id = u.id
+      left join user_settings us on us.user_id = u.id
+      left join plans p on p.id::text = u.plan_id
+      where u.role = 'user' and ${within(sql`u.created_at`, range, tz)}`),
+    one(sql`
+      select
+        (select count(*)::int from support_tickets where status = 'open') as open,
+        (select count(*)::int from support_tickets where status = 'in_progress') as in_progress,
+        (select min(created_at) from support_tickets where status <> 'resolved') as oldest,
+        (select avg(extract(epoch from (r.first_at - t.created_at)))
+           from support_tickets t
+           join (select ticket_id, min(created_at) as first_at from ticket_replies where author = 'admin' group by ticket_id) r
+             on r.ticket_id = t.id
+           where ${within(sql`t.created_at`, range, tz)}) as first_reply_s,
+        (select avg(extract(epoch from (t.updated_at - t.created_at)))
+           from support_tickets t
+           where t.status = 'resolved' and ${within(sql`t.created_at`, range, tz)}) as resolve_s`),
+    rows<{ id: string; number: number; subject: string; name: string; status: "open" | "in_progress"; created_at: string }>(sql`
+      select id, number, subject, name, status, created_at
+      from support_tickets where status <> 'resolved'
+      order by created_at asc limit 5`),
+    one(sql`
+      select
+        count(*) filter (where plan_expires_at > ${nowSql} and plan_expires_at <= ${nowSql} + interval '7 days')::int as due7,
+        count(*) filter (where plan_expires_at > ${nowSql} and plan_expires_at <= ${nowSql} + interval '30 days')::int as due30,
+        count(*) filter (where plan_expires_at <= ${nowSql} and plan_expires_at > ${nowSql} - interval '30 days')::int as ended30
+      from "user" where role = 'user' and plan_expires_at is not null`),
+    rows<{ id: string; name: string; plan: string | null; ends: string }>(sql`
+      select u.id, u.name, p.name as plan, u.plan_expires_at as ends
+      from "user" u left join plans p on p.id::text = u.plan_id
+      where u.role = 'user' and u.plan_expires_at > now()
+      order by u.plan_expires_at asc limit 5`),
+    one(sql`
+      select
+        (select forwarding_enabled from email_intake_config where id = 'app') as enabled,
+        (select count(*)::int from inbound_addresses ia join "user" u on u.id = ia.user_id
+          where u.role = 'user' and ia.first_received_at is not null) as set_up,
+        (select count(*)::int from "user" where role = 'user') as total,
+        count(*)::int as received,
+        count(*) filter (where status = 'accepted')::int as accepted,
+        count(*) filter (where status = 'rejected')::int as rejected,
+        (select max(received_at) from inbound_email_log) as last_at
+      from inbound_email_log where ${within(sql`received_at`, range, tz)}`),
+    rows<{ reason: string; n: number }>(sql`
+      select coalesce(reason, 'No reason given') as reason, count(*)::int as n
+      from inbound_email_log
+      where status = 'rejected' and ${within(sql`received_at`, range, tz)}
+      group by 1 order by 2 desc limit 3`),
+    rows<{
+      kind: "next" | "sending" | "last";
+      id: string;
+      title: string;
+      at: string;
+      email_total: number;
+      email_sent: number;
+      email_failed: number;
+      in_app: number;
+    }>(sql`
+      (select 'next' as kind, id, title, scheduled_for as at, email_total, email_sent, email_failed, in_app_count as in_app
+         from broadcasts where status = 'scheduled' order by scheduled_for asc limit 1)
+      union all
+      (select 'sending', id, title, started_at, email_total, email_sent, email_failed, in_app_count
+         from broadcasts where status = 'sending' order by started_at desc limit 1)
+      union all
+      (select 'last', id, title, finished_at, email_total, email_sent, email_failed, in_app_count
+         from broadcasts where status = 'sent' order by finished_at desc nulls last limit 1)`),
+    one(sql`
+      select
+        (select gmail_oauth_enabled from email_intake_config where id = 'app') as enabled,
+        (select count(distinct g.user_id)::int from gmail_config g join "user" u on u.id = g.user_id
+          where u.role = 'user' and g.connected) as connected,
+        (select count(*)::int from "user" where role = 'user') as total,
+        (select max(last_synced_at) from gmail_sync_state) as last_sync,
+        (select count(*)::int from gmail_ingest_errors e join "user" u on u.id = e.user_id
+          where u.role = 'user' and ${within(sql`e.created_at`, range, tz)}) as ingest_errors,
+        (select count(distinct s.user_id)::int from gmail_sync_state s join "user" u on u.id = s.user_id
+          where u.role = 'user' and s.last_error is not null) as failing`),
+    one(sql`
+      select
+        pg_database_size(current_database())::bigint as db_bytes,
+        (select count(*)::int from resume_files) as resume_files,
+        (select coalesce(sum(octet_length(data)), 0)::bigint from resume_files) as resume_bytes,
+        (select coalesce(sum(octet_length(data)), 0)::bigint from app_assets) as asset_bytes`),
+    one(sql`
+      select
+        (select count(*)::int from support_tickets where status <> 'resolved' and created_at < now() - interval '24 hours') as tickets_waiting,
+        (select count(*)::int from payment_orders where status = 'failed' and mode = 'live' and failed_at > now() - interval '7 days') as failed_payments,
+        (select count(*)::int from "user" u left join plans p on p.id::text = u.plan_id
+          where u.role = 'user' and not coalesce(p.is_free, true)
+            and u.plan_expires_at <= now() and u.plan_expires_at > now() - interval '7 days') as expired_plans,
+        (select count(*)::int from support_tickets
+          where category = 'deletion' and status <> 'resolved' and cancelled_at is null) as deletion_requests,
+        (select count(*)::int from inbound_ai_queue where created_at < now() - interval '1 hour') as ai_stuck,
+        (select count(*)::int from kb_questions where status = 'open') as kb_open,
+        (select count(*)::int from "user"
+          where role = 'user' and status = 'inactive' and updated_at > now() - interval '7 days') as deactivated`),
+    getEmailDelivery(),
+    getEmailProvider(),
+    providersReady(),
+    diskSize(),
+  ]);
+
+  /* ---- revenue by month (amounts, last 12 months) ---- */
+  const b = buckets(today);
+  const monthRows = await rows<{ k: string; amount: number }>(sql`
+    select to_char(date_trunc('month', paid_at at time zone ${tz}), 'YYYY-MM') as k, sum(base_amount)::bigint as amount
+    from payment_orders
+    where status = 'paid' and mode = 'live' and paid_at >= ${startOf(`${b.monthly[0].k}-01`, tz)}
+    group by 1`);
+  const monthBy = new Map(monthRows.map((r) => [r.k, num(r.amount)]));
+
+  /* ---- plan mix ---- */
+  const mix = new Map<string, { label: string; value: number; plan: string }>();
+  for (const r of planRows) {
+    const key = r.expired ? "expired" : r.free ? `free:${r.pid ?? "none"}` : (r.pid as string);
+    const entry = r.expired
+      ? { label: "Expired", plan: "expired" }
+      : r.free
+        ? { label: r.name ?? "No plan", plan: "free" }
+        : { label: r.name ?? "Unknown plan", plan: r.pid as string };
+    mix.set(key, { ...entry, value: (mix.get(key)?.value ?? 0) + num(r.n) });
+  }
+  const planMix = [...mix.values()].filter((p) => p.value > 0).sort((a, z) => z.value - a.value);
+
+  /* ---- funnel (people who joined in the period) ---- */
+  const facts: FunnelFacts[] = cohort.map((c) => ({
+    emailVerified: !!c.verified,
+    forwardingReceived: !!c.fwd,
+    hasAiKey: !!c.ai,
+    hasResume: !!c.resume,
+    leads: num(c.leads),
+    paid: !c.free,
+  }));
+  const funnel = FUNNEL_STEPS.map((s) => ({
+    ...s,
+    value: facts.filter((f) => reachedStep(s.key, f)).length,
+    stopped: facts.filter((f) => stoppedAt(s.key, f)).length,
+  }));
+
+  /* ---- broadcasts ---- */
+  const summary = (kind: "next" | "sending" | "last"): BroadcastSummary | null => {
+    const r = broadcastRows.find((x) => x.kind === kind);
+    if (!r || !r.at) return null;
+    // In-app only broadcasts have no emails; show who got it in the app instead.
+    const emails = num(r.email_total) > 0;
+    return {
+      id: r.id,
+      title: r.title,
+      at: new Date(r.at).toISOString(),
+      total: emails ? num(r.email_total) : num(r.in_app),
+      delivered: emails ? num(r.email_sent) : num(r.in_app),
+      failed: emails ? num(r.email_failed) : 0,
+    };
+  };
+  const broadcasts = { next: summary("next"), sending: summary("sending"), last: summary("last") };
+
+  /* ---- email delivery ---- */
+  const sesConfigured = !!(delivery.ses.region && delivery.ses.accessKeyId && delivery.ses.hasSecret);
+  const account = provider === "ses" && sesConfigured ? await sesAccount(delivery.ses.account) : null;
+
+  /* ---- needs attention ---- */
+  const a = attention;
+  const last7 = { from: addDays(today, -6), to: today };
+  const items: AttentionItem[] = [];
+  const add = (cond: boolean, item: AttentionItem) => cond && items.push(item);
+  add(provider ? !ready[provider] : false, {
+    key: "email-not-ready",
+    severity: "critical",
+    count: 1,
+    text: "Email isn't set up, so the app can't send any",
+    href: links.settings("email"),
+  });
+  add(num(a.tickets_waiting) > 0, {
+    key: "tickets-waiting",
+    severity: "critical",
+    count: num(a.tickets_waiting),
+    text: `${plural(num(a.tickets_waiting), "ticket", "tickets")} waiting more than 24 hours`,
+    href: links.tickets({ status: "unresolved", waitingHours: 24 }),
+  });
+  add(num(a.failed_payments) > 0, {
+    key: "failed-payments",
+    severity: "critical",
+    count: num(a.failed_payments),
+    text: `${plural(num(a.failed_payments), "payment", "payments")} failed in the last 7 days`,
+    href: links.orders({ status: "failed", mode: "live", ...last7 }),
+  });
+  add(!forwarding.enabled, {
+    key: "forwarding-off",
+    severity: "critical",
+    count: 1,
+    text: "Forwarding is turned off, so no job alerts come in",
+    href: links.settings("intake"),
+  });
+  add(num(a.expired_plans) > 0, {
+    key: "expired-plans",
+    severity: "warning",
+    count: num(a.expired_plans),
+    text: `${plural(num(a.expired_plans), "paid plan", "paid plans")} ended in the last 7 days without renewal`,
+    href: links.renewals({ due: "ended30" }),
+  });
+  add(num(a.deletion_requests) > 0, {
+    key: "deletion-requests",
+    severity: "warning",
+    count: num(a.deletion_requests),
+    text: plural(num(a.deletion_requests), "account deletion request", "account deletion requests"),
+    href: `/jmp-admin/tickets?status=unresolved&category=deletion`,
+  });
+  add(num(a.ai_stuck) > 0, {
+    key: "ai-queue",
+    severity: "warning",
+    count: num(a.ai_stuck),
+    text: `${plural(num(a.ai_stuck), "job alert", "job alerts")} waiting in the AI reading queue for over an hour`,
+    href: links.inbound({ status: "queued" }),
+  });
+  add(gmail.enabled === true && num(gmail.failing) > 0, {
+    key: "gmail-failing",
+    severity: "warning",
+    count: num(gmail.failing),
+    text: `${plural(num(gmail.failing), "Gmail sync is", "Gmail syncs are")} failing`,
+    href: links.users(),
+  });
+  add(provider === "ses" && account !== null && !account.productionAccess, {
+    key: "ses-sandbox",
+    severity: "warning",
+    count: 1,
+    text: "Amazon SES is still in the sandbox, so most users won't get email",
+    href: links.settings("email"),
+  });
+  add((broadcasts.last?.failed ?? 0) > 0, {
+    key: "broadcast-failed",
+    severity: "info",
+    count: broadcasts.last?.failed ?? 0,
+    text: `${plural(broadcasts.last?.failed ?? 0, "email", "emails")} failed in the last broadcast`,
+    href: links.broadcasts({ id: broadcasts.last?.id }),
+  });
+  add(num(a.kb_open) > 0, {
+    key: "kb-unanswered",
+    severity: "info",
+    count: num(a.kb_open),
+    text: `${plural(num(a.kb_open), "unanswered knowledge base question", "unanswered knowledge base questions")}`,
+    href: links.kbUnanswered(),
+  });
+  add(num(a.deactivated) > 0, {
+    key: "deactivated",
+    severity: "info",
+    count: num(a.deactivated),
+    text: `${plural(num(a.deactivated), "account", "accounts")} deactivated in the last 7 days`,
+    href: links.users({ status: "inactive" }),
+  });
+
+  const conv = (paidN: unknown, joinedN: unknown) => (num(joinedN) > 0 ? Math.round((num(paidN) / num(joinedN)) * 100) : 0);
+  const oldest = support.oldest ? new Date(support.oldest as string).getTime() : null;
+
+  return {
+    generatedAt: new Date(now).toISOString(),
+    attention: items,
+    users: { total: num(users.total), joined: num(users.joined), joinedPrev: num(users.joined_prev) },
+    signedIn: { count: num(signedIn.now_n), prev: num(signedIn.prev_n) },
+    paid: {
+      count: num(paid.paid_now),
+      conversionPct: conv(paid.joined_paid, paid.joined),
+      prevConversionPct: num(paid.joined_prev) > 0 ? conv(paid.joined_paid_prev, paid.joined_prev) : null,
+    },
+    revenue: {
+      total: num(revenue.total),
+      prev: num(revenue.prev),
+      orders: num(revenue.orders),
+      byMonth: b.monthly.map(({ k, label }): Point => ({ label, value: monthBy.get(k) ?? 0 })),
+      byPlan: revenueByPlan.map((r) => ({ label: r.plan, value: num(r.amount) })),
+      currency: (revenue.currency as string) || "INR",
+    },
+    incompleteOrders: { unpaid: num(incomplete.unpaid), failed: num(incomplete.failed), lastFailedAt: isoOrNull(incomplete.last_failed) },
+    newUsers,
+    newPaidUsers,
+    activeUsers,
+    planMix,
+    funnel,
+    support: {
+      open: num(support.open),
+      inProgress: num(support.in_progress),
+      oldestOpenMs: oldest === null ? null : now - oldest,
+      avgFirstResponseMs: support.first_reply_s == null ? null : num(support.first_reply_s) * 1000,
+      avgResolutionMs: support.resolve_s == null ? null : num(support.resolve_s) * 1000,
+      waiting: waiting.map((t) => ({
+        id: t.id,
+        number: num(t.number),
+        subject: t.subject,
+        who: t.name || "Unknown",
+        status: t.status,
+        waitingMs: now - new Date(t.created_at).getTime(),
+      })),
+    },
+    renewals: {
+      due7: num(renewals.due7),
+      due30: num(renewals.due30),
+      expired30: num(renewals.ended30),
+      next: nextRenewals.map((r) => ({ userId: r.id, name: r.name, plan: r.plan ?? "No plan", endsAt: new Date(r.ends).toISOString() })),
+    },
+    forwarding: {
+      enabled: forwarding.enabled !== false,
+      usersSetUp: num(forwarding.set_up),
+      usersTotal: num(forwarding.total),
+      received: num(forwarding.received),
+      rejected: num(forwarding.rejected),
+      acceptedPct:
+        num(forwarding.accepted) + num(forwarding.rejected) > 0
+          ? Math.round((num(forwarding.accepted) / (num(forwarding.accepted) + num(forwarding.rejected))) * 100)
+          : 100,
+      lastReceivedAt: isoOrNull(forwarding.last_at),
+      topRejections: topRejections.map((r) => ({ reason: r.reason, count: num(r.n) })),
+    },
+    emailDelivery: {
+      provider,
+      ready: ready[provider],
+      sesSandbox: account ? !account.productionAccess : null,
+      sesQuota: account ? { used: account.sentLast24Hours, max: account.max24HourSend } : null,
+      log: null,
+    },
+    broadcasts,
+    gmail: {
+      enabled: gmail.enabled === true,
+      connected: num(gmail.connected),
+      totalUsers: num(gmail.total),
+      lastSyncAt: isoOrNull(gmail.last_sync),
+      ingestErrors: num(gmail.ingest_errors),
+      failingSyncs: num(gmail.failing),
+    },
+    system: {
+      environment: process.env.APP_ENV ?? (process.env.NODE_ENV === "production" ? "Production" : "Development"),
+      commit: process.env.APP_COMMIT ? process.env.APP_COMMIT.slice(0, 7) : null,
+      dbSizeBytes: num(storage.db_bytes),
+      diskBytes: disk,
+      resumeBytes: num(storage.resume_bytes),
+      resumeFiles: num(storage.resume_files),
+      assetBytes: num(storage.asset_bytes),
+      jobs: null,
+    },
   };
 }

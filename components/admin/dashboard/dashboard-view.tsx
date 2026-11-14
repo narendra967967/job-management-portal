@@ -5,9 +5,7 @@
 // dashboard lets them reorder and hide blocks.
 
 import { useState } from "react";
-import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
-import { Check, FlaskConical, LayoutGrid, RotateCcw } from "lucide-react";
+import { Check, LayoutGrid, RotateCcw } from "lucide-react";
 import { Button } from "@/components/admin/ui/button";
 import { VizStyle } from "@/components/admin/ui/charts";
 import { InfoTip } from "@/components/ui/info-tip";
@@ -17,12 +15,12 @@ import {
   blockLabel,
   defaultLayout,
   isDefaultLayout,
-  periodRange,
   serializeLayout,
   type BlockId,
   type BlockSize,
   type DashboardData,
   type DashboardLayout,
+  type DayRange,
   type PeriodSel,
 } from "@/lib/admin/dashboard-model";
 import { cn } from "@/lib/utils";
@@ -102,15 +100,19 @@ function saveLayout(l: DashboardLayout) {
 export function DashboardView({
   data,
   sel,
+  range: dayRange,
+  timeZone,
   layout: initialLayout,
-  sample,
 }: {
   data: DashboardData;
   sel: PeriodSel;
+  /** The period as dates in the viewer's zone, worked out on the server (no server/browser drift). */
+  range: DayRange;
+  /** The zone the server counted in; the browser corrects it if it differs. */
+  timeZone: string;
   layout: DashboardLayout;
-  sample?: { quiet: boolean };
 }) {
-  const range = periodRange(sel);
+  const range = { from: dayRange.from, to: dayRange.to };
   const [layout, setLayout] = useState(initialLayout);
   const [editing, setEditing] = useState(false);
   const change = (next: DashboardLayout) => {
@@ -127,10 +129,10 @@ export function DashboardView({
   return (
     <div className="space-y-4">
       <VizStyle />
-      {sample && <SampleBanner quiet={sample.quiet} />}
       <PeriodSwitch
         sel={sel}
         generatedAt={data.generatedAt}
+        timeZone={timeZone}
         extra={
           !editing && (
             <Button variant="outline" size="sm" className="h-11 gap-1.5 sm:h-9" onClick={() => setEditing(true)}>
@@ -186,21 +188,3 @@ export function DashboardView({
   );
 }
 
-// PHASE 1 ONLY: says the numbers are made up, and flips between a busy and a
-// quiet day so both states can be reviewed. Removed in phase 3.
-function SampleBanner({ quiet }: { quiet: boolean }) {
-  const pathname = usePathname();
-  const params = useSearchParams();
-  const sp = new URLSearchParams(params.toString());
-  if (quiet) sp.delete("sample");
-  else sp.set("sample", "quiet");
-  return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-dashed border-primary/40 bg-primary/5 px-3 py-2 text-sm">
-      <FlaskConical className="size-4 shrink-0 text-primary" aria-hidden />
-      <span className="min-w-0 flex-1">Sample data. Real numbers arrive in a later phase.</span>
-      <Link href={`${pathname}?${sp.toString()}`} scroll={false} className="inline-flex min-h-11 items-center text-xs font-medium text-primary hover:underline">
-        {quiet ? "Show a busy day" : "Show a quiet day"}
-      </Link>
-    </div>
-  );
-}

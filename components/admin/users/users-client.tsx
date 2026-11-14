@@ -125,6 +125,8 @@ export function UsersClient({
   const [fExpiry, setFExpiry] = useState(() => pick(sp.get("expiry"), ["all", "soon", "expired", "none"] as const, "all"));
   const [joined, setJoined] = useState({ from: dateParam(sp.get("joinedFrom")), to: dateParam(sp.get("joinedTo")) });
   const [signedIn, setSignedIn] = useState({ from: dateParam(sp.get("signedInFrom")), to: dateParam(sp.get("signedInTo")) });
+  // role=user (dashboard links) or role=admin: the dashboard counts customers only.
+  const [role, setRole] = useState(() => pick(sp.get("role"), ["all", "user", "admin"] as const, "all"));
   const [step, setStep] = useState<FunnelKey | null>(() => {
     const v = sp.get("step");
     return isFunnelKey(v) ? v : null;
@@ -140,8 +142,9 @@ export function UsersClient({
       signedInFrom: signedIn.from,
       signedInTo: signedIn.to,
       step,
+      role,
     },
-    { status: "all", plan: "all", expiry: "all" },
+    { status: "all", plan: "all", expiry: "all", role: "all" },
   );
   const [pageSize, setPageSize] = useState(10);
   const [page, setPage] = useState(1);
@@ -180,6 +183,7 @@ export function UsersClient({
     return users.filter((u) => {
       if (q && !u.name.toLowerCase().includes(q) && !u.email.toLowerCase().includes(q)) return false;
       if (fStatus !== "all" && u.status !== fStatus) return false;
+      if (role !== "all" && u.role !== role) return false;
       if (fPlan === "paid" ? u.planFree : fPlan === "free" ? !u.planFree : fPlan !== "all" && u.planId !== fPlan) return false;
       if ((joined.from || joined.to) && !inDays(u.createdAt, joined)) return false;
       if ((signedIn.from || signedIn.to) && !(u.lastLoginAt && inDays(u.lastLoginAt, signedIn))) return false;
@@ -203,9 +207,9 @@ export function UsersClient({
       }
       return true;
     });
-  }, [users, query, fStatus, fPlan, fExpiry, joined, signedIn, step]);
+  }, [users, query, fStatus, fPlan, fExpiry, joined, signedIn, step, role]);
 
-  useEffect(() => setPage(1), [query, fStatus, fPlan, fExpiry, joined, signedIn, step, pageSize]);
+  useEffect(() => setPage(1), [query, fStatus, fPlan, fExpiry, joined, signedIn, step, role, pageSize]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
   const current = Math.min(page, pageCount);
@@ -366,7 +370,7 @@ export function UsersClient({
         </Button>
       </div>
 
-      {(joined.from || joined.to || signedIn.from || signedIn.to || step) && (
+      {(joined.from || joined.to || signedIn.from || signedIn.to || step || role !== "all") && (
         <div className="flex flex-wrap items-center gap-2" aria-label="Filters from the link">
           {(joined.from || joined.to) && (
             <FilterChip label={`Joined ${rangeLabel(joined.from, joined.to)}`} onClear={() => setJoined({ from: "", to: "" })} />
@@ -375,6 +379,7 @@ export function UsersClient({
             <FilterChip label={`Signed in ${rangeLabel(signedIn.from, signedIn.to)}`} onClear={() => setSignedIn({ from: "", to: "" })} />
           )}
           {step && <FilterChip label={`Stopped at: ${funnelLabel(step)}`} onClear={() => setStep(null)} />}
+          {role !== "all" && <FilterChip label={role === "user" ? "Customers only" : "Admins only"} onClear={() => setRole("all")} />}
         </div>
       )}
 

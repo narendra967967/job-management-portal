@@ -101,13 +101,15 @@ export function SignedInTile({ data, range }: BlockProps) {
 
 export function PaidUsersTile({ data }: BlockProps) {
   const p = data.paid;
-  const diff = p.prevConversionPct === null ? null : p.conversionPct - p.prevConversionPct;
+  const joined = data.users.joined;
+  // Conversion only means something when people signed up in the period.
+  const diff = joined === 0 || p.prevConversionPct === null ? null : p.conversionPct - p.prevConversionPct;
   return (
     <Tile
       icon={CreditCard}
       label="Paid users"
       value={formatCount(p.count)}
-      sub={`${p.conversionPct}% of new sign-ups paid`}
+      sub={joined === 0 ? "No new sign-ups in this period" : `${p.conversionPct}% of new sign-ups paid`}
       change={diff === null ? null : { text: diff === 0 ? "Same as previous period" : `${diff > 0 ? "+" : ""}${diff} points vs previous period`, up: diff >= 0 }}
       href={links.users({ plan: "paid" })}
     />
@@ -221,7 +223,6 @@ export function FunnelBlock({ data, range }: BlockProps) {
         {data.funnel.map((s, i) => {
           const pct = first > 0 ? Math.round((s.value / first) * 100) : 0;
           const next = data.funnel[i + 1];
-          const stuck = next ? s.value - next.value : 0;
           return (
             <li key={s.key}>
               <Link
@@ -231,7 +232,7 @@ export function FunnelBlock({ data, range }: BlockProps) {
                 <div className="mb-1 flex items-center justify-between gap-2 text-xs">
                   <span className="font-medium">{s.label}</span>
                   <span className="shrink-0 tabular-nums text-muted-foreground">
-                    {formatCount(s.value)} · {pct}%{next && stuck > 0 ? ` · ${formatCount(stuck)} stopped` : ""}
+                    {formatCount(s.value)} · {pct}%{next && s.stopped > 0 ? ` · ${formatCount(s.stopped)} stopped` : ""}
                   </span>
                 </div>
                 <div className="h-2 overflow-hidden rounded-full bg-muted">
@@ -282,6 +283,7 @@ export function RevenueBlock({ data, range }: BlockProps) {
         </div>
         <div>
           <p className="mb-1 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">By plan, this period</p>
+          {r.byPlan.length === 0 && <p className="py-2 text-sm text-muted-foreground">No paid orders in this period</p>}
           <ul>
             {r.byPlan.map((p) => (
               <li key={p.label}>
