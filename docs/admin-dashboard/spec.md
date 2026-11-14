@@ -67,3 +67,7 @@ database. Block sizes are fixed. Needs attention can't be hidden.
 5. Job runs and deployed commit.
 6. Customizable layout.
 7. Check script, knowledge-base articles, preprod, prod.
+
+Status, November 15, 2026: phases 1 to 6 are built, and phase 7's check script
+(`scripts/security/dashboard-checks.mts`) and articles are done. What's left is the owner's
+deploy to preprod, then prod. Migrations 0060 to 0062 run on deploy.
