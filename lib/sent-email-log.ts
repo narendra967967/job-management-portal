@@ -8,7 +8,7 @@ import "server-only";
 
 import { sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { cleanErrorMessage } from "@/lib/clean-error";
+import { cleanErrorMessage, dbErrorReason } from "@/lib/clean-error";
 import type { SentEmailStatus, SentEmailTag } from "@/lib/admin/sent-emails-model";
 
 export interface SentEmailEntry {
@@ -51,6 +51,6 @@ async function insert(e: SentEmailEntry): Promise<void> {
 /** Records one send in the background. Never throws and is never awaited by the sender. */
 export function logSentEmail(e: SentEmailEntry): void {
   insert(e).catch((err) => {
-    console.error("[sent-email-log] couldn't record an email:", err instanceof Error ? err.message : err);
+    console.error(`[sent-email-log] couldn't record an email: ${dbErrorReason(err)}`);
   });
 }

@@ -9,7 +9,7 @@ import "server-only";
 
 import { sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { cleanErrorMessage } from "@/lib/clean-error";
+import { cleanErrorMessage, dbErrorReason } from "@/lib/clean-error";
 import type { JobKey } from "@/lib/job-runs-model";
 
 async function record(job: JobKey, startedAt: Date, error: unknown | null): Promise<void> {
@@ -33,7 +33,7 @@ async function record(job: JobKey, startedAt: Date, error: unknown | null): Prom
         last_ok_at = coalesce(excluded.last_ok_at, job_runs.last_ok_at),
         failures_in_a_row = case when excluded.last_ok then 0 else job_runs.failures_in_a_row + 1 end`);
   } catch (err) {
-    console.error(`[job-runs] couldn't record the ${job} run:`, err instanceof Error ? err.message : err);
+    console.error(`[job-runs] couldn't record the ${job} run: ${dbErrorReason(err)}`);
   }
 }
 
