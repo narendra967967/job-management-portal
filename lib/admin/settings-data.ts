@@ -57,12 +57,7 @@ export interface AdminSettings {
     purgeStatuses: string[];
   };
   billing: {
-    enabled: boolean;
-    provider: string;
-    mode: string;
     currency: string;
-    keyId: string;
-    hasSecret: boolean;
     gstin: string;
     gstRegistered: boolean | null;
     pan: string;
@@ -167,12 +162,7 @@ export async function loadAdminSettings(adminId: string): Promise<AdminSettings>
       purgeStatuses: c?.purgeStatuses ?? [],
     },
     billing: {
-      enabled: b?.enabled ?? false,
-      provider: b?.provider ?? "razorpay",
-      mode: b?.mode ?? "test",
       currency: b?.currency ?? "INR",
-      keyId: b?.keyId ?? "",
-      hasSecret: !!b?.keySecretCiphertext,
       gstin: b?.gstin ?? "",
       gstRegistered: b?.gstRegistered ?? null,
       pan: b?.pan ?? "",

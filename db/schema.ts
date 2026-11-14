@@ -798,17 +798,9 @@ export const ticketReplies = pgTable(
  *  an automatic rollback to the previous build still works, then get dropped. */
 export const billingConfig = pgTable("billing_config", {
   id: text("id").primaryKey().default("app"),
-  /** @deprecated moved to payment_gateways (0054); drop next release. */
-  enabled: boolean("enabled").notNull().default(false),
-  /** @deprecated moved to payment_gateways (0054); drop next release. */
-  provider: text("provider").notNull().default("razorpay"),
-  /** @deprecated moved to payment_gateways (0054); drop next release. */
-  mode: text("mode").notNull().default("test"),
+  // The gateway itself (on/off, mode, keys) is in payment_gateways since 0054;
+  // its old columns here were dropped in 0063.
   currency: text("currency").notNull().default("INR"),
-  /** @deprecated moved to payment_gateways (0054); drop next release. */
-  keyId: text("key_id"),
-  /** @deprecated moved to payment_gateways (0054); drop next release. */
-  keySecretCiphertext: text("key_secret_ciphertext"),
   // "GST registered": null = not chosen yet (online payment stays off until
   // Billing is complete), false = not registered (no GST; PAN on a commercial
   // invoice), true = registered (GSTIN, rate, SAC; tax invoice).

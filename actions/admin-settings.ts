@@ -278,12 +278,7 @@ export async function updateBillingAction(input: unknown): Promise<Result> {
   await requireAdmin();
   const p = z
     .object({
-      enabled: z.boolean(),
-      provider: z.enum(["razorpay", "stripe"]),
-      mode: z.enum(["test", "live"]),
       currency: z.enum(["INR", "USD"]),
-      keyId: z.string().optional().default(""),
-      keySecret: z.string().optional().default(""),
       gstRegistered: z.boolean().nullable().optional().default(null),
       pan: z.string().max(10).optional().default(""),
       gstin: z.string().max(15).optional().default(""),
@@ -297,7 +292,6 @@ export async function updateBillingAction(input: unknown): Promise<Result> {
     .safeParse(input);
   if (!p.success) return fail(p.error);
   const v = p.data;
-  if (v.enabled && !v.keyId.trim()) return { ok: false, error: "Enter the gateway key ID." };
   // Partial details may be saved (filled in over time); whatever is entered
   // must be well-formed. Completeness only decides whether online payment runs.
   const gstin = v.gstin.trim().toUpperCase();
@@ -307,11 +301,7 @@ export async function updateBillingAction(input: unknown): Promise<Result> {
   if (pan && !isValidPan(pan)) return { ok: false, error: "That PAN isn't valid. It's 5 letters, 4 digits, 1 letter." };
   if (sacCode && !isValidSac(sacCode)) return { ok: false, error: "A SAC code for services is 6 digits starting with 99." };
   const data: Record<string, unknown> = {
-    enabled: v.enabled,
-    provider: v.provider,
-    mode: v.mode,
     currency: v.currency,
-    keyId: v.keyId || null,
     gstRegistered: v.gstRegistered,
     pan: pan || null,
     gstin: gstin || null,
@@ -322,7 +312,6 @@ export async function updateBillingAction(input: unknown): Promise<Result> {
     companyAddress: v.companyAddress || null,
     invoicePrefix: v.invoicePrefix || "JOB-",
   };
-  if (v.keySecret) data.keySecretCiphertext = encryptSecret(v.keySecret);
   await db.insert(billingConfig).values({ id: "app", ...data }).onConflictDoUpdate({ target: billingConfig.id, set: data });
   revalidate();
   return { ok: true };

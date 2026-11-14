@@ -498,9 +498,8 @@ function BrandingAsset({
 /* ---------------- Application: Billing ---------------- */
 
 function BillingCard({ initial }: { initial: AdminSettings["billing"] }) {
-  // Old gateway fields (now in Settings → Payments) pass through unchanged
-  // until the deprecated billing_config columns are dropped.
-  const { enabled, provider, mode, currency, keyId } = initial;
+  // The payment gateway itself is set in Settings → Payments.
+  const { currency } = initial;
   const [gstRegistered, setGstRegistered] = useState<boolean | null>(initial.gstRegistered);
   const [companyName, setCompanyName] = useState(initial.companyName);
   const [companyAddress, setCompanyAddress] = useState(initial.companyAddress);
@@ -647,7 +646,7 @@ function BillingCard({ initial }: { initial: AdminSettings["billing"] }) {
         onSave={() =>
           sv.save(() =>
             updateBillingAction({
-              enabled, provider, mode, currency, keyId,
+              currency,
               gstRegistered,
               pan,
               gstin,
