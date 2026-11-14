@@ -1,9 +1,8 @@
 // Sent-email log (admin Monitoring → Sent emails): one row per email the app
 // sends, whichever channel sent it. Client-safe shapes and labels. Approved in
 // docs/admin-dashboard/spec.md ("New data"): no email content is kept, rows
-// are kept 30 days under Settings → Data retention. The table and the
-// recording at lib/mailer.ts sendMailWith arrive in dashboard phase 4; until
-// then the page shows lib/admin/sent-emails-sample.ts.
+// are kept 30 days under Settings → Data retention. Recorded at lib/mailer.ts
+// sendMailWith (lib/sent-email-log.ts), read by lib/admin/sent-emails-data.ts.
 
 export type SentEmailStatus = "sent" | "failed";
 
@@ -15,6 +14,21 @@ export const SENT_EMAIL_KIND_LABELS: Record<SentEmailKind, string> = {
   broadcast: "Broadcast",
   test: "Test email",
 };
+
+/** Channel names as stored and shown. Text in the table, so a new one needs no migration. */
+export const SENT_EMAIL_CHANNELS = { ses: "Amazon SES", smtp: "SMTP" } as const;
+
+/**
+ * Which email a send is, for the log. lib/email.ts sendAppEmail requires it,
+ * so a new email can't skip the log.
+ */
+export interface SentEmailTag {
+  kind: SentEmailKind;
+  /** The template's name, the broadcast's title or the test's name. */
+  label: string;
+  templateKey?: string;
+  broadcastId?: string;
+}
 
 export interface SentEmailRow {
   id: string;
@@ -39,6 +53,3 @@ export interface SentEmailRow {
   /** The channel's message id, for looking an email up in its console. */
   messageId: string | null;
 }
-
-/** Default number of days kept (Settings → Data retention can change it). */
-export const SENT_EMAIL_KEEP_DAYS = 30;

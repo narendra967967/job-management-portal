@@ -10,7 +10,8 @@ export type RetentionKey =
   | "notificationDays"
   | "autoActionDays"
   | "kbConversationDays"
-  | "broadcastQueueDays";
+  | "broadcastQueueDays"
+  | "sentEmailLogDays";
 
 export type RetentionConfig = Record<RetentionKey, number>;
 
@@ -79,6 +80,14 @@ export const RETENTION_TYPES: RetentionType[] = [
     min: 30,
     max: 365,
     default: 90,
+  },
+  {
+    key: "sentEmailLogDays",
+    label: "Sent emails",
+    hint: "Every email the app sent: who to, which email, the channel and the result · never the content",
+    min: 7,
+    max: 365,
+    default: 30,
   },
   {
     key: "kbConversationDays",

@@ -176,6 +176,7 @@ export async function sendTestBroadcastAction(input: BroadcastInput): Promise<{ 
         p.data.category === "promotional"
           ? `You're getting this because you have a ${appName} account. The real email has an unsubscribe link here.`
           : `This is a service message about your ${appName} account, so it can't be turned off.`,
+      tag: { kind: "test", label: `Broadcast test: ${p.data.title}` },
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

@@ -421,6 +421,13 @@
       "when": 1794145618960,
       "tag": "0059_email_delivery",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1794669041396,
+      "tag": "0060_sent_email_log",
+      "breakpoints": true
     }
   ]
 }

@@ -442,8 +442,8 @@ export interface DashboardData {
     ready: boolean;
     sesSandbox: boolean | null;
     sesQuota: { used: number; max: number } | null;
-    /** From the sent-email log (dashboard phase 4); null until it exists. */
-    log: { sent: number; failed: number; byChannel: { channel: string; sent: number; failed: number }[] } | null;
+    /** From the sent-email log, for the period: every email handed to a channel. */
+    log: { sent: number; failed: number; byChannel: { channel: string; sent: number; failed: number }[] };
   };
   broadcasts: { next: BroadcastSummary | null; sending: BroadcastSummary | null; last: BroadcastSummary | null };
   gmail: { enabled: boolean; connected: number; totalUsers: number; lastSyncAt: string | null; ingestErrors: number; failingSyncs: number };

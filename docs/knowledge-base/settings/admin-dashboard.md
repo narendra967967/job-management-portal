@@ -38,7 +38,7 @@ This strip shows only what needs you, most urgent first, and says "All clear" ot
 
 ## Other blocks
 
-**Renewals** counts paid plans and free trials, the same as the Renewals page. **Forwarding health** shows the period's job-alert emails, and **Accepted** is accepted ÷ (accepted + rejected). **Email delivery** reads the Amazon SES quota from AWS, at most every 5 minutes. Sent and failed email counts, scheduled job runs and the deployed commit aren't recorded yet, and those blocks say so.
+**Renewals** counts paid plans and free trials, the same as the Renewals page. **Forwarding health** shows the period's job-alert emails, and **Accepted** is accepted ÷ (accepted + rejected). **Email delivery** reads the Amazon SES quota from AWS, at most every 5 minutes, and counts the period's sent and failed emails from Monitoring → Sent emails. Unlike the rest of the dashboard, those counts include admins and test emails, because they measure delivery. Scheduled job runs and the deployed commit aren't recorded yet, and the System block says so.
 
 ## Changing the layout
 

@@ -36,7 +36,7 @@ export default async function PrivacyPage() {
   ]);
   const contact = supportEmail || "our support address";
   return (
-    <LegalLayout title="Privacy policy" updated="November 8, 2026">
+    <LegalLayout title="Privacy policy" updated="November 14, 2026">
       <p>
         This Privacy Policy explains what information {appName} (&ldquo;we&rdquo;, &ldquo;us&rdquo;) collects
         when you use our job search tracker (the &ldquo;Service&rdquo;), how we use it and how we keep it
@@ -268,8 +268,12 @@ export default async function PrivacyPage() {
         </li>
       </ul>
       <p>
-        We only email addresses that have been confirmed. For each email we keep a record of who it went
-        to and whether it arrived, for the period given under Data retention.
+        We only send these messages to addresses that have been confirmed.
+      </p>
+      <p>
+        For every email we send you, of any kind, we keep a short record: your address, which email it was
+        and its subject line, and whether it went out or failed. We don&rsquo;t keep a copy of the email
+        itself. These records are deleted after the period given under Data retention.
       </p>
 
       <h2>Sharing</h2>
@@ -310,8 +314,9 @@ export default async function PrivacyPage() {
         Service are deleted automatically: the email delivery log after {days(retention.inboundLogDays)},
         ingestion issues after {days(retention.ingestIssueDays)}, the message IDs used to avoid importing
         an email twice after {days(retention.processedLedgerDays)}, notifications after{" "}
-        {days(retention.notificationDays)}, the record of who our messages were emailed to after{" "}
-        {days(retention.broadcastQueueDays)}, and the history of automatic status changes on your leads
+        {days(retention.notificationDays)}, the record of who our messages to everyone were emailed to after{" "}
+        {days(retention.broadcastQueueDays)}, the record of each email we send you after{" "}
+        {days(retention.sentEmailLogDays)}, and the history of automatic status changes on your leads
         after {days(retention.autoActionDays)}, except changes you undid, which stay with the lead.
         {gmailOn ? " Disconnecting Google stops all further reading of your mailbox." : ""} Confirmation
         codes expire shortly and are then deleted. When you reset your leads they are deleted

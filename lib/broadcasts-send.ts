@@ -218,6 +218,7 @@ export async function runBroadcasts(): Promise<BroadcastRunResult> {
           footerNote: b.promo
             ? `You're getting this because you have a ${appName} account.`
             : `This is a service message about your ${appName} account, so it can't be turned off.`,
+          tag: { kind: "broadcast", label: b.title, broadcastId: job.broadcast_id },
         });
         await db
           .update(broadcastRecipients)

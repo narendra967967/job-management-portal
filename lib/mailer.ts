@@ -15,6 +15,8 @@ import { decryptSecret } from "@/lib/crypto";
 import { getEmailProvider, getSesCredentials } from "@/lib/email-delivery";
 import type { EmailProvider } from "@/lib/email-delivery-model";
 import { sesTransportOptions } from "@/lib/ses";
+import { SENT_EMAIL_CHANNELS, type SentEmailTag } from "@/lib/admin/sent-emails-model";
+import { cleanSendError, logSentEmail } from "@/lib/sent-email-log";
 
 /** Email isn't set up for the chosen service (the name predates Amazon SES). */
 export const SMTP_NOT_CONFIGURED = "SMTP_NOT_CONFIGURED";
@@ -26,6 +28,8 @@ export interface MailInput {
   text?: string;
   /** Extra headers, e.g. List-Unsubscribe on promotional email. */
   headers?: Record<string, string>;
+  /** Which email this is, for the sent-email log. */
+  tag: SentEmailTag;
 }
 
 interface ResolvedSmtp {
@@ -98,12 +102,34 @@ export async function sendMail(input: MailInput): Promise<void> {
   await sendMailWith(await getEmailProvider(), input);
 }
 
-/** Send with a specific service, whichever is chosen (the test emails in Settings). */
+/**
+ * Send with a specific service, whichever is chosen (the test emails in
+ * Settings). Every email passes through here, so this is where each one is
+ * recorded in the sent-email log, in the background (lib/sent-email-log.ts).
+ * "Email isn't set up" isn't recorded: nothing was handed to a channel, and
+ * Needs attention on the dashboard already says so.
+ */
 export async function sendMailWith(provider: EmailProvider, input: MailInput): Promise<void> {
+  const channel = SENT_EMAIL_CHANNELS[provider];
+  const entry = { to: input.to, subject: input.subject, tag: input.tag, channel };
+  let messageId: string | undefined;
+  try {
+    messageId = await deliver(provider, input);
+  } catch (e) {
+    if (!(e instanceof Error && e.message === SMTP_NOT_CONFIGURED)) {
+      logSentEmail({ ...entry, status: "failed", error: cleanSendError(e) });
+    }
+    throw e;
+  }
+  logSentEmail({ ...entry, status: "sent", messageId });
+}
+
+/** Hands the email to the service. Returns the service's message id. */
+async function deliver(provider: EmailProvider, input: MailInput): Promise<string | undefined> {
   if (provider === "ses") {
     const c = await getSesCredentials();
     if (!c) throw new Error(SMTP_NOT_CONFIGURED);
-    await nodemailer.createTransport(sesTransportOptions(c)).sendMail({
+    const info = await nodemailer.createTransport(sesTransportOptions(c)).sendMail({
       from: c.fromName ? { name: c.fromName, address: c.fromEmail } : c.fromEmail,
       replyTo: c.replyTo || undefined,
       to: input.to,
@@ -112,7 +138,7 @@ export async function sendMailWith(provider: EmailProvider, input: MailInput): P
       text: input.text,
       headers: input.headers,
     });
-    return;
+    return info.messageId;
   }
 
   const c = await resolveConfig();
@@ -125,7 +151,7 @@ export async function sendMailWith(provider: EmailProvider, input: MailInput): P
     auth: c.user && c.pass ? { user: c.user, pass: c.pass } : undefined,
   });
 
-  await transport.sendMail({
+  const info = await transport.sendMail({
     from: c.fromName ? { name: c.fromName, address: c.fromEmail } : c.fromEmail,
     replyTo: c.replyTo || undefined,
     to: input.to,
@@ -134,4 +160,5 @@ export async function sendMailWith(provider: EmailProvider, input: MailInput): P
     text: input.text,
     headers: input.headers,
   });
+  return info.messageId;
 }

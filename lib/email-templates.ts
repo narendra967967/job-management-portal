@@ -189,6 +189,8 @@ export interface TemplateEmailOptions {
   /** Wording to use instead of the saved one (the editor's test email). */
   content?: EmailTemplateContent;
   subjectPrefix?: string;
+  /** The editor's test email: logged as a test, not as the automatic email. */
+  test?: boolean;
 }
 
 /**
@@ -225,6 +227,9 @@ export async function sendTemplateEmail(key: EmailTemplateKey, opts: TemplateEma
     footerNote: r.footerNote || undefined,
     text,
     headers: opts.headers,
+    tag: opts.test
+      ? { kind: "test", label: `Template test: ${def.name}`, templateKey: def.key }
+      : { kind: "template", label: def.name, templateKey: def.key },
   });
 }
 

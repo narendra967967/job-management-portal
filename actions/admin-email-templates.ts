@@ -164,7 +164,7 @@ export async function sendEmailTemplateTestAction(
   const { app_name: _sampleName, ...samples } = sampleValues(def);
   void _sampleName;
   try {
-    await sendTemplateEmail(def.key, { to: me.email, values: samples, content, buttonUrl: siteUrl(), subjectPrefix: "[Test] " });
+    await sendTemplateEmail(def.key, { to: me.email, values: samples, content, buttonUrl: siteUrl(), subjectPrefix: "[Test] ", test: true });
   } catch (e) {
     console.error("email template test failed", e);
     return { ok: false, error: "The test email didn't send. Check Settings → Email delivery." };

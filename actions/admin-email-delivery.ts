@@ -107,6 +107,7 @@ export async function sendSesTestAction(to: unknown): Promise<{ ok: true; to: st
   try {
     await sendAppEmail({
       via: "ses",
+      tag: { kind: "test", label: "Amazon SES test email" },
       to: p.data,
       subject: `${appName}: Amazon SES test email`,
       heading: "Amazon SES is working",

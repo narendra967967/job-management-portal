@@ -102,7 +102,7 @@ export function PeriodSwitch({
           setCustom(false);
           go({ id });
         }}
-        className="h-11 min-w-0 flex-1 rounded-lg border border-input bg-card px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 sm:h-9 sm:flex-none"
+        className="h-11 min-w-40 flex-1 rounded-lg border border-input bg-card px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 sm:h-9 sm:flex-none"
       >
         {PERIODS.map((p) => (
           <option key={p.id} value={p.id}>

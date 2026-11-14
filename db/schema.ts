@@ -1157,11 +1157,45 @@ export const retentionConfig = pgTable("retention_config", {
   autoActionDays: integer("auto_action_days").notNull().default(365),
   kbConversationDays: integer("kb_conversation_days").notNull().default(60),
   broadcastQueueDays: integer("broadcast_queue_days").notNull().default(90),
+  sentEmailLogDays: integer("sent_email_log_days").notNull().default(30),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .defaultNow()
     .$onUpdate(() => new Date()),
 });
+
+/** One row per email the app hands to a channel (admin Monitoring → Sent
+ *  emails). Written by lib/sent-email-log.ts from lib/mailer.ts sendMailWith,
+ *  never in the way of the send. No email content: who it went to, which email,
+ *  the channel and the result. Kind, channel and status are text so a new
+ *  channel or kind needs no migration. Trimmed by Data retention. */
+export const sentEmailLog = pgTable(
+  "sent_email_log",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    sentAt: timestamp("sent_at", { withTimezone: true }).notNull().defaultNow(),
+    toAddress: text("to_address").notNull(),
+    // The account the address belonged to when it was sent; gone with the account.
+    userId: text("user_id").references(() => user.id, { onDelete: "cascade" }),
+    // template | broadcast | test (lib/admin/sent-emails-model.ts)
+    kind: text("kind").notNull(),
+    templateKey: text("template_key"),
+    broadcastId: uuid("broadcast_id").references(() => broadcasts.id, { onDelete: "set null" }),
+    // The template's name, the broadcast's title or the test's name, as it was.
+    label: text("label").notNull(),
+    subject: text("subject").notNull().default(""),
+    // As shown, e.g. "Amazon SES" or "SMTP".
+    channel: text("channel").notNull(),
+    // sent | failed
+    status: text("status").notNull(),
+    error: text("error"),
+    messageId: text("message_id"),
+  },
+  (t) => [
+    index("sent_email_log_sent_idx").on(t.sentAt.desc()),
+    index("sent_email_log_user_idx").on(t.userId),
+  ],
+);
 
 /** Emails waiting for the AI reader (no built-in reader, or it found no jobs,
  *  and the user has an AI key). Holds only what the AI needs — the email

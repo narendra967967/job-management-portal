@@ -5,8 +5,8 @@ import "server-only";
 // in the viewer's own time zone. Customer metrics count role = 'user' only:
 // admins are operators, not customers.
 //
-// Not here yet: the sent-email log (phase 4) and scheduled job runs and the
-// deployed commit (phase 5). Those fields come back null and the blocks say so.
+// Not here yet: scheduled job runs and the deployed commit (phase 5). Those
+// fields come back null and the blocks say so.
 
 import { statfs } from "node:fs/promises";
 import { sql, type SQL } from "drizzle-orm";
@@ -158,6 +158,7 @@ export async function loadDashboard(range: DayRange, tz: string, today: string):
     provider,
     ready,
     disk,
+    sentLog,
   ] = await Promise.all([
     one(sql`
       select count(*)::int as total,
@@ -327,6 +328,13 @@ export async function loadDashboard(range: DayRange, tz: string, today: string):
     getEmailProvider(),
     providersReady(),
     diskSize(),
+    // Every email the app handed to a channel, admins and tests included: this is delivery health.
+    rows<{ channel: string; sent: number; failed: number }>(sql`
+      select channel,
+        count(*) filter (where status = 'sent')::int as sent,
+        count(*) filter (where status = 'failed')::int as failed
+      from sent_email_log where ${within(sql`sent_at`, range, tz)}
+      group by channel order by count(*) desc`),
   ]);
 
   /* ---- revenue by month (amounts, last 12 months) ---- */
@@ -543,7 +551,11 @@ export async function loadDashboard(range: DayRange, tz: string, today: string):
       ready: ready[provider],
       sesSandbox: account ? !account.productionAccess : null,
       sesQuota: account ? { used: account.sentLast24Hours, max: account.max24HourSend } : null,
-      log: null,
+      log: {
+        sent: sentLog.reduce((a, c) => a + num(c.sent), 0),
+        failed: sentLog.reduce((a, c) => a + num(c.failed), 0),
+        byChannel: sentLog.map((c) => ({ channel: c.channel, sent: num(c.sent), failed: num(c.failed) })),
+      },
     },
     broadcasts,
     gmail: {

@@ -129,6 +129,12 @@ const db = new pg.Client({ connectionString: process.env.DATABASE_URL });
 await db.connect();
 const before = (await db.query("select * from email_delivery")).rows as Record<string, unknown>[];
 const providerBefore = await getEmailProvider();
+// The sent-email log: only the rows this script makes (to these addresses,
+// since it started) are removed at the end, so real sends meanwhile stay.
+const logStart = (await db.query("select now() as t")).rows[0].t as Date;
+const logCountBefore = Number((await db.query("select count(*) from sent_email_log where sent_at < $1", [logStart])).rows[0].count);
+const firstUser = (await db.query(`select lower(email) as email from "user" order by created_at limit 1`)).rows[0]?.email as string | undefined;
+const logAddresses = ["someone@example.com", "x@example.com", "gone-broadcast@example.com", "broken-log@example.com", ...(firstUser ? [firstUser] : [])];
 
 async function restore() {
   await db.query("delete from email_delivery");
@@ -167,6 +173,7 @@ try {
     html: "<p>Hi</p>",
     text: "Hi",
     headers: { "List-Unsubscribe": "<https://example.com/u>", "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" },
+    tag: { kind: "template", label: "Delivery check", templateKey: "verify_email" },
   });
   const sent = seen.find((r) => r.url.startsWith("/v2/email/outbound-emails"));
   check("D4", "the email went to SES", !!sent);
@@ -189,7 +196,7 @@ try {
     }
   };
   mode = "reject";
-  check("D5", "a sandbox rejection is explained", /sandbox/.test(await errorOf(() => sendMailWith("ses", { to: "x@example.com", subject: "s", html: "h" }))));
+  check("D5", "a sandbox rejection is explained", /sandbox/.test(await errorOf(() => sendMailWith("ses", { to: "x@example.com", subject: "s", html: "h", tag: { kind: "test", label: "Reject check" } }))));
   mode = "badkey";
   check("D5", "an unknown key is explained", /doesn't recognize/.test(await errorOf(async () => getSesAccount((await getSesCredentials())!))));
   mode = "denied";
@@ -198,19 +205,76 @@ try {
   await db.query("update email_delivery set ses_secret_ciphertext = null where id = 'app'");
   let thrown = "";
   try {
-    await sendMail({ to: "x@example.com", subject: "s", html: "h" });
+    await sendMail({ to: "x@example.com", subject: "s", html: "h", tag: { kind: "test", label: "Not set up check" } });
   } catch (e) {
     thrown = (e as Error).message;
   }
   check("D5", "SES chosen but incomplete fails instead of falling back to SMTP", thrown === "SMTP_NOT_CONFIGURED", thrown);
   check("D5", "and the switch would refuse SES now", (await providersReady()).ses === false);
+
+  // D7 the sent-email log (dashboard phase 4). Rows are written in the
+  // background, so wait for them.
+  const logRows = async (to: string) =>
+    (await db.query("select * from sent_email_log where to_address = $1 and sent_at >= $2 order by sent_at", [to, logStart])).rows as Record<string, unknown>[];
+  const waitRows = async (to: string, n: number) => {
+    for (let i = 0; i < 40; i++) {
+      const r = await logRows(to);
+      if (r.length >= n) return r;
+      await new Promise((ok) => setTimeout(ok, 50));
+    }
+    return logRows(to);
+  };
+  const [okRow] = await waitRows("someone@example.com", 1);
+  check("D7", "a sent email is recorded", okRow?.status === "sent" && okRow.channel === "Amazon SES" && okRow.kind === "template");
+  check("D7", "with which email it was", okRow?.label === "Delivery check" && okRow.template_key === "verify_email" && okRow.subject === "Delivery check");
+  check("D7", "and the channel's message id", typeof okRow?.message_id === "string" && okRow.message_id.includes("check-message-id"), String(okRow?.message_id));
+  check("D7", "the email's content isn't stored", !JSON.stringify(okRow ?? {}).includes("<p>Hi</p>") && !("html" in (okRow ?? {})));
+  const xRows = await waitRows("x@example.com", 1);
+  const failRow = xRows.find((r) => r.label === "Reject check");
+  check("D7", "a failed email is recorded with the channel's reason", failRow?.status === "failed" && /not verified/.test(String(failRow?.error)));
+  check("D7", "the error holds no key or secret", !!failRow && !String(failRow.error).includes(FAKE_ID_BODY) && !String(failRow.error).includes(SECRET_MARKER));
+  check("D7", "\"email isn't set up\" isn't recorded (nothing reached a channel)", !xRows.some((r) => r.label === "Not set up check"));
+
+  // Put the secret back for the rest.
+  await db.query("update email_delivery set ses_secret_ciphertext = $1 where id = 'app'", [ciphertext]);
+  const [someone] = (await db.query(`select id, email from "user" order by created_at limit 1`)).rows as { id: string; email: string }[];
+  if (someone) {
+    await sendMailWith("ses", { to: someone.email.toUpperCase(), subject: "s", html: "h", tag: { kind: "test", label: "Account link check" } });
+    const [linked] = await waitRows(someone.email.toUpperCase(), 1);
+    check("D7", "the row is linked to the account the address belongs to", linked?.user_id === someone.id);
+  }
+  await sendMailWith("ses", {
+    to: "gone-broadcast@example.com",
+    subject: "s",
+    html: "h",
+    tag: { kind: "broadcast", label: "Deleted broadcast check", broadcastId: "00000000-0000-4000-8000-000000000000" },
+  });
+  const [gone] = await waitRows("gone-broadcast@example.com", 1);
+  check("D7", "a broadcast deleted meanwhile still gets its row", gone?.kind === "broadcast" && gone.broadcast_id === null);
+  let brokenThrew = false;
+  try {
+    // A tag the log can't store: the insert fails, the send must not.
+    await sendMailWith("ses", { to: "broken-log@example.com", subject: "s", html: "h", tag: { kind: "test" } as never });
+  } catch {
+    brokenThrew = true;
+  }
+  check("D7", "a failure to record never fails the send", !brokenThrew);
+  const mailerSrc = read("lib/mailer.ts");
+  check("D7", "the mailer never waits for the log", mailerSrc.includes("logSentEmail(") && !/await\s+logSentEmail/.test(mailerSrc));
+  check("D7", "every send has to say which email it is", /tag: SentEmailTag;/.test(read("lib/email.ts")) && /tag: SentEmailTag;/.test(mailerSrc));
+  check("D7", "Data retention trims the log", /sentEmailLogDays/.test(read("lib/retention-model.ts")) && /delete\(sentEmailLog\)/.test(read("lib/retention.ts")));
 } finally {
   await restore();
+  await new Promise((ok) => setTimeout(ok, 300)); // let any last background insert land
+  await db.query("delete from sent_email_log where sent_at >= $1 and lower(to_address) = any($2::text[])", [logStart, logAddresses]);
   await new Promise<void>((r) => fake.close(() => r()));
 }
 const after = (await db.query("select * from email_delivery")).rows;
 check("D3", "email_delivery is back exactly as it was", JSON.stringify(after) === JSON.stringify(before));
 check("D3", "the service in use is unchanged", (await getEmailProvider()) === providerBefore, providerBefore);
+const logLeft = (await db.query("select count(*) from sent_email_log where lower(to_address) = any($1::text[]) and sent_at >= $2", [logAddresses, logStart])).rows[0].count;
+const logOlder = Number((await db.query("select count(*) from sent_email_log where sent_at < $1", [logStart])).rows[0].count);
+check("D7", "the check's log rows are gone and older rows untouched", Number(logLeft) === 0 && logOlder === logCountBefore);
 await db.end();
 
 /* ---------------- D6 signed out (HTTP) ---------------- */

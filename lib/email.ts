@@ -8,6 +8,7 @@ import "server-only";
 
 import { sendMail, sendMailWith, isMailConfigured, SMTP_NOT_CONFIGURED } from "@/lib/mailer";
 import type { EmailProvider } from "@/lib/email-delivery-model";
+import type { SentEmailTag } from "@/lib/admin/sent-emails-model";
 import { getAppName, getSupportEmail } from "@/lib/branding";
 
 export { isMailConfigured, SMTP_NOT_CONFIGURED };
@@ -39,6 +40,8 @@ export interface AppEmailOptions {
   headers?: Record<string, string>;
   /** Send with this service instead of the chosen one (the test emails in Settings → Email delivery). */
   via?: EmailProvider;
+  /** Which email this is, for the sent-email log (admin Monitoring → Sent emails). */
+  tag: SentEmailTag;
 }
 
 function esc(s: string): string {
@@ -133,6 +136,6 @@ export async function sendAppEmail(opts: AppEmailOptions): Promise<void> {
     return;
   }
   const { html, text } = await renderAppEmail(opts);
-  const mail = { to: opts.to, subject: opts.subject, html, text, headers: opts.headers };
+  const mail = { to: opts.to, subject: opts.subject, html, text, headers: opts.headers, tag: opts.tag };
   await (opts.via ? sendMailWith(opts.via, mail) : sendMail(mail));
 }

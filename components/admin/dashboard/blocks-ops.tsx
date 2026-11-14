@@ -209,29 +209,28 @@ export function EmailDeliveryBlock({ data, range }: BlockProps) {
           <Meter value={q.used} max={q.max} label="Amazon SES quota used today" tone={quotaPct > 0.9 ? "bad" : quotaPct > 0.7 ? "warn" : "default"} />
         </div>
       )}
-      {e.log ? (
-        <>
-          <StatRow label="Sent" value={formatCount(e.log.sent)} href={links.sentEmails({ status: "sent", from: range.from, to: range.to })} />
-          <StatRow
-            label="Failed"
-            value={formatCount(e.log.failed)}
-            tone={e.log.failed > 0 ? "bad" : "good"}
-            href={links.sentEmails({ status: "failed", from: range.from, to: range.to })}
-          />
-        </>
-      ) : (
-        <Note>Sent and failed counts start once the sent-email log is on.</Note>
-      )}
-      {e.log && e.log.byChannel.length > 1 && (
+      <StatRow label="Sent" value={formatCount(e.log.sent)} href={links.sentEmails({ status: "sent", from: range.from, to: range.to })} />
+      <StatRow
+        label="Failed"
+        value={formatCount(e.log.failed)}
+        tone={e.log.failed > 0 ? "bad" : "good"}
+        href={links.sentEmails({ status: "failed", from: range.from, to: range.to })}
+      />
+      {e.log.byChannel.length > 1 && (
         <div className="mt-2 border-t pt-2">
           <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">By channel</p>
           <ul className="mt-1 space-y-1 text-xs">
             {e.log.byChannel.map((c) => (
-              <li key={c.channel} className="flex justify-between gap-2">
-                <span className="text-muted-foreground">{c.channel}</span>
-                <span className="tabular-nums">
-                  {formatCount(c.sent)} sent{c.failed > 0 && <span className="text-destructive"> · {formatCount(c.failed)} failed</span>}
-                </span>
+              <li key={c.channel}>
+                <Link
+                  href={links.sentEmails({ channel: c.channel, from: range.from, to: range.to })}
+                  className="-mx-1 flex min-h-8 items-center justify-between gap-2 rounded px-1 hover:bg-muted/60"
+                >
+                  <span className="text-muted-foreground">{c.channel}</span>
+                  <span className="tabular-nums">
+                    {formatCount(c.sent)} sent{c.failed > 0 && <span className="text-destructive"> · {formatCount(c.failed)} failed</span>}
+                  </span>
+                </Link>
               </li>
             ))}
           </ul>

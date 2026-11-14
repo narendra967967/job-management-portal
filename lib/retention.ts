@@ -16,6 +16,7 @@ import {
   leadPurgeLog,
   notifications,
   retentionConfig,
+  sentEmailLog,
 } from "@/db/schema";
 import { RETENTION_DEFAULTS, RETENTION_TYPES, type RetentionConfig, type RetentionKey } from "@/lib/retention-model";
 
@@ -85,6 +86,9 @@ export async function runRetention(): Promise<Record<RetentionKey, number>> {
           ),
         )
         .returning({ id: broadcastRecipients.id }),
+    ),
+    sentEmailLogDays: await removed(
+      db.delete(sentEmailLog).where(lt(sentEmailLog.sentAt, cutoff(c.sentEmailLogDays))).returning({ id: sentEmailLog.id }),
     ),
   };
 }

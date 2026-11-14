@@ -9,7 +9,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Copy, Download, Eye, FlaskConical, Search, User } from "lucide-react";
+import { Copy, Download, Eye, Search, User } from "lucide-react";
 import { Badge } from "@/components/admin/ui/badge";
 import { Button } from "@/components/admin/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/admin/ui/dialog";
@@ -35,7 +35,6 @@ import {
 } from "@/components/admin/ui/data-table";
 import { dateParam, pick, useInitialQuery, useQuerySync } from "@/lib/admin/url-filters";
 import {
-  SENT_EMAIL_KEEP_DAYS,
   SENT_EMAIL_KIND_LABELS,
   type SentEmailKind,
   type SentEmailRow,
@@ -48,7 +47,8 @@ const KINDS = Object.keys(SENT_EMAIL_KIND_LABELS) as SentEmailKind[];
 
 function downloadCsv(name: string, header: string[], lines: (string | null)[][]) {
   const cell = (v: string | null) => {
-    const s = v ?? "";
+    // Subjects can carry user text: keep a leading = + - @ from running as a formula.
+    const s = (v ?? "").replace(/^[=+\-@]/, "'$&");
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   const csv = [header, ...lines].map((l) => l.map(cell).join(",")).join("\n");
@@ -68,7 +68,7 @@ async function copyText(value: string, what: string) {
   }
 }
 
-export function SentEmailsClient({ rows, sample }: { rows: SentEmailRow[]; sample?: boolean }) {
+export function SentEmailsClient({ rows, keepDays, capped }: { rows: SentEmailRow[]; keepDays: number; capped?: boolean }) {
   const router = useRouter();
   // Dates and times only render in the browser, in the viewer's own time zone.
   const mounted = useMounted();
@@ -134,11 +134,10 @@ export function SentEmailsClient({ rows, sample }: { rows: SentEmailRow[]; sampl
 
   return (
     <div className="space-y-4">
-      {sample && (
-        <div className="flex items-center gap-2 rounded-xl border border-dashed border-primary/40 bg-primary/5 px-3 py-2 text-sm">
-          <FlaskConical className="size-4 shrink-0 text-primary" aria-hidden />
-          Sample data. The real log starts recording in a later phase.
-        </div>
+      {capped && (
+        <p className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm">
+          Showing the newest {rows.length.toLocaleString("en-IN")} emails. Older ones are kept but not listed here.
+        </p>
       )}
 
       <div className="flex flex-wrap items-end gap-2">
@@ -176,8 +175,8 @@ export function SentEmailsClient({ rows, sample }: { rows: SentEmailRow[]; sampl
         </select>
         <DateRangeFields from={fromInput} to={toInput} onFrom={setFromInput} onTo={setToInput} error={rangeError} />
         <InfoTip label="How long sent emails are kept">
-          Each email is kept for {SENT_EMAIL_KEEP_DAYS} days by default (Settings → Data retention). Only who it went to, which
-          email, the channel and the result are kept, never the email&apos;s content.
+          Each email is kept for {keepDays} days (Settings → Data retention). Only who it went to, which email and its subject
+          line, the channel and the result are kept, never the email&apos;s content.
         </InfoTip>
       </div>
       {rangeError && <p className="-mt-2 text-xs text-destructive">{rangeError}</p>}

@@ -412,6 +412,7 @@ export async function sendTestEmailAction(to: unknown): Promise<Result> {
     // Always through SMTP, even while Amazon SES is the service in use.
     await sendAppEmail({
       via: "smtp",
+      tag: { kind: "test", label: "SMTP test email" },
       to: p.data,
       subject: `${appName}: SMTP test email`,
       heading: "Your SMTP is working",
