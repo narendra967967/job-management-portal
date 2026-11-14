@@ -28,7 +28,7 @@ import {
 import { timeAgo } from "@/lib/email-intake-model";
 import { ticketRef } from "@/lib/tickets-model";
 import { useMounted } from "@/lib/use-mounted";
-import { BlockCard, Empty, Meter, Note, StatRow } from "./parts";
+import { BlockCard, Empty, Meter, StatRow } from "./parts";
 import type { BlockProps } from "./blocks-growth";
 
 const ROW = "-mx-2 flex min-h-11 items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-muted/60";
@@ -323,25 +323,36 @@ export function SystemBlock({ data }: BlockProps) {
           </div>
           <StatRow
             label="Résumés"
-            value={`${formatCount(s.resumeFiles)} files · ${formatBytes(s.resumeBytes)}`}
+            value={`${formatCount(s.resumeFiles)} ${s.resumeFiles === 1 ? "file" : "files"} · ${formatBytes(s.resumeBytes)}`}
             href={links.settings("retention")}
           />
           <StatRow label="App images" value={formatBytes(s.assetBytes)} href={links.settings("general")} />
         </div>
         <div className="mt-2 border-t pt-2 lg:mt-0 lg:border-t-0 lg:pt-0">
           <p className="mb-1 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">Scheduled jobs, last run</p>
-          {!s.jobs && <Note>Job runs are recorded from the next update.</Note>}
           <ul>
-            {(s.jobs ?? []).map((j) => (
-              <li key={j.key} className="flex min-h-9 items-center gap-2 text-sm">
-                <span className="min-w-0 flex-1 truncate text-muted-foreground" title={j.error}>
-                  {j.label}
-                  {j.ok === false && j.error && <span className="block truncate text-[11px] text-destructive">{j.error}</span>}
-                </span>
-                <span className="shrink-0 text-xs text-muted-foreground">{mounted && j.lastRunAt ? timeAgo(j.lastRunAt) : j.lastRunAt ? "" : "Never"}</span>
-                <Badge variant={j.ok === null ? "neutral" : j.ok ? "success" : "danger"}>{j.ok === null ? "Not run" : j.ok ? "OK" : "Failed"}</Badge>
-              </li>
-            ))}
+            {s.jobs.map((j) => {
+              const state = j.ok === null ? "none" : j.ok === false ? "failed" : j.late ? "late" : "ok";
+              return (
+                <li key={j.key} className="flex min-h-9 items-center gap-2 py-1 text-sm">
+                  <span className="min-w-0 flex-1 text-muted-foreground">
+                    {j.label}
+                    {state === "failed" ? (
+                      <span className="line-clamp-3 text-[11px] break-words text-destructive">
+                        {j.failuresInARow > 1 ? `Failed ${j.failuresInARow} times in a row. ` : ""}
+                        {j.error}
+                      </span>
+                    ) : (
+                      <span className="block text-[11px]">{j.every}</span>
+                    )}
+                  </span>
+                  <span className="shrink-0 text-xs text-muted-foreground">{mounted && j.lastRunAt ? timeAgo(j.lastRunAt) : j.lastRunAt ? "" : "Never"}</span>
+                  <Badge variant={state === "none" ? "neutral" : state === "failed" ? "danger" : state === "late" ? "warning" : "success"}>
+                    {state === "none" ? "Not run" : state === "failed" ? "Failed" : state === "late" ? "Late" : "OK"}
+                  </Badge>
+                </li>
+              );
+            })}
           </ul>
         </div>
       </div>

@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { runJob } from "@/lib/job-runs";
 import { runSyncForAllUsers } from "@/lib/gmail-sync";
 
 // Gmail sync endpoint — called on a schedule by GitHub Actions (TRD §9). Public
@@ -12,6 +13,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const results = await runSyncForAllUsers();
+  const results = await runJob("sync", () => runSyncForAllUsers());
   return NextResponse.json({ ok: true, results });
 }

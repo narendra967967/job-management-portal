@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { runJob } from "@/lib/job-runs";
 import { runBroadcasts } from "@/lib/broadcasts-send";
 
 // Broadcast sender — called every few minutes by the server crontab. Starts
@@ -16,6 +17,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const result = await runBroadcasts();
+  const result = await runJob("broadcasts", () => runBroadcasts());
   return NextResponse.json({ ok: true, ...result });
 }

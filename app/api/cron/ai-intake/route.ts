@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { runJob } from "@/lib/job-runs";
 import { sweepAiQueue } from "@/lib/inbound/ai-queue";
 
 // AI reader sweep — called every few minutes by the server crontab. Emails are
@@ -15,6 +16,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const result = await sweepAiQueue();
+  const result = await runJob("ai", () => sweepAiQueue());
   return NextResponse.json({ ok: true, ...result });
 }

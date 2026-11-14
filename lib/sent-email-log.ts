@@ -8,6 +8,7 @@ import "server-only";
 
 import { sql } from "drizzle-orm";
 import { db } from "@/lib/db";
+import { cleanErrorMessage } from "@/lib/clean-error";
 import type { SentEmailStatus, SentEmailTag } from "@/lib/admin/sent-emails-model";
 
 export interface SentEmailEntry {
@@ -22,12 +23,7 @@ export interface SentEmailEntry {
 
 /** Channel errors are kept short, and anything shaped like an AWS key is masked. */
 export function cleanSendError(e: unknown): string {
-  const msg = e instanceof Error ? e.message : String(e);
-  return msg
-    .replace(/\b(AKIA|ASIA)[A-Z0-9]{12,}\b/g, "[access key]")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 500);
+  return cleanErrorMessage(e);
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

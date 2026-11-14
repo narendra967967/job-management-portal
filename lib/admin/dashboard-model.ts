@@ -390,10 +390,16 @@ export interface BroadcastSummary {
 export interface JobRun {
   key: string;
   label: string;
-  /** ISO time of the last run, null when it hasn't run yet. */
+  /** How often the crontab runs it, as shown. */
+  every: string;
+  /** ISO time the last run finished, null when it hasn't run yet. */
   lastRunAt: string | null;
   ok: boolean | null;
   error?: string;
+  /** Failed runs since the last good one. */
+  failuresInARow: number;
+  /** Should have run again by now. */
+  late: boolean;
 }
 
 export interface DashboardData {
@@ -455,8 +461,8 @@ export interface DashboardData {
     resumeBytes: number;
     resumeFiles: number;
     assetBytes: number;
-    /** Last run of each scheduled job (dashboard phase 5); null until they're recorded. */
-    jobs: JobRun[] | null;
+    /** Last run of each scheduled job, in lib/job-runs-model.ts order. */
+    jobs: JobRun[];
   };
 }
 

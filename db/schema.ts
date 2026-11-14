@@ -1197,6 +1197,23 @@ export const sentEmailLog = pgTable(
   ],
 );
 
+/**
+ * The last run of each scheduled job (the cron routes), one row per job, kept
+ * up to date by runJob in lib/job-runs.ts. Shown in the dashboard's System block
+ * (docs/admin-dashboard/spec.md). The job keys are in lib/job-runs-model.ts.
+ */
+export const jobRuns = pgTable("job_runs", {
+  job: text("job").primaryKey(),
+  lastStartedAt: timestamp("last_started_at", { withTimezone: true }).notNull(),
+  lastFinishedAt: timestamp("last_finished_at", { withTimezone: true }).notNull(),
+  lastOk: boolean("last_ok").notNull(),
+  // Why the last run failed, short and with key-shaped text masked. Null after a good run.
+  lastError: text("last_error"),
+  lastDurationMs: integer("last_duration_ms").notNull(),
+  lastOkAt: timestamp("last_ok_at", { withTimezone: true }),
+  failuresInARow: integer("failures_in_a_row").notNull().default(0),
+});
+
 /** Emails waiting for the AI reader (no built-in reader, or it found no jobs,
  *  and the user has an AI key). Holds only what the AI needs — the email
  *  reduced to text with numbered link markers, and those links — and is

@@ -2,7 +2,7 @@
 title: What the admin dashboard numbers mean
 category: Settings and data
 summary: The dashboard counts customers only, for the period picked at the top (Last 30 days by default), in your own time zone. Revenue is live payments before GST. Every number opens the matching list, already filtered.
-keywords: dashboard, home, stats, metrics, kpi, numbers wrong, conversion, funnel, revenue, signed in, needs attention, period, edit layout, hide block
+keywords: dashboard, home, stats, metrics, kpi, numbers wrong, conversion, funnel, revenue, signed in, needs attention, period, edit layout, hide block, system, deployed commit, version, job failed, job late
 ---
 
 Every number on the dashboard leaves admin accounts out, so it matches what customers did. Click any number and the list behind it opens with the same filter, including **Customers only** on the Users page.
@@ -38,7 +38,9 @@ This strip shows only what needs you, most urgent first, and says "All clear" ot
 
 ## Other blocks
 
-**Renewals** counts paid plans and free trials, the same as the Renewals page. **Forwarding health** shows the period's job-alert emails, and **Accepted** is accepted ÷ (accepted + rejected). **Email delivery** reads the Amazon SES quota from AWS, at most every 5 minutes, and counts the period's sent and failed emails from Monitoring → Sent emails. Unlike the rest of the dashboard, those counts include admins and test emails, because they measure delivery. Scheduled job runs and the deployed commit aren't recorded yet, and the System block says so.
+**Renewals** counts paid plans and free trials, the same as the Renewals page. **Forwarding health** shows the period's job-alert emails, and **Accepted** is accepted ÷ (accepted + rejected). **Email delivery** reads the Amazon SES quota from AWS, at most every 5 minutes, and counts the period's sent and failed emails from Monitoring → Sent emails. Unlike the rest of the dashboard, those counts include admins and test emails, because they measure delivery.
+
+**System** shows the commit the running app was built from (the first seven characters of the git commit, or **Unknown** on a local machine) and the last run of each scheduled job. A job is **Failed** when its last run stopped with an error, which shows under its name, **Late** when it should have run again by now, and **Not run** until its first run. The scheduled jobs article explains each one.
 
 ## Changing the layout
 

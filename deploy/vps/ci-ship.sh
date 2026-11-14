@@ -29,7 +29,7 @@ if ssh vps "docker image inspect $IMAGE >/dev/null 2>&1"; then
   ssh vps "$REMOTE/deploy.sh $ENV $SHA"
 else
   echo "== Build $IMAGE =="
-  docker build -t "$IMAGE" .
+  docker build --build-arg APP_COMMIT="$SHA" -t "$IMAGE" .
   echo "== Ship image =="
   docker save "$IMAGE" | gzip -1 | ssh vps "cat > $REMOTE/incoming/$SHA.tar.gz"
   ssh vps "$REMOTE/deploy.sh $ENV $SHA $REMOTE/incoming/$SHA.tar.gz"

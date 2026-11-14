@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { runJob } from "@/lib/job-runs";
 import { runPlanReminders } from "@/lib/plan-reminders";
 
 // Renewal reminders (7 … 1 days before a plan ends). Called once a day, around
@@ -11,6 +12,6 @@ export async function POST(request: NextRequest) {
   if (!secret || auth !== `Bearer ${secret}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const result = await runPlanReminders();
+  const result = await runJob("reminders", () => runPlanReminders());
   return NextResponse.json({ ok: true, ...result });
 }

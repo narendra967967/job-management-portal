@@ -60,6 +60,10 @@ COPY --from=deps --chown=nextjs:nodejs /app/node_modules/smtp-server ./node_modu
 COPY --from=deps --chown=nextjs:nodejs /app/node_modules/nodemailer ./node_modules/nodemailer
 COPY --from=deps --chown=nextjs:nodejs /app/node_modules/ipv6-normalize ./node_modules/ipv6-normalize
 COPY --from=deps --chown=nextjs:nodejs /app/node_modules/punycode.js ./node_modules/punycode.js
+# The git commit this image was built from, shown in the admin dashboard's
+# System block. Set last so a new commit only rebuilds this tiny layer.
+ARG APP_COMMIT=""
+ENV APP_COMMIT=$APP_COMMIT
 USER nextjs
 EXPOSE 3000
 CMD ["node", "server.js"]

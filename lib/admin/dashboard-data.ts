@@ -5,8 +5,8 @@ import "server-only";
 // in the viewer's own time zone. Customer metrics count role = 'user' only:
 // admins are operators, not customers.
 //
-// Not here yet: scheduled job runs and the deployed commit (phase 5). Those
-// fields come back null and the blocks say so.
+// The deployed commit is baked into the image at build time (APP_COMMIT, see
+// the Dockerfile); job runs come from job_runs (lib/job-runs.ts).
 
 import { statfs } from "node:fs/promises";
 import { sql, type SQL } from "drizzle-orm";
@@ -29,6 +29,7 @@ import {
 import { getEmailDelivery, getEmailProvider, getSesCredentials, providersReady } from "@/lib/email-delivery";
 import type { SesAccountInfo } from "@/lib/email-delivery-model";
 import { getSesAccount } from "@/lib/ses";
+import { JOBS, isLate } from "@/lib/job-runs-model";
 
 
 
@@ -159,6 +160,7 @@ export async function loadDashboard(range: DayRange, tz: string, today: string):
     ready,
     disk,
     sentLog,
+    jobRows,
   ] = await Promise.all([
     one(sql`
       select count(*)::int as total,
@@ -335,6 +337,7 @@ export async function loadDashboard(range: DayRange, tz: string, today: string):
         count(*) filter (where status = 'failed')::int as failed
       from sent_email_log where ${within(sql`sent_at`, range, tz)}
       group by channel order by count(*) desc`),
+    rows(sql`select job, last_finished_at, last_ok, last_error, failures_in_a_row from job_runs`),
   ]);
 
   /* ---- revenue by month (amounts, last 12 months) ---- */
@@ -574,7 +577,20 @@ export async function loadDashboard(range: DayRange, tz: string, today: string):
       resumeBytes: num(storage.resume_bytes),
       resumeFiles: num(storage.resume_files),
       assetBytes: num(storage.asset_bytes),
-      jobs: null,
+      jobs: JOBS.map((j) => {
+        const r = jobRows.find((x) => x.job === j.key);
+        const lastRunAt = r ? isoOrNull(r.last_finished_at) : null;
+        return {
+          key: j.key,
+          label: j.label,
+          every: j.every,
+          lastRunAt,
+          ok: r ? r.last_ok === true : null,
+          error: r?.last_error ? String(r.last_error) : undefined,
+          failuresInARow: num(r?.failures_in_a_row),
+          late: isLate(lastRunAt, j.lateAfterMin, now),
+        };
+      }),
     },
   };
 }

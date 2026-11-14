@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { runJob } from "@/lib/job-runs";
 import { runLeadPurge } from "@/lib/lead-purge";
 import { runLeadRules } from "@/lib/lead-rules";
 import { runRetention } from "@/lib/retention";
@@ -18,8 +19,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const leadRules = await runLeadRules();
-  const result = await runLeadPurge();
-  const retention = await runRetention();
+  // Recorded as one job, "Daily cleanup": if one step throws, the rest don't run.
+  const { leadRules, result, retention } = await runJob("purge", async () => {
+    const leadRules = await runLeadRules();
+    const result = await runLeadPurge();
+    const retention = await runRetention();
+    return { leadRules, result, retention };
+  });
   return NextResponse.json({ ok: true, ...result, retention, leadRules });
 }
