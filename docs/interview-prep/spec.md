@@ -25,7 +25,7 @@ It sits inside the existing app and account. It doesn't change how the job track
 | D2 | It's a **module of Jobtiva**, not a separate product. The signed-in app gets two main menus: **Lead management** (every current menu) and **Mock interviews** (this module). |
 | D3 | The module gets its **own public landing page**, linked from the homepage sections, header and footer. |
 | D4 | **Mock interviews is always open**, whatever the user's plan. Without an active plan, Lead management locks (as today) but Mock interviews doesn't. |
-| D5 | **AI interview allowance comes from the plan.** The plan editor gets an "AI mock interviews included" count and a "price per extra AI interview". The Free plan includes **1 AI interview, once ever** (the free plan itself is once-only). After the allowance, each AI interview is bought. An expired plan's unused allowance is lost. |
+| D5 | **AI interview allowance comes from the plan.** The plan editor gets an "AI mock interviews included" count, granted **each plan period** (each purchase or renewal) with **no carry-over**. The Free plan includes **1 AI interview, once ever** (the free plan itself is once-only). An expired plan's unused allowance is lost. **Any AI interview outside the allowance is priced per minute:** admin sets a per-minute price in the module settings, and the price is that rate times the chosen duration (decided November 17, 2026). |
 | D6 | **The marketplace is open:** anyone can apply to be an interviewer. Each application is still approved by admin. Candidates choose whom to book. |
 | D7 | Interviewers don't need a paid Jobtiva plan. An interviewer can book other interviewers, never their own services. Someone can sign up only to be an interviewer. |
 
@@ -196,9 +196,9 @@ Saved onto each booking or session when it's created (D36). Defaults in brackets
 
 | Area | Settings |
 |---|---|
-| Switches | AI interviews on/off; marketplace on/off; new interviewer applications on/off; pause new bookings |
-| AI interviews | AI provider, model and key for this module; categories; difficulty levels; allowed durations (15, 30, 45, 60); minutes per question (2); wrap-up extension (10 min); resume window (15 min); price with no active plan; prompts; metric weights |
-| Plans (in the plan editor) | AI interviews included; price per extra AI interview |
+| Switches | AI interviews: **Open** or **Coming soon**; human interviews (the marketplace, for candidates): **Open** or **Coming soon**; new interviewer applications on/off; pause new bookings. "Coming soon" keeps the menu visible with a coming-soon page instead of the feature |
+| AI interviews | AI provider, model and key for this module; categories; difficulty levels; allowed durations (15, 30, 45, 60); minutes per question (2); wrap-up extension (10 min); resume window (15 min); **price per minute** (for any interview outside the plan allowance); prompts; metric weights |
+| Plans (in the plan editor) | AI interviews included (per plan period, no carry-over) |
 | Commission | First-time % ; returning % |
 | Pricing | Minimum and maximum service price; allowed durations (15, 30, 45, 60, 90); services per interviewer |
 | Booking | Payment hold (10 min); defaults and allowed ranges for notice (12 h), buffer (15 min), bookings a day (4), horizon (30 days); Join page opens (10 min before) |
@@ -298,47 +298,18 @@ tables are added to Data retention.
 
 ## 9. Roadmap
 
-Each release runs in our usual order: **screens on sample data → database → wiring → safety checks → content and
-rollout**, user side before admin, checked at 375 and 768 px, with an owner checkpoint after each phase.
-
-### Release 1: AI mock interviews (text)
-
-| Phase | Work |
-|---|---|
-| 1. Screens | Navigation with two main menus (Lead management, Mock interviews), including the phone menu and onboarding tour; New interview; the interview chat; the shared report page; Interview history; Performance; plan editor fields; admin module settings; admin AI interview usage and sessions; landing page draft |
-| 2. Database | Settings, sessions, messages, events, evaluations, plan columns, AI interview purchases |
-| 3. Wiring | Module AI key; the interviewer loop with pacing and wrap-up; evaluation; allowance and purchase; resume within 15 minutes; usage and cost; "Prepare for this interview" on leads |
-| 4. Safety | Check script (access, allowance can't be bypassed, evaluation schema, purchase idempotency); knowledge-base articles |
-| 5. Content and rollout | Landing page and homepage links; Privacy line for AI interviews; emails registered; you deploy preprod → prod |
-
-### Between the releases: GST and invoices
-
-The system-wide GST work in `docs/gst/spec.md` (switch, admin GST panel, billing details, tax split by state,
-invoices and credit notes, reports) is built after Release 1 and before Release 2.
-
-### Release 2: human mock interviews
-
-| Phase | Work |
-|---|---|
-| 0. Tests | Google Meet test on the Workspace trial (D28); RazorpayX payouts in test mode |
-| 1. Screens | Candidate: find, profile, service, slot, form, pay, My bookings, Join page, report, review, complaint. Interviewer: onboarding, profile, services, availability, bookings, evaluation form, wallet, withdrawals, reviews. Admin: applications, bookings, release reviews, payouts, refunds, strikes, reviews, catalog, settings, dashboard |
-| 2. Database | Section 6's marketplace tables, ledger and audit log |
-| 3. Wiring | Holds and bookings, payment and refunds, Meet, reminders, evaluation with code, ledger and wallet, withdrawals and RazorpayX payouts, cancellations and reschedules, no-show handling, strikes, reviews |
-| 4. Safety | Ledger checks (balances always equal the sum of entries; no double release), race tests on slot holds, webhook replay tests, access tests |
-| 5. Content and rollout | Interviewer Agreement, policies, landing page update, knowledge-base articles, emails; you deploy |
-
-### Later (not scheduled)
-
-Voice AI interviews; recommendations from tracked leads; packages; finance-only admin roles; Meet attendance
-reports (needs a higher Workspace plan).
+The detailed roadmap, approved by the owner on November 17, 2026, is in **`docs/interview-prep/roadmap.md`**.
+In short: Release 1 (AI mock interviews, text) in eight steps, then the GST stage from `docs/gst/spec.md`
+(shipped with GST off), then Release 2 (human mock interviews) in nine steps, rolled out in two steps behind the
+"Open / Coming soon" switches. Each step ends at an owner checkpoint.
 
 ---
 
 ## 10. Still open
 
-- **Paid plans' AI allowance:** is it granted per plan period (each purchase or renewal), and does unused
-  allowance carry over? Assumed: per period, no carry-over.
-- **Price of an AI interview with no active plan:** assumed to be a module setting (section 4).
-- The furthest date a reschedule can move to (D43): default to be set in admin; I'd start at 30 days from the
-  original date.
-- The rest of the interviewer onboarding fields, settled at UI time (D14).
+- **How long an included interview can be:** does a plan-allowance (or free) AI interview cover any allowed
+  duration, or only up to a limit, with longer interviews charged per minute? Assumed: an admin setting for the
+  longest duration an included interview covers. Settled at R1.3.
+- The furthest date a reschedule can move to (D43): default set in admin; I'd start at 30 days from the
+  original date. Settled at R2.1.
+- The rest of the interviewer onboarding fields (D14). Settled at R2.2.
