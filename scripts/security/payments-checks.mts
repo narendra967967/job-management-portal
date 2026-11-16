@@ -513,11 +513,11 @@ async function main() {
       }
       check("L1", "every locked page redirects an expired user to /upgrade", bad.length === 0, bad.join(", ") || `${locked.length} pages`);
       const open: string[] = [];
-      for (const p of ["/upgrade", "/settings", "/guides"]) {
+      for (const p of ["/upgrade", "/settings", "/guides", "/mock-interviews/ai"]) {
         const res = await fetch(`${APP}${p}`, { headers: { cookie: userCookie }, redirect: "manual" });
         if (res.status !== 200) open.push(`${p}:${res.status}`);
       }
-      check("L2", "Upgrade Plan, Settings and guides stay open", open.length === 0, open.join(", "));
+      check("L2", "Upgrade Plan, Settings, guides and Mock interviews stay open", open.length === 0, open.join(", "));
       const spoof = await fetch(`${APP}/leads`, { headers: { cookie: userCookie, "x-pathname": "/upgrade" }, redirect: "manual" });
       check("L3", "a spoofed x-pathname header doesn't unlock a page", (spoof.headers.get("location") ?? "").includes("/upgrade"), String(spoof.status));
       const rsc = await fetch(`${APP}/leads`, { headers: { cookie: userCookie, rsc: "1" }, redirect: "manual" });

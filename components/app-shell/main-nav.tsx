@@ -21,7 +21,9 @@ import {
   Lock,
   type LucideIcon,
 } from "lucide-react";
-import { BookOpen, Compass, LifeBuoy, Sparkles } from "lucide-react";
+import { BookOpen, Bot, Briefcase, Compass, History, LifeBuoy, MessagesSquare, Sparkles, TrendingUp, UserRound } from "lucide-react";
+import { useNavArea } from "@/components/app-shell/use-nav-area";
+import { LEADS_HOME, MOCK_INTERVIEWS_HOME, type NavArea } from "@/lib/nav-area";
 import { Logo } from "@/components/app-shell/logo";
 import { SidebarAddLeadButton } from "@/components/leads/add-lead-dialog";
 import { SupportNavButton, useContactSupport } from "@/components/support/contact-support";
@@ -55,8 +57,11 @@ interface NavItem {
   icon: LucideIcon;
 }
 
-// Sidebar is organised into collapsible groups.
-const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
+type NavGroupDef = { label: string; items: NavItem[] };
+
+// Two main menus (lib/nav-area.ts), each organised into collapsible groups.
+// Lead management: the job tracker.
+const LEAD_GROUPS: NavGroupDef[] = [
   {
     label: "Leads",
     items: [
@@ -82,13 +87,46 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   },
 ];
 
-// Mobile bottom tab bar — the five most-used destinations (space-constrained).
-const BOTTOM_NAV: NavItem[] = [
-  { href: "/leads", label: "Leads", icon: LayoutGrid },
-  { href: "/ready", label: "Ready", icon: Rocket },
-  { href: "/outreached", label: "Outreached", icon: Send },
-  { href: "/todo", label: "To-do", icon: ListChecks },
-  { href: "/reminders", label: "Reminders", icon: Bell },
+// Mock interviews: the Interview Preparation module (docs/interview-prep/spec.md).
+const MOCK_GROUPS: NavGroupDef[] = [
+  {
+    label: "Practice",
+    items: [
+      { href: "/mock-interviews/ai", label: "AI mock interviews", icon: Bot },
+      { href: "/mock-interviews/human", label: "Human interviews", icon: UserRound },
+    ],
+  },
+  {
+    label: "Progress",
+    items: [
+      { href: "/mock-interviews/history", label: "Interview history", icon: History },
+      { href: "/mock-interviews/performance", label: "Performance", icon: TrendingUp },
+    ],
+  },
+];
+
+const GROUPS: Record<NavArea, NavGroupDef[]> = { leads: LEAD_GROUPS, mock: MOCK_GROUPS };
+
+// Mobile bottom tab bar — the most-used destinations of the open main menu.
+const BOTTOM_NAV: Record<NavArea, NavItem[]> = {
+  leads: [
+    { href: "/leads", label: "Leads", icon: LayoutGrid },
+    { href: "/ready", label: "Ready", icon: Rocket },
+    { href: "/outreached", label: "Outreached", icon: Send },
+    { href: "/todo", label: "To-do", icon: ListChecks },
+    { href: "/reminders", label: "Reminders", icon: Bell },
+  ],
+  mock: [
+    { href: "/mock-interviews/ai", label: "AI interview", icon: Bot },
+    { href: "/mock-interviews/human", label: "Human", icon: UserRound },
+    { href: "/mock-interviews/history", label: "History", icon: History },
+    { href: "/mock-interviews/performance", label: "Performance", icon: TrendingUp },
+  ],
+};
+
+const MAIN_MENUS: { area: NavArea; href: string; label: string; icon: LucideIcon }[] = [
+  { area: "leads", href: LEADS_HOME, label: "Lead management", icon: Briefcase },
+  { area: "mock", href: MOCK_INTERVIEWS_HOME, label: "Mock interviews", icon: MessagesSquare },
 ];
 
 function isActive(pathname: string, href: string) {
@@ -211,16 +249,44 @@ function NavGroup({
 }
 
 /** Index of the group that holds the active route, or -1. */
-function activeGroupIndex(pathname: string): number {
-  return NAV_GROUPS.findIndex((g) => g.items.some((it) => isActive(pathname, it.href)));
+function activeGroupIndex(groups: NavGroupDef[], pathname: string): number {
+  return groups.findIndex((g) => g.items.some((it) => isActive(pathname, it.href)));
 }
 
-/** Persistent left sidebar — desktop only (md+). Groups behave like an accordion:
- *  only one is open at a time, and the one holding the current page opens itself. */
-export function SidebarNav() {
+/** The two main menus. Each opens its area's first page; the open one is
+ *  highlighted and its groups are listed below. */
+function MainMenu({ area }: { area: NavArea }) {
+  return (
+    <div data-tour="main-menu" className="space-y-1 rounded-xl border border-sidebar-border bg-sidebar-accent/40 p-1">
+      {MAIN_MENUS.map(({ area: a, href, label, icon: Icon }) => {
+        const current = a === area;
+        return (
+          <Link
+            key={a}
+            href={href}
+            onClick={() => freshNavigation(href)}
+            aria-current={current ? "true" : undefined}
+            className={cn(
+              "flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-semibold transition-colors",
+              current
+                ? "bg-card text-primary shadow-sm"
+                : "text-muted-foreground hover:bg-card/60 hover:text-foreground",
+            )}
+          >
+            <Icon className="size-5 shrink-0" aria-hidden />
+            {label}
+          </Link>
+        );
+      })}
+    </div>
+  );
+}
+
+/** The collapsible groups of one main menu — an accordion: only one group is open
+ *  at a time, and the one holding the current page opens itself. */
+function AreaGroups({ groups, locked }: { groups: NavGroupDef[]; locked: boolean }) {
   const pathname = usePathname();
-  const limited = useLimitedMode();
-  const activeIdx = activeGroupIndex(pathname);
+  const activeIdx = activeGroupIndex(groups, pathname);
   const [openIdx, setOpenIdx] = useState<number | null>(activeIdx >= 0 ? activeIdx : 0);
 
   // Follow navigation: when the active page moves to another group, open it.
@@ -229,9 +295,8 @@ export function SidebarNav() {
   }, [activeIdx]);
 
   return (
-    <nav className="flex flex-col gap-3 p-3">
-      {limited ? <UpgradePlanLink pathname={pathname} /> : <SidebarAddLeadButton />}
-      {NAV_GROUPS.map((g, i) => (
+    <>
+      {groups.map((g, i) => (
         <NavGroup
           key={g.label}
           label={g.label}
@@ -239,9 +304,31 @@ export function SidebarNav() {
           pathname={pathname}
           open={openIdx === i}
           onToggle={() => setOpenIdx((cur) => (cur === i ? null : i))}
-          locked={limited}
+          locked={locked}
         />
       ))}
+    </>
+  );
+}
+
+/** Persistent left sidebar — desktop only (md+); the phone menu reuses it.
+ *  In limited mode (plan ended) Lead management is locked but Mock interviews
+ *  stays open (spec D4). */
+export function SidebarNav() {
+  const pathname = usePathname();
+  const limited = useLimitedMode();
+  const area = useNavArea();
+
+  return (
+    <nav className="flex flex-col gap-3 p-3">
+      {limited ? (
+        <UpgradePlanLink pathname={pathname} />
+      ) : (
+        area === "leads" && <SidebarAddLeadButton />
+      )}
+      <MainMenu area={area} />
+      {/* Keyed by area so each main menu starts with its own accordion state. */}
+      <AreaGroups key={area} groups={GROUPS[area]} locked={limited && area === "leads"} />
     </nav>
   );
 }
@@ -446,14 +533,21 @@ export function MobileNav({ name }: { name?: string }) {
 export function BottomNav() {
   const pathname = usePathname();
   const limited = useLimitedMode();
+  const area = useNavArea();
   const { open: openSupport } = useContactSupport();
-  if (limited) {
+  // Limited mode outside Mock interviews: only the pages that stay open. Mock
+  // interviews keeps its own tabs, since it stays open (spec D4).
+  if (limited && area === "leads") {
     const tab = "flex min-h-14 flex-col items-center justify-center gap-1 px-0.5 text-[10px] font-medium whitespace-nowrap transition-colors";
     return (
-      <nav className="grid shrink-0 grid-cols-3 border-t bg-card pb-[env(safe-area-inset-bottom)] md:hidden">
+      <nav className="grid shrink-0 grid-cols-4 border-t bg-card pb-[env(safe-area-inset-bottom)] md:hidden">
         <Link href="/upgrade" onClick={() => freshNavigation("/upgrade")} className={cn(tab, isActive(pathname, "/upgrade") ? "text-primary" : "text-muted-foreground")}>
           <Sparkles className="size-5 shrink-0" aria-hidden />
           Upgrade Plan
+        </Link>
+        <Link href={MOCK_INTERVIEWS_HOME} onClick={() => freshNavigation(MOCK_INTERVIEWS_HOME)} className={cn(tab, "text-muted-foreground")}>
+          <MessagesSquare className="size-5 shrink-0" aria-hidden />
+          Interviews
         </Link>
         <button type="button" onClick={() => openSupport()} className={cn(tab, "text-muted-foreground")}>
           <LifeBuoy className="size-5 shrink-0" aria-hidden />
@@ -466,9 +560,16 @@ export function BottomNav() {
       </nav>
     );
   }
+  const tabs = BOTTOM_NAV[area];
   return (
-    <nav data-tour="bottom-nav" className="grid shrink-0 grid-cols-5 border-t bg-card pb-[env(safe-area-inset-bottom)] md:hidden">
-      {BOTTOM_NAV.map(({ href, label, icon: Icon }) => {
+    <nav
+      data-tour="bottom-nav"
+      className={cn(
+        "grid shrink-0 border-t bg-card pb-[env(safe-area-inset-bottom)] md:hidden",
+        tabs.length === 5 ? "grid-cols-5" : "grid-cols-4",
+      )}
+    >
+      {tabs.map(({ href, label, icon: Icon }) => {
         const active = isActive(pathname, href);
         return (
           <Link

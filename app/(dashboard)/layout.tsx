@@ -38,6 +38,7 @@ import { tourDue } from "@/lib/tour";
 import { NotLimited } from "@/components/billing/not-limited";
 import { LimitedModeProvider } from "@/lib/access-mode";
 import { FreshPage } from "@/lib/nav-reset";
+import { LeadAreaOnly } from "@/components/app-shell/use-nav-area";
 
 // Per-user, session-gated routes — never statically prerendered (no DB at build).
 export const dynamic = "force-dynamic";
@@ -54,8 +55,8 @@ export default async function DashboardLayout({
   await guardMaintenance();
   // Gate on the account state: deactivated users can sign in but don't reach
   // the dashboard. Expired users get limited mode: only Upgrade Plan, Help &
-  // support, guides and Settings (Help + Account) open; feature Server Actions
-  // refuse them too (getActiveUserId).
+  // support, guides, Settings (Help + Account) and Mock interviews open; lead
+  // feature Server Actions refuse them too (getActiveUserId).
   const u = await getSessionUser();
   if (!u) redirect("/login");
   const state = accessState(u);
@@ -104,13 +105,17 @@ export default async function DashboardLayout({
               <Logo showName={false} name={appName} />
             </div>
             <NotLimited>
-              <TopBarSearch />
+              <LeadAreaOnly>
+                <TopBarSearch />
+              </LeadAreaOnly>
             </NotLimited>
             <div className="ml-auto flex items-center gap-1.5 sm:gap-2.5">
               <PlanChip className="hidden xl:inline-flex" />
               <NotLimited>
-                <TopBarStats className="hidden lg:flex" />
-                <HeaderAddLeadButton />
+                <LeadAreaOnly>
+                  <TopBarStats className="hidden lg:flex" />
+                  <HeaderAddLeadButton />
+                </LeadAreaOnly>
                 <NotesButton />
               </NotLimited>
               {/* On phones the floating help bubble covers this — keep room for search. */}
@@ -139,7 +144,9 @@ export default async function DashboardLayout({
 
       {/* Mobile-only floating "Add lead" button (above the bottom nav). */}
       <NotLimited>
-        <AddLeadFab />
+        <LeadAreaOnly>
+          <AddLeadFab />
+        </LeadAreaOnly>
       </NotLimited>
       </div>
       {/* Floating help launcher + panel (bottom-right, all dashboard pages). */}

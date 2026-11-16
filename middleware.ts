@@ -37,5 +37,6 @@ export const config = {
     "/ready/:path*",
     "/support/:path*",
     "/upgrade/:path*",
+    "/mock-interviews/:path*",
   ],
 };

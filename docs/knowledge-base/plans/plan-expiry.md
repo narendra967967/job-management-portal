@@ -1,7 +1,7 @@
 ---
 title: What happens when a user's plan expires
 category: Plans and billing
-summary: When a plan's expiry passes, the user can still sign in but the app goes into limited mode. Everything is locked except Upgrade Plan, Help & support, guides and Settings (Help and Account only), until they buy a plan or an admin renews it.
+summary: When a plan expires the user can still sign in, in limited mode. Lead management locks; Upgrade Plan, Help & support, guides, Settings (Help and Account only) and Mock interviews stay open until they buy a plan or an admin renews it.
 keywords: plan expired, renew, renewal page, expiry, access days, free trial, extend plan, limited mode, locked menus, upgrade plan
 ---
 
@@ -11,13 +11,14 @@ The free trial is once only. Users can't pick a free plan for themselves, so aft
 
 ## Limited mode
 
-The day the expiry passes, the user can still sign in, but every menu except **Upgrade Plan** is locked. The lock isn't just the menu: opening a locked page by its address sends them back to Upgrade Plan, and actions like adding a lead or using AI are refused on the server.
+The day the expiry passes, the user can still sign in, but everything under **Lead management** is locked. The lock isn't just the menu: opening a locked page by its address sends them back to Upgrade Plan, and actions like adding a lead or using AI are refused on the server.
 
 What stays open:
 
 - **Upgrade Plan**, which lists every paid plan
 - Help & support and the guides
 - Settings, showing only the Help and Account tabs
+- **Mock interviews**, which stays open whatever the plan (for now its pages all say Coming soon)
 
 The Upgrade Plan page is headed "Your plan has ended" and tells them their leads, contacts and settings are safe. Nothing is deleted while a user is in limited mode.
 

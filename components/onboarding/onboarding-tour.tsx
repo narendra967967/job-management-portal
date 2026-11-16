@@ -112,6 +112,16 @@ function desktopSteps(firstName: string, hasNotes: boolean): DriveStep[] {
         side: "bottom",
       },
     },
+    // Index 6 on purpose: mobileSteps reuses steps 0, 2, 5 and the last by position.
+    {
+      element: sel("main-menu"),
+      popover: {
+        title: "Two main menus",
+        description:
+          "Lead management holds everything for tracking jobs. Mock interviews is where you practice for the interview itself. Switch between them here.",
+        side: "right",
+      },
+    },
     {
       element: sel("group-leads"),
       popover: {
@@ -197,7 +207,8 @@ function mobileSteps(firstName: string, hasNotes: boolean): DriveStep[] {
       element: sel("menu"),
       popover: {
         title: "Everything else",
-        description: "Open the menu for Contacts, Outreach, Settings, guides and support. Take the tour lives there too.",
+        description:
+          "Open the menu to switch between Lead management and Mock interviews, and for Contacts, Outreach, Settings, guides and support. Take the tour lives there too.",
         side: "bottom",
         align: "start",
       },

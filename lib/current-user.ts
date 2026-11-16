@@ -61,8 +61,9 @@ export function accessState(u: { status: string; planExpiresAt: Date | null }): 
 }
 
 /** Paths an expired user (limited mode) may still open: Upgrade Plan, Help &
- *  support, guides, and Settings (which itself shows only Help + Account). */
-export const LIMITED_MODE_PATHS = ["/upgrade", "/settings", "/support", "/guides"];
+ *  support, guides, Settings (which itself shows only Help + Account), and the
+ *  Mock interviews module, which is open whatever the plan (interview-prep spec D4). */
+export const LIMITED_MODE_PATHS = ["/upgrade", "/settings", "/support", "/guides", "/mock-interviews"];
 
 export function allowedInLimitedMode(pathname: string): boolean {
   return LIMITED_MODE_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
