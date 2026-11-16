@@ -35,7 +35,7 @@ It sits inside the existing app and account. It doesn't change how the job track
 |---|---|
 | D8 | **Text only** for now. Voice is deferred. |
 | D9 | Runs on a **Jobtiva AI key set aside for this module**, separate from users' own keys and from the admin knowledge-base key, so usage is tracked on its own. The module has its **own admin settings page**. Public copy never says whose AI or key runs it. |
-| D10 | **Length follows the chosen duration.** Questions per minute is an admin setting (default 2 minutes a question, so 30 minutes ≈ 15 questions with follow-ups). When the time is up, the interview may run up to **10 minutes more** to finish; at that point it ends, whatever is left. Then the evaluation is generated automatically. |
+| D10 | **Length follows the chosen duration:** 15, 30, 45 or **60 minutes at most**. At the start, the system passes the important inputs (role, industry, category, difficulty, resume, job description, topics) to the AI, which **generates a question plan sized to the chosen duration** and covering the five report metrics. The question count is the duration divided by minutes per question, an admin setting (default 2, so 30 minutes ≈ 15 questions); follow-ups come on top where needed for scoring. Any duration can use an included interview (free or plan allowance); a paid interview costs the admin's per-minute price times the chosen duration (D5). When the time is up, the interview may run up to **10 minutes more** to finish; at that point it ends, whatever is left. Then the evaluation is generated automatically. |
 | D11 | Inputs: target role, industry, category, difficulty, resume, job description and topics. Resume, job description and topics are **required**; "General preparation" counts as a job description. Each can be typed or picked from the career profile or a tracked lead. A lead with status Interview gets a **"Prepare for this interview"** button. |
 | D12 | Coding and System Design run as **discussion interviews** (explain your approach). No code editor or code execution. |
 | D13 | **A broken interview can be resumed within 15 minutes.** Every session records its events (start, each question and answer, disconnects, resume, end) so admin can decide on a credit if it couldn't be finished. |
@@ -307,9 +307,6 @@ In short: Release 1 (AI mock interviews, text) in eight steps, then the GST stag
 
 ## 10. Still open
 
-- **How long an included interview can be:** does a plan-allowance (or free) AI interview cover any allowed
-  duration, or only up to a limit, with longer interviews charged per minute? Assumed: an admin setting for the
-  longest duration an included interview covers. Settled at R1.3.
 - The furthest date a reschedule can move to (D43): default set in admin; I'd start at 30 days from the
   original date. Settled at R2.1.
 - The rest of the interviewer onboarding fields (D14). Settled at R2.2.

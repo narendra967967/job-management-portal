@@ -87,8 +87,7 @@ the same format later.
 
 - Mock interviews admin menu with its own settings page (D9): the Open / Coming soon switches; AI provider,
   model and key (write-only); categories; difficulty levels; durations; minutes per question; wrap-up time;
-  resume window; **price per minute**; the longest duration an included interview covers (open item, spec
-  section 10); prompts; metric weights.
+  resume window; **price per minute**; prompts (including the question-plan prompt); metric weights.
 - Plan editor: AI mock interviews included (per plan period).
 - AI interview usage: sessions table, cost per session and in total, each session's event log.
 - Credit action on a session (for interviews that broke), with a required note.
@@ -105,7 +104,10 @@ screen. Sample data removed.
 Needs the module AI key entered in admin by the owner.
 
 - Module key path in `lib/ai.ts`, separate from users' keys and the knowledge-base key.
-- The interview loop: questions paced to the duration, follow-ups, the hard 10-minute wrap-up, then the end.
+- The question plan: at the start, the candidate's inputs go to the AI, which generates questions sized to the
+  chosen duration (duration ÷ minutes per question) across the five report metrics.
+- The interview loop: the planned questions in turn, follow-ups where scoring needs them, the hard 10-minute
+  wrap-up, then the end.
 - Evaluation: one structured AI call checked against the report format, retried if the reply doesn't fit.
 - Allowance (free interview once ever on Free; plan allowance per period) and per-minute purchase through the
   existing Razorpay checkout as a new purchase type.
@@ -269,7 +271,7 @@ Meet attendance reports (needs a higher Workspace plan).
 | # | At | Decides or approves |
 |---|---|---|
 | 1 | R1.1 | Navigation and the plan lock |
-| 2 | R1.2, R1.3 | Every Release 1 screen, especially the report page; the longest included duration |
+| 2 | R1.2, R1.3 | Every Release 1 screen, especially the report page |
 | 3 | R1.5, R1.6 | Real interviews; the model; the per-minute price and plan allowances |
 | 4 | R1.8 | Landing page; deploys Release 1 |
 | 5 | G.1, G.3 | GST screens; the PDF library; invoices |
