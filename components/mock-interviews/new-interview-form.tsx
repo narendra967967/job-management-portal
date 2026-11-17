@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { Briefcase, CheckCircle2, FileText, Loader2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { MarkdownEditor } from "@/components/ui/markdown-editor";
 import { ChipInput } from "@/components/ui/chip-input";
 import { InfoTip } from "@/components/ui/info-tip";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -331,14 +331,12 @@ export function NewInterviewForm({
                 </div>
               )}
               {resumeMode === "paste" && (
-                <Textarea
+                <MarkdownEditor
                   value={resumeText}
-                  maxLength={LIMITS.paste}
-                  onChange={(e) => setResumeText(e.target.value)}
+                  onChange={(v) => setResumeText(v.slice(0, LIMITS.paste))}
                   placeholder="Paste the text of your resume"
-                  rows={6}
-                  aria-label="Resume text"
-                  aria-invalid={!!errors.resume}
+                  className="min-h-36"
+                  ariaLabel="Resume text"
                 />
               )}
               {err("resume")}
@@ -388,14 +386,12 @@ export function NewInterviewForm({
                   <p className="text-xs text-muted-foreground">You don&apos;t have any open leads. Paste the job description instead.</p>
                 ))}
               {jdMode === "paste" && (
-                <Textarea
+                <MarkdownEditor
                   value={jdText}
-                  maxLength={LIMITS.paste}
-                  onChange={(e) => setJdText(e.target.value)}
+                  onChange={(v) => setJdText(v.slice(0, LIMITS.paste))}
                   placeholder="Paste the job description"
-                  rows={6}
-                  aria-label="Job description"
-                  aria-invalid={!!errors.jd}
+                  className="min-h-36"
+                  ariaLabel="Job description"
                 />
               )}
               {jdMode === "general" && (
