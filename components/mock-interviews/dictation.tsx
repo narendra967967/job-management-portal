@@ -38,6 +38,11 @@ function speechLang(): string {
   return /^en(-|$)/i.test(l) ? l : "en-US";
 }
 
+/** The box's text now, with a space to join the next spoken words onto. */
+function boxText(t: string): string {
+  return t && !/\s$/.test(t) ? `${t} ` : t;
+}
+
 const ERRORS: Record<string, [string, string]> = {
   "not-allowed": ["Microphone blocked", "Allow the microphone for this site in your browser's settings, then try again."],
   "service-not-allowed": ["Speech to text isn't available", "Your browser's speech service is turned off. You can still type your answer."],
@@ -57,6 +62,10 @@ export function useDictation({ text, onText, max }: { text: string; onText: (v: 
   const wanted = useRef(false); // the user still wants to listen (Chrome stops by itself after a pause)
   const base = useRef(""); // the text before this round of speech
   const finals = useRef(""); // finished phrases from this round
+  // Each listening session has an id. Stopping moves it on, so anything an old
+  // session still delivers (Chrome sends its last phrase after stop()) is ignored
+  // and can't bring back text the user has since deleted.
+  const session = useRef(0);
   const latest = useRef({ text, onText, max });
   latest.current = { text, onText, max };
 
@@ -64,7 +73,9 @@ export function useDictation({ text, onText, max }: { text: string; onText: (v: 
 
   const stop = useCallback(() => {
     wanted.current = false;
-    rec.current?.stop();
+    session.current++;
+    rec.current?.abort();
+    rec.current = null;
     setListening(false);
   }, []);
 
@@ -75,11 +86,12 @@ export function useDictation({ text, onText, max }: { text: string; onText: (v: 
     r.lang = speechLang();
     r.continuous = true;
     r.interimResults = true;
-    const t = latest.current.text;
-    base.current = t && !/\s$/.test(t) ? `${t} ` : t;
+    const id = ++session.current;
+    base.current = boxText(latest.current.text);
     finals.current = "";
 
     r.onresult = (e) => {
+      if (session.current !== id) return;
       let interim = "";
       for (let i = e.resultIndex; i < e.results.length; i++) {
         const phrase = e.results[i][0].transcript;
@@ -90,6 +102,7 @@ export function useDictation({ text, onText, max }: { text: string; onText: (v: 
       latest.current.onText(next);
     };
     r.onerror = (e) => {
+      if (session.current !== id) return;
       if (e.error === "no-speech" || e.error === "aborted") return;
       const [title, desc] = ERRORS[e.error] ?? ["Speech to text stopped", "Try again, or type your answer."];
       toast.error(title, desc);
@@ -97,9 +110,11 @@ export function useDictation({ text, onText, max }: { text: string; onText: (v: 
       setListening(false);
     };
     r.onend = () => {
-      // Chrome ends a session after a pause; carry on while the user hasn't stopped.
+      if (session.current !== id) return;
+      // Chrome ends a session after a pause; carry on while the user hasn't
+      // stopped, starting again from what's in the box now.
       if (wanted.current) {
-        base.current = (base.current + finals.current).slice(0, latest.current.max);
+        base.current = boxText(latest.current.text).slice(0, latest.current.max);
         finals.current = "";
         try {
           r.start();
@@ -124,6 +139,7 @@ export function useDictation({ text, onText, max }: { text: string; onText: (v: 
 
   useEffect(() => () => {
     wanted.current = false;
+    session.current++;
     rec.current?.abort();
   }, []);
 

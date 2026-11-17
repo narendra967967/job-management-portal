@@ -185,7 +185,10 @@ export function InterviewChat({ sessionId, state }: { sessionId: string; state: 
             value={draft}
             maxLength={MAX_ANSWER}
             onChange={(e) => setDraft(e.target.value)}
+            // Editing by hand turns the mic off, so speech and typing never fight.
+            onPointerDown={() => dictation.listening && dictation.stop()}
             onKeyDown={(e) => {
+              if (dictation.listening && !["Shift", "Control", "Alt", "Meta"].includes(e.key)) dictation.stop();
               // Enter sends on a keyboard; Shift+Enter adds a line. Phones use the button.
               if (e.key === "Enter" && !e.shiftKey && window.matchMedia("(min-width: 768px)").matches) {
                 e.preventDefault();
