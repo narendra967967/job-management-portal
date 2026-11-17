@@ -3,22 +3,16 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Bot, Clock3, FileText, Hourglass, PlayCircle, RotateCcw, Search, Trash2, Trophy, UserRound, type LucideIcon } from "lucide-react";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Bot, Clock3, FileText, Hourglass, PlayCircle, RotateCcw, Search, Trophy, UserRound, type LucideIcon } from "lucide-react";
+import { buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import { useConfirm } from "@/components/ui/confirm-dialog";
-import { toast } from "@/components/ui/toast";
 import {
-  BulkBar,
   RowActions,
-  RowCheckbox,
-  SelectAllCheckbox,
   TableBox,
   TablePagination,
   tableSelectCls,
   usePagination,
-  useRowSelection,
 } from "@/components/ui/data-table";
 import { SampleBanner } from "@/components/mock-interviews/sample-banner";
 import { LevelTag, ScoreRing, SourceTag, Sparkline, bandTone } from "@/components/mock-interviews/visual-kit";
@@ -28,7 +22,8 @@ import { useMounted } from "@/lib/use-mounted";
 import { cn } from "@/lib/utils";
 
 // Interview history (spec D49, D53): every AI and human interview, newest first,
-// with its score and report. R1.2: sample data.
+// with its score and report. Records can't be deleted (owner, November 17,
+// 2026), so there's no multi-select: nothing to do in bulk. R1.2: sample data.
 
 const STATUS_TEXT: Record<SessionStatus, string> = {
   completed: "Report ready",
@@ -50,7 +45,6 @@ const scoreOf = (i: SampleInterview) => (i.scores ? overallScore(i.scores, W) : 
 export function HistoryTable() {
   const mounted = useMounted();
   const router = useRouter();
-  const { confirm, dialog } = useConfirm();
   const [query, setQuery] = useState("");
   const [type, setType] = useState<TypeFilter>("all");
   const [status, setStatus] = useState<"all" | SessionStatus>("all");
@@ -66,7 +60,6 @@ export function HistoryTable() {
   }, [query, type, status]);
 
   const paging = usePagination(rows, `${query}|${type}|${status}`);
-  const selection = useRowSelection(rows.map((r) => r.id));
 
   const scored = [...SAMPLE_INTERVIEWS].filter((i) => i.scores).sort((a, b) => a.date.localeCompare(b.date));
   const recent = scored.slice(-6);
@@ -80,17 +73,6 @@ export function HistoryTable() {
     ready: SAMPLE_INTERVIEWS.filter((i) => i.status === "completed").length,
   };
 
-  async function remove(ids: string[]) {
-    const ok = await confirm({
-      title: ids.length === 1 ? "Delete this interview?" : `Delete ${ids.length} interviews?`,
-      description: "Their reports and scores are removed from your history and Performance. This can't be undone.",
-      confirmLabel: "Delete",
-      destructive: true,
-    });
-    if (!ok) return;
-    selection.clear();
-    toast.info("Sample: nothing was deleted", "Deleting works once interviews are saved.");
-  }
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
@@ -174,13 +156,6 @@ export function HistoryTable() {
           </select>
         </div>
 
-        <BulkBar selection={selection}>
-          <Button variant="destructive" onClick={() => void remove([...selection.selected])}>
-            <Trash2 className="size-4" aria-hidden />
-            Delete
-          </Button>
-        </BulkBar>
-
         {rows.length === 0 ? (
           <div className="rounded-xl border border-dashed p-8 text-center">
             <Clock3 className="mx-auto size-9 text-primary/60" aria-hidden />
@@ -195,9 +170,6 @@ export function HistoryTable() {
           <TableBox minWidth={980}>
             <thead className="border-b bg-white/40 text-left text-xs text-muted-foreground">
               <tr>
-                <th className="w-10 px-3 py-2">
-                  <SelectAllCheckbox selection={selection} />
-                </th>
                 <th className="w-36 px-3 py-2 font-medium">Report</th>
                 <th className="px-3 py-2 font-medium">Score</th>
                 <th className="min-w-56 px-3 py-2 font-medium">Interview</th>
@@ -214,9 +186,7 @@ export function HistoryTable() {
                   key={i.id}
                   i={i}
                   mounted={mounted}
-                  selection={selection}
                   onOpen={(href) => router.push(href)}
-                  onDelete={() => void remove([i.id])}
                 />
               ))}
             </tbody>
@@ -224,7 +194,6 @@ export function HistoryTable() {
         )}
         <TablePagination paging={paging} />
       </section>
-      {dialog}
     </div>
   );
 }
@@ -276,23 +245,16 @@ function Tile({
 function HistoryRow({
   i,
   mounted,
-  selection,
   onOpen,
-  onDelete,
 }: {
   i: SampleInterview;
   mounted: boolean;
-  selection: ReturnType<typeof useRowSelection>;
   onOpen: (href: string) => void;
-  onDelete: () => void;
 }) {
   const overall = scoreOf(i);
   const report = `/mock-interviews/report/${i.id}`;
   return (
     <tr className="align-middle">
-      <td className="px-3 py-2">
-        <RowCheckbox selection={selection} id={i.id} label={`${i.role} on ${i.date.slice(0, 10)}`} />
-      </td>
       <td className="px-3 py-2">
         {i.status === "completed" ? (
           <Link href={report} className={cn(buttonVariants({ variant: "outline" }), "w-full border-emerald-300 text-emerald-800 hover:bg-emerald-50")}>
@@ -352,10 +314,6 @@ function HistoryRow({
               Book a similar one
             </DropdownMenuItem>
           )}
-          <DropdownMenuItem onClick={onDelete} className="text-destructive">
-            <Trash2 className="size-4" aria-hidden />
-            Delete
-          </DropdownMenuItem>
         </RowActions>
       </td>
     </tr>

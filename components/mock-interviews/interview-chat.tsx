@@ -10,6 +10,7 @@ import {
   FileText,
   SendHorizontal,
   Square,
+  WifiOff,
 } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -108,14 +109,30 @@ export function InterviewChat({
     max: MAX_ANSWER,
   });
 
+  // The clock only runs while connected (owner, November 17, 2026): any
+  // disconnection pauses it, and it picks up exactly where it stopped. Here that's
+  // the browser going offline; R1.5 counts time on the server from the live
+  // connection, so a closed tab or crashed browser pauses it too.
+  const [offline, setOffline] = useState(false);
   useEffect(() => {
-    if (ended) return;
+    const update = () => setOffline(!navigator.onLine);
+    update();
+    window.addEventListener("online", update);
+    window.addEventListener("offline", update);
+    return () => {
+      window.removeEventListener("online", update);
+      window.removeEventListener("offline", update);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (ended || offline) return;
     const t = setInterval(
       () => setSecondsLeft((s) => Math.max(0, s - 1)),
       1000,
     );
     return () => clearInterval(t);
-  }, [ended]);
+  }, [ended, offline]);
 
   useEffect(() => {
     scrollIntoMain(endRef.current, "end");
@@ -294,6 +311,19 @@ export function InterviewChat({
           </div>
 
           <InterviewPanelCompact d={panel} />
+
+          {offline && !ended && (
+            <p
+              className="flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3.5 py-2.5 text-sm text-amber-900"
+              role="alert"
+            >
+              <WifiOff className="mt-0.5 size-4 shrink-0" aria-hidden />
+              <span>
+                <span className="font-semibold">You&apos;re offline. The clock is paused.</span>{" "}
+                It picks up from {mmss(secondsLeft)} as soon as you&apos;re back. Your answers so far are kept.
+              </span>
+            </p>
+          )}
 
           {state === "wrapup" && (
             <p

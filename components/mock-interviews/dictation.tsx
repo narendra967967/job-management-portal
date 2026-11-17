@@ -43,6 +43,44 @@ function boxText(t: string): string {
   return t && !/\s$/.test(t) ? `${t} ` : t;
 }
 
+// Spoken punctuation (owner, November 17, 2026). "period" is left out on
+// purpose: it's a common word in answers ("notice period", "trial period").
+const COMMANDS: [RegExp, string][] = [
+  [/\s*\bnew paragraph\b\s*/gi, "\n\n"],
+  [/\s*\b(?:new|next) line\b\s*/gi, "\n"],
+  [/\s*\bfull stop\b/gi, "."],
+  [/\s*\bquestion mark\b/gi, "?"],
+  [/\s*\bexclamation (?:mark|point)\b/gi, "!"],
+  [/\s*\bcomma\b/gi, ","],
+  [/\s*\bcolon\b/gi, ":"],
+];
+
+/**
+ * Tidies dictated words: spoken commands become punctuation or line breaks, a
+ * lone "i" becomes "I", and sentences start with a capital. `before` is the text
+ * already in the box, to know whether the next word starts a sentence.
+ */
+export function formatSpoken(spoken: string, before: string): string {
+  let t = spoken;
+  for (const [re, out] of COMMANDS) t = t.replace(re, out);
+  t = t
+    .replace(/([.,?!:])(?=[A-Za-z])/g, "$1 ") // a space after punctuation
+    .replace(/ {2,}/g, " ")
+    .replace(/\n +/g, "\n")
+    .replace(/\bi\b/g, "I"); // "i", "i'm", "i've" → "I", "I'm", "I've"
+  // A capital after a sentence ends, and at the very start.
+  t = t.replace(/([.!?]\s+|\n+)([a-z])/g, (_, gap: string, c: string) => gap + c.toUpperCase());
+  const startsSentence = before.trim() === "" || /[.!?]\s*$|\n\s*$/.test(before);
+  if (startsSentence) t = t.replace(/^(\s*)([a-z])/, (_, sp: string, c: string) => sp + c.toUpperCase());
+  return t;
+}
+
+/** Joins the box text and new dictated text without a space before punctuation. */
+function joinSpoken(before: string, spoken: string): string {
+  const formatted = formatSpoken(spoken, before);
+  return /^[.,?!:\n]/.test(formatted) ? before.replace(/\s+$/, "") + formatted : before + formatted;
+}
+
 const ERRORS: Record<string, [string, string]> = {
   "not-allowed": ["Microphone blocked", "Allow the microphone for this site in your browser's settings, then try again."],
   "service-not-allowed": ["Speech to text isn't available", "Your browser's speech service is turned off. You can still type your answer."],
@@ -98,7 +136,7 @@ export function useDictation({ text, onText, max }: { text: string; onText: (v: 
         if (e.results[i].isFinal) finals.current += phrase.trim() + " ";
         else interim += phrase;
       }
-      const next = (base.current + finals.current + interim).slice(0, latest.current.max);
+      const next = joinSpoken(base.current, finals.current + interim).slice(0, latest.current.max);
       latest.current.onText(next);
     };
     r.onerror = (e) => {
