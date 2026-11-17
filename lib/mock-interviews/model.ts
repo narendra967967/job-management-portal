@@ -83,9 +83,41 @@ export function plannedQuestions(durationMin: number, minutesPerQuestion: number
   return Math.max(1, Math.floor(durationMin / Math.max(0.5, minutesPerQuestion)));
 }
 
-/** Price of an interview outside the allowance: per-minute rate times duration (D5). Paise. */
-export function aiInterviewPrice(durationMin: number, ratePerMinutePaise: number): number {
-  return Math.round(durationMin * ratePerMinutePaise);
+/** Admin pricing for one difficulty level (D5): a per-minute rate and its own discount. */
+export interface DifficultyPricing {
+  ratePerMinutePaise: number;
+  discountOn: boolean;
+  discountPercent: number; // 0-100, used only while discountOn
+}
+export type PricingByDifficulty = Record<Difficulty, DifficultyPricing>;
+
+export interface AiInterviewQuote {
+  /** Minutes times the level's rate, before any discount. Paise. */
+  full: number;
+  /** Discount applied, in percent (0 when the level's discount is off). */
+  percent: number;
+  /** What the candidate pays, rounded to the nearest rupee. Paise. */
+  final: number;
+}
+
+/** Price of an interview outside the allowance (D5): duration times the
+ *  difficulty's per-minute rate, less that level's discount when it's on,
+ *  rounded to the nearest rupee. Prices include GST (D34). */
+export function aiInterviewQuote(durationMin: number, p: DifficultyPricing): AiInterviewQuote {
+  const full = Math.round(durationMin * Math.max(0, p.ratePerMinutePaise));
+  const percent = p.discountOn ? Math.min(100, Math.max(0, p.discountPercent)) : 0;
+  const final = Math.round((full * (100 - percent)) / 100 / 100) * 100;
+  return { full, percent, final };
+}
+
+/** The lowest per-minute rate after discounts, for "from ₹3 a minute". Paise. */
+export function lowestRatePerMinute(pricing: PricingByDifficulty): number {
+  return Math.min(
+    ...DIFFICULTIES.map((d) => {
+      const p = pricing[d];
+      return (p.ratePerMinutePaise * (100 - (p.discountOn ? Math.min(100, Math.max(0, p.discountPercent)) : 0))) / 100;
+    }),
+  );
 }
 
 /** Overall score out of 100 from 1-10 metric scores and admin weights (D49). */

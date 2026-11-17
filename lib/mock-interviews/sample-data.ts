@@ -1,12 +1,17 @@
 // PHASE R1.2 SAMPLE DATA: the Mock interviews screens run on this until the
 // database phase (R1.4) replaces it. Delete this file then. Nothing here is saved.
 
-import type { AllowanceState, Difficulty, MetricScores, MetricWeights, ReportSource, ReportWriting } from "./model";
+import type { AllowanceState, Difficulty, MetricScores, MetricWeights, PricingByDifficulty, ReportSource, ReportWriting } from "./model";
 
 /** Module settings the screens need (admin sets these in R1.3/R1.4). */
 export const SAMPLE_SETTINGS = {
   minutesPerQuestion: 2,
-  ratePerMinutePaise: 400, // ₹4 a minute
+  /** Per-minute price and discount for each difficulty (admin sets these). */
+  pricing: {
+    Easy: { ratePerMinutePaise: 300, discountOn: false, discountPercent: 0 },
+    Medium: { ratePerMinutePaise: 400, discountOn: true, discountPercent: 10 },
+    Hard: { ratePerMinutePaise: 500, discountOn: true, discountPercent: 20 },
+  } satisfies PricingByDifficulty,
   wrapUpMinutes: 10,
   resumeWindowMinutes: 15,
   paceGraceMinutes: 5, // no pace verdict before this

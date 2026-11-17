@@ -5,7 +5,7 @@ import { ArrowRight, Clock, MessageSquareText, PlayCircle, Plus, Sparkles, FileT
 import { buttonVariants } from "@/components/ui/button";
 import { SampleBanner } from "@/components/mock-interviews/sample-banner";
 import { SAMPLE_INTERVIEWS, SAMPLE_SETTINGS } from "@/lib/mock-interviews/sample-data";
-import { aiInterviewPrice, longDate, overallScore, rupees, scoreBand, type AllowanceState } from "@/lib/mock-interviews/model";
+import { aiInterviewQuote, longDate, lowestRatePerMinute, overallScore, rupees, scoreBand, type AllowanceState } from "@/lib/mock-interviews/model";
 import { useMounted } from "@/lib/use-mounted";
 import { cn } from "@/lib/utils";
 
@@ -112,23 +112,24 @@ export function AiHome({ allowance, allowanceKey }: { allowance: AllowanceState;
 }
 
 function AllowanceCard({ allowance, mounted }: { allowance: AllowanceState; mounted: boolean }) {
-  const example = aiInterviewPrice(30, SAMPLE_SETTINGS.ratePerMinutePaise);
-  const rate = rupees(SAMPLE_SETTINGS.ratePerMinutePaise);
+  // Prices differ by difficulty (D5); quote the lowest, and a Medium example.
+  const rate = rupees(lowestRatePerMinute(SAMPLE_SETTINGS.pricing));
+  const example = aiInterviewQuote(30, SAMPLE_SETTINGS.pricing.Medium).final;
   let title: string;
   let text: string;
   if (allowance.kind === "plan") {
     const left = Math.max(0, allowance.included - allowance.used);
     title = `${left} of ${allowance.included} AI interviews left on your ${allowance.planName} plan`;
-    text = `Your included interviews renew with your plan${mounted ? ` on ${longDate(allowance.periodEnds)}` : ""}; unused ones don't carry over. After that, an interview costs ${rate} a minute.`;
+    text = `Your included interviews renew with your plan${mounted ? ` on ${longDate(allowance.periodEnds)}` : ""}; unused ones don't carry over. After that, interviews cost from ${rate} a minute, depending on difficulty.`;
   } else if (allowance.kind === "free") {
     title = allowance.left > 0 ? "Your free AI interview is ready" : "You've used your free AI interview";
     text =
       allowance.left > 0
         ? "The Free plan includes one AI interview, once. Use it at any length up to 60 minutes."
-        : `Each interview now costs ${rate} a minute, so a 30-minute interview is ${rupees(example)}.`;
+        : `Interviews now cost from ${rate} a minute, depending on difficulty. A 30-minute Medium interview is ${rupees(example)}.`;
   } else {
     title = "Pay per interview";
-    text = `Each interview costs ${rate} a minute, so a 30-minute interview is ${rupees(example)}. A paid plan includes some interviews.`;
+    text = `Interviews cost from ${rate} a minute, depending on difficulty. A 30-minute Medium interview is ${rupees(example)}. A paid plan includes some interviews.`;
   }
   return (
     <div className="rounded-xl border bg-card p-4">

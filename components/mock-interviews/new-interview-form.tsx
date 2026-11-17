@@ -20,11 +20,12 @@ import {
   DISCUSSION_CATEGORIES,
   INDUSTRIES,
   INTERVIEW_CATEGORIES,
-  aiInterviewPrice,
+  aiInterviewQuote,
   allowanceLeft,
   plannedQuestions,
   rupees,
   type AllowanceState,
+  type Difficulty,
 } from "@/lib/mock-interviews/model";
 import { cn } from "@/lib/utils";
 import { scrollIntoMain } from "@/components/mock-interviews/scroll-into-main";
@@ -66,7 +67,7 @@ export function NewInterviewForm({
   const [role, setRole] = useState(fromLead?.title ?? "");
   const [industry, setIndustry] = useState("");
   const [category, setCategory] = useState("");
-  const [difficulty, setDifficulty] = useState<string>("Medium");
+  const [difficulty, setDifficulty] = useState<Difficulty>("Medium");
   const [duration, setDuration] = useState<number>(30);
   const [resumeMode, setResumeMode] = useState<ResumeMode>(resumes.length ? "saved" : "upload");
   const [resumeId, setResumeId] = useState(resumes.find((r) => r.isDefault)?.id ?? resumes[0]?.id ?? "");
@@ -98,7 +99,9 @@ export function NewInterviewForm({
 
   const questions = plannedQuestions(duration, SAMPLE_SETTINGS.minutesPerQuestion);
   const left = allowanceLeft(allowance);
-  const price = aiInterviewPrice(duration, SAMPLE_SETTINGS.ratePerMinutePaise);
+  const pricing = SAMPLE_SETTINGS.pricing;
+  const quote = aiInterviewQuote(duration, pricing[difficulty]);
+  const price = quote.final;
   const included = left > 0;
 
   function validate(): Record<string, string> {
@@ -243,11 +246,25 @@ export function NewInterviewForm({
             <fieldset className="space-y-1.5">
               <legend className="mb-1.5 text-sm font-medium">Difficulty</legend>
               <div className="grid grid-cols-3 gap-2">
-                {DIFFICULTIES.map((d) => (
-                  <ChoiceButton key={d} selected={difficulty === d} onClick={() => setDifficulty(d)}>
-                    {d}
-                  </ChoiceButton>
-                ))}
+                {DIFFICULTIES.map((d) => {
+                  const p = pricing[d];
+                  return (
+                    <ChoiceButton key={d} selected={difficulty === d} onClick={() => setDifficulty(d)} className="flex-col py-2">
+                      <span>{d}</span>
+                      {/* Price per minute only matters when the interview isn't included. */}
+                      {!included && (
+                        <span className="mt-0.5 flex flex-wrap items-center justify-center gap-1 text-[11px] font-normal text-muted-foreground">
+                          {rupees(p.ratePerMinutePaise)}/min
+                          {p.discountOn && p.discountPercent > 0 && (
+                            <span className="rounded-full bg-emerald-100 px-1.5 text-[10px] font-semibold text-emerald-800">
+                              {p.discountPercent}% off
+                            </span>
+                          )}
+                        </span>
+                      )}
+                    </ChoiceButton>
+                  );
+                })}
               </div>
             </fieldset>
 
@@ -266,6 +283,9 @@ export function NewInterviewForm({
                     <span className="text-[11px] font-normal text-muted-foreground">
                       about {plannedQuestions(m, SAMPLE_SETTINGS.minutesPerQuestion)} questions
                     </span>
+                    {!included && (
+                      <span className="text-[11px] font-semibold text-foreground">{rupees(aiInterviewQuote(m, pricing[difficulty]).final)}</span>
+                    )}
                   </ChoiceButton>
                 ))}
               </div>
@@ -420,14 +440,33 @@ export function NewInterviewForm({
             <Row label="Length" value={`${duration} min`} />
             <Row label="Questions" value={`about ${questions}, plus follow-ups`} />
             <Row label="Difficulty" value={difficulty} />
-            <Row label="Cost" value={included ? "Included" : rupees(price)} strong />
+            <div className="flex justify-between gap-3">
+              <dt className="text-muted-foreground">Cost</dt>
+              <dd className="text-right font-semibold">
+                {included ? (
+                  "Included"
+                ) : (
+                  <span className="inline-flex flex-wrap items-center justify-end gap-1.5">
+                    {quote.percent > 0 && (
+                      <>
+                        <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-800">
+                          {quote.percent}% off
+                        </span>
+                        <s className="font-normal text-muted-foreground">{rupees(quote.full)}</s>
+                      </>
+                    )}
+                    {rupees(price)}
+                  </span>
+                )}
+              </dd>
+            </div>
           </dl>
           <p className="text-xs text-muted-foreground">
             {included
               ? allowance.kind === "free"
                 ? "Uses your one free AI interview."
                 : `Uses 1 of the ${left} interviews left on your plan.`
-              : `${duration} minutes at ${rupees(SAMPLE_SETTINGS.ratePerMinutePaise)} a minute.`}
+              : `${duration} minutes at ${rupees(pricing[difficulty].ratePerMinutePaise)} a minute${quote.percent > 0 ? `, ${quote.percent}% off` : ""}.`}
           </p>
           <Button className="w-full" size="lg" onClick={start} disabled={starting}>
             {starting && <Loader2 className="size-4 animate-spin" aria-hidden />}

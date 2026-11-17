@@ -47,8 +47,9 @@ A phase isn't done until all of these hold (from `CLAUDE.md` and the standing ru
 ## 3. Settled before Release 1 (November 17, 2026)
 
 - A paid plan's AI allowance is granted **each plan period, with no carry-over**.
-- Any AI interview outside the allowance is **priced per minute**: admin sets the rate, and the price is the rate
-  times the chosen duration.
+- Any AI interview outside the allowance is **priced per minute**: admin sets a rate **for each difficulty**
+  (Easy, Medium, Hard), each with its own discount on or off and percentage. The price is the minutes times the
+  level's rate, less its discount, rounded to the nearest rupee.
 - Each part of the module has an **Open / Coming soon** switch for candidates (AI interviews, human interviews),
   plus the separate switch for interviewer applications.
 - The module's AI provider and model are chosen at R1.6, after comparing two models on quality and cost.
@@ -72,7 +73,7 @@ lead pages locked and Mock interviews open; nothing else in the job tracker chan
 
 - New interview: role, industry, category, difficulty, duration; resume, job description (or General
   preparation) and topics, typed or picked from the career profile or a lead.
-- Allowance check: interviews left on the plan, or the per-minute price for the chosen duration and a Pay button.
+- Allowance check: interviews left on the plan, or the price for the chosen difficulty and duration (with any discount shown) and a Pay button.
 - The interview: chat screen, timer, wrap-up notice, the 10-minute extension, the end.
 - Interrupted interview: the Resume banner within 15 minutes.
 - The shared report page: five scores, the overall score out of 100, the five written parts, the source label.
@@ -87,7 +88,7 @@ the same format later.
 
 - Mock interviews admin menu with its own settings page (D9): the Open / Coming soon switches; AI provider,
   model and key (write-only); categories; difficulty levels; durations; minutes per question; pace grace period (5 min); wrap-up time;
-  resume window; **price per minute**; prompts (including the question-plan prompt); metric weights.
+  resume window; **price per minute per difficulty, each with a discount on/off and percentage**; prompts (including the question-plan prompt); metric weights.
 - Plan editor: AI mock interviews included (per plan period).
 - AI interview usage: sessions table, cost per session and in total, each session's event log.
 - Credit action on a session (for interviews that broke), with a required note.
@@ -125,14 +126,14 @@ allowance, pay for one).
 - Two models compared on quality and cost.
 - A short cost report: average and worst-case cost per 15, 30, 45 and 60-minute interview, and per minute.
 
-**Owner checks:** reads a few transcripts and reports, picks the model, sets the per-minute price and plan
+**Owner checks:** reads a few transcripts and reports, picks the model, sets the per-minute price and discount for each difficulty, and the plan
 allowances. Release 1 doesn't roll out until the owner is happy with interview quality.
 
 ### R1.7 Safety checks (S to M)
 
 A `scripts/security/` check script: signed-out access refused; one user can't see another's sessions; the
-allowance can't be bypassed or spent twice; purchases are idempotent and charge the per-minute price for the
-chosen duration; evaluations always match the report format; the module key never reaches the browser; Coming
+allowance can't be bypassed or spent twice; purchases are idempotent and charge the chosen difficulty's per-minute
+price for the chosen duration, with its discount only when switched on; evaluations always match the report format; the module key never reaches the browser; Coming
 soon really blocks the feature, not just the menu. Knowledge-base articles. The deploy runbook lists the check.
 
 ### R1.8 Content and rollout (M)
@@ -272,7 +273,7 @@ Meet attendance reports (needs a higher Workspace plan).
 |---|---|---|
 | 1 | R1.1 | Navigation and the plan lock |
 | 2 | R1.2, R1.3 | Every Release 1 screen, especially the report page |
-| 3 | R1.5, R1.6 | Real interviews; the model; the per-minute price and plan allowances |
+| 3 | R1.5, R1.6 | Real interviews; the model; per-minute prices and discounts per difficulty; plan allowances |
 | 4 | R1.8 | Landing page; deploys Release 1 |
 | 5 | G.1, G.3 | GST screens; the PDF library; invoices |
 | 6 | G.5 | Deploys the GST stage (switched off) |
