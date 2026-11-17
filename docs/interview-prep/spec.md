@@ -197,7 +197,7 @@ Saved onto each booking or session when it's created (D36). Defaults in brackets
 | Area | Settings |
 |---|---|
 | Switches | AI interviews: **Open** or **Coming soon**; human interviews (the marketplace, for candidates): **Open** or **Coming soon**; new interviewer applications on/off; pause new bookings. "Coming soon" keeps the menu visible with a coming-soon page instead of the feature |
-| AI interviews | AI provider, model and key for this module; categories; difficulty levels; allowed durations (15, 30, 45, 60); minutes per question (2); wrap-up extension (10 min); resume window (15 min); **price per minute** (for any interview outside the plan allowance); prompts; metric weights |
+| AI interviews | AI provider, model and key for this module; categories; difficulty levels; allowed durations (15, 30, 45, 60); minutes per question (2); pace grace period, before the pace meter gives a verdict (5 min); wrap-up extension (10 min); resume window (15 min); **price per minute** (for any interview outside the plan allowance); prompts; metric weights |
 | Plans (in the plan editor) | AI interviews included (per plan period, no carry-over) |
 | Commission | First-time % ; returning % |
 | Pricing | Minimum and maximum service price; allowed durations (15, 30, 45, 60, 90); services per interviewer |

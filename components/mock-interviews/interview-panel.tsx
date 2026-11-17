@@ -19,6 +19,8 @@ export interface PanelData {
   questionNo: number;
   totalQuestions: number;
   minutesPerQuestion: number;
+  /** No pace verdict before this many minutes (admin setting). */
+  paceGraceMinutes: number;
   topics: { name: string; question: number }[];
   answers: number;
   avgWords: number;
@@ -36,6 +38,14 @@ export function timerTone(phase: Phase, secondsLeft: number) {
 
 /** Where the candidate is against the clock. */
 export function pace(d: PanelData) {
+  // Too early to judge: a slow first answer shouldn't read as "behind".
+  if (d.elapsed < d.paceGraceMinutes * 60)
+    return {
+      label: "Just started",
+      note: `Your pace shows after the first ${d.paceGraceMinutes} minutes. Settle in.`,
+      tone: "text-slate-700 bg-slate-50 border-slate-200",
+      bar: "bg-slate-400",
+    };
   // Questions finished so far against how many the time used would allow.
   const expected = d.elapsed / (d.minutesPerQuestion * 60);
   const diff = Math.max(0, d.questionNo - 1) - expected;

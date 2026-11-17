@@ -9,6 +9,7 @@ export const SAMPLE_SETTINGS = {
   ratePerMinutePaise: 400, // ₹4 a minute
   wrapUpMinutes: 10,
   resumeWindowMinutes: 15,
+  paceGraceMinutes: 5, // no pace verdict before this
   weights: { communication: 20, technical: 20, confidence: 20, problemSolving: 20, relevance: 20 } satisfies MetricWeights,
 };
 

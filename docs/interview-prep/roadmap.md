@@ -86,7 +86,7 @@ the same format later.
 ### R1.3 Admin screens on sample data (M)
 
 - Mock interviews admin menu with its own settings page (D9): the Open / Coming soon switches; AI provider,
-  model and key (write-only); categories; difficulty levels; durations; minutes per question; wrap-up time;
+  model and key (write-only); categories; difficulty levels; durations; minutes per question; pace grace period (5 min); wrap-up time;
   resume window; **price per minute**; prompts (including the question-plan prompt); metric weights.
 - Plan editor: AI mock interviews included (per plan period).
 - AI interview usage: sessions table, cost per session and in total, each session's event log.

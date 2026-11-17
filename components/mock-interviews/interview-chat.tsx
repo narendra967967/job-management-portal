@@ -142,6 +142,7 @@ export function InterviewChat({
       questionNo,
       totalQuestions,
       minutesPerQuestion: SAMPLE_SETTINGS.minutesPerQuestion,
+      paceGraceMinutes: SAMPLE_SETTINGS.paceGraceMinutes,
       topics: SAMPLE_SESSION.topics,
       answers: yourAnswers.length,
       avgWords: yourAnswers.length
