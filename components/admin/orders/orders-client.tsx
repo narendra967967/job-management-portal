@@ -42,7 +42,7 @@ const STATUS_VARIANT: Record<OrderStatus, "success" | "danger" | "warning" | "ne
   cancelled: "neutral",
 };
 
-const KIND_LABELS = { new: "New", renew: "Renewal", upgrade: "Upgrade" } as const;
+const KIND_LABELS = { new: "New", renew: "Renewal", upgrade: "Upgrade", ai_interview: "AI interview" } as const;
 
 const selectCls =
   "h-9 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
@@ -215,7 +215,7 @@ export function OrdersClient() {
         r.user?.name,
         r.user?.email,
         r.planName,
-        PERIOD_LABELS[r.period],
+        r.period ? PERIOD_LABELS[r.period] : "",
         KIND_LABELS[r.kind],
         ORDER_STATUS_LABELS[r.status],
         (r.total / 100).toFixed(2),
@@ -394,7 +394,7 @@ export function OrdersClient() {
                 <td className="px-4 py-2.5">
                   <span className="block">{r.planName}</span>
                   <span className="block text-xs whitespace-nowrap text-muted-foreground">
-                    {PERIOD_LABELS[r.period]} · {KIND_LABELS[r.kind]}
+                    {r.period ? `${PERIOD_LABELS[r.period]} · ` : ""}{KIND_LABELS[r.kind]}
                   </span>
                 </td>
                 <td className="px-4 py-2.5">

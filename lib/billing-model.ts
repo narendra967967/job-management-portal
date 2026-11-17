@@ -277,8 +277,9 @@ export interface AdminOrderRow {
   /** The account was deleted since (name/email are the order's snapshot). */
   userDeleted?: boolean;
   planName: string;
-  period: BillingPeriod;
-  kind: QuoteKind;
+  /** null for an AI interview order. */
+  period: BillingPeriod | null;
+  kind: QuoteKind | "ai_interview";
   /** Paise: price before GST, GST, and what was charged. */
   base: number;
   tax: number;

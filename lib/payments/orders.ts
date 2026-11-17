@@ -202,6 +202,9 @@ export type ConfirmResult =
  * returns the same result without changing anything.
  */
 export async function confirmPayment(order: Order, payment: RazorpayPayment, creds: RazorpayCreds): Promise<ConfirmResult> {
+  // Plans only. AI interview orders get their own confirmation (roadmap R1.5).
+  const period = order.period;
+  if (order.kind === "ai_interview" || !period) return { ok: false, error: "This order isn't for a plan." };
   if (payment.order_id !== order.gatewayOrderId) return { ok: false, error: "That payment belongs to another order." };
   if (payment.amount !== order.totalAmount || payment.currency !== order.currency) {
     console.error(`[payments] amount mismatch on order ${order.id}: got ${payment.amount} ${payment.currency}`);
@@ -247,7 +250,7 @@ export async function confirmPayment(order: Order, payment: RazorpayPayment, cre
         : ({ id: o.planId ?? "", name: o.planName, currency: o.currency, monthlyPrice: 0, yearlyPrice: 0 } as OfferPlan);
       const q = quote({
         plan: bought,
-        period: o.period,
+        period,
         current: {
           planId: cur?.id ?? null,
           name: cur?.name ?? "",
@@ -330,7 +333,7 @@ export async function sendReceipt(orderId: string): Promise<void> {
   const rows: [string, string][] = [
     ["Receipt number", receiptOf(o)],
     ["Date", dateOnly(o.paidAt ?? o.createdAt)],
-    ["Plan", `${o.planName}, billed ${PERIOD_LABELS[o.period].toLowerCase()}`],
+    o.period ? ["Plan", `${o.planName}, billed ${PERIOD_LABELS[o.period].toLowerCase()}`] : ["Item", o.planName],
     ["Active until", o.termEndsAt ? dateOnly(o.termEndsAt) : ""],
     ...(o.taxAmount > 0
       ? ([

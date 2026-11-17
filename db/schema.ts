@@ -19,6 +19,8 @@ import {
   text,
   boolean,
   integer,
+  smallint,
+  real,
   uuid,
   date,
   timestamp,
@@ -28,10 +30,12 @@ import {
   check,
   index,
   customType,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 
 import { user } from "./auth-schema";
 import type { SalaryInsight } from "../lib/types";
+import type { InterviewSettingsSnapshot, MetricWeights, PlannedQuestion, PricingByDifficulty, ReportWriting } from "../lib/mock-interviews/model";
 
 // Raw bytes column (node-postgres returns/accepts a Buffer).
 const bytea = customType<{ data: Buffer; driverData: Buffer }>({
@@ -528,6 +532,9 @@ export const plans = pgTable("plans", {
   allowSalaryInsight: boolean("allow_salary_insight").notNull().default(false),
   // Résumé ATS score checker (Settings → Resumes). Off by default on every plan.
   allowAtsCheck: boolean("allow_ats_check").notNull().default(false),
+  // AI mock interviews included each plan period, no carry-over (spec D5). On a
+  // Free plan it is once ever, like the Free plan itself.
+  aiInterviewsIncluded: integer("ai_interviews_included").notNull().default(0),
   // Open (not archived) leads a user may hold; null = unlimited. Enforced on
   // manual add and alert intake (lib/entitlements.ts).
   limitActiveLeads: integer("limit_active_leads"),
@@ -826,7 +833,8 @@ export const billingConfig = pgTable("billing_config", {
 
 export const gatewayMode = pgEnum("gateway_mode", ["test", "live"]);
 export const billingPeriod = pgEnum("billing_period", ["monthly", "yearly"]);
-export const orderKind = pgEnum("order_kind", ["new", "renew", "upgrade"]);
+// ai_interview: a paid AI mock interview (spec D5); no plan, no period.
+export const orderKind = pgEnum("order_kind", ["new", "renew", "upgrade", "ai_interview"]);
 export const orderStatus = pgEnum("order_status", ["created", "paid", "failed", "cancelled"]);
 
 /** Admin → Settings → Payments: one row per gateway (id = "razorpay", …).
@@ -867,7 +875,8 @@ export const paymentOrders = pgTable(
     userEmail: text("user_email").notNull().default(""),
     planId: uuid("plan_id").references(() => plans.id, { onDelete: "set null" }),
     planName: text("plan_name").notNull(),
-    period: billingPeriod("period").notNull(),
+    // Plan orders only; null for an AI interview (kind ai_interview).
+    period: billingPeriod("period"),
     kind: orderKind("kind").notNull(),
     status: orderStatus("status").notNull().default("created"),
     currency: text("currency").notNull().default("INR"),
@@ -886,6 +895,8 @@ export const paymentOrders = pgTable(
     mode: gatewayMode("mode").notNull(),
     gatewayOrderId: text("gateway_order_id"),
     gatewayPaymentId: text("gateway_payment_id"),
+    // kind ai_interview: the booking this pays for (made first as pending_payment).
+    aiInterviewId: uuid("ai_interview_id").references(() => aiInterviews.id, { onDelete: "set null" }),
     // How the user paid, from the gateway (upi, card, netbanking, wallet…).
     method: text("method"),
     // Seller + tax details at payment time (lib/billing-model BillingSnapshot),
@@ -915,6 +926,13 @@ export const paymentOrders = pgTable(
     // Razorpay's minimum charge is 100 paise (₹1.00).
     check("payment_orders_min_total_ck", sql`${t.totalAmount} >= 100`),
     check("payment_orders_credit_days_ck", sql`${t.creditDays} >= 0`),
+    // A plan order has a period; an AI interview order has none and no plan.
+    check(
+      "payment_orders_kind_period_ck",
+      sql`(${t.kind}::text = 'ai_interview' and ${t.period} is null) or (${t.kind}::text <> 'ai_interview' and ${t.period} is not null)`,
+    ),
+    // One paid order per AI interview (a failed try can be retried).
+    uniqueIndex("payment_orders_ai_interview_paid_uq").on(t.aiInterviewId).where(sql`${t.status} = 'paid'`),
   ],
 );
 
@@ -1150,6 +1168,7 @@ export const retentionConfig = pgTable("retention_config", {
   kbConversationDays: integer("kb_conversation_days").notNull().default(60),
   broadcastQueueDays: integer("broadcast_queue_days").notNull().default(90),
   sentEmailLogDays: integer("sent_email_log_days").notNull().default(30),
+  aiInterviewEventDays: integer("ai_interview_event_days").notNull().default(365),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .defaultNow()
@@ -1667,3 +1686,258 @@ export const emailDelivery = pgTable("email_delivery", {
     .defaultNow()
     .$onUpdate(() => new Date()),
 });
+
+/* ------------------------------------------------------------------ */
+/* Mock interviews (docs/interview-prep/spec.md, Release 1: AI)        */
+/* ------------------------------------------------------------------ */
+
+export const aiInterviewStatus = pgEnum("ai_interview_status", [
+  "pending_payment",
+  "ready",
+  "in_progress",
+  "interrupted",
+  "completed",
+  "stopped",
+  "failed",
+  "expired",
+]);
+
+/** Admin → Mock interviews → Module settings (single "app" row, spec §4).
+ *  Every booking copies the settings in force onto itself (D36). The module AI
+ *  key is encrypted like the other secrets and never leaves the server. */
+export const mockInterviewConfig = pgTable(
+  "mock_interview_config",
+  {
+    id: text("id").primaryKey().default("app"),
+    // Open / Coming soon for each part (D9 switches).
+    aiState: text("ai_state").notNull().default("coming_soon"),
+    humanState: text("human_state").notNull().default("coming_soon"),
+    applicationsOpen: boolean("applications_open").notNull().default(false),
+    pauseBookings: boolean("pause_bookings").notNull().default(false),
+    // The module's own AI key (D9), separate from users' keys and the KB key.
+    aiProvider: aiProvider("ai_provider").notNull().default("openai"),
+    aiModel: text("ai_model"),
+    aiKeyCiphertext: text("ai_key_ciphertext"),
+    aiKeyLast4: text("ai_key_last4"),
+    aiLastTestOk: boolean("ai_last_test_ok"),
+    aiLastTestAt: timestamp("ai_last_test_at", { withTimezone: true }),
+    categories: text("categories").array().notNull().default(sql`'{}'::text[]`),
+    durations: integer("durations").array().notNull().default(sql`'{15,30,45,60}'::integer[]`),
+    minutesPerQuestion: real("minutes_per_question").notNull().default(2),
+    wrapUpMinutes: integer("wrap_up_minutes").notNull().default(10),
+    resumeWindowMinutes: integer("resume_window_minutes").notNull().default(15),
+    paceGraceMinutes: integer("pace_grace_minutes").notNull().default(5),
+    bookingValidDays: integer("booking_valid_days").notNull().default(30),
+    expiryReminderDays: integer("expiry_reminder_days").notNull().default(3),
+    // Per difficulty: rate per minute (paise) and its own discount (D5).
+    pricing: jsonb("pricing").$type<PricingByDifficulty>().notNull(),
+    weights: jsonb("weights").$type<MetricWeights>().notNull(),
+    // null = the built-in default prompt.
+    promptQuestionPlan: text("prompt_question_plan"),
+    promptInterviewer: text("prompt_interviewer"),
+    promptEvaluation: text("prompt_evaluation"),
+    updatedBy: text("updated_by").references(() => user.id, { onDelete: "set null" }),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [
+    check("mic_states_ck", sql`${t.aiState} in ('open', 'coming_soon') and ${t.humanState} in ('open', 'coming_soon')`),
+    check(
+      "mic_numbers_ck",
+      sql`${t.minutesPerQuestion} between 1 and 5 and ${t.wrapUpMinutes} between 0 and 20 and ${t.resumeWindowMinutes} between 5 and 60
+        and ${t.paceGraceMinutes} between 0 and 15 and ${t.bookingValidDays} between 1 and 365
+        and ${t.expiryReminderDays} >= 0 and ${t.expiryReminderDays} < ${t.bookingValidDays}`,
+    ),
+  ],
+);
+
+/** One AI mock interview, from booking to the end (spec D13a–e). A booking
+ *  has one session: resuming continues it, and a give-back makes a new booking
+ *  (credited_from_id). Deleted with the account; kept otherwise (D53). */
+export const aiInterviews = pgTable(
+  "ai_interviews",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    status: aiInterviewStatus("status").notNull().default("ready"),
+    // The candidate's setup.
+    role: text("role").notNull(),
+    industry: text("industry").notNull(),
+    category: text("category").notNull(),
+    difficulty: text("difficulty").notNull(),
+    durationMin: integer("duration_min").notNull(),
+    topics: text("topics").array().notNull().default(sql`'{}'::text[]`),
+    // The lead it was booked for, with a copy of its label so the interview
+    // still reads right after the lead is deleted.
+    leadId: uuid("lead_id").references(() => jobLeads.id, { onDelete: "set null" }),
+    leadLabel: text("lead_label"),
+    // Resume and job description as the AI will read them, copied at booking.
+    // An uploaded file is read and discarded; only its text is kept.
+    resumeId: uuid("resume_id").references(() => resumes.id, { onDelete: "set null" }),
+    resumeSource: text("resume_source").notNull(), // saved | upload | paste
+    resumeLabel: text("resume_label").notNull().default(""),
+    resumeText: text("resume_text").notNull().default(""),
+    jobDescriptionSource: text("job_description_source").notNull(), // lead | paste | none
+    jobDescription: text("job_description").notNull().default(""),
+    // How it was covered (D5). Paid: price before and after the level's discount.
+    coverage: text("coverage").notNull(),
+    planName: text("plan_name"),
+    // Plan allowance: the plan expiry it counted against. A renewal or upgrade
+    // moves the expiry, so the count starts fresh (no carry-over).
+    allowancePeriodEnds: timestamp("allowance_period_ends", { withTimezone: true }),
+    priceFullPaise: integer("price_full_paise").notNull().default(0),
+    pricePaise: integer("price_paise").notNull().default(0),
+    discountPercent: integer("discount_percent").notNull().default(0),
+    // Given back by admin: the interview it replaces, who and why (D55).
+    creditedFromId: uuid("credited_from_id").references((): AnyPgColumn => aiInterviews.id, { onDelete: "set null" }),
+    creditedBy: text("credited_by").references(() => user.id, { onDelete: "set null" }),
+    creditNote: text("credit_note"),
+    // Booking life (D13b).
+    validUntil: timestamp("valid_until", { withTimezone: true }).notNull(),
+    expiryReminderSentAt: timestamp("expiry_reminder_sent_at", { withTimezone: true }),
+    settings: jsonb("settings").$type<InterviewSettingsSnapshot>().notNull(),
+    // The run. The clock counts connected seconds only (D13e).
+    questionPlan: jsonb("question_plan").$type<PlannedQuestion[]>(),
+    questionsAsked: integer("questions_asked").notNull().default(0),
+    activeSeconds: integer("active_seconds").notNull().default(0),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    lastActiveAt: timestamp("last_active_at", { withTimezone: true }),
+    interruptedAt: timestamp("interrupted_at", { withTimezone: true }),
+    wrapUpStartedAt: timestamp("wrap_up_started_at", { withTimezone: true }),
+    endedAt: timestamp("ended_at", { withTimezone: true }),
+    endReason: text("end_reason"),
+    // AI use, for admin usage and cost (D56).
+    aiProvider: aiProvider("ai_provider"),
+    aiModel: text("ai_model"),
+    tokensIn: integer("tokens_in").notNull().default(0),
+    tokensOut: integer("tokens_out").notNull().default(0),
+    aiCostPaise: real("ai_cost_paise").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [
+    index("ai_interviews_user_created_idx").on(t.userId, t.createdAt.desc()),
+    index("ai_interviews_created_idx").on(t.createdAt.desc()),
+    index("ai_interviews_status_valid_idx").on(t.status, t.validUntil),
+    index("ai_interviews_user_period_idx").on(t.userId, t.allowancePeriodEnds),
+    // An interview can be given back once.
+    uniqueIndex("ai_interviews_credited_from_uq").on(t.creditedFromId),
+    check("ai_interviews_difficulty_ck", sql`${t.difficulty} in ('Easy', 'Medium', 'Hard')`),
+    check("ai_interviews_duration_ck", sql`${t.durationMin} between 5 and 60`),
+    check("ai_interviews_coverage_ck", sql`${t.coverage} in ('plan', 'free', 'paid', 'credit')`),
+    check("ai_interviews_resume_source_ck", sql`${t.resumeSource} in ('saved', 'upload', 'paste')`),
+    check("ai_interviews_jd_source_ck", sql`${t.jobDescriptionSource} in ('lead', 'paste', 'none')`),
+    check(
+      "ai_interviews_money_ck",
+      sql`${t.priceFullPaise} >= 0 and ${t.pricePaise} >= 0 and ${t.pricePaise} <= ${t.priceFullPaise} and ${t.discountPercent} between 0 and 100`,
+    ),
+    // A give-back always says why.
+    check("ai_interviews_credit_ck", sql`${t.coverage} <> 'credit' or (${t.creditedFromId} is not null and length(${t.creditNote}) >= 10)`),
+  ],
+);
+
+/** The conversation, one row per question, follow-up or answer. Kept with the
+ *  interview (D53). */
+export const aiInterviewMessages = pgTable(
+  "ai_interview_messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    interviewId: uuid("interview_id")
+      .notNull()
+      .references(() => aiInterviews.id, { onDelete: "cascade" }),
+    seq: integer("seq").notNull(),
+    sender: text("sender").notNull(), // ai | candidate
+    kind: text("kind").notNull(), // question | follow_up | answer | closing
+    // The planned question a question opens (shown as "Question n").
+    questionNo: smallint("question_no"),
+    text: text("text").notNull(),
+    // Seconds on the interview clock when sent.
+    clockSeconds: integer("clock_seconds").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("ai_interview_messages_seq_uq").on(t.interviewId, t.seq),
+    check("ai_interview_messages_sender_ck", sql`${t.sender} in ('ai', 'candidate')`),
+    check("ai_interview_messages_kind_ck", sql`${t.kind} in ('question', 'follow_up', 'answer', 'closing')`),
+  ],
+);
+
+/** What happened during an interview (D13): start, disconnects, resume,
+ *  wrap-up, end, errors. Admin reads it before giving an interview back.
+ *  Trimmed by Data retention (ai_interview_event_days). */
+export const aiInterviewEvents = pgTable(
+  "ai_interview_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    interviewId: uuid("interview_id")
+      .notNull()
+      .references(() => aiInterviews.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull(),
+    detail: text("detail").notNull().default(""),
+    clockSeconds: integer("clock_seconds").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("ai_interview_events_interview_idx").on(t.interviewId, t.createdAt),
+    index("ai_interview_events_created_idx").on(t.createdAt),
+  ],
+);
+
+/** One report, in the format shared by AI and human interviews (D49). Release
+ *  2 links human bookings here too. The five scores are columns so the
+ *  Performance page can query them. */
+export const interviewEvaluations = pgTable(
+  "interview_evaluations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    source: text("source").notNull(), // ai | human
+    aiInterviewId: uuid("ai_interview_id").references(() => aiInterviews.id, { onDelete: "cascade" }),
+    status: text("status").notNull().default("draft"), // draft | submitted
+    // Interviewer evaluations only: the name the candidate sees.
+    evaluatorName: text("evaluator_name"),
+    communication: smallint("communication"),
+    technical: smallint("technical"),
+    confidence: smallint("confidence"),
+    problemSolving: smallint("problem_solving"),
+    relevance: smallint("relevance"),
+    // The weights used, and the overall score out of 100 they gave.
+    weights: jsonb("weights").$type<MetricWeights>(),
+    overall: smallint("overall"),
+    writing: jsonb("writing").$type<ReportWriting>(),
+    submittedAt: timestamp("submitted_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [
+    uniqueIndex("interview_evaluations_ai_uq").on(t.aiInterviewId),
+    index("interview_evaluations_user_submitted_idx").on(t.userId, t.submittedAt.desc()),
+    check("interview_evaluations_source_ck", sql`${t.source} in ('ai', 'human')`),
+    check("interview_evaluations_status_ck", sql`${t.status} in ('draft', 'submitted')`),
+    check(
+      "interview_evaluations_scores_ck",
+      sql`coalesce(${t.communication}, 1) between 1 and 10 and coalesce(${t.technical}, 1) between 1 and 10
+        and coalesce(${t.confidence}, 1) between 1 and 10 and coalesce(${t.problemSolving}, 1) between 1 and 10
+        and coalesce(${t.relevance}, 1) between 1 and 10 and coalesce(${t.overall}, 0) between 0 and 100`,
+    ),
+    // A submitted report is complete.
+    check(
+      "interview_evaluations_submitted_ck",
+      sql`${t.status} <> 'submitted' or (${t.communication} is not null and ${t.technical} is not null and ${t.confidence} is not null
+        and ${t.problemSolving} is not null and ${t.relevance} is not null and ${t.overall} is not null and ${t.writing} is not null
+        and ${t.submittedAt} is not null)`,
+    ),
+  ],
+);

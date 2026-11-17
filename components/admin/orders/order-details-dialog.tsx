@@ -43,7 +43,7 @@ const STATUS_VARIANT: Record<OrderStatus, "success" | "danger" | "warning" | "ne
   cancelled: "neutral",
 };
 
-const KIND_LABELS = { new: "New purchase", renew: "Renewal", upgrade: "Upgrade" } as const;
+const KIND_LABELS = { new: "New purchase", renew: "Renewal", upgrade: "Upgrade", ai_interview: "AI mock interview" } as const;
 
 const dateOnly = (iso: string) =>
   new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
@@ -103,7 +103,7 @@ export function OrderDetailsDialog({
               <div className="min-w-0 flex-1">
                 <DialogTitle className="text-lg">Order {o.receipt}</DialogTitle>
                 <DialogDescription className="mt-0.5">
-                  {o.planName} · {PERIOD_LABELS[o.period]} · {formatDateTime(o.createdAt)}
+                  {o.planName} · {o.period ? PERIOD_LABELS[o.period] : KIND_LABELS[o.kind]} · {formatDateTime(o.createdAt)}
                 </DialogDescription>
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   <Badge variant={STATUS_VARIANT[o.status]}>{ORDER_STATUS_LABELS[o.status]}</Badge>
@@ -152,7 +152,7 @@ export function OrderDetailsDialog({
 
                 <Section icon={Package} title="Plan and access">
                   <Row label="Plan">{o.planName}</Row>
-                  <Row label="Billing">{PERIOD_LABELS[o.period]}</Row>
+                  {o.period && <Row label="Billing">{PERIOD_LABELS[o.period]}</Row>}
                   <Row label="Type">{KIND_LABELS[o.kind]}</Row>
                   <Row label="Access">
                     {o.status === "paid" ? `${dateOnly(o.startsAt)} to ${dateOnly(o.expiresAt)}` : "Not applied (unpaid)"}

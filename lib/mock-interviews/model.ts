@@ -163,3 +163,38 @@ export function longDate(iso: string): string {
 export function shortDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
+
+/* ---------------- stored shapes (R1.4) ---------------- */
+
+export type PartState = "open" | "coming_soon";
+
+/** Status of one AI interview, from booking to the end (spec D13a–e). A paid
+ *  booking waits in pending_payment until the payment is confirmed. */
+export const AI_INTERVIEW_STATUSES = ["pending_payment", "ready", "in_progress", "interrupted", "completed", "stopped", "failed", "expired"] as const;
+export type AiInterviewStatus = (typeof AI_INTERVIEW_STATUSES)[number];
+
+/** How a booking was covered (D5): plan allowance, the Free plan's one, paid, or given back by admin. */
+export const AI_COVERAGE = ["plan", "free", "paid", "credit"] as const;
+export type AiCoverage = (typeof AI_COVERAGE)[number];
+
+/** One planned question (D10): written by the AI at the start. The tip and
+ *  topic show beside the conversation. */
+export interface PlannedQuestion {
+  no: number;
+  question: string;
+  /** The candidate's topic this question covers, if any. */
+  topic?: string;
+  tip: string;
+}
+
+/** The module settings in force when a booking was made (D36). Changing a
+ *  setting later never changes this booking. */
+export interface InterviewSettingsSnapshot {
+  minutesPerQuestion: number;
+  wrapUpMinutes: number;
+  resumeWindowMinutes: number;
+  paceGraceMinutes: number;
+  bookingValidDays: number;
+  pricing: DifficultyPricing;
+  weights: MetricWeights;
+}
