@@ -10,6 +10,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/current-user";
 import { encryptSecret } from "@/lib/crypto";
+import { testModuleAi } from "@/lib/ai";
 import { aiInterviewEvents, aiInterviews, mockInterviewConfig } from "@/db/schema";
 import { getModuleSettings, settingsSnapshot } from "@/lib/mock-interviews/config";
 import { DEFAULT_PROMPTS, DIFFICULTIES, METRICS, type ModuleSettings } from "@/lib/mock-interviews/model";
@@ -47,6 +48,8 @@ const sectionSchema = z.discriminatedUnion("section", [
     model: z.string().trim().max(120, "Model name is too long."),
     // Blank keeps the saved key.
     key: z.string().trim().max(400).optional().default(""),
+    inputCostPerMTokPaise: whole(0, 10_000_000, "Input token price"),
+    outputCostPerMTokPaise: whole(0, 10_000_000, "Output token price"),
   }),
   z.object({
     section: z.literal("rules"),
@@ -103,6 +106,8 @@ export async function saveModuleSettingsAction(input: unknown): Promise<Result &
       if (v.key && v.key.length < 20) return { ok: false, error: "That doesn't look like a full API key." };
       next.provider = v.provider;
       next.model = v.model;
+      next.inputCostPerMTokPaise = v.inputCostPerMTokPaise;
+      next.outputCostPerMTokPaise = v.outputCostPerMTokPaise;
       if (v.key) keyPatch = { aiKeyCiphertext: encryptSecret(v.key), aiKeyLast4: v.key.slice(-4) };
       break;
     case "rules": {
@@ -142,6 +147,8 @@ export async function saveModuleSettingsAction(input: unknown): Promise<Result &
     pauseBookings: next.pauseBookings,
     aiProvider: next.provider,
     aiModel: next.model || null,
+    aiInputCostPerMTokPaise: next.inputCostPerMTokPaise,
+    aiOutputCostPerMTokPaise: next.outputCostPerMTokPaise,
     categories: next.categories,
     durations: next.durations,
     minutesPerQuestion: next.minutesPerQuestion,
@@ -163,6 +170,17 @@ export async function saveModuleSettingsAction(input: unknown): Promise<Result &
   revalidatePath("/jmp-admin/mock-interviews/settings");
   revalidatePath("/mock-interviews", "layout");
   return { ok: true, keyLast4: keyPatch ? keyPatch.aiKeyLast4 : cur.keyLast4 };
+}
+
+/** Module settings → Test connection: a tiny request with the saved key. */
+export async function testModuleAiAction(): Promise<{ ok: true; model: string } | { ok: false; error: string }> {
+  await requireAdmin();
+  const r = await testModuleAi();
+  await db
+    .update(mockInterviewConfig)
+    .set({ aiLastTestOk: r.ok, aiLastTestAt: new Date() })
+    .where(eq(mockInterviewConfig.id, "app"));
+  return r;
 }
 
 /* ---------------- AI interview sessions ---------------- */

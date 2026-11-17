@@ -211,6 +211,9 @@ export interface ModuleSettings {
   provider: AiProviderId;
   model: string;
   keyLast4: string | null;
+  /** What the provider charges, in paise per million tokens (admin-set). */
+  inputCostPerMTokPaise: number;
+  outputCostPerMTokPaise: number;
   categories: string[];
   durations: number[];
   minutesPerQuestion: number;

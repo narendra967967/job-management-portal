@@ -22,7 +22,7 @@ import { ConfirmDialog } from "@/components/admin/ui/confirm-dialog";
 import { toast } from "@/components/admin/ui/toast";
 import { Field, SubHead, Toggle, selectCls } from "@/components/admin/settings/form-bits";
 import { InfoTip } from "@/components/ui/info-tip";
-import { saveModuleSettingsAction } from "@/actions/admin-mock-interviews";
+import { saveModuleSettingsAction, testModuleAiAction } from "@/actions/admin-mock-interviews";
 import {
   AI_DURATIONS,
   DEFAULT_PROMPTS,
@@ -222,9 +222,44 @@ function Availability({ s, set }: SectionProps) {
 
 /* ---------------- AI service ---------------- */
 
+/** ₹ per million tokens, edited in rupees and stored in paise. */
+function TokenPrice({ label, paise, onChange }: { label: string; paise: number; onChange: (paise: number) => void }) {
+  const bad = !Number.isFinite(paise) || paise < 0 || paise > 10_000_000;
+  return (
+    <Field label={label} hint={bad ? "Between ₹0 and ₹1,00,000" : "₹ per million tokens"}>
+      <div className="flex items-center gap-1.5">
+        <span className="text-sm text-muted-foreground">₹</span>
+        <Input
+          type="number"
+          min={0}
+          step={0.01}
+          value={Number.isFinite(paise) ? paise / 100 : ""}
+          onChange={(e) => onChange(e.target.value === "" ? NaN : Math.round(Number(e.target.value) * 100))}
+          aria-invalid={bad}
+          className="h-11 w-32 sm:h-9"
+        />
+      </div>
+    </Field>
+  );
+}
+
 function AiService({ s, set }: SectionProps) {
   const [key, setKey] = useState("");
-  const keyError = key && key.trim().length < 20 ? "That doesn't look like a full API key." : "";
+  const [testing, setTesting] = useState(false);
+  const priceBad = [s.inputCostPerMTokPaise, s.outputCostPerMTokPaise].some((p) => !Number.isFinite(p) || p < 0 || p > 10_000_000);
+  const keyError = key && key.trim().length < 20 ? "That doesn't look like a full API key." : priceBad ? "Fix the token prices marked in red." : "";
+  async function test() {
+    setTesting(true);
+    try {
+      const r = await testModuleAiAction();
+      if (r.ok) toast.success("Connected", `The saved key works with ${r.model}.`);
+      else toast.error("Couldn't connect", r.error);
+    } catch {
+      toast.error("Couldn't connect", "Something went wrong. Try again.");
+    } finally {
+      setTesting(false);
+    }
+  }
   return (
     <section className={cardCls}>
       <h2 className="text-base font-semibold">AI service</h2>
@@ -253,20 +288,32 @@ function AiService({ s, set }: SectionProps) {
             />
           </div>
         </Field>
+        <TokenPrice label="Input tokens" paise={s.inputCostPerMTokPaise} onChange={(v) => set("inputCostPerMTokPaise", v)} />
+        <TokenPrice label="Output tokens" paise={s.outputCostPerMTokPaise} onChange={(v) => set("outputCostPerMTokPaise", v)} />
       </div>
       {keyError && <p className="mt-2 text-xs text-destructive">{keyError}</p>}
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        <Button variant="outline" onClick={() => toast.info("Test connection comes with the interviewer", "It sends a tiny request with the saved key once interviews are wired up (roadmap R1.5).")}>
+        <Button variant="outline" onClick={test} disabled={testing || !s.keyLast4}>
           <Wand2 className="size-4" aria-hidden />
-          Test connection
+          {testing ? "Testing…" : "Test connection"}
         </Button>
+        <InfoTip label="About token prices">
+          Copy them from your provider&apos;s price list, in rupees. Admin → AI interviews works out each interview&apos;s AI cost from the tokens it used and these prices. Leave them at 0 and the cost shows as ₹0.
+        </InfoTip>
         <InfoTip label="About this key">
           Used only for mock interviews, separate from users&apos; own keys and the knowledge base key, so its usage and cost are tracked on their own. Stored encrypted and never shown again.
         </InfoTip>
       </div>
       <Save
         error={keyError}
-        payload={() => ({ section: "ai", provider: s.provider, model: s.model, key })}
+        payload={() => ({
+          section: "ai",
+          provider: s.provider,
+          model: s.model,
+          key,
+          inputCostPerMTokPaise: s.inputCostPerMTokPaise,
+          outputCostPerMTokPaise: s.outputCostPerMTokPaise,
+        })}
         onSaved={(r) => {
           setKey("");
           if (r.keyLast4 !== undefined) set("keyLast4", r.keyLast4);

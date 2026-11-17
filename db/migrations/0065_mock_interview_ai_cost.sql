@@ -1,0 +1,2 @@
+ALTER TABLE "mock_interview_config" ADD COLUMN "ai_input_cost_per_mtok_paise" integer DEFAULT 0 NOT NULL;--> statement-breakpoint
+ALTER TABLE "mock_interview_config" ADD COLUMN "ai_output_cost_per_mtok_paise" integer DEFAULT 0 NOT NULL;

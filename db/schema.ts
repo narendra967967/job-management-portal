@@ -1721,6 +1721,10 @@ export const mockInterviewConfig = pgTable(
     aiKeyLast4: text("ai_key_last4"),
     aiLastTestOk: boolean("ai_last_test_ok"),
     aiLastTestAt: timestamp("ai_last_test_at", { withTimezone: true }),
+    // What the provider charges, set by admin, in paise per million tokens. AI
+    // cost per interview = tokens x these (0 until set).
+    aiInputCostPerMTokPaise: integer("ai_input_cost_per_mtok_paise").notNull().default(0),
+    aiOutputCostPerMTokPaise: integer("ai_output_cost_per_mtok_paise").notNull().default(0),
     categories: text("categories").array().notNull().default(sql`'{}'::text[]`),
     durations: integer("durations").array().notNull().default(sql`'{15,30,45,60}'::integer[]`),
     minutesPerQuestion: real("minutes_per_question").notNull().default(2),

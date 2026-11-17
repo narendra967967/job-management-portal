@@ -9,7 +9,7 @@ import "server-only";
 
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { appAiConfig, userSettings as settingsT } from "@/db/schema";
+import { appAiConfig, mockInterviewConfig, userSettings as settingsT } from "@/db/schema";
 import { decryptSecret } from "@/lib/crypto";
 import { AI_PROVIDER_DEFAULT_MODEL, type AiProvider } from "@/lib/types";
 
@@ -354,5 +354,121 @@ export async function aiCompleteVision(
         images,
         maxTokens,
       );
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Mock interviews — the module's own key (Admin → Mock interviews →    */
+/* Module settings → AI service). Separate from users' keys and the     */
+/* admin key, so its use and cost are counted on their own. Returns the */
+/* tokens used with the text.                                          */
+/* ------------------------------------------------------------------ */
+
+/** Thrown when Module settings has no AI key. */
+export const MODULE_AI_NOT_CONFIGURED = "MODULE_AI_NOT_CONFIGURED";
+
+export interface ChatTurn {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface ModuleAiResult {
+  text: string;
+  tokensIn: number;
+  tokensOut: number;
+  provider: AiProvider;
+  model: string;
+}
+
+export interface ModuleAiOptions extends AiCallOptions {
+  /** Ask for a JSON object back (OpenAI and OpenRouter honor it; Anthropic is told in the prompt). */
+  json?: boolean;
+}
+
+async function getModuleAi(): Promise<UserAi> {
+  const [c] = await db
+    .select({ provider: mockInterviewConfig.aiProvider, model: mockInterviewConfig.aiModel, ciphertext: mockInterviewConfig.aiKeyCiphertext })
+    .from(mockInterviewConfig)
+    .where(eq(mockInterviewConfig.id, "app"));
+  if (!c?.ciphertext) throw new Error(MODULE_AI_NOT_CONFIGURED);
+  return { provider: c.provider, model: c.model?.trim() || AI_PROVIDER_DEFAULT_MODEL[c.provider], key: decryptSecret(c.ciphertext) };
+}
+
+async function chatOpenAiLike(url: string, ai: UserAi, system: string, turns: ChatTurn[], maxTokens: number, opts: ModuleAiOptions): Promise<Omit<ModuleAiResult, "provider" | "model">> {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${ai.key}`,
+      ...(url.includes("openrouter") ? { "HTTP-Referer": "https://github.com/job-management-portal", "X-Title": "Jobtiva" } : {}),
+    },
+    body: JSON.stringify({
+      model: ai.model,
+      temperature: opts.temperature ?? 0.4,
+      max_tokens: maxTokens,
+      ...(opts.json ? { response_format: { type: "json_object" } } : {}),
+      messages: [{ role: "system", content: system }, ...turns],
+    }),
+    signal: AbortSignal.timeout(opts.timeoutMs ?? 60_000),
+  });
+  if (!res.ok) throw new Error(`AI error ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  const data = await res.json();
+  return {
+    text: (data.choices?.[0]?.message?.content ?? "").trim(),
+    tokensIn: Number(data.usage?.prompt_tokens ?? 0),
+    tokensOut: Number(data.usage?.completion_tokens ?? 0),
+  };
+}
+
+async function chatAnthropic(ai: UserAi, system: string, turns: ChatTurn[], maxTokens: number, opts: ModuleAiOptions): Promise<Omit<ModuleAiResult, "provider" | "model">> {
+  // Anthropic wants the conversation to start with the user.
+  const messages = turns[0]?.role === "assistant" ? [{ role: "user" as const, content: "(The interview begins.)" }, ...turns] : turns;
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-api-key": ai.key, "anthropic-version": "2023-06-01" },
+    body: JSON.stringify({
+      model: ai.model,
+      max_tokens: maxTokens,
+      ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
+      system: opts.json ? `${system}\n\nReply with one JSON object only, no other text.` : system,
+      messages,
+    }),
+    signal: AbortSignal.timeout(opts.timeoutMs ?? 60_000),
+  });
+  if (!res.ok) throw new Error(`Anthropic error ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  const data = await res.json();
+  return {
+    text: (data.content?.[0]?.text ?? "").trim(),
+    tokensIn: Number(data.usage?.input_tokens ?? 0),
+    tokensOut: Number(data.usage?.output_tokens ?? 0),
+  };
+}
+
+/** One call on the Mock interviews module key: a system prompt and the conversation so far. */
+export async function moduleAiChat(system: string, turns: ChatTurn[], maxTokens = 800, opts: ModuleAiOptions = {}): Promise<ModuleAiResult> {
+  const ai = await getModuleAi();
+  const r =
+    ai.provider === "anthropic"
+      ? await chatAnthropic(ai, system, turns, maxTokens, opts)
+      : await chatOpenAiLike(
+          ai.provider === "openrouter" ? "https://openrouter.ai/api/v1/chat/completions" : "https://api.openai.com/v1/chat/completions",
+          ai,
+          system,
+          turns,
+          maxTokens,
+          opts,
+        );
+  return { ...r, provider: ai.provider, model: ai.model };
+}
+
+/** Module settings → Test connection: a tiny request with the saved key. */
+export async function testModuleAi(): Promise<{ ok: true; model: string } | { ok: false; error: string }> {
+  try {
+    const r = await moduleAiChat("Reply with the single word OK.", [{ role: "user", content: "Ping" }], 5, { timeoutMs: 20_000, temperature: 0 });
+    return { ok: true, model: r.model };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg === MODULE_AI_NOT_CONFIGURED) return { ok: false, error: "Save an API key first." };
+    return { ok: false, error: msg.replace(/sk-[A-Za-z0-9_-]+/g, "sk-…").slice(0, 200) };
   }
 }
