@@ -28,6 +28,7 @@ import {
 } from "@/lib/mock-interviews/model";
 import { cn } from "@/lib/utils";
 import { scrollIntoMain } from "@/components/mock-interviews/scroll-into-main";
+import { LeadPicker } from "@/components/mock-interviews/lead-picker";
 
 // New AI interview (spec D10, D11). R1.2: the form validates on the client and
 // "starts" a sample session; R1.5 wires the allowance, payment and the AI.
@@ -79,6 +80,11 @@ export function NewInterviewForm({
   const [starting, setStarting] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // Select shows the chosen item's label only when it knows the labels.
+  const resumeLabels = useMemo(
+    () => Object.fromEntries(resumes.map((r) => [r.id, r.isDefault ? `${r.label} (default)` : r.label])),
+    [resumes],
+  );
   const jdLead = useLeadDetail(jdLeadId);
   const jdLeadHasText = !!jdLead?.jdText?.trim();
   // Interview-stage leads first; every open lead is still pickable.
@@ -283,7 +289,7 @@ export function NewInterviewForm({
               />
               {resumeMode === "saved" &&
                 (resumes.length ? (
-                  <Select value={resumeId} onValueChange={(v) => setResumeId(String(v ?? ""))}>
+                  <Select items={resumeLabels} value={resumeId} onValueChange={(v) => setResumeId(String(v ?? ""))}>
                     <SelectTrigger aria-label="Saved resume" className="h-11 w-full sm:h-9">
                       <SelectValue placeholder="Pick a resume" />
                     </SelectTrigger>
@@ -356,19 +362,7 @@ export function NewInterviewForm({
               {jdMode === "lead" &&
                 (leadOptions.length ? (
                   <>
-                    <Select value={jdLeadId} onValueChange={(v) => setJdLeadId(String(v ?? ""))}>
-                      <SelectTrigger aria-label="Lead" className="h-11 w-full sm:h-9">
-                        <SelectValue placeholder="Pick a lead" />
-                      </SelectTrigger>
-                      <SelectContent className="w-auto min-w-(--anchor-width)">
-                        {leadOptions.map((l) => (
-                          <SelectItem key={l.id} value={l.id}>
-                            {l.title} · {l.company}
-                            {l.status === "interview" ? " (Interview)" : ""}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <LeadPicker leads={leadOptions} value={jdLeadId} onChange={setJdLeadId} invalid={!!errors.jd} />
                     {jdLeadId && (
                       <p className={cn("text-xs", jdLeadHasText ? "text-muted-foreground" : "text-amber-700")}>
                         {jdLeadHasText ? (
