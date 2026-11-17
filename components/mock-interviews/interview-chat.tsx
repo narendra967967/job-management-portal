@@ -12,6 +12,7 @@ import { SAMPLE_CHAT, SAMPLE_FOLLOW_UPS, SAMPLE_SETTINGS, type ChatMessage } fro
 import { plannedQuestions } from "@/lib/mock-interviews/model";
 import { cn } from "@/lib/utils";
 import { scrollIntoMain } from "@/components/mock-interviews/scroll-into-main";
+import { DictationButton, useDictation } from "@/components/mock-interviews/dictation";
 
 // The AI interview (spec D10, D13). R1.2: a sample conversation; answering adds
 // a canned follow-up. R1.5 connects the real interviewer, pacing and wrap-up.
@@ -33,6 +34,7 @@ export function InterviewChat({ sessionId, state }: { sessionId: string; state: 
   const [secondsLeft, setSecondsLeft] = useState(state === "wrapup" ? SAMPLE_SETTINGS.wrapUpMinutes * 60 - 31 : 18 * 60 + 42);
   const endRef = useRef<HTMLDivElement>(null);
   const ended = state === "ended";
+  const dictation = useDictation({ text: draft, onText: setDraft, max: MAX_ANSWER });
 
   useEffect(() => {
     if (ended) return;
@@ -50,6 +52,7 @@ export function InterviewChat({ sessionId, state }: { sessionId: string; state: 
   function send() {
     const text = draft.trim();
     if (!text || thinking || ended) return;
+    dictation.stop();
     setMessages((m) => [...m, { id: `y${m.length}`, from: "you", text }]);
     setDraft("");
     setThinking(true);
@@ -189,7 +192,7 @@ export function InterviewChat({ sessionId, state }: { sessionId: string; state: 
                 send();
               }
             }}
-            placeholder="Type your answer"
+            placeholder={dictation.listening ? "Listening… speak your answer" : dictation.supported ? "Type or speak your answer" : "Type your answer"}
             rows={3}
             aria-label="Your answer"
             className="resize-none border-0 bg-transparent shadow-none focus-visible:ring-0"
@@ -197,13 +200,22 @@ export function InterviewChat({ sessionId, state }: { sessionId: string; state: 
           />
           <div className="flex items-center justify-between gap-2 px-1">
             <span className="text-[11px] text-muted-foreground">
-              <span className="hidden md:inline">Enter to send, Shift+Enter for a new line · </span>
+              {dictation.listening ? (
+                <span className="font-medium text-rose-700" role="status">
+                  Listening. Check the words, then press Send ·{" "}
+                </span>
+              ) : (
+                <span className="hidden md:inline">Enter to send, Shift+Enter for a new line · </span>
+              )}
               {draft.length}/{MAX_ANSWER}
             </span>
-            <Button onClick={send} disabled={!draft.trim() || thinking}>
-              <SendHorizontal className="size-4" aria-hidden />
-              Send
-            </Button>
+            <div className="flex shrink-0 items-center gap-1.5">
+              <DictationButton dictation={dictation} disabled={thinking} />
+              <Button onClick={send} disabled={!draft.trim() || thinking}>
+                <SendHorizontal className="size-4" aria-hidden />
+                Send
+              </Button>
+            </div>
           </div>
         </div>
       )}

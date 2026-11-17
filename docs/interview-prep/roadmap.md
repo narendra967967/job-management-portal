@@ -137,7 +137,7 @@ soon really blocks the feature, not just the menu. Knowledge-base articles. The 
 
 ### R1.8 Content and rollout (M)
 
-Module landing page linked from the homepage sections, header and footer; the Privacy Policy line for AI
+Module landing page linked from the homepage sections, header and footer; the Privacy Policy lines for AI interviews and for voice input (the browser's speech service)
 interviews; a final check of the new emails; a user guide if wanted. The owner deploys to preprod, tries it,
 then promotes to prod.
 
