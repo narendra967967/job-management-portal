@@ -29,8 +29,14 @@ import {
   LifeBuoy,
   ChevronDown,
   LogOut,
+  Bot,
+  SlidersHorizontal,
+  UserRound,
+  CalendarCheck,
+  Wallet,
   type LucideIcon,
 } from "lucide-react";
+import { SHOW_SAMPLE_SCREENS } from "@/lib/mock-interviews/preview";
 import { cn } from "@/lib/utils";
 import { adminSignOut } from "@/lib/auth-admin-client";
 import { AdminNotesButton } from "@/components/admin/admin-notes-button";
@@ -90,6 +96,18 @@ const GROUPS: Group[] = [
     ],
   },
   {
+    // The Interview Preparation module (docs/interview-prep). R1.3: the AI pages
+    // run on sample data, so production shows them as "soon" until R1.4.
+    label: "Mock interviews",
+    items: [
+      { href: "/jmp-admin/mock-interviews/ai", label: "AI interviews", icon: Bot, soon: !SHOW_SAMPLE_SCREENS },
+      { href: "/jmp-admin/mock-interviews/settings", label: "Module settings", icon: SlidersHorizontal, soon: !SHOW_SAMPLE_SCREENS },
+      { label: "Interviewers", icon: UserRound, soon: true },
+      { label: "Bookings", icon: CalendarCheck, soon: true },
+      { label: "Payouts", icon: Wallet, soon: true },
+    ],
+  },
+  {
     // Watching the system run.
     label: "Monitoring",
     items: [
@@ -117,6 +135,8 @@ const TITLES: Record<string, string> = {
   "/jmp-admin/broadcasts": "Broadcasts",
   "/jmp-admin/broadcasts/new": "New broadcast",
   "/jmp-admin/email-templates": "Email templates",
+  "/jmp-admin/mock-interviews/ai": "AI interviews",
+  "/jmp-admin/mock-interviews/settings": "Mock interviews settings",
 };
 
 const KB_HREF = "/jmp-admin/knowledge-base";

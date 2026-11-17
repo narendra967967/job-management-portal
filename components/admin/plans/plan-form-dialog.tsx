@@ -26,6 +26,8 @@ import {
   type AccentKey,
 } from "@/lib/admin/plans-model";
 import { cn } from "@/lib/utils";
+import { InfoTip } from "@/components/ui/info-tip";
+import { SHOW_SAMPLE_SCREENS } from "@/lib/mock-interviews/preview";
 
 export interface PlanFormValues {
   name: string;
@@ -114,6 +116,9 @@ export function PlanFormDialog({
   const [currency, setCurrency] = useState<Currency>("INR");
   const [resumesUnlimited, setResumesUnlimited] = useState(false);
   const [limitResumes, setLimitResumes] = useState("3");
+  // PHASE R1.3 SAMPLE: shown on a developer machine only, not saved until R1.4
+  // adds the plan column (interview-prep spec D5).
+  const [aiInterviewsIncluded, setAiInterviewsIncluded] = useState("1");
   const [allowCustomPrompts, setAllowCustomPrompts] = useState(false);
   const [allowNotes, setAllowNotes] = useState(false);
   const [allowSalaryInsight, setAllowSalaryInsight] = useState(false);
@@ -399,6 +404,28 @@ export function PlanFormDialog({
                 </label>
               </div>
             </Field>
+            {SHOW_SAMPLE_SCREENS && (
+              <Field label="AI mock interviews included">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Input
+                    type="number"
+                    min={0}
+                    max={100}
+                    step={1}
+                    value={aiInterviewsIncluded}
+                    onChange={(e) => setAiInterviewsIncluded(e.target.value)}
+                    className="w-28"
+                  />
+                  <span className="text-xs text-muted-foreground">{isFree ? "once ever" : "per plan period"}</span>
+                  <InfoTip label="About AI mock interviews included">
+                    {isFree
+                      ? "The free plan's interviews can be used once ever. Interviews beyond this are paid per minute."
+                      : "Granted with each purchase or renewal; unused ones don't carry over. Interviews beyond this are paid per minute."}
+                  </InfoTip>
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">Sample: not saved yet</span>
+                </div>
+              </Field>
+            )}
             <label className="flex cursor-pointer items-center gap-2 text-sm">
               <input
                 type="checkbox"
