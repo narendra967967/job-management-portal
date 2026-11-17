@@ -14,6 +14,11 @@
 2-59/5 * * * *  /srv/jobtiva/cron-run.sh prod broadcasts    >> /srv/jobtiva/logs/cron.log 2>&1
 4-59/5 * * * *  /srv/jobtiva/cron-run.sh preprod broadcasts >> /srv/jobtiva/logs/cron.log 2>&1
 
+# Mock interviews: close interviews not resumed in time, retry failed reports, expire bookings,
+# send "expires soon" emails, clear unpaid bookings. Safe to repeat.
+1-59/5 * * * *  /srv/jobtiva/cron-run.sh prod interviews    >> /srv/jobtiva/logs/cron.log 2>&1
+3-59/5 * * * *  /srv/jobtiva/cron-run.sh preprod interviews >> /srv/jobtiva/logs/cron.log 2>&1
+
 # Plan-ending reminders (last 7 days of a plan), daily at 04:30 UTC = 10:00 IST.
 30 4 * * *    /srv/jobtiva/cron-run.sh prod reminders    >> /srv/jobtiva/logs/cron.log 2>&1
 40 4 * * *    /srv/jobtiva/cron-run.sh preprod reminders >> /srv/jobtiva/logs/cron.log 2>&1

@@ -3,6 +3,7 @@ import "server-only";
 import { and, asc, count, desc, eq, inArray, isNotNull, ne, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { aiInterviewMessages, aiInterviews, interviewEvaluations, plans, user } from "@/db/schema";
+import { settleInterview, type Phase } from "./engine";
 import type {
   AllowanceState,
   BookingRow,
@@ -57,6 +58,15 @@ export async function getAllowance(userId: string): Promise<AllowanceState> {
 }
 
 /* ---------------- bookings ---------------- */
+
+/** Bring the user's running interviews up to date (dropped connections, closed windows) before showing them. */
+async function settleUser(userId: string): Promise<void> {
+  const running = await db
+    .select({ id: aiInterviews.id })
+    .from(aiInterviews)
+    .where(and(eq(aiInterviews.userId, userId), inArray(aiInterviews.status, ["in_progress", "interrupted"])));
+  for (const r of running) await settleInterview(r.id);
+}
 
 function resumeMinutesLeft(i: InterviewRow, now: number): number {
   if (!i.interruptedAt) return i.settings.resumeWindowMinutes;
@@ -116,6 +126,7 @@ async function reportsFor(ids: string[]): Promise<Map<string, EvaluationRow>> {
 
 /** Every booking but unpaid ones, newest first. */
 export async function listBookings(userId: string): Promise<BookingRow[]> {
+  await settleUser(userId);
   const list = await db
     .select()
     .from(aiInterviews)
@@ -147,6 +158,7 @@ async function messagesOf(interviewId: string): Promise<ChatMessage[]> {
     text: m.text,
     ...(m.questionNo ? { questionNo: m.questionNo } : {}),
     at: m.clockSeconds,
+    kind: m.kind as ChatMessage["kind"],
   }));
 }
 
@@ -163,6 +175,7 @@ export interface BriefingData {
 
 /** The briefing before starting or resuming (D13e). Only startable bookings. */
 export async function getBriefing(userId: string, id: string): Promise<BriefingData | null> {
+  await settleUser(userId);
   const i = await ownInterview(userId, id);
   if (!i) return null;
   const booking = toBooking(i, undefined, Date.now());
@@ -229,13 +242,21 @@ export interface SessionData {
   plan: PlannedQuestion[];
   messages: ChatMessage[];
   activeSeconds: number;
+  /** live, wrapup, or ended (finished, stopped or failed). */
+  phase: Phase;
+  status: string;
+  /** Ended: whether the report exists yet. */
+  reportReady: boolean;
 }
 
-export async function getSession(userId: string, id: string): Promise<SessionData | null> {
+/** The interview screen. A booking that hasn't started yet returns "not started" (it starts from the briefing). */
+export async function getSession(userId: string, id: string): Promise<SessionData | "not_started" | null> {
+  await settleUser(userId);
   const i = await ownInterview(userId, id);
   if (!i) return null;
-  const status = bookingStatus(i, Date.now());
-  if (!["ready", "in_progress", "interrupted"].includes(status)) return null;
+  if (i.status === "ready" || i.status === "pending_payment" || i.status === "expired") return i.status === "ready" ? "not_started" : null;
+  const phase: Phase = i.status === "in_progress" || i.status === "interrupted" ? (i.wrapUpStartedAt ? "wrapup" : "live") : "ended";
+  const reportReady = phase === "ended" && (await reportsFor([i.id])).has(i.id);
   const plan = i.questionPlan ?? [];
   return {
     id: i.id,
@@ -248,6 +269,9 @@ export async function getSession(userId: string, id: string): Promise<SessionDat
     plan,
     messages: await messagesOf(i.id),
     activeSeconds: i.activeSeconds,
+    phase,
+    status: i.status,
+    reportReady,
   };
 }
 
@@ -271,6 +295,7 @@ function historyStatus(i: InterviewRow, report: EvaluationRow | undefined): Inte
 
 /** Every interview that started, newest first (AI now; human ones join in Release 2). */
 export async function listInterviews(userId: string): Promise<InterviewSummary[]> {
+  await settleUser(userId);
   const list = await db
     .select()
     .from(aiInterviews)

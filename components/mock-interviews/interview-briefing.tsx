@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   AlarmClock,
   ArrowLeft,
@@ -13,6 +14,7 @@ import {
   FileText,
   Flag,
   Headphones,
+  Loader2,
   Lightbulb,
   ListChecks,
   MessageCircle,
@@ -29,6 +31,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
+import { toast } from "@/components/ui/toast";
+import { startInterviewAction } from "@/actions/mock-interviews";
 import { LevelTag } from "@/components/mock-interviews/visual-kit";
 import type { BriefingData } from "@/lib/mock-interviews/data";
 import { METRICS, plannedQuestions, type MetricKey } from "@/lib/mock-interviews/model";
@@ -302,10 +306,36 @@ export function InterviewBriefing({ data }: { data: BriefingData }) {
   );
 }
 
+/**
+ * Starts the interview on the server first (the AI writes the question plan,
+ * which takes a few seconds), then opens the interview screen. Resuming goes
+ * straight in.
+ */
 function StartButton({ resuming, href, compact }: { resuming: boolean; href: string; compact?: boolean }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const id = href.split("/").pop() ?? "";
+  async function go() {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const r = await startInterviewAction(id);
+      if (!r.ok) {
+        toast.error(resuming ? "Couldn't resume" : "Couldn't start", r.error);
+        setBusy(false);
+        return;
+      }
+      router.push(href);
+    } catch {
+      toast.error("Something went wrong", "Check your connection and try again.");
+      setBusy(false);
+    }
+  }
   return (
-    <Link
-      href={href}
+    <button
+      type="button"
+      onClick={go}
+      disabled={busy}
       className={cn(
         buttonVariants({ size: "lg" }),
         compact ? "shrink-0" : "w-full",
@@ -313,9 +343,15 @@ function StartButton({ resuming, href, compact }: { resuming: boolean; href: str
         resuming ? "bg-gradient-to-r from-amber-500 to-orange-500" : "bg-gradient-to-r from-primary to-violet-600",
       )}
     >
-      {resuming ? <RefreshCw className="size-4" aria-hidden /> : <PlayCircle className="size-4" aria-hidden />}
-      {resuming ? "Resume interview" : "Start interview"}
-    </Link>
+      {busy ? (
+        <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden />
+      ) : resuming ? (
+        <RefreshCw className="size-4" aria-hidden />
+      ) : (
+        <PlayCircle className="size-4" aria-hidden />
+      )}
+      {busy ? (resuming ? "Resuming…" : "Preparing your questions…") : resuming ? "Resume interview" : "Start interview"}
+    </button>
   );
 }
 

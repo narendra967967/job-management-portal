@@ -5,6 +5,7 @@
 export const JOBS = [
   { key: "ai", label: "AI alert reader", every: "Every 5 minutes", lateAfterMin: 30 },
   { key: "broadcasts", label: "Broadcast sender", every: "Every 5 minutes", lateAfterMin: 30 },
+  { key: "interviews", label: "Mock interview upkeep", every: "Every 5 minutes", lateAfterMin: 30 },
   { key: "sync", label: "Gmail sync", every: "Every 15 minutes", lateAfterMin: 60 },
   { key: "reminders", label: "Renewal reminders", every: "Daily", lateAfterMin: 26 * 60 },
   { key: "purge", label: "Daily cleanup", every: "Daily", lateAfterMin: 26 * 60 },

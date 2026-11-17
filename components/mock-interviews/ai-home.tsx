@@ -40,6 +40,7 @@ import {
   type PricingByDifficulty,
 } from "@/lib/mock-interviews/model";
 import { useMounted } from "@/lib/use-mounted";
+import { emailAiInterviewReceiptAction } from "@/actions/mock-interviews";
 import { LEVEL_TAG } from "@/components/mock-interviews/visual-kit";
 import { cn } from "@/lib/utils";
 
@@ -287,9 +288,15 @@ export function AiHome({
                         </DropdownMenuItem>
                       )}
                       {b.payment.kind === "paid" && (
-                        <DropdownMenuItem onClick={() => toast.info("Receipt", "Receipts for paid interviews arrive with the next update.")}>
+                        <DropdownMenuItem
+                          onClick={() =>
+                            void emailAiInterviewReceiptAction(b.id)
+                              .then((r) => (r.ok ? toast.success("Receipt sent", "Check your inbox for the payment receipt.") : toast.error("Not sent", r.error)))
+                              .catch(() => toast.error("Not sent", "Check your connection and try again."))
+                          }
+                        >
                           <Receipt className="size-4" aria-hidden />
-                          View receipt
+                          Email my receipt
                         </DropdownMenuItem>
                       )}
                       <DropdownMenuItem onClick={() => router.push("/mock-interviews/ai/new")}>

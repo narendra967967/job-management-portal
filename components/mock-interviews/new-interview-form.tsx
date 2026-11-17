@@ -47,6 +47,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "@/components/ui/toast";
 import { useLeadDetail, useLeads, useResumes } from "@/lib/mock-store";
 import { bookAiInterviewAction, updateAiBookingAction } from "@/actions/mock-interviews";
+import { closeCheckoutAction, verifyCheckoutAction } from "@/actions/payments";
+import { openRazorpay } from "@/lib/razorpay-checkout";
+import type { AiCheckoutStart } from "@/lib/payments/ai-interview-orders";
 import type { BookingSetup } from "@/lib/mock-interviews/data";
 import {
   DIFFICULTIES,
@@ -228,11 +231,47 @@ export function NewInterviewForm({
       if (editing) {
         toast.success("Changes saved", "Your booking keeps its difficulty and length.");
         router.push("/mock-interviews/ai");
+      } else if (r.checkout) {
+        await pay(r.id, r.checkout);
       } else router.push(`/mock-interviews/ai?booked=${r.id}`);
     } catch {
       toast.error("Something went wrong", "Check your connection and try again.");
       setStarting(false);
     }
+  }
+
+  // Outside the allowance: Razorpay checkout, then the server checks the payment
+  // with Razorpay before the booking counts (the browser only passes the ids).
+  async function pay(id: string, c: AiCheckoutStart) {
+    const outcome = await openRazorpay({
+      key: c.keyId,
+      orderId: c.gatewayOrderId,
+      amount: c.amount,
+      currency: c.currency,
+      name: c.merchantName,
+      description: c.description,
+      prefill: c.prefill,
+      onFailedAttempt: (reason) => void closeCheckoutAction({ orderId: c.orderId, outcome: "failed", reason }),
+    });
+    if (outcome.kind !== "success") {
+      void closeCheckoutAction({ orderId: c.orderId, outcome: outcome.kind === "load-error" ? "failed" : "cancelled", ...(outcome.kind === "load-error" ? { reason: "The payment window didn't load" } : {}) });
+      toast.info(outcome.kind === "load-error" ? "The payment window didn't open" : "Payment not made", "Nothing was booked. You can try again whenever you like.");
+      setStarting(false);
+      return;
+    }
+    const res = await verifyCheckoutAction({
+      orderId: c.orderId,
+      razorpayOrderId: outcome.orderId,
+      razorpayPaymentId: outcome.paymentId,
+      razorpaySignature: outcome.signature,
+    });
+    if (!res.ok) {
+      toast.error("Payment not confirmed yet", res.error);
+      setStarting(false);
+      return;
+    }
+    toast.success("Paid and booked", "Your receipt is on its way by email.");
+    router.push(`/mock-interviews/ai?booked=${id}`);
   }
 
   // After the first Start, errors update as fields are fixed.

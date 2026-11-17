@@ -303,4 +303,5 @@ export interface ChatMessage {
   questionNo?: number;
   /** Seconds into the interview when it was sent. */
   at?: number;
+  kind?: "question" | "follow_up" | "answer" | "closing";
 }

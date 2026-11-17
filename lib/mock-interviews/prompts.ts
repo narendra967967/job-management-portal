@@ -1,0 +1,166 @@
+import "server-only";
+
+import { z } from "zod";
+import { METRICS, type ReportWriting } from "./model";
+
+// The three AI calls of an interview (spec D10, D49): the question plan, each
+// interviewer turn, and the evaluation. Admin edits the wording of each prompt
+// (Module settings → Prompts); the reply format below is owned by the code, so
+// an edited prompt can't break the parsing.
+
+export interface PromptValues {
+  role: string;
+  industry: string;
+  category: string;
+  difficulty: string;
+  question_count: number;
+  topics: string;
+  resume: string;
+  job_description: string;
+}
+
+/** Fill {{placeholders}}; unknown ones are left as typed. */
+export function fillPrompt(template: string, v: PromptValues): string {
+  return template.replace(/\{\{(\w+)\}\}/g, (all, key: string) => (key in v ? String(v[key as keyof PromptValues]) : all));
+}
+
+const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n)}…` : s);
+
+/** The candidate's material, appended to the question plan prompt. */
+export function materialBlock(v: PromptValues): string {
+  return [
+    `Role: ${v.role}`,
+    `Industry: ${v.industry}`,
+    `Kind of interview: ${v.category}`,
+    `Difficulty: ${v.difficulty}`,
+    `Topics the candidate wants covered: ${v.topics || "none given"}`,
+    "",
+    "Resume:",
+    clip(v.resume, 12_000) || "(none)",
+    "",
+    "Job description:",
+    clip(v.job_description, 12_000) || "(none: general preparation for the role)",
+  ].join("\n");
+}
+
+/* ---------------- 1. question plan ---------------- */
+
+export function planFormat(count: number, topics: string[]): string {
+  return [
+    "Reply with one JSON object only, in this shape:",
+    '{"opening": string, "questions": [{"question": string, "topic": string | null, "skill": string, "tip": string}]}',
+    `- "questions": exactly ${count} items, in the order they'll be asked, easiest first.`,
+    `- "topic": one of ${JSON.stringify(topics)} when the question covers it, otherwise null. Cover every topic at least once.`,
+    `- "skill": the main skill it tests, one of ${JSON.stringify(METRICS.map((m) => m.key))}. Spread them.`,
+    '- "tip": one short sentence of advice for answering that question well, written to the candidate.',
+    '- "opening": one or two friendly sentences that welcome the candidate before the first question. Don\'t ask a question in it.',
+    "- Plain text in every field: no Markdown, no numbering.",
+  ].join("\n");
+}
+
+export const planSchema = z.object({
+  opening: z.string().trim().min(1).max(600),
+  questions: z
+    .array(
+      z.object({
+        question: z.string().trim().min(5).max(600),
+        topic: z.string().trim().max(60).nullable().optional(),
+        skill: z.string().trim().max(40).optional(),
+        tip: z.string().trim().min(1).max(300),
+      }),
+    )
+    .min(1)
+    .max(40),
+});
+
+/* ---------------- 2. interviewer turn ---------------- */
+
+export interface TurnState {
+  questionNo: number;
+  totalQuestions: number;
+  followUpsOnQuestion: number;
+  maxFollowUps: number;
+  nextQuestion: string | null;
+  wrappingUp: boolean;
+  minutesLeft: number;
+}
+
+export function turnFormat(s: TurnState): string {
+  const lines = [
+    "You've just read the candidate's latest answer. Decide what happens next and write it.",
+    "Reply with one JSON object only:",
+    '{"action": "follow_up" | "next_question" | "end", "message": string}',
+    `- You're on planned question ${s.questionNo} of ${s.totalQuestions}. Follow-ups asked on it so far: ${s.followUpsOnQuestion} (at most ${s.maxFollowUps}).`,
+    "- follow_up: ask one short follow-up on the same question, only when the answer is thin, vague or needs evidence for scoring.",
+  ];
+  if (s.wrappingUp) {
+    lines.push(
+      "- Time is up. Don't start a new planned question. Either ask one last short follow-up to finish this question, or end.",
+      '- end: thank the candidate in one or two sentences and say their report is being prepared. Give no scores or feedback.',
+    );
+  } else if (s.nextQuestion) {
+    lines.push(
+      `- next_question: move on. Your message is a brief, natural transition (no feedback on the last answer) followed by this planned question, kept in meaning: "${s.nextQuestion}"`,
+      `- About ${s.minutesLeft} minutes are left.`,
+      "- end: only if the candidate asks to stop.",
+    );
+  } else {
+    lines.push(
+      "- This was the last planned question. Ask a follow-up if it's needed, otherwise end.",
+      '- end: thank the candidate in one or two sentences and say their report is being prepared. Give no scores or feedback.',
+    );
+  }
+  lines.push("- Never give feedback, hints or scores during the interview. Plain text, no Markdown, under 90 words.");
+  return lines.join("\n");
+}
+
+export const turnSchema = z.object({
+  action: z.enum(["follow_up", "next_question", "end"]),
+  message: z.string().trim().min(1).max(1500),
+});
+
+/* ---------------- 3. evaluation ---------------- */
+
+const point = z.object({ headline: z.string().trim().min(1).max(90), detail: z.string().trim().min(1).max(1200) });
+const score = z.number().int().min(1).max(10);
+
+export const evaluationSchema = z.object({
+  scores: z.object({ communication: score, technical: score, confidence: score, problemSolving: score, relevance: score }),
+  strengths: z.array(point).min(1).max(6),
+  improvements: z.array(point).min(1).max(6),
+  missed: z
+    .array(z.object({ question: z.string().trim().min(1).max(600), headline: z.string().trim().min(1).max(90), note: z.string().trim().min(1).max(1200) }))
+    .max(8),
+  betterAnswers: z.array(z.object({ question: z.string().trim().min(1).max(600), answer: z.string().trim().min(1).max(2000) })).max(8),
+  nextSteps: z.array(point).min(1).max(6),
+});
+export type EvaluationReply = z.infer<typeof evaluationSchema>;
+
+export function evaluationFormat(): string {
+  return [
+    "Reply with one JSON object only, in this shape:",
+    '{"scores": {"communication": n, "technical": n, "confidence": n, "problemSolving": n, "relevance": n},',
+    ' "strengths": [{"headline": string, "detail": string}],',
+    ' "improvements": [{"headline": string, "detail": string}],',
+    ' "missed": [{"question": string, "headline": string, "note": string}],',
+    ' "betterAnswers": [{"question": string, "answer": string}],',
+    ' "nextSteps": [{"headline": string, "detail": string}]}',
+    "- Each score is a whole number from 1 to 10, judged only on what's in the transcript.",
+    "- headline: a short label of 2 to 6 words. detail / note / answer: the full explanation, specific to this candidate's answers.",
+    "- missed: questions answered wrongly or only partly, with what was missing. betterAnswers: a stronger answer for those questions.",
+    "- strengths, improvements and nextSteps: 1 to 4 items each. Plain text in every field, no Markdown.",
+    "- Questions the candidate never reached aren't failures; don't list them as missed.",
+  ].join("\n");
+}
+
+export function toWriting(r: EvaluationReply): ReportWriting {
+  return { strengths: r.strengths, improvements: r.improvements, missed: r.missed, betterAnswers: r.betterAnswers, nextSteps: r.nextSteps };
+}
+
+/** The first JSON object in a reply (some models wrap it in prose or a code fence). */
+export function parseJsonObject(text: string): unknown {
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  if (start < 0 || end <= start) throw new Error("No JSON object in the reply");
+  return JSON.parse(text.slice(start, end + 1));
+}

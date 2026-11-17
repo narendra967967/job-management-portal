@@ -11,11 +11,13 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { getCurrentUserId } from "@/lib/current-user";
 import { extractResumeText } from "@/lib/resume-extract";
-import { aiInterviews, jobLeadDetails, jobLeads, plans, resumes, user } from "@/db/schema";
+import { aiInterviews, jobLeadDetails, jobLeads, paymentOrders, plans, resumes, user } from "@/db/schema";
 import { aiInterviewsOpen, getModuleSettings, settingsSnapshot } from "@/lib/mock-interviews/config";
-import { DIFFICULTIES, INDUSTRIES } from "@/lib/mock-interviews/model";
+import { DIFFICULTIES, INDUSTRIES, aiInterviewQuote } from "@/lib/mock-interviews/model";
+import { aiPaymentAvailable, sendAiInterviewReceipt, startAiInterviewCheckout, type AiCheckoutStart } from "@/lib/payments/ai-interview-orders";
+import { endInterview, heartbeat, startInterview, submitAnswer, type LiveState } from "@/lib/mock-interviews/engine";
 
-type Result = { ok: true; id: string } | { ok: false; error: string; field?: string };
+type Result = { ok: true; id: string; checkout?: AiCheckoutStart } | { ok: false; error: string; field?: string };
 
 const LIMITS = { role: 100, paste: 20_000, minJd: 100, minResume: 300, topics: 10, topic: 40, fileBytes: 5 * 1024 * 1024 };
 
@@ -155,7 +157,7 @@ export async function bookAiInterviewAction(form: FormData): Promise<Result> {
   const m = await material(userId, v, parsed.file);
   if ("error" in m) return { ok: false, error: m.error, field: m.field };
 
-  return db.transaction(async (tx) => {
+  const booked = await db.transaction(async (tx) => {
     const [u] = await tx
       .select({ planExpiresAt: user.planExpiresAt, planName: plans.name, isFree: plans.isFree, included: plans.aiInterviewsIncluded })
       .from(user)
@@ -184,13 +186,16 @@ export async function bookAiInterviewAction(form: FormData): Promise<Result> {
         }
       }
     }
-    if (!coverage) return { ok: false, error: "Paying for an interview isn't available yet. It arrives with the next update." } as Result;
+    // Outside the allowance: priced per minute at the level's rate, less its
+    // discount (D5). The booking waits as pending_payment until it's paid.
+    const quote = coverage ? null : aiInterviewQuote(v.durationMin, settings.pricing[v.difficulty]);
+    if (quote && !(await aiPaymentAvailable())) return { ok: false, error: "Online payment isn't available right now. Please try again later." } as Result;
 
     const [row] = await tx
       .insert(aiInterviews)
       .values({
         userId,
-        status: "ready",
+        status: quote ? "pending_payment" : "ready",
         role: v.role,
         industry: v.industry,
         category: v.category,
@@ -198,16 +203,27 @@ export async function bookAiInterviewAction(form: FormData): Promise<Result> {
         durationMin: v.durationMin,
         topics: v.topics,
         ...m,
-        coverage,
+        coverage: coverage ?? "paid",
         planName: coverage === "plan" ? u.planName : null,
+        ...(quote ? { priceFullPaise: quote.full, pricePaise: quote.final, discountPercent: quote.percent } : {}),
         allowancePeriodEnds,
         validUntil: new Date(Date.now() + settings.bookingValidDays * 86_400_000),
         settings: settingsSnapshot(settings, v.difficulty),
       })
       .returning({ id: aiInterviews.id });
-    revalidatePath("/mock-interviews", "layout");
-    return { ok: true, id: row.id } as Result;
+    return { ok: true, id: row.id, pay: !!quote } as const;
   });
+  if (!booked.ok) return booked;
+  if ("pay" in booked && booked.pay) {
+    const start = await startAiInterviewCheckout(userId, booked.id);
+    if (!start.ok) {
+      await db.delete(aiInterviews).where(and(eq(aiInterviews.id, booked.id), eq(aiInterviews.status, "pending_payment")));
+      return { ok: false, error: start.error };
+    }
+    return { ok: true, id: booked.id, checkout: start.checkout };
+  }
+  revalidatePath("/mock-interviews", "layout");
+  return { ok: true, id: booked.id };
 }
 
 /**
@@ -249,4 +265,74 @@ export async function updateAiBookingAction(id: unknown, form: FormData): Promis
 export async function aiInterviewsOpenAction(): Promise<boolean> {
   await getCurrentUserId();
   return aiInterviewsOpen(await getModuleSettings());
+}
+
+/* ---------------- the interview screen ---------------- */
+
+const interviewId = z.string().uuid();
+const MAX_ANSWER = 4000;
+
+async function interviewGate(id: unknown): Promise<{ userId: string; id: string } | { error: string }> {
+  const userId = await getCurrentUserId();
+  const p = interviewId.safeParse(id);
+  if (!p.success) return { error: "That interview isn't available." };
+  if (!(await aiInterviewsOpenAction())) return { error: "AI interviews aren't open right now." };
+  return { userId, id: p.data };
+}
+
+/** Start a ready booking (the AI writes the question plan), or resume one (D13a, D13e). */
+export async function startInterviewAction(id: unknown): Promise<{ ok: true } | { ok: false; error: string }> {
+  const g = await interviewGate(id);
+  if ("error" in g) return { ok: false, error: g.error };
+  const r = await startInterview(g.userId, g.id);
+  revalidatePath("/mock-interviews", "layout");
+  return r;
+}
+
+/** Every 15 seconds while the interview screen is open and online: counts the clock. */
+export async function interviewHeartbeatAction(id: unknown): Promise<LiveState | null> {
+  const g = await interviewGate(id);
+  if ("error" in g) return null;
+  return heartbeat(g.userId, g.id);
+}
+
+/** Send an answer; returns it and the interviewer's reply. */
+export async function answerInterviewAction(id: unknown, text: unknown) {
+  const g = await interviewGate(id);
+  if ("error" in g) return { ok: false as const, error: g.error };
+  const t = z
+    .string()
+    .trim()
+    .min(1, "Write or say your answer first.")
+    .max(MAX_ANSWER, `Keep your answer under ${MAX_ANSWER.toLocaleString("en-US")} characters.`)
+    .safeParse(text);
+  if (!t.success) return { ok: false as const, error: t.error.issues[0]?.message ?? "Check your answer." };
+  return submitAnswer(g.userId, g.id, t.data);
+}
+
+/** End the interview early; the answers so far are scored. */
+export async function endInterviewAction(id: unknown): Promise<{ ok: true } | { ok: false; error: string }> {
+  const g = await interviewGate(id);
+  if ("error" in g) return { ok: false, error: g.error };
+  const r = await endInterview(g.userId, g.id);
+  revalidatePath("/mock-interviews", "layout");
+  return r;
+}
+
+/** Email the receipt for a paid interview again (bookings list → Receipt). */
+export async function emailAiInterviewReceiptAction(id: unknown): Promise<{ ok: true } | { ok: false; error: string }> {
+  const userId = await getCurrentUserId();
+  const p = interviewId.safeParse(id);
+  if (!p.success) return { ok: false, error: "That booking isn't available." };
+  const [o] = await db
+    .select({ id: paymentOrders.id })
+    .from(paymentOrders)
+    .where(and(eq(paymentOrders.aiInterviewId, p.data), eq(paymentOrders.userId, userId), eq(paymentOrders.status, "paid")));
+  if (!o) return { ok: false, error: "There's no payment for this booking." };
+  try {
+    await sendAiInterviewReceipt(o.id);
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "We couldn't send the email just now. Try again in a minute." };
+  }
 }

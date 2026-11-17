@@ -34,6 +34,7 @@ import { sendTemplateEmail } from "@/lib/email-templates";
 import { greetingName } from "@/lib/email-templates-model";
 import { absoluteUrl } from "@/lib/site-url";
 import { getAppName } from "@/lib/branding";
+import { confirmAiInterviewPayment, sendAiInterviewReceipt } from "@/lib/payments/ai-interview-orders";
 
 type Order = typeof paymentOrders.$inferSelect;
 
@@ -202,9 +203,10 @@ export type ConfirmResult =
  * returns the same result without changing anything.
  */
 export async function confirmPayment(order: Order, payment: RazorpayPayment, creds: RazorpayCreds): Promise<ConfirmResult> {
-  // Plans only. AI interview orders get their own confirmation (roadmap R1.5).
+  // A paid AI mock interview has its own confirmation (lib/payments/ai-interview-orders.ts).
+  if (order.kind === "ai_interview") return confirmAiInterviewPayment(order, payment, creds);
   const period = order.period;
-  if (order.kind === "ai_interview" || !period) return { ok: false, error: "This order isn't for a plan." };
+  if (!period) return { ok: false, error: "This order isn't for a plan." };
   if (payment.order_id !== order.gatewayOrderId) return { ok: false, error: "That payment belongs to another order." };
   if (payment.amount !== order.totalAmount || payment.currency !== order.currency) {
     console.error(`[payments] amount mismatch on order ${order.id}: got ${payment.amount} ${payment.currency}`);
@@ -329,6 +331,7 @@ function esc(s: string): string {
 export async function sendReceipt(orderId: string): Promise<void> {
   const [o] = await db.select().from(paymentOrders).where(eq(paymentOrders.id, orderId));
   if (!o || o.status !== "paid" || !o.userEmail) throw new Error("Only a paid order with an email has a receipt.");
+  if (o.kind === "ai_interview") return sendAiInterviewReceipt(orderId);
   const money = (p: number) => formatPaise(p, o.currency);
   const rows: [string, string][] = [
     ["Receipt number", receiptOf(o)],

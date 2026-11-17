@@ -10,13 +10,14 @@
 
 import { z } from "zod";
 
-export type EmailTemplateGroup = "Sign-in" | "Confirmation codes" | "Account" | "Plans and payments" | "Leads" | "Support";
+export type EmailTemplateGroup = "Sign-in" | "Confirmation codes" | "Account" | "Plans and payments" | "Mock interviews" | "Leads" | "Support";
 
 export const EMAIL_TEMPLATE_GROUPS: EmailTemplateGroup[] = [
   "Sign-in",
   "Confirmation codes",
   "Account",
   "Plans and payments",
+  "Mock interviews",
   "Leads",
   "Support",
 ];
@@ -55,6 +56,9 @@ export type EmailTemplateKey =
   | "account_deleted"
   | "plan_ending"
   | "payment_received"
+  | "mock_interview_receipt"
+  | "mock_interview_expiring"
+  | "mock_interview_report"
   | "old_leads_cleared"
   | "ticket_received"
   | "ticket_resolved"
@@ -333,6 +337,84 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
       bodyHtml: "<p>Hi {{user_name}}, thanks for your payment. Your {{plan_name}} plan is active until {{active_until}}.</p>{{receipt_details}}",
       buttonLabel: "See your plan",
       footerNote: "Keep this email as your payment receipt.",
+    },
+  },
+
+
+  /* ---------------- Mock interviews ---------------- */
+  {
+    key: "mock_interview_receipt",
+    group: "Mock interviews",
+    name: "AI interview payment received",
+    trigger: "A paid AI mock interview's payment succeeds, or an admin resends the receipt",
+    recipient: "user",
+    placeholders: [
+      APP,
+      NAME,
+      { key: "interview_label", label: "What they bought, e.g. \"AI mock interview: 30 min, Medium\"", sample: "AI mock interview: 30 min, Medium" },
+      { key: "valid_until", label: "The last day they can start it", sample: "December 18, 2026" },
+      { key: "total_paid", label: "The amount paid", sample: "₹108.00" },
+      {
+        key: "receipt_details",
+        label: "The receipt table: number, date, interview, tax, total, payment ID",
+        sample:
+          '<table style="width:100%;border-collapse:collapse;margin:8px 0 18px;font-size:14px"><tr><td style="padding:7px 0;border-bottom:1px solid #E5E7EB;color:#6B7280">Receipt number</td><td style="padding:7px 0;border-bottom:1px solid #E5E7EB;text-align:right">RCPT-0008</td></tr><tr><td style="padding:7px 0;border-bottom:1px solid #E5E7EB;color:#6B7280">Total paid</td><td style="padding:7px 0;border-bottom:1px solid #E5E7EB;text-align:right;font-weight:bold">₹108.00</td></tr></table>',
+        required: true,
+        block: true,
+      },
+    ],
+    defaults: {
+      subject: "Payment received: {{interview_label}}",
+      heading: "Your interview is booked",
+      bodyHtml:
+        "<p>Hi {{user_name}}, thanks for your payment. Your {{interview_label}} is booked, and you can start it any time until {{valid_until}}.</p>{{receipt_details}}",
+      buttonLabel: "Go to my interviews",
+      footerNote: "Keep this email as your payment receipt.",
+    },
+  },
+  {
+    key: "mock_interview_expiring",
+    group: "Mock interviews",
+    name: "AI interview booking expires soon",
+    trigger: "A few days before a booked AI interview that hasn't started expires (Module settings → Bookings)",
+    recipient: "user",
+    placeholders: [
+      APP,
+      NAME,
+      { key: "interview_role", label: "The role the interview is for", sample: "Technical Project Manager" },
+      { key: "expires_on", label: "The last day to start it", sample: "December 18, 2026" },
+      { key: "expires_when", label: "\"tomorrow\", or \"in 3 days\"", sample: "in 3 days" },
+    ],
+    defaults: {
+      subject: "Your mock interview booking expires {{expires_when}}",
+      heading: "Your interview is still waiting",
+      bodyHtml:
+        "<p>Hi {{user_name}}, you booked an AI mock interview for {{interview_role}} and haven't started it yet. The booking runs out on {{expires_on}}, and after that it can't be used.</p>" +
+        "<p>It takes the length you picked plus a few minutes to wrap up, so find a quiet slot before then.</p>",
+      buttonLabel: "Start my interview",
+      footerNote: "We send this once per booking.",
+    },
+  },
+  {
+    key: "mock_interview_report",
+    group: "Mock interviews",
+    name: "Interview report ready",
+    trigger: "The report on an AI mock interview has been written",
+    recipient: "user",
+    placeholders: [
+      APP,
+      NAME,
+      { key: "interview_role", label: "The role the interview was for", sample: "Technical Project Manager" },
+      { key: "overall_score", label: "The overall score out of 100", sample: "74" },
+    ],
+    defaults: {
+      subject: "Your interview report is ready: {{overall_score}}/100",
+      heading: "Your interview report is ready",
+      bodyHtml:
+        "<p>Hi {{user_name}}, the report on your {{interview_role}} mock interview is ready. You scored {{overall_score}} out of 100.</p>" +
+        "<p>It shows how you did on each of the five skills, what went well, the answers worth another look and a better way to give them.</p>",
+      buttonLabel: "Read my report",
+      footerNote: "",
     },
   },
 

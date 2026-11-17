@@ -1,7 +1,7 @@
 ---
 title: The scheduled jobs on the server and what each one does
 category: Runbooks
-summary: The server crontab runs the AI alert reader and broadcast sender every 5 minutes, Gmail sync every 15, and daily the renewal reminders, cleanup and backup. The dashboard System block shows each job's last run.
+summary: The server crontab runs the AI alert reader, mock interview upkeep and broadcast sender every 5 minutes, Gmail sync every 15, and daily the renewal reminders, cleanup and backup. The dashboard System block shows each job's last run.
 keywords: cron, crontab, scheduled jobs, daily job, sync, purge, backup, broadcasts, scheduled broadcast, cron secret, quiet hours, run now, reminders, job failed, job late, last run, system block
 ---
 
@@ -11,6 +11,7 @@ Scheduled work runs from the `deploy` user's crontab on the server, for prod and
 |---|---|---|
 | Every 15 minutes | sync | Gmail sync, for users connected that way. Each user is synced on their own interval, and nothing runs during quiet hours |
 | Every 5 minutes | ai | Picks up alerts waiting for the AI reader, including retries |
+| Every 5 minutes (prod at :01, :06…, preprod at :03, :08…) | interviews | Mock interview upkeep: closes interviews not resumed in time, retries failed reports, expires bookings, sends "expires soon" emails, clears unpaid bookings |
 | Every 5 minutes (prod at :02, :07…, preprod at :04, :09…) | broadcasts | Starts scheduled broadcasts that are due and sends queued broadcast emails, one every 2 seconds and up to 120 a run. Send now doesn't wait for it |
 | 04:30 prod, 04:40 preprod | reminders | Emails renewal reminders to people whose plan ends within 7 days, once a day each |
 | 21:00 prod, 21:10 preprod | purge | The automatic lead cleanup rules, then Lead retention if switched on, then Data retention |
@@ -20,11 +21,11 @@ Scheduled work runs from the `deploy` user's crontab on the server, for prod and
 
 ## Running a job now
 
-As the deploy user in `/srv/jobtiva`: `./cron-run.sh prod purge`, or `sync`, `ai`, `broadcasts` or `reminders`, and `preprod` for the other environment. Output goes to `logs/cron.log`.
+As the deploy user in `/srv/jobtiva`: `./cron-run.sh prod purge`, or `sync`, `ai`, `broadcasts`, `reminders` or `interviews`, and `preprod` for the other environment. Output goes to `logs/cron.log`.
 
 ## Did the jobs run?
 
-Look at the System block on the admin dashboard first. It lists the app's jobs with when each last finished and how it went: **AI alert reader** (ai), **Broadcast sender** (broadcasts), **Gmail sync** (sync), **Renewal reminders** (reminders) and **Daily cleanup** (purge, which covers the lead rules, Lead retention and Data retention in one run). The backup isn't an app job, so it isn't listed; its log is `logs/backup.log`.
+Look at the System block on the admin dashboard first. It lists the app's jobs with when each last finished and how it went: **AI alert reader** (ai), **Broadcast sender** (broadcasts), **Mock interview upkeep** (interviews), **Gmail sync** (sync), **Renewal reminders** (reminders) and **Daily cleanup** (purge, which covers the lead rules, Lead retention and Data retention in one run). The backup isn't an app job, so it isn't listed; its log is `logs/backup.log`.
 
 | Shown | Meaning |
 |---|---|

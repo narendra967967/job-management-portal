@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Trigger a JMP cron route from the AWS host's scheduler (crontab / systemd timer).
 #
-#   Usage:   jmp-cron.sh <sync|purge|ai|broadcasts|reminders>
+#   Usage:   jmp-cron.sh <sync|purge|ai|broadcasts|reminders|interviews>
 #   Needs:   APP_URL       e.g. https://app.example.com  (the app's base URL)
 #            CRON_SECRET   must match the server's CRON_SECRET
 #
@@ -11,6 +11,7 @@
 #   - ai    reads forwarded emails waiting for the AI reader (usually none).
 #   - broadcasts  starts due scheduled broadcasts and sends queued emails, paced.
 #   - reminders   emails plan-ending reminders (once per user per day; safe to repeat).
+#   - interviews  mock interview upkeep: closes dropped interviews, retries reports, expiry.
 set -euo pipefail
 
 route="${1:-}"
@@ -20,7 +21,8 @@ case "$route" in
   ai)    path="/api/cron/ai-intake" ;;
   broadcasts) path="/api/cron/broadcasts" ;;
   reminders) path="/api/cron/plan-reminders" ;;
-  *) echo "usage: $0 <sync|purge|ai|broadcasts|reminders>" >&2; exit 2 ;;
+  interviews) path="/api/cron/mock-interviews" ;;
+  *) echo "usage: $0 <sync|purge|ai|broadcasts|reminders|interviews>" >&2; exit 2 ;;
 esac
 
 : "${APP_URL:?set APP_URL (e.g. https://app.example.com)}"

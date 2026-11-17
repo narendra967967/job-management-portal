@@ -15,7 +15,8 @@ import {
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useConfirm } from "@/components/ui/confirm-dialog";
-import { StandInBanner } from "@/components/mock-interviews/sample-banner";
+import { toast } from "@/components/ui/toast";
+import { answerInterviewAction, endInterviewAction, interviewHeartbeatAction, startInterviewAction } from "@/actions/mock-interviews";
 import {
   InterviewPanel,
   InterviewPanelCompact,
@@ -25,7 +26,6 @@ import {
   type PanelData,
 } from "@/components/mock-interviews/interview-panel";
 import type { SessionData } from "@/lib/mock-interviews/data";
-import { STANDIN_FOLLOW_UPS, STANDIN_TIPS, standInOpening } from "@/lib/mock-interviews/standin";
 import { plannedQuestions, type ChatMessage } from "@/lib/mock-interviews/model";
 import { useProfile } from "@/lib/mock-store";
 import { cn } from "@/lib/utils";
@@ -37,8 +37,8 @@ import {
 
 // The AI interview (spec D10, D13): the conversation in the middle, a live panel
 // beside it (time, progress, topics, pace, what's scored, a tip), and an answer
-// box that can be typed or spoken into. Until R1.5 connects the real interviewer,
-// pacing and wrap-up, a stand-in answers with canned follow-ups and saves nothing.
+// box that can be typed or spoken into. The interviewer, the clock and the
+// wrap-up all run on the server (lib/mock-interviews/engine.ts).
 
 export type ChatState = "live" | "wrapup" | "ended";
 
@@ -70,31 +70,23 @@ function lengthHint(n: number) {
   };
 }
 
-export function InterviewChat({
-  session,
-  state,
-}: {
-  session: SessionData;
-  state: ChatState;
-}) {
+export function InterviewChat({ session }: { session: SessionData }) {
   const router = useRouter();
   const profile = useProfile();
   const { durationMin, settings } = session;
   const totalQuestions = session.plan.length || plannedQuestions(durationMin, settings.minutesPerQuestion);
-  const [messages, setMessages] = useState<ChatMessage[]>(() =>
-    session.messages.length ? session.messages : [standInOpening(session.role)],
-  );
+  const [messages, setMessages] = useState<ChatMessage[]>(session.messages);
   const [draft, setDraft] = useState("");
   const [thinking, setThinking] = useState(false);
   const { confirm, dialog } = useConfirm();
-  const [followUp, setFollowUp] = useState(0);
+  const [state, setState] = useState<ChatState>(session.phase);
   const interviewSeconds = durationMin * 60;
   const wrapSeconds = settings.wrapUpMinutes * 60;
-  // Seconds left: of the interview while live, of the wrap-up extension after.
-  // The clock picks up where it stopped (it counts connected time only).
-  const [secondsLeft, setSecondsLeft] = useState(
-    state === "wrapup" ? wrapSeconds - 31 : Math.max(0, interviewSeconds - session.activeSeconds),
-  );
+  // Seconds on the clock. The server keeps the real count (connected time only)
+  // and every heartbeat corrects this; in between it ticks here.
+  const [active, setActive] = useState(session.activeSeconds);
+  const secondsLeft =
+    state === "wrapup" ? Math.max(0, interviewSeconds + wrapSeconds - active) : Math.max(0, interviewSeconds - active);
   const endRef = useRef<HTMLDivElement>(null);
   const ended = state === "ended";
   const dictation = useDictation({
@@ -103,10 +95,9 @@ export function InterviewChat({
     max: MAX_ANSWER,
   });
 
-  // The clock only runs while connected (owner, November 17, 2026): any
-  // disconnection pauses it, and it picks up exactly where it stopped. Here that's
-  // the browser going offline; R1.5 counts time on the server from the live
-  // connection, so a closed tab or crashed browser pauses it too.
+  // The clock only runs while connected (owner, November 17, 2026). Offline,
+  // it stops here and no heartbeats go out, so the server doesn't count the
+  // time either; a closed tab or crashed browser stops the heartbeats too.
   const [offline, setOffline] = useState(false);
   useEffect(() => {
     const update = () => setOffline(!navigator.onLine);
@@ -119,14 +110,44 @@ export function InterviewChat({
     };
   }, []);
 
+  // Coming back to an interrupted interview resumes it.
+  useEffect(() => {
+    if (session.status !== "interrupted") return;
+    startInterviewAction(session.id)
+      .then((r) => {
+        if (!r.ok) toast.error("Couldn't resume", r.error);
+        router.refresh();
+      })
+      .catch(() => toast.error("Couldn't resume", "Check your connection and reload the page."));
+  }, [session.id, session.status, router]);
+
   useEffect(() => {
     if (ended || offline) return;
-    const t = setInterval(
-      () => setSecondsLeft((s) => Math.max(0, s - 1)),
-      1000,
-    );
+    const t = setInterval(() => setActive((a) => a + 1), 1000);
     return () => clearInterval(t);
   }, [ended, offline]);
+
+  // Heartbeat: every 15 seconds while connected.
+  useEffect(() => {
+    if (ended || offline) return;
+    let live = true;
+    const beat = async () => {
+      try {
+        const r = await interviewHeartbeatAction(session.id);
+        if (!live || !r) return;
+        setActive(r.activeSeconds);
+        setState(r.phase);
+      } catch {
+        /* the next beat tries again */
+      }
+    };
+    void beat();
+    const t = setInterval(beat, 15_000);
+    return () => {
+      live = false;
+      clearInterval(t);
+    };
+  }, [ended, offline, session.id]);
 
   useEffect(() => {
     scrollIntoMain(endRef.current, "end");
@@ -136,20 +157,17 @@ export function InterviewChat({
     (n, m) => Math.max(n, m.questionNo ?? 0),
     0,
   );
-  const base = `/mock-interviews/ai/session/${session.id}`;
-  const elapsed =
-    state === "wrapup"
-      ? interviewSeconds + (wrapSeconds - secondsLeft)
-      : interviewSeconds - secondsLeft;
+  const elapsed = active;
   const yourAnswers = messages.filter((m) => m.from === "you");
   const totalWords = yourAnswers.reduce((n, m) => n + words(m.text), 0);
+  const waitingForAnswer = messages.at(-1)?.from === "ai" && messages.at(-1)?.kind !== "closing";
 
   const panel: PanelData = useMemo(
     () => ({
       phase: state,
       secondsLeft,
       totalSeconds: state === "wrapup" ? wrapSeconds : interviewSeconds,
-      elapsed,
+      elapsed: Math.min(elapsed, interviewSeconds + wrapSeconds),
       questionNo,
       totalQuestions,
       minutesPerQuestion: settings.minutesPerQuestion,
@@ -159,9 +177,7 @@ export function InterviewChat({
       avgWords: yourAnswers.length
         ? Math.round(totalWords / yourAnswers.length)
         : 0,
-      tip:
-        session.plan[Math.max(1, questionNo) - 1]?.tip ??
-        STANDIN_TIPS[(Math.max(1, questionNo) - 1) % STANDIN_TIPS.length],
+      tip: session.plan[Math.max(1, questionNo) - 1]?.tip ?? "Lead with the outcome, then explain how you got there.",
     }),
     [
       state,
@@ -179,33 +195,33 @@ export function InterviewChat({
     ],
   );
 
-  function send() {
+  async function send() {
     const text = draft.trim();
-    if (!text || thinking || ended) return;
+    if (!text || thinking || ended || !waitingForAnswer) return;
     dictation.stop();
-    setMessages((m) => [
-      ...m,
-      { id: `y${m.length}`, from: "you", text, at: elapsed },
-    ]);
+    const tempId = `pending-${Date.now()}`;
+    setMessages((m) => [...m, { id: tempId, from: "you", text, at: elapsed }]);
     setDraft("");
     setThinking(true);
-    // Stand-in: a canned follow-up instead of the AI (R1.5 replaces it).
-    setTimeout(() => {
-      const next = STANDIN_FOLLOW_UPS[followUp % STANDIN_FOLLOW_UPS.length];
-      const opensQuestion = next.startsWith("Thanks. Next question");
-      setMessages((m) => [
-        ...m,
-        {
-          id: `a${m.length}`,
-          from: "ai",
-          text: next,
-          at: elapsed + 2,
-          questionNo: opensQuestion ? questionNo + 1 : undefined,
-        },
-      ]);
-      setFollowUp((f) => f + 1);
+    try {
+      const r = await answerInterviewAction(session.id, text);
+      if (!r.ok) {
+        // Put the answer back so nothing typed is lost.
+        setMessages((m) => m.filter((x) => x.id !== tempId));
+        setDraft(text);
+        toast.error("Not sent", r.error);
+        return;
+      }
+      setMessages((m) => [...m.filter((x) => x.id !== tempId), ...r.messages]);
+      setActive(r.state.activeSeconds);
+      setState(r.state.phase);
+    } catch {
+      setMessages((m) => m.filter((x) => x.id !== tempId));
+      setDraft(text);
+      toast.error("Not sent", "Check your connection and try again. Your answer is still in the box.");
+    } finally {
       setThinking(false);
-    }, 1400);
+    }
   }
 
   async function endNow() {
@@ -216,7 +232,14 @@ export function InterviewChat({
       confirmLabel: "End interview",
       destructive: true,
     });
-    if (ok) router.push(`${base}?state=ended`);
+    if (!ok) return;
+    const r = await endInterviewAction(session.id).catch(() => null);
+    if (!r?.ok) {
+      toast.error("Couldn't end the interview", r?.error ?? "Check your connection and try again.");
+      return;
+    }
+    setState("ended");
+    router.refresh();
   }
 
   const tone = timerTone(state, secondsLeft);
@@ -230,21 +253,6 @@ export function InterviewChat({
 
   return (
     <div className="mx-auto max-w-6xl space-y-3">
-      <StandInBanner
-        previews={[
-          { label: "In progress", href: base, active: state === "live" },
-          {
-            label: "Wrapping up",
-            href: `${base}?state=wrapup`,
-            active: state === "wrapup",
-          },
-          {
-            label: "Finished",
-            href: `${base}?state=ended`,
-            active: state === "ended",
-          },
-        ]}
-      />
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
         {/* ---------------- Conversation column ---------------- */}
@@ -352,7 +360,7 @@ export function InterviewChat({
                         <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
                           Question {m.questionNo}
                         </span>
-                      ) : (
+                      ) : m.kind === "closing" ? null : (
                         <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
                           Follow-up
                         </span>
@@ -438,7 +446,7 @@ export function InterviewChat({
               </dl>
               <div className="flex flex-wrap justify-center gap-2 border-t p-4">
                 <Link
-                  href="/mock-interviews/report/ai-8"
+                  href={`/mock-interviews/report/${session.id}`}
                   className={cn(
                     buttonVariants({ size: "lg" }),
                     "bg-gradient-to-r from-primary to-violet-600 text-white hover:opacity-90",
@@ -484,7 +492,7 @@ export function InterviewChat({
                     window.matchMedia("(min-width: 768px)").matches
                   ) {
                     e.preventDefault();
-                    send();
+                    void send();
                   }
                 }}
                 placeholder={
@@ -497,7 +505,7 @@ export function InterviewChat({
                 rows={3}
                 aria-label="Your answer"
                 className="resize-none border-0 bg-transparent shadow-none focus-visible:ring-0"
-                disabled={thinking}
+                disabled={thinking || !waitingForAnswer}
               />
               {/* Answer length meter. */}
               <div className="px-2" aria-live="polite">
@@ -531,10 +539,10 @@ export function InterviewChat({
                   )}
                 </span>
                 <div className="flex shrink-0 items-center gap-1.5">
-                  <DictationButton dictation={dictation} disabled={thinking} />
+                  <DictationButton dictation={dictation} disabled={thinking || !waitingForAnswer} />
                   <Button
                     onClick={send}
-                    disabled={!draft.trim() || thinking}
+                    disabled={!draft.trim() || thinking || !waitingForAnswer}
                     className="bg-gradient-to-r from-primary to-violet-600 text-white shadow-sm hover:opacity-90"
                   >
                     <SendHorizontal className="size-4" aria-hidden />
