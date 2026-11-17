@@ -45,6 +45,7 @@ import {
   type Difficulty,
 } from "@/lib/mock-interviews/model";
 import { useMounted } from "@/lib/use-mounted";
+import { LEVEL_TAG } from "@/components/mock-interviews/visual-kit";
 import { cn } from "@/lib/utils";
 
 // AI mock interviews: the candidate's booked AI interviews (spec D13a to D13d).
@@ -62,11 +63,7 @@ const STATUS: Record<BookingStatus, { label: string; cls: string }> = {
   expired: { label: "Expired", cls: "bg-slate-100 text-slate-600" },
 };
 
-const LEVEL: Record<Difficulty, string> = {
-  Easy: "bg-emerald-50 text-emerald-800 border-emerald-200",
-  Medium: "bg-amber-50 text-amber-800 border-amber-200",
-  Hard: "bg-rose-50 text-rose-800 border-rose-200",
-};
+const LEVEL = LEVEL_TAG;
 
 type View = "todo" | "all" | "expiring" | "month" | BookingStatus;
 type PayFilter = "all" | "paid" | "plan" | "free";

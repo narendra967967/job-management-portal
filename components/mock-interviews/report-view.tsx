@@ -50,6 +50,7 @@ import {
   type ReportPoint,
 } from "@/lib/mock-interviews/model";
 import { useMounted } from "@/lib/use-mounted";
+import { Sparkline, bandTone } from "@/components/mock-interviews/visual-kit";
 import { cn } from "@/lib/utils";
 
 // One report layout for AI and interviewer evaluations (spec D49). Visual first:
@@ -62,32 +63,6 @@ type Modal = {
   body: React.ReactNode;
 } | null;
 
-/** Band colors for the overall score, always shown with the band's word. */
-function bandTone(overall: number) {
-  if (overall >= 85)
-    return {
-      ring: "stroke-emerald-500",
-      text: "text-emerald-700",
-      chip: "bg-emerald-50 text-emerald-800 border-emerald-200",
-    };
-  if (overall >= 70)
-    return {
-      ring: "stroke-primary",
-      text: "text-primary",
-      chip: "bg-primary/10 text-primary border-primary/20",
-    };
-  if (overall >= 50)
-    return {
-      ring: "stroke-amber-500",
-      text: "text-amber-700",
-      chip: "bg-amber-50 text-amber-800 border-amber-200",
-    };
-  return {
-    ring: "stroke-rose-500",
-    text: "text-rose-700",
-    chip: "bg-rose-50 text-rose-700 border-rose-200",
-  };
-}
 
 export function ReportView({ interview }: { interview: SampleInterview }) {
   const mounted = useMounted();
@@ -461,43 +436,6 @@ function Fact({
   );
 }
 
-/** A tiny trend line of overall scores, the latest dot emphasised. */
-function Sparkline({ values, labels }: { values: number[]; labels: string[] }) {
-  if (values.length < 2)
-    return <span className="text-muted-foreground">Not enough yet</span>;
-  const W = 120;
-  const H = 32;
-  const min = Math.min(...values) - 5;
-  const max = Math.max(...values) + 5;
-  const x = (i: number) => 4 + (i / (values.length - 1)) * (W - 8);
-  const y = (v: number) => H - 4 - ((v - min) / (max - min || 1)) * (H - 8);
-  const d = values.map((v, i) => `${i ? "L" : "M"}${x(i)},${y(v)}`).join(" ");
-  const last = values.length - 1;
-  return (
-    <svg
-      viewBox={`0 0 ${W} ${H}`}
-      className="h-8 w-[7.5rem]"
-      role="img"
-      aria-label={`Overall scores, oldest to newest: ${values.map((v, i) => (labels[i] ? `${labels[i]} ${v}` : v)).join(", ")}`}
-    >
-      <path
-        d={d}
-        fill="none"
-        className="stroke-primary"
-        strokeWidth={2}
-        strokeLinejoin="round"
-        strokeLinecap="round"
-      />
-      <circle
-        cx={x(last)}
-        cy={y(values[last])}
-        r={3.5}
-        className="fill-primary stroke-card"
-        strokeWidth={2}
-      />
-    </svg>
-  );
-}
 
 /* ---------------- skills ---------------- */
 

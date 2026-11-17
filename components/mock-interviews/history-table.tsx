@@ -3,8 +3,8 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FileText, PlayCircle, RotateCcw, Search, Trash2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Bot, Clock3, FileText, Hourglass, PlayCircle, RotateCcw, Search, Trash2, Trophy, UserRound, type LucideIcon } from "lucide-react";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { useConfirm } from "@/components/ui/confirm-dialog";
@@ -14,7 +14,6 @@ import {
   RowActions,
   RowCheckbox,
   SelectAllCheckbox,
-  StatBox,
   TableBox,
   TablePagination,
   tableSelectCls,
@@ -22,13 +21,14 @@ import {
   useRowSelection,
 } from "@/components/ui/data-table";
 import { SampleBanner } from "@/components/mock-interviews/sample-banner";
+import { LevelTag, ScoreRing, SourceTag, Sparkline, bandTone } from "@/components/mock-interviews/visual-kit";
 import { SAMPLE_INTERVIEWS, SAMPLE_SETTINGS, type SampleInterview, type SessionStatus } from "@/lib/mock-interviews/sample-data";
-import { overallScore, shortDate } from "@/lib/mock-interviews/model";
+import { overallScore, scoreBand, shortDate } from "@/lib/mock-interviews/model";
 import { useMounted } from "@/lib/use-mounted";
 import { cn } from "@/lib/utils";
 
-// Interview history (spec D49, D53): every AI and human interview, newest first.
-// R1.2: sample data.
+// Interview history (spec D49, D53): every AI and human interview, newest first,
+// with its score and report. R1.2: sample data.
 
 const STATUS_TEXT: Record<SessionStatus, string> = {
   completed: "Report ready",
@@ -44,6 +44,8 @@ const STATUS_TONE: Record<SessionStatus, string> = {
 };
 
 type TypeFilter = "all" | "ai" | "human";
+const W = SAMPLE_SETTINGS.weights;
+const scoreOf = (i: SampleInterview) => (i.scores ? overallScore(i.scores, W) : null);
 
 export function HistoryTable() {
   const mounted = useMounted();
@@ -65,10 +67,17 @@ export function HistoryTable() {
 
   const paging = usePagination(rows, `${query}|${type}|${status}`);
   const selection = useRowSelection(rows.map((r) => r.id));
+
+  const scored = [...SAMPLE_INTERVIEWS].filter((i) => i.scores).sort((a, b) => a.date.localeCompare(b.date));
+  const recent = scored.slice(-6);
+  const scores = scored.map((i) => scoreOf(i)!);
+  const avg = scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
+  const best = scores.length ? Math.max(...scores) : 0;
   const counts = {
     ai: SAMPLE_INTERVIEWS.filter((i) => i.source === "ai").length,
     human: SAMPLE_INTERVIEWS.filter((i) => i.source === "human").length,
     waiting: SAMPLE_INTERVIEWS.filter((i) => i.status === "awaiting_report").length,
+    ready: SAMPLE_INTERVIEWS.filter((i) => i.status === "completed").length,
   };
 
   async function remove(ids: string[]) {
@@ -84,86 +93,183 @@ export function HistoryTable() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4">
+    <div className="mx-auto max-w-6xl space-y-4">
       <SampleBanner />
-      <h1 className="text-lg font-semibold tracking-tight">Interview history</h1>
 
-      <div className="grid grid-cols-3 gap-2 sm:max-w-xl">
-        <StatBox label="AI interviews" value={String(counts.ai)} active={type === "ai"} onClick={() => setType(type === "ai" ? "all" : "ai")} />
-        <StatBox label="With an interviewer" value={String(counts.human)} active={type === "human"} onClick={() => setType(type === "human" ? "all" : "human")} />
-        <StatBox
+      {/* Hero: your record at a glance */}
+      <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+        <div className="flex flex-col gap-4 bg-gradient-to-r from-primary/12 via-violet-500/8 to-transparent p-4 md:flex-row md:items-center md:p-5">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-violet-600 text-white shadow-sm">
+              <Clock3 className="size-6" aria-hidden />
+            </span>
+            <div className="min-w-0">
+              <h1 className="text-xl font-semibold tracking-tight">Interview history</h1>
+              <p className="text-sm text-muted-foreground">Every interview you&apos;ve done, with its score and report.</p>
+            </div>
+          </div>
+          <dl className="grid grid-cols-3 gap-2 rounded-xl border bg-white/70 p-2 text-center md:w-[26rem]">
+            <div className="px-1">
+              <dt className="text-[11px] text-muted-foreground">Average</dt>
+              <dd className={cn("text-xl font-semibold tabular-nums", bandTone(avg).text)}>{avg}</dd>
+            </div>
+            <div className="px-1">
+              <dt className="text-[11px] text-muted-foreground">Best</dt>
+              <dd className="inline-flex items-center gap-1 text-xl font-semibold tabular-nums">
+                <Trophy className="size-4 text-amber-500" aria-hidden />
+                {best}
+              </dd>
+            </div>
+            <div className="flex flex-col items-center px-1">
+              <dt className="text-[11px] text-muted-foreground">Recent trend</dt>
+              <dd>
+                <Sparkline values={recent.map((i) => scoreOf(i)!)} labels={mounted ? recent.map((i) => shortDate(i.date)) : []} className="h-7 w-24" />
+              </dd>
+            </div>
+          </dl>
+        </div>
+      </section>
+
+      {/* Stat tiles: each filters the list; click again to clear. */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Tile icon={Bot} tone="indigo" label="AI interviews" value={counts.ai} active={type === "ai"} onClick={() => setType(type === "ai" ? "all" : "ai")} />
+        <Tile icon={UserRound} tone="orange" label="With an interviewer" value={counts.human} active={type === "human"} onClick={() => setType(type === "human" ? "all" : "human")} />
+        <Tile
+          icon={FileText}
+          tone="emerald"
+          label="Reports ready"
+          value={counts.ready}
+          active={status === "completed"}
+          onClick={() => setStatus(status === "completed" ? "all" : "completed")}
+        />
+        <Tile
+          icon={Hourglass}
+          tone="amber"
           label="Waiting for evaluation"
-          value={String(counts.waiting)}
+          value={counts.waiting}
           active={status === "awaiting_report"}
           onClick={() => setStatus(status === "awaiting_report" ? "all" : "awaiting_report")}
         />
       </div>
 
-      <div className="flex flex-wrap items-end gap-2">
-        <label className="relative min-w-0 flex-1 basis-56">
-          <span className="sr-only">Search interviews</span>
-          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
-          <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search role, kind or interviewer" className="h-11 pl-9 sm:h-9" />
-        </label>
-        <select aria-label="Type" className={cn(tableSelectCls, "h-11 sm:h-9")} value={type} onChange={(e) => setType(e.target.value as TypeFilter)}>
-          <option value="all">All types</option>
-          <option value="ai">AI</option>
-          <option value="human">With an interviewer</option>
-        </select>
-        <select aria-label="Status" className={cn(tableSelectCls, "h-11 sm:h-9")} value={status} onChange={(e) => setStatus(e.target.value as "all" | SessionStatus)}>
-          <option value="all">All statuses</option>
-          {(Object.keys(STATUS_TEXT) as SessionStatus[]).map((s) => (
-            <option key={s} value={s}>
-              {STATUS_TEXT[s]}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <BulkBar selection={selection}>
-        <Button variant="destructive" onClick={() => void remove([...selection.selected])}>
-          <Trash2 className="size-4" aria-hidden />
-          Delete
-        </Button>
-      </BulkBar>
-
-      {rows.length === 0 ? (
-        <p className="rounded-xl border border-dashed bg-card p-8 text-center text-sm text-muted-foreground">
-          {SAMPLE_INTERVIEWS.length === 0 ? "No interviews yet. Your first one will show up here." : "No interviews match these filters."}
-        </p>
-      ) : (
-        <TableBox minWidth={880}>
-          <thead className="border-b bg-white/40 text-left text-xs text-muted-foreground">
-            <tr>
-              <th className="w-10 px-3 py-2">
-                <SelectAllCheckbox selection={selection} />
-              </th>
-              <th className="px-3 py-2 font-medium">Date</th>
-              <th className="min-w-56 px-3 py-2 font-medium">Interview</th>
-              <th className="px-3 py-2 font-medium">Type</th>
-              <th className="px-3 py-2 font-medium">Length</th>
-              <th className="px-3 py-2 text-right font-medium">Score</th>
-              <th className="px-3 py-2 font-medium">Status</th>
-              <th className="w-14 px-3 py-2 text-right font-medium">Action</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {paging.paged.map((i) => (
-              <HistoryRow
-                key={i.id}
-                i={i}
-                mounted={mounted}
-                selection={selection}
-                onOpen={(href) => router.push(href)}
-                onDelete={() => void remove([i.id])}
-              />
+      <section className="space-y-3 rounded-2xl border bg-card p-4 shadow-sm md:p-5">
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="relative min-w-0 flex-1 basis-56">
+            <span className="sr-only">Search interviews</span>
+            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+            <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search role, kind or interviewer" className="h-11 pl-9 sm:h-9" />
+          </label>
+          <select aria-label="Type" className={cn(tableSelectCls, "h-11 sm:h-9")} value={type} onChange={(e) => setType(e.target.value as TypeFilter)}>
+            <option value="all">All types</option>
+            <option value="ai">AI</option>
+            <option value="human">With an interviewer</option>
+          </select>
+          <select aria-label="Status" className={cn(tableSelectCls, "h-11 sm:h-9")} value={status} onChange={(e) => setStatus(e.target.value as "all" | SessionStatus)}>
+            <option value="all">All statuses</option>
+            {(Object.keys(STATUS_TEXT) as SessionStatus[]).map((s) => (
+              <option key={s} value={s}>
+                {STATUS_TEXT[s]}
+              </option>
             ))}
-          </tbody>
-        </TableBox>
-      )}
-      <TablePagination paging={paging} />
+          </select>
+        </div>
+
+        <BulkBar selection={selection}>
+          <Button variant="destructive" onClick={() => void remove([...selection.selected])}>
+            <Trash2 className="size-4" aria-hidden />
+            Delete
+          </Button>
+        </BulkBar>
+
+        {rows.length === 0 ? (
+          <div className="rounded-xl border border-dashed p-8 text-center">
+            <Clock3 className="mx-auto size-9 text-primary/60" aria-hidden />
+            <p className="mt-2 font-medium">{SAMPLE_INTERVIEWS.length === 0 ? "No interviews yet" : "No interviews match these filters"}</p>
+            {SAMPLE_INTERVIEWS.length === 0 && (
+              <Link href="/mock-interviews/ai" className={cn(buttonVariants({ size: "lg" }), "mt-4")}>
+                Book your first interview
+              </Link>
+            )}
+          </div>
+        ) : (
+          <TableBox minWidth={980}>
+            <thead className="border-b bg-white/40 text-left text-xs text-muted-foreground">
+              <tr>
+                <th className="w-10 px-3 py-2">
+                  <SelectAllCheckbox selection={selection} />
+                </th>
+                <th className="w-36 px-3 py-2 font-medium">Report</th>
+                <th className="px-3 py-2 font-medium">Score</th>
+                <th className="min-w-56 px-3 py-2 font-medium">Interview</th>
+                <th className="px-3 py-2 font-medium">Type</th>
+                <th className="px-3 py-2 font-medium">Level</th>
+                <th className="px-3 py-2 font-medium">Date</th>
+                <th className="px-3 py-2 font-medium">Status</th>
+                <th className="w-14 px-3 py-2 text-right font-medium">More</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {paging.paged.map((i) => (
+                <HistoryRow
+                  key={i.id}
+                  i={i}
+                  mounted={mounted}
+                  selection={selection}
+                  onOpen={(href) => router.push(href)}
+                  onDelete={() => void remove([i.id])}
+                />
+              ))}
+            </tbody>
+          </TableBox>
+        )}
+        <TablePagination paging={paging} />
+      </section>
       {dialog}
     </div>
+  );
+}
+
+const TILE_TONE = {
+  indigo: { icon: "bg-primary/10 text-primary", ring: "border-primary ring-2 ring-primary/20" },
+  orange: { icon: "bg-orange-100 text-orange-700", ring: "border-orange-400 ring-2 ring-orange-200" },
+  emerald: { icon: "bg-emerald-100 text-emerald-700", ring: "border-emerald-400 ring-2 ring-emerald-200" },
+  amber: { icon: "bg-amber-100 text-amber-700", ring: "border-amber-400 ring-2 ring-amber-200" },
+} as const;
+
+function Tile({
+  icon: Icon,
+  tone,
+  label,
+  value,
+  active,
+  onClick,
+}: {
+  icon: LucideIcon;
+  tone: keyof typeof TILE_TONE;
+  label: string;
+  value: number;
+  active: boolean;
+  onClick: () => void;
+}) {
+  const t = TILE_TONE[tone];
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onClick}
+      className={cn(
+        "flex min-h-16 items-center gap-3 rounded-2xl border bg-card p-3 text-left shadow-sm transition-all hover:-translate-y-px hover:shadow-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none motion-reduce:hover:translate-y-0",
+        active && t.ring,
+      )}
+    >
+      <span className={cn("flex size-10 shrink-0 items-center justify-center rounded-xl", t.icon)}>
+        <Icon className="size-5" aria-hidden />
+      </span>
+      <span className="min-w-0">
+        <span className="block text-2xl leading-none font-semibold tabular-nums">{value}</span>
+        <span className="mt-1 block text-xs text-muted-foreground">{label}</span>
+      </span>
+    </button>
   );
 }
 
@@ -180,31 +286,57 @@ function HistoryRow({
   onOpen: (href: string) => void;
   onDelete: () => void;
 }) {
-  const overall = i.scores ? overallScore(i.scores, SAMPLE_SETTINGS.weights) : null;
+  const overall = scoreOf(i);
   const report = `/mock-interviews/report/${i.id}`;
   return (
     <tr className="align-middle">
       <td className="px-3 py-2">
         <RowCheckbox selection={selection} id={i.id} label={`${i.role} on ${i.date.slice(0, 10)}`} />
       </td>
-      <td className="px-3 py-2 text-xs whitespace-nowrap text-muted-foreground">{mounted ? shortDate(i.date) : " "}</td>
       <td className="px-3 py-2">
-        {i.status === "completed" || i.status === "awaiting_report" ? (
-          <Link href={report} className="font-medium hover:text-primary hover:underline">
-            {i.role}
+        {i.status === "completed" ? (
+          <Link href={report} className={cn(buttonVariants({ variant: "outline" }), "w-full border-emerald-300 text-emerald-800 hover:bg-emerald-50")}>
+            <FileText className="size-4" aria-hidden />
+            View report
+          </Link>
+        ) : i.status === "awaiting_report" ? (
+          <Link href={report} className={cn(buttonVariants({ variant: "outline" }), "w-full border-amber-300 text-amber-800 hover:bg-amber-50")}>
+            <Hourglass className="size-4" aria-hidden />
+            Waiting
           </Link>
         ) : (
-          <span className="font-medium">{i.role}</span>
+          <Link href={`/mock-interviews/ai/session/${i.id}`} className={cn(buttonVariants(), "w-full bg-amber-500 text-white hover:bg-amber-600")}>
+            <PlayCircle className="size-4" aria-hidden />
+            Resume
+          </Link>
         )}
+      </td>
+      <td className="px-3 py-2">
+        {overall === null ? (
+          <span className="text-xs text-muted-foreground">No score yet</span>
+        ) : (
+          <span className="inline-flex items-center gap-2">
+            <ScoreRing value={overall} size={38} />
+            <span className={cn("text-xs font-semibold", bandTone(overall).text)}>{scoreBand(overall)}</span>
+          </span>
+        )}
+      </td>
+      <td className="px-3 py-2">
+        <p className="font-medium">{i.role}</p>
         <p className="text-xs text-muted-foreground">
-          {i.category} · {i.difficulty}
+          {i.category} · {i.industry}
         </p>
       </td>
-      <td className="px-3 py-2 text-xs whitespace-nowrap">{i.source === "ai" ? "AI" : `Interviewer · ${i.interviewer}`}</td>
-      <td className="px-3 py-2 text-xs whitespace-nowrap">{i.durationMin} min</td>
-      <td className="px-3 py-2 text-right tabular-nums">{overall === null ? <span className="text-muted-foreground">-</span> : <span className="font-medium">{overall}</span>}</td>
       <td className="px-3 py-2">
-        <span className={cn("inline-flex rounded px-1.5 py-0.5 text-[11px] font-medium whitespace-nowrap", STATUS_TONE[i.status])}>{STATUS_TEXT[i.status]}</span>
+        <SourceTag source={i.source} name={i.interviewer} />
+      </td>
+      <td className="px-3 py-2 whitespace-nowrap">
+        <LevelTag level={i.difficulty} />
+        <span className="ml-1.5 text-xs text-muted-foreground">{i.durationMin} min</span>
+      </td>
+      <td className="px-3 py-2 text-xs whitespace-nowrap text-muted-foreground">{mounted ? shortDate(i.date) : " "}</td>
+      <td className="px-3 py-2">
+        <span className={cn("inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap", STATUS_TONE[i.status])}>{STATUS_TEXT[i.status]}</span>
       </td>
       <td className="px-3 py-1 text-right">
         <RowActions label={i.role}>
@@ -214,16 +346,10 @@ function HistoryRow({
               {i.status === "completed" ? "View report" : "View details"}
             </DropdownMenuItem>
           )}
-          {i.status === "interrupted" && (
-            <DropdownMenuItem onClick={() => onOpen(`/mock-interviews/ai/session/${i.id}`)}>
-              <PlayCircle className="size-4" aria-hidden />
-              Resume
-            </DropdownMenuItem>
-          )}
           {i.source === "ai" && (
             <DropdownMenuItem onClick={() => onOpen("/mock-interviews/ai/new")}>
               <RotateCcw className="size-4" aria-hidden />
-              Practice again
+              Book a similar one
             </DropdownMenuItem>
           )}
           <DropdownMenuItem onClick={onDelete} className="text-destructive">
