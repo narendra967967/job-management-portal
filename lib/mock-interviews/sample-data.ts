@@ -121,14 +121,39 @@ export interface ChatMessage {
   text: string;
   /** The planned question this message opens (shown as "Question n"). */
   questionNo?: number;
+  /** Seconds into the interview when it was sent. */
+  at?: number;
 }
 
+/** The session the interview screen shows (R1.5: from the session row). */
+export const SAMPLE_SESSION = {
+  role: "Technical Project Manager",
+  category: "Project management",
+  difficulty: "Medium",
+  durationMin: 30,
+  /** Topics the candidate asked for, and the planned question that covers each. */
+  topics: [
+    { name: "Risk management", question: 1 },
+    { name: "Stakeholder management", question: 2 },
+    { name: "Estimation", question: 3 },
+    { name: "Agile and Scrum", question: 5 },
+  ],
+};
+
+/** One tip per planned question, shown beside the conversation. */
+export const SAMPLE_TIPS = [
+  "Lead with the outcome, then explain how you got there.",
+  "Name the trigger: what date or signal made you act, and who you told.",
+  "Give a range, not one date, and say what would narrow it.",
+  "Use one real example. Situation, what you did, and the result.",
+];
+
 export const SAMPLE_CHAT: ChatMessage[] = [
-  { id: "m1", from: "ai", questionNo: 1, text: "Thanks for joining. Let's start with an overview: tell me about a project you led from start to finish, and what it delivered." },
-  { id: "m2", from: "you", text: "I led the migration of our payments service to a new provider. Eight engineers, five months. We cut transaction costs by about 18% and had no downtime during the switch." },
-  { id: "m3", from: "ai", text: "What was the biggest risk in that migration, and how did you handle it?" },
-  { id: "m4", from: "you", text: "Double charging during the cutover. We ran both providers in parallel for two weeks with a reconciliation job and a kill switch." },
-  { id: "m5", from: "ai", questionNo: 2, text: "Good. Next one: how do you decide when to escalate a delayed dependency from another team?" },
+  { id: "m1", from: "ai", questionNo: 1, at: 5, text: "Thanks for joining. Let's start with an overview: tell me about a project you led from start to finish, and what it delivered." },
+  { id: "m2", from: "you", at: 78, text: "I led the migration of our payments service to a new provider. Eight engineers, five months. We cut transaction costs by about 18% and had no downtime during the switch." },
+  { id: "m3", from: "ai", at: 84, text: "What was the biggest risk in that migration, and how did you handle it?" },
+  { id: "m4", from: "you", at: 161, text: "Double charging during the cutover. We ran both providers in parallel for two weeks with a reconciliation job and a kill switch." },
+  { id: "m5", from: "ai", questionNo: 2, at: 168, text: "Good. Next one: how do you decide when to escalate a delayed dependency from another team?" },
 ];
 
 /** Canned follow-ups the sample interviewer cycles through when you answer. */

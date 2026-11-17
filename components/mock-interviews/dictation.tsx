@@ -166,7 +166,7 @@ export function DictationButton({
       title={listening ? "Stop speaking" : "Speak your answer"}
       className={cn(
         "relative inline-flex size-11 shrink-0 items-center justify-center rounded-lg border transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-50 sm:size-9",
-        listening ? "border-rose-300 bg-rose-50 text-rose-700" : "bg-white/60 text-muted-foreground hover:text-foreground",
+        listening ? "border-rose-500 bg-rose-500 text-white shadow-sm" : "border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-100",
       )}
     >
       {listening ? <MicOff className="size-4" aria-hidden /> : <Mic className="size-4" aria-hidden />}
