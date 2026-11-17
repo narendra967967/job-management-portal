@@ -2,10 +2,11 @@ import Link from "next/link";
 import { FlaskConical } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// PHASE R1.2: marks a screen running on sample data, with optional links that
-// preview its other states. Removed with the sample data in R1.4.
+// Marks the interview screen while it runs on the stand-in interviewer
+// (lib/mock-interviews/standin.ts), with links that preview its other states.
+// Removed in R1.5 with the stand-in.
 
-export function SampleBanner({ previews, className }: { previews?: { label: string; href: string; active?: boolean }[]; className?: string }) {
+export function StandInBanner({ previews, className }: { previews?: { label: string; href: string; active?: boolean }[]; className?: string }) {
   return (
     <div
       role="note"
@@ -16,7 +17,7 @@ export function SampleBanner({ previews, className }: { previews?: { label: stri
     >
       <span className="flex items-center gap-1.5 font-medium">
         <FlaskConical className="size-3.5" aria-hidden />
-        Sample data: nothing here is saved yet
+        Practice run: the AI interviewer isn&apos;t connected yet, and answers aren&apos;t saved
       </span>
       {previews && previews.length > 0 && (
         <span className="flex flex-wrap items-center gap-1">

@@ -56,6 +56,8 @@ export interface Plan {
   /** Premium: AI salary insight per job. */
   allowSalaryInsight: boolean;
   allowAtsCheck: boolean;
+  /** AI mock interviews each plan period (Free: once ever). */
+  aiInterviewsIncluded: number;
   limitActiveLeads: number | null;
   limitAiAddMonthly: number | null;
   allowAiDrafts: boolean;

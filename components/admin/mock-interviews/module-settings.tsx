@@ -1,11 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import {
   Bot,
   CalendarClock,
-  FlaskConical,
   IndianRupee,
   KeyRound,
   ListChecks,
@@ -23,13 +22,27 @@ import { ConfirmDialog } from "@/components/admin/ui/confirm-dialog";
 import { toast } from "@/components/admin/ui/toast";
 import { Field, SubHead, Toggle, selectCls } from "@/components/admin/settings/form-bits";
 import { InfoTip } from "@/components/ui/info-tip";
-import { PROMPT_PLACEHOLDERS, SAMPLE_MODULE_SETTINGS, type ModuleSettings, type PartState } from "@/lib/mock-interviews/admin-sample";
-import { AI_DURATIONS, DIFFICULTIES, METRICS, aiInterviewQuote, overallScore, plannedQuestions, rupees, type Difficulty, type MetricKey } from "@/lib/mock-interviews/model";
+import { saveModuleSettingsAction } from "@/actions/admin-mock-interviews";
+import {
+  AI_DURATIONS,
+  DEFAULT_PROMPTS,
+  DIFFICULTIES,
+  METRICS,
+  PROMPT_PLACEHOLDERS,
+  aiInterviewQuote,
+  overallScore,
+  plannedQuestions,
+  rupees,
+  type Difficulty,
+  type MetricKey,
+  type ModuleSettings,
+  type PartState,
+} from "@/lib/mock-interviews/model";
 import { cn } from "@/lib/utils";
 
 // Admin → Mock interviews → Module settings (docs/interview-prep/spec.md section
-// 4). R1.3: sample data; saving shows a notice. R1.4 stores it, and every
-// booking or session keeps a copy of the settings it was made under (D36).
+// 4). Each section saves on its own; every booking keeps a copy of the settings
+// it was made under (D36), so a change here never alters past bookings.
 
 type SectionId = "availability" | "ai" | "rules" | "pricing" | "bookings" | "scoring" | "prompts";
 const SECTIONS: { id: SectionId; label: string; icon: LucideIcon }[] = [
@@ -46,16 +59,11 @@ const cardCls = "rounded-2xl border bg-card p-4 md:p-5";
 const textareaCls =
   "min-h-32 w-full rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm leading-relaxed outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50";
 
-function sampleSaved() {
-  toast.info("Sample: not saved yet", "Settings are stored from the next phase (R1.4).");
-}
-
-export function ModuleSettings() {
-  const params = useSearchParams();
+export function ModuleSettingsClient({ initial, section }: { initial: ModuleSettings; section?: string }) {
   const router = useRouter();
-  const fromUrl = params.get("section") as SectionId | null;
+  const fromUrl = (section ?? null) as SectionId | null;
   const [active, setActive] = useState<SectionId>(SECTIONS.some((s) => s.id === fromUrl) ? (fromUrl as SectionId) : "availability");
-  const [s, setS] = useState<ModuleSettings>(SAMPLE_MODULE_SETTINGS);
+  const [s, setS] = useState<ModuleSettings>(initial);
   const set = <K extends keyof ModuleSettings>(k: K, v: ModuleSettings[K]) => setS((cur) => ({ ...cur, [k]: v }));
 
   function pick(id: SectionId) {
@@ -67,10 +75,6 @@ export function ModuleSettings() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-4">
-      <p className="flex items-center gap-1.5 rounded-lg border border-dashed border-amber-400/70 bg-amber-50/80 px-3 py-2 text-xs font-medium text-amber-900">
-        <FlaskConical className="size-3.5" aria-hidden />
-        Sample settings: nothing here is saved yet
-      </p>
       <div className="lg:flex lg:gap-6">
         <nav aria-label="Settings sections" className="-mx-4 flex gap-1 overflow-x-auto px-4 pb-1 lg:mx-0 lg:block lg:w-52 lg:shrink-0 lg:space-y-1 lg:px-0">
           {SECTIONS.map(({ id, label, icon: Icon }) => (
@@ -105,11 +109,28 @@ export function ModuleSettings() {
 
 type SectionProps = { s: ModuleSettings; set: <K extends keyof ModuleSettings>(k: K, v: ModuleSettings[K]) => void };
 
-function Save({ error, onSave }: { error?: string; onSave?: () => void }) {
+/** Saves one section; the action validates again and keeps the other sections. */
+function Save({ error, payload, onSaved }: { error?: string; payload: () => Record<string, unknown> & { section: SectionId }; onSaved?: (r: { keyLast4?: string | null }) => void }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  async function save() {
+    setBusy(true);
+    try {
+      const r = await saveModuleSettingsAction(payload());
+      if (!r.ok) return toast.error("Not saved", r.error);
+      toast.success("Settings saved");
+      onSaved?.(r);
+      router.refresh();
+    } catch {
+      toast.error("Not saved", "Something went wrong. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
   return (
     <div className="mt-5 flex flex-wrap items-center gap-3">
-      <Button onClick={onSave ?? sampleSaved} disabled={!!error}>
-        Save changes
+      <Button onClick={save} disabled={!!error || busy}>
+        {busy ? "Saving…" : "Save changes"}
       </Button>
       {error && (
         <p className="text-xs text-destructive" role="alert">
@@ -179,14 +200,14 @@ function Availability({ s, set }: SectionProps) {
         <Toggle checked={s.applicationsOpen} onChange={(v) => set("applicationsOpen", v)} label="Accept new interviewer applications" />
         <Toggle checked={s.pauseBookings} onChange={(v) => set("pauseBookings", v)} label="Pause new bookings" />
       </div>
-      <Save />
+      <Save payload={() => ({ section: "availability", aiState: s.aiState, humanState: s.humanState, applicationsOpen: s.applicationsOpen, pauseBookings: s.pauseBookings })} />
       <ConfirmDialog
         open={confirm !== null}
         onOpenChange={(o) => !o && setConfirm(null)}
         title={confirm === "open" ? "Open AI interviews to candidates?" : "Switch AI interviews to Coming soon?"}
         description={
           confirm === "open"
-            ? "Candidates can book and start AI interviews straight away."
+            ? "Candidates can book and start AI interviews right away."
             : "Candidates can't book new AI interviews. Existing bookings stay, and can still be started."
         }
         confirmLabel={confirm === "open" ? "Open" : "Switch to Coming soon"}
@@ -235,7 +256,7 @@ function AiService({ s, set }: SectionProps) {
       </div>
       {keyError && <p className="mt-2 text-xs text-destructive">{keyError}</p>}
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        <Button variant="outline" onClick={() => toast.info("Sample: Test connection", "R1.5 sends a tiny request with this key and reports back.")}>
+        <Button variant="outline" onClick={() => toast.info("Test connection comes with the interviewer", "It sends a tiny request with the saved key once interviews are wired up (roadmap R1.5).")}>
           <Wand2 className="size-4" aria-hidden />
           Test connection
         </Button>
@@ -243,7 +264,14 @@ function AiService({ s, set }: SectionProps) {
           Used only for mock interviews, separate from users&apos; own keys and the knowledge base key, so its usage and cost are tracked on their own. Stored encrypted and never shown again.
         </InfoTip>
       </div>
-      <Save error={keyError} />
+      <Save
+        error={keyError}
+        payload={() => ({ section: "ai", provider: s.provider, model: s.model, key })}
+        onSaved={(r) => {
+          setKey("");
+          if (r.keyLast4 !== undefined) set("keyLast4", r.keyLast4);
+        }}
+      />
     </section>
   );
 }
@@ -372,7 +400,18 @@ function Rules({ s, set }: SectionProps) {
         <NumberField label="Resume window" value={s.resumeWindowMinutes} onChange={(v) => set("resumeWindowMinutes", v)} min={5} max={60} suffix="min" hint="After a disconnection" />
         <NumberField label="Pace grace period" value={s.paceGraceMinutes} onChange={(v) => set("paceGraceMinutes", v)} min={0} max={15} suffix="min" hint="Before the pace meter judges" />
       </div>
-      <Save error={error} />
+      <Save
+        error={error}
+        payload={() => ({
+          section: "rules",
+          categories: s.categories,
+          durations: s.durations,
+          minutesPerQuestion: s.minutesPerQuestion,
+          wrapUpMinutes: s.wrapUpMinutes,
+          resumeWindowMinutes: s.resumeWindowMinutes,
+          paceGraceMinutes: s.paceGraceMinutes,
+        })}
+      />
     </section>
   );
 }
@@ -461,7 +500,7 @@ function Pricing({ s, set }: SectionProps) {
           );
         })}
       </div>
-      <Save error={errors[0]} />
+      <Save error={errors[0]} payload={() => ({ section: "pricing", pricing: s.pricing })} />
     </section>
   );
 }
@@ -482,7 +521,7 @@ function Bookings({ s, set }: SectionProps) {
         <NumberField label="A booking is valid for" value={s.bookingValidDays} onChange={(v) => set("bookingValidDays", v)} min={1} max={365} suffix="days" />
         <NumberField label="Expiry reminder" value={s.expiryReminderDays} onChange={(v) => set("expiryReminderDays", v)} min={0} max={30} suffix="days before" hint="0 sends no reminder" />
       </div>
-      <Save error={error} />
+      <Save error={error} payload={() => ({ section: "bookings", bookingValidDays: s.bookingValidDays, expiryReminderDays: s.expiryReminderDays })} />
     </section>
   );
 }
@@ -536,7 +575,7 @@ function Scoring({ s, set }: SectionProps) {
           </span>
         )}
       </div>
-      <Save error={error} />
+      <Save error={error} payload={() => ({ section: "scoring", weights: s.weights })} />
     </section>
   );
 }
@@ -569,7 +608,7 @@ function Prompts({ s, set }: SectionProps) {
               <span>{s.prompts[key].length}/4000</span>
               <button
                 type="button"
-                onClick={() => set("prompts", { ...s.prompts, [key]: SAMPLE_MODULE_SETTINGS.prompts[key] })}
+                onClick={() => set("prompts", { ...s.prompts, [key]: DEFAULT_PROMPTS[key] })}
                 className="min-h-11 text-primary hover:underline sm:min-h-0"
               >
                 Reset to default
@@ -578,7 +617,7 @@ function Prompts({ s, set }: SectionProps) {
           </Field>
         ))}
       </div>
-      <Save error={error} />
+      <Save error={error} payload={() => ({ section: "prompts", ...s.prompts })} />
     </section>
   );
 }

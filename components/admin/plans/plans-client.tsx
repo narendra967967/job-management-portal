@@ -280,6 +280,9 @@ function PlanCard({
             ATS check: <span className="font-medium text-foreground">{plan.allowAtsCheck ? "Yes" : "No"}</span>
           </span>
           <span>
+            AI interviews: <span className="font-medium text-foreground">{plan.aiInterviewsIncluded}</span>
+          </span>
+          <span>
             Active leads: <span className="font-medium text-foreground">{plan.limitActiveLeads === null ? "Unlimited" : plan.limitActiveLeads}</span>
           </span>
           <span>

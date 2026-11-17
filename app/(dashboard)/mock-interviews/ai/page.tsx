@@ -1,18 +1,17 @@
 import type { Metadata } from "next";
 import { AiComingSoon } from "@/components/mock-interviews/coming-soon";
 import { AiHome } from "@/components/mock-interviews/ai-home";
-import { SHOW_SAMPLE_SCREENS } from "@/lib/mock-interviews/preview";
-import { SAMPLE_ALLOWANCES } from "@/lib/mock-interviews/sample-data";
+import { getCurrentUserId } from "@/lib/current-user";
+import { aiInterviewsOpen, getModuleSettings } from "@/lib/mock-interviews/config";
+import { getAllowance, listBookings } from "@/lib/mock-interviews/data";
 
 export const metadata: Metadata = { title: "AI mock interviews" };
+export const dynamic = "force-dynamic";
 
-export default async function AiMockInterviewsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ allowance?: string; booked?: string }>;
-}) {
-  if (!SHOW_SAMPLE_SCREENS) return <AiComingSoon />;
-  const sp = await searchParams;
-  const allowanceKey = sp.allowance && sp.allowance in SAMPLE_ALLOWANCES ? sp.allowance : "plan";
-  return <AiHome allowance={SAMPLE_ALLOWANCES[allowanceKey]} allowanceKey={allowanceKey} bookedId={sp.booked} />;
+export default async function AiMockInterviewsPage({ searchParams }: { searchParams: Promise<{ booked?: string }> }) {
+  const settings = await getModuleSettings();
+  if (!aiInterviewsOpen(settings)) return <AiComingSoon />;
+  const userId = await getCurrentUserId();
+  const [allowance, bookings, sp] = await Promise.all([getAllowance(userId), listBookings(userId), searchParams]);
+  return <AiHome allowance={allowance} bookings={bookings} pricing={settings.pricing} bookedId={sp.booked} />;
 }

@@ -28,7 +28,9 @@ A plan someone is on can't be deactivated, the default plan can't be deleted, an
 | AI reads alerts from sites without a built-in reader | AI reading of forwarded alerts |
 | Priority support | Marks the plan for priority support |
 
-Every AI feature also needs the user's own AI key. The plan decides whether a feature is allowed, and the key pays for it.
+Every AI feature also needs the user's own AI key. The plan decides whether a feature is allowed, and the key pays for it. AI mock interviews are the exception: they run on the module's own key (Mock interviews → Module settings).
+
+**AI mock interviews included** sets how many AI mock interviews the plan gives. On a paid plan they come with each purchase or renewal and don't carry over; on the Free plan it's once ever. Beyond that, interviews are paid per minute. See the AI mock interviews article.
 
 When a feature is off, users see it locked with "On higher plans" or "isn't on your plan". Messages never name a plan, because plan names can change in admin.
 

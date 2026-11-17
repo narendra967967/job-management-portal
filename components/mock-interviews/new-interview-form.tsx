@@ -24,6 +24,7 @@ import {
   Kanban,
   Loader2,
   Lock,
+  MessagesSquare,
   Network,
   Package,
   Rocket,
@@ -44,21 +45,20 @@ import { ChipInput } from "@/components/ui/chip-input";
 import { InfoTip } from "@/components/ui/info-tip";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/components/ui/toast";
-import { SampleBanner } from "@/components/mock-interviews/sample-banner";
 import { useLeadDetail, useLeads, useResumes } from "@/lib/mock-store";
-import { SAMPLE_BOOKINGS, SAMPLE_NEW_BOOKING_ID, SAMPLE_SETTINGS } from "@/lib/mock-interviews/sample-data";
+import { bookAiInterviewAction, updateAiBookingAction } from "@/actions/mock-interviews";
+import type { BookingSetup } from "@/lib/mock-interviews/data";
 import {
-  AI_DURATIONS,
   DIFFICULTIES,
   DISCUSSION_CATEGORIES,
   INDUSTRIES,
-  INTERVIEW_CATEGORIES,
   aiInterviewQuote,
   allowanceLeft,
   plannedQuestions,
   rupees,
   type AllowanceState,
   type Difficulty,
+  type PricingByDifficulty,
 } from "@/lib/mock-interviews/model";
 import { cn } from "@/lib/utils";
 import { scrollIntoMain } from "@/components/mock-interviews/scroll-into-main";
@@ -83,36 +83,49 @@ const DEFAULT_TOPICS = ["Past projects", "Strengths and weaknesses", "Why this r
 type ResumeMode = "saved" | "upload" | "paste";
 type JdMode = "lead" | "paste" | "general";
 
+export interface FormOptions {
+  categories: string[];
+  durations: number[];
+  minutesPerQuestion: number;
+  wrapUpMinutes: number;
+  pricing: PricingByDifficulty;
+}
+
 export function NewInterviewForm({
   allowance,
-  allowanceKey,
-  leadId,
-  editId,
+  options,
+  leadId: leadParam,
+  editing,
 }: {
   allowance: AllowanceState;
-  allowanceKey: string;
+  options: FormOptions;
   leadId?: string;
   /** Editing a booking before it starts: difficulty and length stay as booked (D13c). */
-  editId?: string;
+  editing?: BookingSetup;
 }) {
   const router = useRouter();
   const leads = useLeads();
   const resumes = useResumes();
+  const leadId = leadParam ?? editing?.leadId ?? undefined;
   const fromLead = leadId ? leads.find((l) => l.id === leadId) : undefined;
-  const editing = editId ? SAMPLE_BOOKINGS.find((b) => b.id === editId && b.status === "ready") : undefined;
 
   const [role, setRole] = useState(editing?.role ?? fromLead?.title ?? "");
   const [industry, setIndustry] = useState(editing?.industry ?? "");
   const [category, setCategory] = useState(editing?.category ?? "");
   const [difficulty, setDifficulty] = useState<Difficulty>(editing?.difficulty ?? "Medium");
-  const [duration, setDuration] = useState<number>(editing?.durationMin ?? 30);
-  const [resumeMode, setResumeMode] = useState<ResumeMode>(resumes.length ? "saved" : "upload");
-  const [resumeId, setResumeId] = useState(resumes.find((r) => r.isDefault)?.id ?? resumes[0]?.id ?? "");
+  const [duration, setDuration] = useState<number>(editing?.durationMin ?? (options.durations.includes(30) ? 30 : options.durations[0]));
+  // An uploaded file isn't kept, only its text, so editing shows that text.
+  const [resumeMode, setResumeMode] = useState<ResumeMode>(
+    editing ? (editing.resumeSource === "saved" ? "saved" : "paste") : resumes.length ? "saved" : "upload",
+  );
+  const [resumeId, setResumeId] = useState(editing?.resumeId ?? resumes.find((r) => r.isDefault)?.id ?? resumes[0]?.id ?? "");
   const [file, setFile] = useState<File | null>(null);
-  const [resumeText, setResumeText] = useState("");
-  const [jdMode, setJdMode] = useState<JdMode>(fromLead ? "lead" : "paste");
-  const [jdLeadId, setJdLeadId] = useState(fromLead?.id ?? "");
-  const [jdText, setJdText] = useState("");
+  const [resumeText, setResumeText] = useState(editing?.resumeText ?? "");
+  const [jdMode, setJdMode] = useState<JdMode>(
+    editing ? (editing.jobDescriptionSource === "none" ? "general" : editing.jobDescriptionSource) : fromLead ? "lead" : "paste",
+  );
+  const [jdLeadId, setJdLeadId] = useState(editing?.jobDescriptionSource === "lead" ? (editing.leadId ?? "") : (fromLead?.id ?? ""));
+  const [jdText, setJdText] = useState(editing?.jobDescription ?? "");
   const [topics, setTopics] = useState<string[]>(editing?.topics ?? []);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [starting, setStarting] = useState(false);
@@ -134,9 +147,9 @@ export function NewInterviewForm({
     [leads],
   );
 
-  const questions = plannedQuestions(duration, SAMPLE_SETTINGS.minutesPerQuestion);
+  const questions = plannedQuestions(duration, options.minutesPerQuestion);
   const left = allowanceLeft(allowance);
-  const pricing = SAMPLE_SETTINGS.pricing;
+  const pricing = options.pricing;
   const quote = aiInterviewQuote(duration, pricing[difficulty]);
   const price = quote.final;
   const included = left > 0;
@@ -151,7 +164,7 @@ export function NewInterviewForm({
     if (!category) e.category = "Pick the kind of interview.";
     if (resumeMode === "saved" && !resumeId) e.resume = "Pick a saved resume, or upload or paste one.";
     if (resumeMode === "upload") {
-      if (!file) e.resume = "Choose a PDF or Word file.";
+      if (!file) e.resume = "Choose a PDF or Word (.docx) file.";
       else if (file.size > LIMITS.fileMb * 1024 * 1024) e.resume = `The file is over ${LIMITS.fileMb} MB.`;
     }
     if (resumeMode === "paste" && resumeText.trim().length < LIMITS.minResume)
@@ -174,16 +187,52 @@ export function NewInterviewForm({
       scrollIntoMain(document.getElementById(`field-${first}`));
       return;
     }
+    void submit();
+  }
+
+  // Books (spending the allowance) or saves the edit, then lands on the
+  // bookings list with the booking highlighted (D13a). Paying for one outside
+  // the allowance arrives with R1.5.
+  async function submit() {
     setStarting(true);
-    // SAMPLE: R1.5 saves the setup; for a new booking it spends the allowance or
-    // opens Razorpay checkout, then lands on the bookings list (D13a).
-    if (editing) {
-      toast.success("Changes saved", "Your booking keeps its difficulty and length.");
-      setTimeout(() => router.push(`/mock-interviews/ai?allowance=${allowanceKey}`), 500);
-      return;
+    const form = new FormData();
+    form.set(
+      "setup",
+      JSON.stringify({
+        role: role.trim(),
+        industry,
+        category,
+        difficulty,
+        durationMin: duration,
+        topics,
+        leadId: leadId && fromLead ? leadId : null,
+        resumeMode,
+        resumeId: resumeMode === "saved" ? resumeId || null : null,
+        resumeText: resumeMode === "paste" ? resumeText : "",
+        jdMode,
+        jdLeadId: jdMode === "lead" ? jdLeadId || null : null,
+        jdText: jdMode === "paste" ? jdText : "",
+      }),
+    );
+    if (resumeMode === "upload" && file) form.set("file", file);
+    try {
+      const r = editing ? await updateAiBookingAction(editing.id, form) : await bookAiInterviewAction(form);
+      if (!r.ok) {
+        if (r.field) {
+          setErrors({ [r.field]: r.error });
+          scrollIntoMain(document.getElementById(`field-${r.field}`));
+        } else toast.error(editing ? "Not saved" : "Not booked", r.error);
+        setStarting(false);
+        return;
+      }
+      if (editing) {
+        toast.success("Changes saved", "Your booking keeps its difficulty and length.");
+        router.push("/mock-interviews/ai");
+      } else router.push(`/mock-interviews/ai?booked=${r.id}`);
+    } catch {
+      toast.error("Something went wrong", "Check your connection and try again.");
+      setStarting(false);
     }
-    if (!included) toast.info("Sample: payment happens here", `Razorpay checkout for ${rupees(price)} opens in the real version.`);
-    setTimeout(() => router.push(`/mock-interviews/ai?allowance=${allowanceKey}&booked=${SAMPLE_NEW_BOOKING_ID}`), 600);
   }
 
   // After the first Start, errors update as fields are fixed.
@@ -216,20 +265,12 @@ export function NewInterviewForm({
     job: !problems.resume && !problems.jd,
     topics: !problems.topics,
   };
-  const withLead = (k: string) => `/mock-interviews/ai/new?allowance=${k}${leadId ? `&lead=${leadId}` : ""}`;
   const startLabel = editing ? "Save changes" : included ? "Book interview" : `Pay ${rupees(price)} and book`;
 
   return (
     <div className="mx-auto max-w-6xl space-y-4 pb-20 lg:pb-0">
-      <SampleBanner
-        previews={[
-          { label: "Plan allowance", href: withLead("plan"), active: allowanceKey === "plan" },
-          { label: "Free plan", href: withLead("free"), active: allowanceKey === "free" },
-          { label: "Nothing included", href: withLead("none"), active: allowanceKey === "none" },
-        ]}
-      />
       <Link
-        href={`/mock-interviews/ai?allowance=${allowanceKey}`}
+        href="/mock-interviews/ai"
         className="inline-flex min-h-11 items-center gap-1 text-xs text-muted-foreground hover:text-foreground sm:min-h-0"
       >
         <ArrowLeft className="size-3.5" aria-hidden />
@@ -335,8 +376,8 @@ export function NewInterviewForm({
                   errors.category && "rounded-xl ring-2 ring-destructive/40 ring-offset-2",
                 )}
               >
-                {INTERVIEW_CATEGORIES.map((c) => {
-                  const Icon = CATEGORY_ICON[c];
+                {options.categories.map((c) => {
+                  const Icon = CATEGORY_ICON[c] ?? MessagesSquare;
                   const on = category === c;
                   return (
                     <button
@@ -361,7 +402,7 @@ export function NewInterviewForm({
                       </span>
                       <span className="min-w-0">
                         <span className={cn("block leading-tight", on && "font-semibold text-primary")}>{c}</span>
-                        {DISCUSSION_CATEGORIES.includes(c) && <span className="text-[10px] text-muted-foreground">Discussion</span>}
+                        {(DISCUSSION_CATEGORIES as readonly string[]).includes(c) && <span className="text-[10px] text-muted-foreground">Discussion</span>}
                       </span>
                     </button>
                   );
@@ -418,11 +459,11 @@ export function NewInterviewForm({
                 {editing && <LockedNote />}
                 <InfoTip label="About the length">
                   The interviewer plans its questions to fit the time you pick. If time runs out mid-answer, it takes up to{" "}
-                  {SAMPLE_SETTINGS.wrapUpMinutes} more minutes to wrap up.
+                  {options.wrapUpMinutes} more minutes to wrap up.
                 </InfoTip>
               </legend>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {AI_DURATIONS.map((m) => {
+                {options.durations.map((m) => {
                   const on = duration === m;
                   return (
                     <button
@@ -441,7 +482,7 @@ export function NewInterviewForm({
                         {m} min
                       </span>
                       <span className="text-[11px] text-muted-foreground">
-                        about {plannedQuestions(m, SAMPLE_SETTINGS.minutesPerQuestion)} questions
+                        about {plannedQuestions(m, options.minutesPerQuestion)} questions
                       </span>
                       {showPrices && (
                         <span className="text-[11px] font-semibold">{rupees(aiInterviewQuote(m, pricing[difficulty]).final)}</span>
@@ -498,7 +539,7 @@ export function NewInterviewForm({
                   <input
                     ref={fileRef}
                     type="file"
-                    accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                     className="sr-only"
                     onChange={(e) => setFile(e.target.files?.[0] ?? null)}
                   />
@@ -722,7 +763,8 @@ export function NewInterviewForm({
   );
 }
 
-const CATEGORY_ICON: Record<(typeof INTERVIEW_CATEGORIES)[number], LucideIcon> = {
+// Admin can add kinds of interview; those without an icon here get a speech bubble.
+const CATEGORY_ICON: Partial<Record<string, LucideIcon>> = {
   "HR interview": Users,
   "Technical interview": Cpu,
   "Behavioral interview": HeartHandshake,

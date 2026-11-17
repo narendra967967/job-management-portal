@@ -14,69 +14,69 @@ import {
   tableSelectCls,
   usePagination,
 } from "@/components/ui/data-table";
-import { SampleBanner } from "@/components/mock-interviews/sample-banner";
 import { LevelTag, ScoreRing, SourceTag, Sparkline, bandTone } from "@/components/mock-interviews/visual-kit";
-import { SAMPLE_INTERVIEWS, SAMPLE_SETTINGS, type SampleInterview, type SessionStatus } from "@/lib/mock-interviews/sample-data";
-import { overallScore, scoreBand, shortDate } from "@/lib/mock-interviews/model";
+import type { InterviewStatus, InterviewSummary } from "@/lib/mock-interviews/model";
+import { scoreBand, shortDate } from "@/lib/mock-interviews/model";
 import { useMounted } from "@/lib/use-mounted";
 import { cn } from "@/lib/utils";
 
 // Interview history (spec D49, D53): every AI and human interview, newest first,
 // with its score and report. Records can't be deleted (owner, November 17,
-// 2026), so there's no multi-select: nothing to do in bulk. R1.2: sample data.
+// 2026), so there's no multi-select: nothing to do in bulk.
 
-const STATUS_TEXT: Record<SessionStatus, string> = {
+const STATUS_TEXT: Record<InterviewStatus, string> = {
   completed: "Report ready",
   awaiting_report: "Waiting for evaluation",
   interrupted: "Stopped early",
   in_progress: "In progress",
+  failed: "Couldn't finish",
 };
-const STATUS_TONE: Record<SessionStatus, string> = {
+const STATUS_TONE: Record<InterviewStatus, string> = {
   completed: "bg-emerald-50 text-emerald-800",
   awaiting_report: "bg-amber-50 text-amber-800",
   interrupted: "bg-slate-100 text-slate-700",
   in_progress: "bg-sky-50 text-sky-800",
+  failed: "bg-rose-50 text-rose-800",
 };
 
 type TypeFilter = "all" | "ai" | "human";
-const W = SAMPLE_SETTINGS.weights;
-const scoreOf = (i: SampleInterview) => (i.scores ? overallScore(i.scores, W) : null);
+// Each report keeps the overall score its weights gave (weights can change later).
+const scoreOf = (i: InterviewSummary) => (i.scores ? (i.overall ?? null) : null);
 
-export function HistoryTable() {
+export function HistoryTable({ interviews }: { interviews: InterviewSummary[] }) {
   const mounted = useMounted();
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [type, setType] = useState<TypeFilter>("all");
-  const [status, setStatus] = useState<"all" | SessionStatus>("all");
+  const [status, setStatus] = useState<"all" | InterviewStatus>("all");
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return SAMPLE_INTERVIEWS.filter(
+    return interviews.filter(
       (i) =>
         (type === "all" || i.source === type) &&
         (status === "all" || i.status === status) &&
         (!q || `${i.role} ${i.category} ${i.industry} ${i.interviewer ?? ""}`.toLowerCase().includes(q)),
     );
-  }, [query, type, status]);
+  }, [interviews, query, type, status]);
 
   const paging = usePagination(rows, `${query}|${type}|${status}`);
 
-  const scored = [...SAMPLE_INTERVIEWS].filter((i) => i.scores).sort((a, b) => a.date.localeCompare(b.date));
+  const scored = [...interviews].filter((i) => i.scores).sort((a, b) => a.date.localeCompare(b.date));
   const recent = scored.slice(-6);
   const scores = scored.map((i) => scoreOf(i)!);
   const avg = scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
   const best = scores.length ? Math.max(...scores) : 0;
   const counts = {
-    ai: SAMPLE_INTERVIEWS.filter((i) => i.source === "ai").length,
-    human: SAMPLE_INTERVIEWS.filter((i) => i.source === "human").length,
-    waiting: SAMPLE_INTERVIEWS.filter((i) => i.status === "awaiting_report").length,
-    ready: SAMPLE_INTERVIEWS.filter((i) => i.status === "completed").length,
+    ai: interviews.filter((i) => i.source === "ai").length,
+    human: interviews.filter((i) => i.source === "human").length,
+    waiting: interviews.filter((i) => i.status === "awaiting_report").length,
+    ready: interviews.filter((i) => i.status === "completed").length,
   };
 
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
-      <SampleBanner />
 
       {/* Hero: your record at a glance */}
       <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
@@ -146,9 +146,9 @@ export function HistoryTable() {
             <option value="ai">AI</option>
             <option value="human">With an interviewer</option>
           </select>
-          <select aria-label="Status" className={cn(tableSelectCls, "h-11 sm:h-9")} value={status} onChange={(e) => setStatus(e.target.value as "all" | SessionStatus)}>
+          <select aria-label="Status" className={cn(tableSelectCls, "h-11 sm:h-9")} value={status} onChange={(e) => setStatus(e.target.value as "all" | InterviewStatus)}>
             <option value="all">All statuses</option>
-            {(Object.keys(STATUS_TEXT) as SessionStatus[]).map((s) => (
+            {(Object.keys(STATUS_TEXT) as InterviewStatus[]).map((s) => (
               <option key={s} value={s}>
                 {STATUS_TEXT[s]}
               </option>
@@ -159,8 +159,8 @@ export function HistoryTable() {
         {rows.length === 0 ? (
           <div className="rounded-xl border border-dashed p-8 text-center">
             <Clock3 className="mx-auto size-9 text-primary/60" aria-hidden />
-            <p className="mt-2 font-medium">{SAMPLE_INTERVIEWS.length === 0 ? "No interviews yet" : "No interviews match these filters"}</p>
-            {SAMPLE_INTERVIEWS.length === 0 && (
+            <p className="mt-2 font-medium">{interviews.length === 0 ? "No interviews yet" : "No interviews match these filters"}</p>
+            {interviews.length === 0 && (
               <Link href="/mock-interviews/ai" className={cn(buttonVariants({ size: "lg" }), "mt-4")}>
                 Book your first interview
               </Link>
@@ -247,7 +247,7 @@ function HistoryRow({
   mounted,
   onOpen,
 }: {
-  i: SampleInterview;
+  i: InterviewSummary;
   mounted: boolean;
   onOpen: (href: string) => void;
 }) {
@@ -266,6 +266,8 @@ function HistoryRow({
             <Hourglass className="size-4" aria-hidden />
             Waiting
           </Link>
+        ) : i.status === "failed" ? (
+          <span className="block text-center text-xs text-muted-foreground">Couldn&apos;t finish</span>
         ) : (
           <Link href={`/mock-interviews/ai/prepare/${i.id}`} className={cn(buttonVariants(), "w-full bg-amber-500 text-white hover:bg-amber-600")}>
             <PlayCircle className="size-4" aria-hidden />

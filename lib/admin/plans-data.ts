@@ -39,6 +39,7 @@ export async function loadPlans(): Promise<Plan[]> {
     allowNotes: r.allowNotes,
     allowSalaryInsight: r.allowSalaryInsight,
     allowAtsCheck: r.allowAtsCheck,
+    aiInterviewsIncluded: r.aiInterviewsIncluded,
     limitActiveLeads: r.limitActiveLeads,
     limitAiAddMonthly: r.limitAiAddMonthly,
     allowAiDrafts: r.allowAiDrafts,

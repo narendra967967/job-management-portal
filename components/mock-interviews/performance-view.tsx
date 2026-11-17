@@ -19,22 +19,21 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
-import { SampleBanner } from "@/components/mock-interviews/sample-banner";
 import { ScoreTrendChart, SeriesDot, type TrendPoint } from "@/components/mock-interviews/score-trend-chart";
 import { ScoreRing, SourceTag, Sparkline, bandTone } from "@/components/mock-interviews/visual-kit";
-import { SAMPLE_INTERVIEWS, SAMPLE_SETTINGS, type SampleInterview } from "@/lib/mock-interviews/sample-data";
-import { METRICS, overallScore, scoreBand, shortDate, type MetricKey } from "@/lib/mock-interviews/model";
+import type { InterviewSummary } from "@/lib/mock-interviews/model";
+import { METRICS, scoreBand, shortDate, type MetricKey } from "@/lib/mock-interviews/model";
 import { useMounted } from "@/lib/use-mounted";
 import { cn } from "@/lib/utils";
 
 // Performance (spec D53): where the candidate stands and how each skill is moving,
-// across AI and interviewer results (labeled by source). R1.2: sample data.
+// across AI and interviewer results (labeled by source).
 
 type Source = "all" | "ai" | "human";
 type Measure = "overall" | MetricKey;
 
-const W = SAMPLE_SETTINGS.weights;
-const overallOf = (i: SampleInterview) => overallScore(i.scores!, W);
+// The overall score each report gave, with the weights in force then.
+const overallOf = (i: InterviewSummary) => i.overall ?? 0;
 const METRIC_ICON: Record<MetricKey, LucideIcon> = {
   communication: MessageCircle,
   technical: Wrench,
@@ -43,17 +42,17 @@ const METRIC_ICON: Record<MetricKey, LucideIcon> = {
   relevance: Target,
 };
 
-export function PerformanceView() {
+export function PerformanceView({ interviews }: { interviews: InterviewSummary[] }) {
   const mounted = useMounted();
   const [source, setSource] = useState<Source>("all");
   const [measure, setMeasure] = useState<Measure>("overall");
   const [asTable, setAsTable] = useState(false);
 
   const scored = useMemo(
-    () => SAMPLE_INTERVIEWS.filter((i) => i.scores && (source === "all" || i.source === source)).sort((a, b) => a.date.localeCompare(b.date)),
-    [source],
+    () => interviews.filter((i) => i.scores && (source === "all" || i.source === source)).sort((a, b) => a.date.localeCompare(b.date)),
+    [interviews, source],
   );
-  const valueOf = (i: SampleInterview) => (measure === "overall" ? overallOf(i) : i.scores![measure]);
+  const valueOf = (i: InterviewSummary) => (measure === "overall" ? overallOf(i) : i.scores![measure]);
   const points: TrendPoint[] = scored.map((i) => ({
     id: i.id,
     date: i.date,
@@ -66,7 +65,7 @@ export function PerformanceView() {
   // "Lately" = the last 5 scored interviews in view; "before" = the 5 before them.
   const recent = scored.slice(-5);
   const before = scored.slice(-10, -5);
-  const avgOf = (list: SampleInterview[], k: MetricKey) => (list.length ? list.reduce((s, i) => s + i.scores![k], 0) / list.length : null);
+  const avgOf = (list: InterviewSummary[], k: MetricKey) => (list.length ? list.reduce((s, i) => s + i.scores![k], 0) / list.length : null);
   const ranked = [...METRICS].sort((a, b) => (avgOf(recent, b.key) ?? 0) - (avgOf(recent, a.key) ?? 0));
   const latest = scored[scored.length - 1];
   const first = scored[0];
@@ -77,7 +76,6 @@ export function PerformanceView() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
-      <SampleBanner />
 
       {scored.length === 0 || !latest ? (
         <>
@@ -347,7 +345,7 @@ function InterviewCard({
   title: string;
   icon: LucideIcon;
   tone: string;
-  i: SampleInterview;
+  i: InterviewSummary;
   mounted: boolean;
 }) {
   const overall = overallOf(i);

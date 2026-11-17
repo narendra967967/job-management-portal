@@ -7,6 +7,7 @@ import { and, inArray, isNull, lt, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   actionCodes,
+  aiInterviewEvents,
   broadcastRecipients,
   gmailIngestErrors,
   gmailProcessedMessages,
@@ -89,6 +90,9 @@ export async function runRetention(): Promise<Record<RetentionKey, number>> {
     ),
     sentEmailLogDays: await removed(
       db.delete(sentEmailLog).where(lt(sentEmailLog.sentAt, cutoff(c.sentEmailLogDays))).returning({ id: sentEmailLog.id }),
+    ),
+    aiInterviewEventDays: await removed(
+      db.delete(aiInterviewEvents).where(lt(aiInterviewEvents.createdAt, cutoff(c.aiInterviewEventDays))).returning({ id: aiInterviewEvents.id }),
     ),
   };
 }

@@ -4,11 +4,9 @@
 // its event log, and credits (D13, D55). Follows the admin table rule: last 7
 // days by default with required dates, stat boxes that filter, multi-select
 // with CSV export, an Action column and pagination.
-// PHASE R1.3: sample sessions from lib/mock-interviews/admin-sample.ts; R1.4
-// reads the real ones and R1.5 records the real event log.
 
 import { useEffect, useMemo, useState } from "react";
-import { Download, Eye, FlaskConical, Gift, Search, User } from "lucide-react";
+import { Download, Eye, Gift, Loader2, Search, User } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/admin/ui/badge";
 import { Button } from "@/components/admin/ui/button";
@@ -34,7 +32,8 @@ import {
   ymd,
 } from "@/components/admin/ui/data-table";
 import { InfoTip } from "@/components/ui/info-tip";
-import { SAMPLE_SESSIONS, sampleEvents, type AdminSession, type AdminSessionStatus, type SessionEvent } from "@/lib/mock-interviews/admin-sample";
+import { creditAiInterviewAction, getAiInterviewEventsAction } from "@/actions/admin-mock-interviews";
+import { clockLabel, type AdminSession, type AdminSessionStatus, type SessionEvent } from "@/lib/mock-interviews/admin-model";
 import { DIFFICULTIES, rupees, type Difficulty } from "@/lib/mock-interviews/model";
 import { cn, formatDateTime } from "@/lib/utils";
 import { useMounted } from "@/lib/use-mounted";
@@ -47,9 +46,9 @@ const STATUS: Record<AdminSessionStatus, { label: string; variant: "success" | "
 };
 const STATUSES = Object.keys(STATUS) as AdminSessionStatus[];
 type PayKind = AdminSession["payment"]["kind"];
-const PAY_LABEL: Record<PayKind, string> = { paid: "Paid", plan: "Plan", free: "Free trial" };
+const PAY_LABEL: Record<PayKind, string> = { paid: "Paid", plan: "Plan", free: "Free trial", credit: "Given back" };
 
-const EVENT_DOT: Record<SessionEvent["kind"], string> = {
+const EVENT_DOT: Record<string, string> = {
   start: "bg-primary",
   question: "bg-sky-500",
   answer: "bg-emerald-500",
@@ -79,10 +78,11 @@ function downloadCsv(name: string, header: string[], lines: string[][]) {
   URL.revokeObjectURL(a.href);
 }
 
-export function AiInterviewsClient() {
+export function AiInterviewsClient({ rows: initialRows, capped }: { rows: AdminSession[]; capped?: boolean }) {
   const router = useRouter();
   const mounted = useMounted();
-  const [rows, setRows] = useState<AdminSession[]>(SAMPLE_SESSIONS);
+  const [rows, setRows] = useState<AdminSession[]>(initialRows);
+  useEffect(() => setRows(initialRows), [initialRows]);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<"all" | AdminSessionStatus>("all");
   const [level, setLevel] = useState<"all" | Difficulty>("all");
@@ -180,10 +180,11 @@ export function AiInterviewsClient() {
   return (
     <div className="space-y-4">
       <VizStyle />
-      <p className="flex items-center gap-1.5 rounded-lg border border-dashed border-amber-400/70 bg-amber-50/80 px-3 py-2 text-xs font-medium text-amber-900">
-        <FlaskConical className="size-3.5" aria-hidden />
-        Sample sessions: real ones appear once AI interviews are wired up
-      </p>
+      {capped && (
+        <p className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm">
+          Showing the newest {rows.length.toLocaleString("en-IN")} interviews. Older ones are kept but not listed here.
+        </p>
+      )}
 
       <div className="flex flex-wrap items-end gap-2">
         <div className="relative w-full sm:w-auto sm:max-w-xs sm:min-w-0 sm:flex-1">
@@ -343,9 +344,10 @@ export function AiInterviewsClient() {
         session={crediting}
         onClose={() => setCrediting(null)}
         onDone={(s, note) => {
-          setRows((cur) => cur.map((r) => (r.id === s.id ? { ...r, credited: { at: new Date().toISOString(), note } } : r)));
+          setRows((cur) => cur.map((r) => (r.id === s.id ? { ...r, credited: { note } } : r)));
           setCrediting(null);
-          toast.success("Interview given back", `Sample only: in R1.5 ${s.user.name} gets a new ${s.durationMin}-minute ${s.difficulty} booking at no charge.`);
+          toast.success("Interview given back", `${s.user.name} has a new ${s.durationMin}-minute ${s.difficulty} booking at no charge.`);
+          router.refresh();
         }}
       />
     </div>
@@ -376,6 +378,25 @@ function SessionDialog({
   onCredit: (s: AdminSession) => void;
 }) {
   const canCredit = s && !s.credited && (s.status === "stopped" || s.status === "failed");
+  // The event log loads when a session opens.
+  const [events, setEvents] = useState<SessionEvent[] | null>(null);
+  const [eventsError, setEventsError] = useState("");
+  useEffect(() => {
+    if (!s) return;
+    let live = true;
+    setEvents(null);
+    setEventsError("");
+    getAiInterviewEventsAction(s.id)
+      .then((r) => {
+        if (!live) return;
+        if (r.ok) setEvents(r.events);
+        else setEventsError(r.error);
+      })
+      .catch(() => live && setEventsError("Couldn't load the event log."));
+    return () => {
+      live = false;
+    };
+  }, [s]);
   return (
     <Dialog open={s !== null} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-xl">
@@ -417,15 +438,25 @@ function SessionDialog({
 
             <div>
               <h3 className="mb-2 text-sm font-semibold">Event log</h3>
-              <ol className="relative space-y-2.5 border-l border-border pl-4">
-                {sampleEvents(s).map((e, i) => (
-                  <li key={i} className="relative text-sm">
-                    <span className={cn("absolute top-1.5 -left-[21px] size-2.5 rounded-full ring-2 ring-card", EVENT_DOT[e.kind])} aria-hidden />
-                    <span className="mr-2 inline-block w-11 font-mono text-xs text-muted-foreground tabular-nums">{e.at}</span>
-                    <span className={cn(e.kind === "error" && "text-destructive", e.kind === "disconnect" && "text-amber-800")}>{e.text}</span>
-                  </li>
-                ))}
-              </ol>
+              {eventsError ? (
+                <p className="text-sm text-destructive">{eventsError}</p>
+              ) : events === null ? (
+                <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> Loading…
+                </p>
+              ) : events.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No events recorded.</p>
+              ) : (
+                <ol className="relative space-y-2.5 border-l border-border pl-4">
+                  {events.map((e, i) => (
+                    <li key={i} className="relative text-sm">
+                      <span className={cn("absolute top-1.5 -left-[21px] size-2.5 rounded-full ring-2 ring-card", EVENT_DOT[e.kind] ?? "bg-muted-foreground")} aria-hidden />
+                      <span className="mr-2 inline-block w-11 font-mono text-xs text-muted-foreground tabular-nums">{clockLabel(e.clockSeconds)}</span>
+                      <span className={cn(e.kind === "error" && "text-destructive", e.kind === "disconnect" && "text-amber-800")}>{e.text}</span>
+                    </li>
+                  ))}
+                </ol>
+              )}
             </div>
           </div>
         )}
@@ -444,10 +475,25 @@ function SessionDialog({
 function CreditDialog({ session: s, onClose, onDone }: { session: AdminSession | null; onClose: () => void; onDone: (s: AdminSession, note: string) => void }) {
   const [note, setNote] = useState("");
   const [tried, setTried] = useState(false);
+  const [busy, setBusy] = useState(false);
   useEffect(() => {
     setNote("");
     setTried(false);
   }, [s?.id]);
+  async function giveBack() {
+    setTried(true);
+    if (error || !s) return;
+    setBusy(true);
+    try {
+      const r = await creditAiInterviewAction({ id: s.id, note: note.trim() });
+      if (!r.ok) return toast.error("Not given back", r.error);
+      onDone(s, note.trim());
+    } catch {
+      toast.error("Not given back", "Something went wrong. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
   const error = note.trim().length < 10 ? "Write at least 10 characters on why." : "";
   return (
     <Dialog open={s !== null} onOpenChange={(o) => !o && onClose()}>
@@ -478,13 +524,8 @@ function CreditDialog({ session: s, onClose, onDone }: { session: AdminSession |
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button
-            onClick={() => {
-              setTried(true);
-              if (!error && s) onDone(s, note.trim());
-            }}
-          >
-            Give it back
+          <Button onClick={giveBack} disabled={busy}>
+            {busy ? "Giving back…" : "Give it back"}
           </Button>
         </DialogFooter>
       </DialogContent>

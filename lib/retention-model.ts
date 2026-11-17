@@ -11,7 +11,8 @@ export type RetentionKey =
   | "autoActionDays"
   | "kbConversationDays"
   | "broadcastQueueDays"
-  | "sentEmailLogDays";
+  | "sentEmailLogDays"
+  | "aiInterviewEventDays";
 
 export type RetentionConfig = Record<RetentionKey, number>;
 
@@ -88,6 +89,14 @@ export const RETENTION_TYPES: RetentionType[] = [
     min: 7,
     max: 365,
     default: 30,
+  },
+  {
+    key: "aiInterviewEventDays",
+    label: "AI interview event logs",
+    hint: "What happened during each mock interview (start, disconnects, errors), read before giving one back · the interview and its report stay",
+    min: 90,
+    max: 1095,
+    default: 365,
   },
   {
     key: "kbConversationDays",

@@ -25,14 +25,6 @@ import { Input } from "@/components/ui/input";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { toast } from "@/components/ui/toast";
 import { RowActions, TableBox, TablePagination, tableSelectCls, usePagination } from "@/components/ui/data-table";
-import { SampleBanner } from "@/components/mock-interviews/sample-banner";
-import {
-  SAMPLE_BOOKINGS,
-  SAMPLE_SETTINGS,
-  SAMPLE_TODAY,
-  type BookingStatus,
-  type SampleBooking,
-} from "@/lib/mock-interviews/sample-data";
 import {
   DIFFICULTIES,
   aiInterviewQuote,
@@ -42,7 +34,10 @@ import {
   rupees,
   shortDate,
   type AllowanceState,
+  type BookingRow,
+  type BookingStatus,
   type Difficulty,
+  type PricingByDifficulty,
 } from "@/lib/mock-interviews/model";
 import { useMounted } from "@/lib/use-mounted";
 import { LEVEL_TAG } from "@/components/mock-interviews/visual-kit";
@@ -50,7 +45,7 @@ import { cn } from "@/lib/utils";
 
 // AI mock interviews: the candidate's booked AI interviews (spec D13a to D13d).
 // Booking comes first, starting comes later: the New interview form books, then
-// redirects here with the new booking highlighted. R1.2: sample data.
+// redirects here with the new booking highlighted.
 
 const DAY = 86_400_000;
 const EXPIRING_DAYS = 7;
@@ -60,13 +55,14 @@ const STATUS: Record<BookingStatus, { label: string; cls: string }> = {
   in_progress: { label: "In progress", cls: "bg-sky-50 text-sky-800" },
   interrupted: { label: "Stopped early", cls: "bg-amber-50 text-amber-800" },
   completed: { label: "Completed", cls: "bg-emerald-50 text-emerald-800" },
+  failed: { label: "Couldn't finish", cls: "bg-rose-50 text-rose-800" },
   expired: { label: "Expired", cls: "bg-slate-100 text-slate-600" },
 };
 
 const LEVEL = LEVEL_TAG;
 
 type View = "todo" | "all" | "expiring" | "month" | BookingStatus;
-type PayFilter = "all" | "paid" | "plan" | "free";
+type PayFilter = "all" | "paid" | "plan" | "free" | "credit";
 
 const VIEW_LABEL: Record<View, string> = {
   todo: "To do",
@@ -75,44 +71,56 @@ const VIEW_LABEL: Record<View, string> = {
   in_progress: "In progress",
   interrupted: "Stopped early",
   completed: "Completed",
+  failed: "Couldn't finish",
   expired: "Expired",
   expiring: "Expiring soon",
   month: "Completed this month",
 };
 
 const todo = (s: BookingStatus) => s === "ready" || s === "in_progress" || s === "interrupted";
-const daysLeft = (b: SampleBooking) => Math.ceil((new Date(b.validUntil).getTime() - new Date(SAMPLE_TODAY).getTime()) / DAY);
-const expiring = (b: SampleBooking) => b.status === "ready" && daysLeft(b) <= EXPIRING_DAYS;
-const thisMonth = (b: SampleBooking) => b.status === "completed" && b.bookedAt.slice(0, 7) === SAMPLE_TODAY.slice(0, 7);
+const daysLeft = (b: BookingRow, now: number) => Math.ceil((new Date(b.validUntil).getTime() - now) / DAY);
+const expiring = (b: BookingRow, now: number) => b.status === "ready" && daysLeft(b, now) <= EXPIRING_DAYS;
+const thisMonth = (b: BookingRow, now: number) => b.status === "completed" && b.bookedAt.slice(0, 7) === new Date(now).toISOString().slice(0, 7);
 
-export function AiHome({ allowance, allowanceKey, bookedId }: { allowance: AllowanceState; allowanceKey: string; bookedId?: string }) {
+export function AiHome({
+  allowance,
+  bookings,
+  pricing,
+  bookedId,
+}: {
+  allowance: AllowanceState;
+  bookings: BookingRow[];
+  pricing: PricingByDifficulty;
+  bookedId?: string;
+}) {
   const mounted = useMounted();
   const router = useRouter();
+  const [now] = useState(() => Date.now());
   const [view, setView] = useState<View>("todo");
   const [query, setQuery] = useState("");
   const [pay, setPay] = useState<PayFilter>("all");
   const [level, setLevel] = useState<"all" | Difficulty>("all");
 
-  const booked = bookedId ? SAMPLE_BOOKINGS.find((b) => b.id === bookedId) : undefined;
+  const booked = bookedId ? bookings.find((b) => b.id === bookedId) : undefined;
   const counts = {
-    ready: SAMPLE_BOOKINGS.filter((b) => b.status === "ready").length,
-    progress: SAMPLE_BOOKINGS.filter((b) => b.status === "in_progress" || b.status === "interrupted").length,
-    expiring: SAMPLE_BOOKINGS.filter(expiring).length,
-    month: SAMPLE_BOOKINGS.filter(thisMonth).length,
+    ready: bookings.filter((b) => b.status === "ready").length,
+    progress: bookings.filter((b) => b.status === "in_progress" || b.status === "interrupted").length,
+    expiring: bookings.filter((b) => expiring(b, now)).length,
+    month: bookings.filter((b) => thisMonth(b, now)).length,
   };
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return SAMPLE_BOOKINGS.filter((b) => {
+    return bookings.filter((b) => {
       const inView =
         view === "all"
           ? true
           : view === "todo"
             ? todo(b.status)
             : view === "expiring"
-              ? expiring(b)
+              ? expiring(b, now)
               : view === "month"
-                ? thisMonth(b)
+                ? thisMonth(b, now)
                 : view === "in_progress"
                   ? b.status === "in_progress" || b.status === "interrupted"
                   : b.status === view;
@@ -123,22 +131,13 @@ export function AiHome({ allowance, allowanceKey, bookedId }: { allowance: Allow
         (!q || `${b.role} ${b.category} ${b.industry} ${b.topics.join(" ")}`.toLowerCase().includes(q))
       );
     });
-  }, [view, pay, level, query]);
+  }, [bookings, view, pay, level, query, now]);
   const paging = usePagination(rows, `${view}|${pay}|${level}|${query}`);
   const toggle = (v: View) => setView((cur) => (cur === v ? "todo" : v));
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
-      <SampleBanner
-        previews={[
-          { label: "Plan allowance", href: "/mock-interviews/ai?allowance=plan", active: allowanceKey === "plan" && !bookedId },
-          { label: "Free plan", href: "/mock-interviews/ai?allowance=free", active: allowanceKey === "free" },
-          { label: "Nothing included", href: "/mock-interviews/ai?allowance=none", active: allowanceKey === "none" },
-          { label: "Just booked", href: "/mock-interviews/ai?booked=bk-12", active: !!bookedId },
-        ]}
-      />
-
-      <Hero allowance={allowance} allowanceKey={allowanceKey} mounted={mounted} />
+      <Hero allowance={allowance} pricing={pricing} mounted={mounted} />
 
       {booked && (
         <section className="overflow-hidden rounded-2xl border border-emerald-200 bg-card shadow-sm" aria-label="Your new booking">
@@ -198,7 +197,7 @@ export function AiHome({ allowance, allowanceKey, bookedId }: { allowance: Allow
             <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search role, kind or topic" className="h-11 pl-9 sm:h-9" />
           </label>
           <select aria-label="Status" className={cn(tableSelectCls, "h-11 sm:h-9")} value={view} onChange={(e) => setView(e.target.value as View)}>
-            {(["todo", "all", "ready", "in_progress", "completed", "expired", "expiring"] as View[]).map((v) => (
+            {(["todo", "all", "ready", "in_progress", "completed", "failed", "expired", "expiring"] as View[]).map((v) => (
               <option key={v} value={v}>
                 {VIEW_LABEL[v]}
               </option>
@@ -209,6 +208,7 @@ export function AiHome({ allowance, allowanceKey, bookedId }: { allowance: Allow
             <option value="paid">Paid</option>
             <option value="plan">Included in plan</option>
             <option value="free">Free interview</option>
+            <option value="credit">Given back</option>
           </select>
           <select aria-label="Difficulty" className={cn(tableSelectCls, "h-11 sm:h-9")} value={level} onChange={(e) => setLevel(e.target.value as "all" | Difficulty)}>
             <option value="all">Any difficulty</option>
@@ -220,8 +220,8 @@ export function AiHome({ allowance, allowanceKey, bookedId }: { allowance: Allow
           </select>
         </div>
 
-        {SAMPLE_BOOKINGS.length === 0 ? (
-          <EmptyState allowanceKey={allowanceKey} />
+        {bookings.length === 0 ? (
+          <EmptyState />
         ) : rows.length === 0 ? (
           <p className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
             {view === "todo" ? "Nothing waiting. Book a new interview to keep practicing." : "No bookings match these filters."}
@@ -287,7 +287,7 @@ export function AiHome({ allowance, allowanceKey, bookedId }: { allowance: Allow
                         </DropdownMenuItem>
                       )}
                       {b.payment.kind === "paid" && (
-                        <DropdownMenuItem onClick={() => toast.info("Sample: the receipt opens here", "The same receipt email and download as plan payments.")}>
+                        <DropdownMenuItem onClick={() => toast.info("Receipt", "Receipts for paid interviews arrive with the next update.")}>
                           <Receipt className="size-4" aria-hidden />
                           View receipt
                         </DropdownMenuItem>
@@ -313,9 +313,9 @@ export function AiHome({ allowance, allowanceKey, bookedId }: { allowance: Allow
 
 /* ---------------- pieces ---------------- */
 
-function Hero({ allowance, allowanceKey, mounted }: { allowance: AllowanceState; allowanceKey: string; mounted: boolean }) {
-  const rate = rupees(lowestRatePerMinute(SAMPLE_SETTINGS.pricing));
-  const example = aiInterviewQuote(30, SAMPLE_SETTINGS.pricing.Medium).final;
+function Hero({ allowance, pricing, mounted }: { allowance: AllowanceState; pricing: PricingByDifficulty; mounted: boolean }) {
+  const rate = rupees(lowestRatePerMinute(pricing));
+  const example = aiInterviewQuote(30, pricing.Medium).final;
   const left = allowanceLeft(allowance);
   let headline: string;
   let note: string;
@@ -358,7 +358,7 @@ function Hero({ allowance, allowanceKey, mounted }: { allowance: AllowanceState;
             <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{note}</p>
           </div>
           <Link
-            href={`/mock-interviews/ai/new?allowance=${allowanceKey}`}
+            href="/mock-interviews/ai/new"
             className={cn(buttonVariants({ size: "lg" }), "shrink-0 bg-gradient-to-r from-primary to-violet-600 text-white shadow-sm hover:opacity-90")}
           >
             <Plus className="size-4" aria-hidden />
@@ -414,7 +414,7 @@ function Tile({
   );
 }
 
-function PrimaryAction({ b }: { b: SampleBooking }) {
+function PrimaryAction({ b }: { b: BookingRow }) {
   if (b.status === "ready")
     return (
       <Link
@@ -444,14 +444,16 @@ function PrimaryAction({ b }: { b: SampleBooking }) {
         View report
       </Link>
     );
-  return <span className="block text-center text-xs text-muted-foreground">Expired</span>;
+  const label = b.status === "completed" ? "Report on its way" : b.status === "failed" ? "Couldn't finish" : "Expired";
+  return <span className="block text-center text-xs text-muted-foreground">{label}</span>;
 }
 
-function PaidChip({ b }: { b: SampleBooking }) {
+function PaidChip({ b }: { b: BookingRow }) {
   const p = b.payment;
   if (p.kind === "plan")
     return <span className="inline-flex rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">Included · {p.planName}</span>;
   if (p.kind === "free") return <span className="inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">Free interview</span>;
+  if (p.kind === "credit") return <span className="inline-flex rounded-full bg-violet-50 px-2 py-0.5 text-[11px] font-semibold text-violet-800">Given back</span>;
   return (
     <span className="inline-flex items-center gap-1.5 text-sm font-semibold">
       {rupees(p.final)}
@@ -460,11 +462,11 @@ function PaidChip({ b }: { b: SampleBooking }) {
   );
 }
 
-function ValidUntil({ b, mounted }: { b: SampleBooking; mounted: boolean }) {
+function ValidUntil({ b, mounted }: { b: BookingRow; mounted: boolean }) {
   if (!mounted) return null;
   if (b.status === "expired") return <span className="text-muted-foreground">Expired {shortDate(b.validUntil)}</span>;
-  if (b.status === "completed") return <span className="text-muted-foreground">-</span>;
-  const d = daysLeft(b);
+  if (b.status === "completed" || b.status === "failed") return <span className="text-muted-foreground">-</span>;
+  const d = daysLeft(b, Date.now());
   return (
     <span className="inline-flex flex-col">
       <span>{shortDate(b.validUntil)}</span>
@@ -478,13 +480,13 @@ function ValidUntil({ b, mounted }: { b: SampleBooking; mounted: boolean }) {
   );
 }
 
-function EmptyState({ allowanceKey }: { allowanceKey: string }) {
+function EmptyState() {
   return (
     <div className="rounded-xl border border-dashed p-8 text-center">
       <Bot className="mx-auto size-10 text-primary/60" aria-hidden />
       <p className="mt-2 font-medium">No interviews booked yet</p>
       <p className="mt-1 text-sm text-muted-foreground">Book your first one and it&apos;ll wait here until you&apos;re ready.</p>
-      <Link href={`/mock-interviews/ai/new?allowance=${allowanceKey}`} className={cn(buttonVariants({ size: "lg" }), "mt-4")}>
+      <Link href="/mock-interviews/ai/new" className={cn(buttonVariants({ size: "lg" }), "mt-4")}>
         <Plus className="size-4" aria-hidden />
         New interview
       </Link>
@@ -494,7 +496,7 @@ function EmptyState({ allowanceKey }: { allowanceKey: string }) {
 
 function HowItWorks() {
   const steps = [
-    { icon: Plus, title: "Book", text: "Pick the role, kind of interview, difficulty and length. Included or paid, it's booked straight away." },
+    { icon: Plus, title: "Book", text: "Pick the role, kind of interview, difficulty and length. Included or paid, it's booked right away." },
     { icon: PlayCircle, title: "Start when ready", text: "Your booking waits here. Change the setup until you start; difficulty and length stay as booked." },
     { icon: FileText, title: "Read your report", text: "Scores for five skills, what went well, what to fix and better ways to answer." },
   ];

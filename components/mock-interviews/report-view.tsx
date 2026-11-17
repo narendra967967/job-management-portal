@@ -31,23 +31,18 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/toast";
-import { SampleBanner } from "@/components/mock-interviews/sample-banner";
-import {
-  SAMPLE_CHAT,
-  SAMPLE_INTERVIEWS,
-  SAMPLE_SETTINGS,
-  SAMPLE_WRITING,
-  type SampleInterview,
-} from "@/lib/mock-interviews/sample-data";
+import type { ReportData } from "@/lib/mock-interviews/data";
 import {
   METRICS,
   SOURCE_LABELS,
   longDate,
-  overallScore,
   scoreBand,
   shortDate,
+  type ChatMessage,
+  type InterviewSummary,
   type MetricScores,
   type ReportPoint,
+  type ReportWriting,
 } from "@/lib/mock-interviews/model";
 import { useMounted } from "@/lib/use-mounted";
 import { Sparkline, bandTone } from "@/components/mock-interviews/visual-kit";
@@ -55,7 +50,7 @@ import { cn } from "@/lib/utils";
 
 // One report layout for AI and interviewer evaluations (spec D49). Visual first:
 // the score, the skills chart, headlines and a table of the answers to work on.
-// Every full explanation is still here, one tap away in a pop-up. R1.2: sample data.
+// Every full explanation is still here, one tap away in a pop-up.
 
 type Modal = {
   title: string;
@@ -64,40 +59,21 @@ type Modal = {
 } | null;
 
 
-export function ReportView({ interview }: { interview: SampleInterview }) {
+export function ReportView({ report }: { report: ReportData }) {
   const mounted = useMounted();
   const [modal, setModal] = useState<Modal>(null);
+  const { interview, writing, messages } = report;
   const human = interview.source === "human";
-  const writing = SAMPLE_WRITING[interview.source];
 
   // Earlier scored interviews (any source), oldest first, for the comparisons.
-  const scored = SAMPLE_INTERVIEWS.filter(
-    (i) => i.scores && i.date <= interview.date,
-  ).sort((a, b) => a.date.localeCompare(b.date));
+  const scored = report.all
+    .filter((i) => i.scores && i.date <= interview.date)
+    .sort((a, b) => a.date.localeCompare(b.date));
   const previous = [...scored].reverse().find((i) => i.id !== interview.id);
   const recent = scored.slice(-6);
 
   return (
     <div className="mx-auto max-w-4xl space-y-4">
-      <SampleBanner
-        previews={[
-          {
-            label: "AI report",
-            href: "/mock-interviews/report/ai-8",
-            active: interview.id === "ai-8",
-          },
-          {
-            label: "Interviewer report",
-            href: "/mock-interviews/report/hu-1",
-            active: interview.id === "hu-1",
-          },
-          {
-            label: "Waiting for interviewer",
-            href: "/mock-interviews/report/hu-2",
-            active: interview.id === "hu-2",
-          },
-        ]}
-      />
       <Link
         href="/mock-interviews/history"
         className="inline-flex min-h-11 items-center gap-1 text-xs text-muted-foreground hover:text-foreground sm:min-h-0"
@@ -116,6 +92,7 @@ export function ReportView({ interview }: { interview: SampleInterview }) {
           <Hero
             interview={interview}
             scores={interview.scores}
+            overall={report.overall}
             previous={previous}
             recent={recent}
             mounted={mounted}
@@ -180,7 +157,7 @@ export function ReportView({ interview }: { interview: SampleInterview }) {
                   setModal({
                     title: "The full conversation",
                     description: `${interview.role} · ${interview.durationMin} min`,
-                    body: <Conversation />,
+                    body: <Conversation messages={messages} />,
                   })
                 }
               >
@@ -225,7 +202,7 @@ export function ReportView({ interview }: { interview: SampleInterview }) {
 
 /* ---------------- header pieces ---------------- */
 
-function SourceBadge({ interview }: { interview: SampleInterview }) {
+function SourceBadge({ interview }: { interview: InterviewSummary }) {
   const human = interview.source === "human";
   return (
     <span
@@ -251,7 +228,7 @@ function Header({
   interview,
   mounted,
 }: {
-  interview: SampleInterview;
+  interview: InterviewSummary;
   mounted: boolean;
 }) {
   return (
@@ -272,21 +249,21 @@ function Header({
 function Hero({
   interview,
   scores,
+  overall,
   previous,
   recent,
   mounted,
 }: {
-  interview: SampleInterview;
+  interview: InterviewSummary;
   scores: MetricScores;
-  previous?: SampleInterview;
-  recent: SampleInterview[];
+  overall: number;
+  previous?: InterviewSummary;
+  recent: InterviewSummary[];
   mounted: boolean;
 }) {
-  const w = SAMPLE_SETTINGS.weights;
-  const overall = overallScore(scores, w);
   const tone = bandTone(overall);
   const prevOverall = previous?.scores
-    ? overallScore(previous.scores, w)
+    ? (previous.overall ?? null)
     : null;
   const delta = prevOverall === null ? null : overall - prevOverall;
   const ranked = [...METRICS].sort((a, b) => scores[b.key] - scores[a.key]);
@@ -412,7 +389,7 @@ function Hero({
         <Fact label="Focus on">{ranked[ranked.length - 1].label}</Fact>
         <Fact label="Your recent scores">
           <Sparkline
-            values={recent.map((i) => overallScore(i.scores!, w))}
+            values={recent.map((i) => i.overall ?? 0)}
             labels={mounted ? recent.map((i) => shortDate(i.date)) : []}
           />
         </Fact>
@@ -622,7 +599,7 @@ function MissedTable({
   writing,
   onOpen,
 }: {
-  writing: (typeof SAMPLE_WRITING)["ai"];
+  writing: ReportWriting;
   onOpen: (m: Modal) => void;
 }) {
   if (writing.missed.length === 0) return null;
@@ -743,10 +720,10 @@ function ActionPlan({ points }: { points: ReportPoint[] }) {
   );
 }
 
-function Conversation() {
+function Conversation({ messages }: { messages: ChatMessage[] }) {
   return (
     <ol className="space-y-2.5">
-      {SAMPLE_CHAT.map((m) => (
+      {messages.map((m) => (
         <li
           key={m.id}
           className={cn("flex", m.from === "you" && "justify-end")}

@@ -2,7 +2,7 @@
 title: How long logs and history are kept
 category: Settings and data
 summary: Admin Settings → Data retention sets how many days each kind of log is kept, and the daily cron job deletes anything older. Leads themselves are never removed by this.
-keywords: retention, data retention, delete logs, how long, notifications, email log, processed ledger, conversations, history
+keywords: retention, data retention, delete logs, how long, notifications, email log, processed ledger, conversations, history, mock interview events
 ---
 
 **Admin Settings → Data retention** sets a window in days for each kind of log. The daily cron job deletes anything older. Leads themselves are never removed by this, only by the user, or by Lead retention when it's switched on.
@@ -18,6 +18,7 @@ keywords: retention, data retention, delete logs, how long, notifications, email
 | Knowledge base conversations | Admins' chats with the agent, from the last message | 60 | 7 to 365 |
 | Broadcast email lists | Who each broadcast was emailed to and whether it arrived. Only finished or canceled broadcasts; the totals on the broadcast stay | 90 | 30 to 365 |
 | Sent emails | Every email the app sent, shown in Monitoring → Sent emails. No content | 30 | 7 to 365 |
+| AI interview event logs | What happened during each mock interview, shown in Mock interviews → AI interviews. The interview and its report stay | 365 | 90 to 1095 |
 
 Two have reasons behind their limits:
 

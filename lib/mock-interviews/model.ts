@@ -198,3 +198,106 @@ export interface InterviewSettingsSnapshot {
   pricing: DifficultyPricing;
   weights: MetricWeights;
 }
+
+export type AiProviderId = "openai" | "openrouter" | "anthropic";
+
+/** Admin → Mock interviews → Module settings, as the screen edits it. The key
+ *  itself never leaves the server: only its last 4 characters. */
+export interface ModuleSettings {
+  aiState: PartState;
+  humanState: PartState;
+  applicationsOpen: boolean;
+  pauseBookings: boolean;
+  provider: AiProviderId;
+  model: string;
+  keyLast4: string | null;
+  categories: string[];
+  durations: number[];
+  minutesPerQuestion: number;
+  wrapUpMinutes: number;
+  resumeWindowMinutes: number;
+  paceGraceMinutes: number;
+  bookingValidDays: number;
+  expiryReminderDays: number;
+  pricing: PricingByDifficulty;
+  weights: MetricWeights;
+  prompts: { questionPlan: string; interviewer: string; evaluation: string };
+}
+
+export const DEFAULT_PRICING: PricingByDifficulty = {
+  Easy: { ratePerMinutePaise: 300, discountOn: false, discountPercent: 0 },
+  Medium: { ratePerMinutePaise: 400, discountOn: false, discountPercent: 0 },
+  Hard: { ratePerMinutePaise: 500, discountOn: false, discountPercent: 0 },
+};
+
+export const DEFAULT_WEIGHTS: MetricWeights = { communication: 20, technical: 20, confidence: 20, problemSolving: 20, relevance: 20 };
+
+/** Built-in prompts; admin can replace each one (a blank or reset keeps these). */
+export const DEFAULT_PROMPTS: ModuleSettings["prompts"] = {
+  questionPlan:
+    "You are planning a mock interview for a {{role}} in {{industry}}. Kind: {{category}}. Difficulty: {{difficulty}}. Plan {{question_count}} questions that cover the five scored skills and these topics: {{topics}}. Use the resume and job description below.",
+  interviewer:
+    "You are a professional interviewer. Ask one question at a time from the plan. Ask a follow-up only when an answer is thin or needs evidence. Keep a neutral, encouraging tone. Never give feedback during the interview.",
+  evaluation:
+    "Score the candidate 1 to 10 on communication, technical knowledge, confidence and clarity, problem-solving and answer relevance. For each written part give a short headline and the full text. Base everything on the transcript.",
+};
+
+export const PROMPT_PLACEHOLDERS = ["{{role}}", "{{industry}}", "{{category}}", "{{difficulty}}", "{{question_count}}", "{{topics}}", "{{resume}}", "{{job_description}}"];
+
+/* ---------------- what the candidate screens read ---------------- */
+
+/** A booking as the candidate sees it. "interrupted" can still be resumed. */
+export type BookingStatus = "ready" | "in_progress" | "interrupted" | "completed" | "failed" | "expired";
+
+export type BookingPayment =
+  | { kind: "paid"; full: number; final: number; percent: number } // paise
+  | { kind: "plan"; planName: string }
+  | { kind: "free" }
+  | { kind: "credit" };
+
+export interface BookingRow {
+  id: string;
+  role: string;
+  category: string;
+  industry: string;
+  difficulty: Difficulty;
+  durationMin: number;
+  topics: string[];
+  bookedAt: string; // ISO
+  validUntil: string; // ISO
+  payment: BookingPayment;
+  status: BookingStatus;
+  /** Interrupted: minutes left to resume. */
+  resumeMinutesLeft?: number;
+  /** Completed with a report: the report to open. */
+  reportId?: string;
+}
+
+/** One interview in History, Performance and report comparisons. */
+export type InterviewStatus = "completed" | "awaiting_report" | "interrupted" | "in_progress" | "failed";
+
+export interface InterviewSummary {
+  id: string;
+  source: ReportSource;
+  role: string;
+  category: string;
+  industry: string;
+  difficulty: Difficulty;
+  durationMin: number;
+  date: string; // ISO, when it started
+  status: InterviewStatus;
+  /** Present once the report exists, with the overall score it gave (out of 100). */
+  scores?: MetricScores;
+  overall?: number;
+  interviewer?: string; // human interviews only
+}
+
+export interface ChatMessage {
+  id: string;
+  from: "ai" | "you";
+  text: string;
+  /** The planned question this message opens (shown as "Question n"). */
+  questionNo?: number;
+  /** Seconds into the interview when it was sent. */
+  at?: number;
+}

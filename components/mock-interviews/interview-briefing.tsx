@@ -29,16 +29,15 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
-import { SampleBanner } from "@/components/mock-interviews/sample-banner";
 import { LevelTag } from "@/components/mock-interviews/visual-kit";
-import { SAMPLE_CHAT, SAMPLE_SETTINGS, type SampleBooking } from "@/lib/mock-interviews/sample-data";
+import type { BriefingData } from "@/lib/mock-interviews/data";
 import { METRICS, plannedQuestions, type MetricKey } from "@/lib/mock-interviews/model";
 import { cn } from "@/lib/utils";
 
 // The briefing page before an AI interview starts or resumes (spec D13e): what
 // to expect, where they left off (when resuming), a short checklist and the
 // rules that matter, then the one button that opens the interview screen.
-// R1.2: sample data.
+
 
 const METRIC_ICON: Record<MetricKey, LucideIcon> = {
   communication: MessageCircle,
@@ -50,21 +49,18 @@ const METRIC_ICON: Record<MetricKey, LucideIcon> = {
 
 const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
-export function InterviewBriefing({ booking }: { booking: SampleBooking }) {
+export function InterviewBriefing({ data }: { data: BriefingData }) {
+  const { booking, settings, answered, atQuestion, lastQuestion } = data;
   const resuming = booking.status === "interrupted" || booking.status === "in_progress";
-  const questions = plannedQuestions(booking.durationMin, SAMPLE_SETTINGS.minutesPerQuestion);
+  const questions = plannedQuestions(booking.durationMin, settings.minutesPerQuestion);
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const sessionHref = `/mock-interviews/ai/session/${booking.id}`;
 
-  // SAMPLE: where a stopped interview stands (R1.5 reads it from the session).
-  const answered = SAMPLE_CHAT.filter((m) => m.from === "you").length;
-  const atQuestion = SAMPLE_CHAT.reduce((n, m) => Math.max(n, m.questionNo ?? 0), 0);
-  const usedSeconds = 3 * 60 + 50;
-  const lastQuestion = [...SAMPLE_CHAT].reverse().find((m) => m.from === "ai")?.text ?? "";
+  const usedSeconds = data.activeSeconds;
 
   const checklist = [
     { key: "quiet", icon: Headphones, text: "I'm somewhere quiet where I won't be interrupted." },
-    { key: "time", icon: Clock3, text: `I have about ${booking.durationMin + SAMPLE_SETTINGS.wrapUpMinutes} minutes free, including the wrap-up time.` },
+    { key: "time", icon: Clock3, text: `I have about ${booking.durationMin + settings.wrapUpMinutes} minutes free, including the wrap-up time.` },
     { key: "net", icon: Wifi, text: "My internet connection is steady." },
     { key: "ready", icon: FileText, text: "I've looked over the job and my resume, so my examples are fresh." },
   ];
@@ -72,12 +68,6 @@ export function InterviewBriefing({ booking }: { booking: SampleBooking }) {
 
   return (
     <div className="mx-auto max-w-5xl space-y-4 pb-20 lg:pb-0">
-      <SampleBanner
-        previews={[
-          { label: "Starting", href: "/mock-interviews/ai/prepare/bk-12", active: !resuming },
-          { label: "Resuming", href: "/mock-interviews/ai/prepare/ai-9", active: resuming },
-        ]}
-      />
       <Link href="/mock-interviews/ai" className="inline-flex min-h-11 items-center gap-1 text-xs text-muted-foreground hover:text-foreground sm:min-h-0">
         <ArrowLeft className="size-3.5" aria-hidden />
         AI mock interviews
@@ -135,7 +125,7 @@ export function InterviewBriefing({ booking }: { booking: SampleBooking }) {
                 <Fact label="Time used" value={`${mmss(usedSeconds)} of ${booking.durationMin}:00`} />
                 <Fact
                   label="Resume within"
-                  value={`${booking.resumeMinutesLeft ?? SAMPLE_SETTINGS.resumeWindowMinutes} min`}
+                  value={`${booking.resumeMinutesLeft ?? settings.resumeWindowMinutes} min`}
                   tone="text-amber-700"
                 />
               </dl>
@@ -159,7 +149,7 @@ export function InterviewBriefing({ booking }: { booking: SampleBooking }) {
                 </div>
               )}
               <p className="mt-3 text-xs text-muted-foreground">
-                The clock picks up from where it stopped. Everything you&apos;ve answered so far is kept and counts towards your report.
+                The clock picks up from where it stopped. Everything you&apos;ve answered so far is kept and counts toward your report.
               </p>
             </section>
           )}
@@ -173,7 +163,7 @@ export function InterviewBriefing({ booking }: { booking: SampleBooking }) {
             <ol className="mt-3 space-y-3">
               {[
                 { icon: MessageCircle, title: "One question at a time", text: `About ${questions} questions planned around your role, the job and your topics. The interviewer asks follow-ups when an answer needs more.` },
-                { icon: Timer, title: `${booking.durationMin} minutes on the clock`, text: `A timer shows the time left. If time runs out mid-answer, the interviewer takes up to ${SAMPLE_SETTINGS.wrapUpMinutes} more minutes to wrap up, then ends.` },
+                { icon: Timer, title: `${booking.durationMin} minutes on the clock`, text: `A timer shows the time left. If time runs out mid-answer, the interviewer takes up to ${settings.wrapUpMinutes} more minutes to wrap up, then ends.` },
                 { icon: Mic, title: "Type or speak", text: "Type your answers, or tap the mic to speak and check the words before sending. Speaking works in Chrome, Edge and Safari." },
                 { icon: FileText, title: "Your report straight after", text: "Scores for five skills, what went well, what to fix and better ways to answer. It usually takes under a minute." },
               ].map(({ icon: Icon, title, text }, i) => (
@@ -235,7 +225,7 @@ export function InterviewBriefing({ booking }: { booking: SampleBooking }) {
             </h2>
             <ul className="mt-3 space-y-2.5 text-sm">
               <Note icon={RefreshCw}>
-                If your connection drops or the tab closes, you can resume within {SAMPLE_SETTINGS.resumeWindowMinutes} minutes from where
+                If your connection drops or the tab closes, you can resume within {settings.resumeWindowMinutes} minutes from where
                 you stopped.
               </Note>
               <Note icon={Flag}>Ending early is allowed. Questions you haven&apos;t answered won&apos;t be scored.</Note>
@@ -304,7 +294,7 @@ export function InterviewBriefing({ booking }: { booking: SampleBooking }) {
       {/* Phones and tablets: the button stays in reach (right padding clears the help bubble). */}
       <div className="sticky bottom-0 z-10 -mx-1 flex items-center gap-3 rounded-2xl border bg-card/95 p-3 pr-[4.75rem] shadow-md backdrop-blur sm:pr-[5.25rem] lg:hidden">
         <p className="min-w-0 flex-1 text-xs text-muted-foreground">
-          {resuming ? `${booking.resumeMinutesLeft ?? SAMPLE_SETTINGS.resumeWindowMinutes} min left to resume` : `${booking.durationMin} min · about ${questions} questions`}
+          {resuming ? `${booking.resumeMinutesLeft ?? settings.resumeWindowMinutes} min left to resume` : `${booking.durationMin} min · about ${questions} questions`}
         </p>
         <StartButton resuming={resuming} href={sessionHref} compact />
       </div>

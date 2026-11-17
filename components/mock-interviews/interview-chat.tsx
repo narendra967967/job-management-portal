@@ -15,7 +15,7 @@ import {
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useConfirm } from "@/components/ui/confirm-dialog";
-import { SampleBanner } from "@/components/mock-interviews/sample-banner";
+import { StandInBanner } from "@/components/mock-interviews/sample-banner";
 import {
   InterviewPanel,
   InterviewPanelCompact,
@@ -24,15 +24,9 @@ import {
   timerTone,
   type PanelData,
 } from "@/components/mock-interviews/interview-panel";
-import {
-  SAMPLE_CHAT,
-  SAMPLE_FOLLOW_UPS,
-  SAMPLE_SESSION,
-  SAMPLE_SETTINGS,
-  SAMPLE_TIPS,
-  type ChatMessage,
-} from "@/lib/mock-interviews/sample-data";
-import { plannedQuestions } from "@/lib/mock-interviews/model";
+import type { SessionData } from "@/lib/mock-interviews/data";
+import { STANDIN_FOLLOW_UPS, STANDIN_TIPS, standInOpening } from "@/lib/mock-interviews/standin";
+import { plannedQuestions, type ChatMessage } from "@/lib/mock-interviews/model";
 import { useProfile } from "@/lib/mock-store";
 import { cn } from "@/lib/utils";
 import { scrollIntoMain } from "@/components/mock-interviews/scroll-into-main";
@@ -43,8 +37,8 @@ import {
 
 // The AI interview (spec D10, D13): the conversation in the middle, a live panel
 // beside it (time, progress, topics, pace, what's scored, a tip), and an answer
-// box that can be typed or spoken into. R1.2: a sample conversation; answering
-// adds a canned follow-up. R1.5 connects the real interviewer, pacing and wrap-up.
+// box that can be typed or spoken into. Until R1.5 connects the real interviewer,
+// pacing and wrap-up, a stand-in answers with canned follow-ups and saves nothing.
 
 export type ChatState = "live" | "wrapup" | "ended";
 
@@ -77,29 +71,29 @@ function lengthHint(n: number) {
 }
 
 export function InterviewChat({
-  sessionId,
+  session,
   state,
 }: {
-  sessionId: string;
+  session: SessionData;
   state: ChatState;
 }) {
   const router = useRouter();
   const profile = useProfile();
-  const { durationMin } = SAMPLE_SESSION;
-  const totalQuestions = plannedQuestions(
-    durationMin,
-    SAMPLE_SETTINGS.minutesPerQuestion,
+  const { durationMin, settings } = session;
+  const totalQuestions = session.plan.length || plannedQuestions(durationMin, settings.minutesPerQuestion);
+  const [messages, setMessages] = useState<ChatMessage[]>(() =>
+    session.messages.length ? session.messages : [standInOpening(session.role)],
   );
-  const [messages, setMessages] = useState<ChatMessage[]>(SAMPLE_CHAT);
   const [draft, setDraft] = useState("");
   const [thinking, setThinking] = useState(false);
   const { confirm, dialog } = useConfirm();
   const [followUp, setFollowUp] = useState(0);
   const interviewSeconds = durationMin * 60;
-  const wrapSeconds = SAMPLE_SETTINGS.wrapUpMinutes * 60;
+  const wrapSeconds = settings.wrapUpMinutes * 60;
   // Seconds left: of the interview while live, of the wrap-up extension after.
+  // The clock picks up where it stopped (it counts connected time only).
   const [secondsLeft, setSecondsLeft] = useState(
-    state === "wrapup" ? wrapSeconds - 31 : 26 * 60 + 10,
+    state === "wrapup" ? wrapSeconds - 31 : Math.max(0, interviewSeconds - session.activeSeconds),
   );
   const endRef = useRef<HTMLDivElement>(null);
   const ended = state === "ended";
@@ -142,7 +136,7 @@ export function InterviewChat({
     (n, m) => Math.max(n, m.questionNo ?? 0),
     0,
   );
-  const base = `/mock-interviews/ai/session/${sessionId}`;
+  const base = `/mock-interviews/ai/session/${session.id}`;
   const elapsed =
     state === "wrapup"
       ? interviewSeconds + (wrapSeconds - secondsLeft)
@@ -158,14 +152,16 @@ export function InterviewChat({
       elapsed,
       questionNo,
       totalQuestions,
-      minutesPerQuestion: SAMPLE_SETTINGS.minutesPerQuestion,
-      paceGraceMinutes: SAMPLE_SETTINGS.paceGraceMinutes,
-      topics: SAMPLE_SESSION.topics,
+      minutesPerQuestion: settings.minutesPerQuestion,
+      paceGraceMinutes: settings.paceGraceMinutes,
+      topics: session.topics,
       answers: yourAnswers.length,
       avgWords: yourAnswers.length
         ? Math.round(totalWords / yourAnswers.length)
         : 0,
-      tip: SAMPLE_TIPS[(Math.max(1, questionNo) - 1) % SAMPLE_TIPS.length],
+      tip:
+        session.plan[Math.max(1, questionNo) - 1]?.tip ??
+        STANDIN_TIPS[(Math.max(1, questionNo) - 1) % STANDIN_TIPS.length],
     }),
     [
       state,
@@ -175,6 +171,9 @@ export function InterviewChat({
       elapsed,
       questionNo,
       totalQuestions,
+      settings,
+      session.topics,
+      session.plan,
       yourAnswers.length,
       totalWords,
     ],
@@ -190,9 +189,9 @@ export function InterviewChat({
     ]);
     setDraft("");
     setThinking(true);
-    // SAMPLE: a canned follow-up instead of the AI.
+    // Stand-in: a canned follow-up instead of the AI (R1.5 replaces it).
     setTimeout(() => {
-      const next = SAMPLE_FOLLOW_UPS[followUp % SAMPLE_FOLLOW_UPS.length];
+      const next = STANDIN_FOLLOW_UPS[followUp % STANDIN_FOLLOW_UPS.length];
       const opensQuestion = next.startsWith("Thanks. Next question");
       setMessages((m) => [
         ...m,
@@ -231,7 +230,7 @@ export function InterviewChat({
 
   return (
     <div className="mx-auto max-w-6xl space-y-3">
-      <SampleBanner
+      <StandInBanner
         previews={[
           { label: "In progress", href: base, active: state === "live" },
           {
@@ -263,13 +262,13 @@ export function InterviewChat({
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                       <p className="min-w-0 leading-snug font-semibold sm:truncate">
-                        {SAMPLE_SESSION.role}
+                        {session.role}
                       </p>
                       <StatusPill state={state} />
                     </div>
                     <div className="mt-1 flex flex-wrap gap-1.5 text-[11px]">
-                      <Chip>{SAMPLE_SESSION.category}</Chip>
-                      <Chip>{SAMPLE_SESSION.difficulty}</Chip>
+                      <Chip>{session.category}</Chip>
+                      <Chip>{session.difficulty}</Chip>
                       <Chip>{durationMin} min</Chip>
                     </div>
                   </div>
@@ -331,7 +330,7 @@ export function InterviewChat({
               role="status"
             >
               Time&apos;s up. The interviewer is finishing the last questions
-              and will end within {SAMPLE_SETTINGS.wrapUpMinutes} minutes.
+              and will end within {settings.wrapUpMinutes} minutes.
             </p>
           )}
 

@@ -1,18 +1,33 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { AiComingSoon } from "@/components/mock-interviews/coming-soon";
 import { NewInterviewForm } from "@/components/mock-interviews/new-interview-form";
-import { SHOW_SAMPLE_SCREENS } from "@/lib/mock-interviews/preview";
-import { SAMPLE_ALLOWANCES } from "@/lib/mock-interviews/sample-data";
+import { getCurrentUserId } from "@/lib/current-user";
+import { aiInterviewsOpen, getModuleSettings } from "@/lib/mock-interviews/config";
+import { getAllowance, getBookingSetup } from "@/lib/mock-interviews/data";
 
 export const metadata: Metadata = { title: "New AI interview" };
+export const dynamic = "force-dynamic";
 
-export default async function NewAiInterviewPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ allowance?: string; lead?: string; edit?: string }>;
-}) {
-  if (!SHOW_SAMPLE_SCREENS) return <AiComingSoon />;
-  const sp = await searchParams;
-  const allowanceKey = sp.allowance && sp.allowance in SAMPLE_ALLOWANCES ? sp.allowance : "plan";
-  return <NewInterviewForm allowance={SAMPLE_ALLOWANCES[allowanceKey]} allowanceKey={allowanceKey} leadId={sp.lead} editId={sp.edit} />;
+export default async function NewAiInterviewPage({ searchParams }: { searchParams: Promise<{ lead?: string; edit?: string }> }) {
+  const settings = await getModuleSettings();
+  if (!aiInterviewsOpen(settings)) return <AiComingSoon />;
+  const [userId, sp] = await Promise.all([getCurrentUserId(), searchParams]);
+  const [allowance, editing] = await Promise.all([getAllowance(userId), sp.edit ? getBookingSetup(userId, sp.edit) : null]);
+  // Only a booking that hasn't started can be edited (D13c).
+  if (sp.edit && !editing) notFound();
+  return (
+    <NewInterviewForm
+      allowance={allowance}
+      options={{
+        categories: settings.categories,
+        durations: settings.durations,
+        minutesPerQuestion: settings.minutesPerQuestion,
+        wrapUpMinutes: settings.wrapUpMinutes,
+        pricing: settings.pricing,
+      }}
+      leadId={sp.lead}
+      editing={editing ?? undefined}
+    />
+  );
 }

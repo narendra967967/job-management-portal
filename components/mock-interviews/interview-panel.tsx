@@ -21,7 +21,8 @@ export interface PanelData {
   minutesPerQuestion: number;
   /** No pace verdict before this many minutes (admin setting). */
   paceGraceMinutes: number;
-  topics: { name: string; question: number }[];
+  /** The question that covers each topic, once the plan exists. */
+  topics: { name: string; question?: number }[];
   answers: number;
   avgWords: number;
   tip: string;
@@ -136,7 +137,7 @@ function TopicList({ d }: { d: PanelData }) {
   return (
     <ul className="space-y-1.5">
       {d.topics.map((t) => {
-        const done = t.question < d.questionNo;
+        const done = t.question !== undefined && t.question < d.questionNo;
         const now = t.question === d.questionNo;
         return (
           <li key={t.name} className="flex items-center gap-2 text-sm">
