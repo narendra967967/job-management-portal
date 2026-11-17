@@ -39,6 +39,7 @@ import { NotLimited } from "@/components/billing/not-limited";
 import { LimitedModeProvider } from "@/lib/access-mode";
 import { FreshPage } from "@/lib/nav-reset";
 import { LeadAreaOnly } from "@/components/app-shell/use-nav-area";
+import { HideDuringInterview } from "@/components/mock-interviews/hide-during-interview";
 
 // Per-user, session-gated routes — never statically prerendered (no DB at build).
 export const dynamic = "force-dynamic";
@@ -84,7 +85,11 @@ export default async function DashboardLayout({
     </NotLimited>
     <ContactSupportProvider>
     <AddLeadProvider>
-    <div className="app-glass relative isolate flex h-dvh flex-col overflow-hidden md:flex-row">
+    {/* overflow-clip, not hidden: a hidden container can still be scrolled by script
+        (select menus scrolling their option into view nudged the whole frame up).
+        Clip doesn't let a flex item shrink below its content the way hidden does,
+        hence min-h-0 on the content column below. */}
+    <div className="app-glass relative isolate flex h-dvh flex-col overflow-clip md:flex-row">
       {/* Fixed colour field behind the glass surfaces; <main> scrolls over it. */}
       <GlassBackdrop variant="app" />
       {/* Desktop sidebar */}
@@ -96,7 +101,7 @@ export default async function DashboardLayout({
         <SidebarFooter />
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-clip">
         {/* Top app bar */}
         <header className="shrink-0 border-b border-white/80 bg-white/55 shadow-[0_1px_2px_-1px_oklch(0.51_0.24_277_/_0.12)] backdrop-blur-md">
           <div className="flex h-16 items-center gap-2 px-4 md:gap-3 md:px-6">
@@ -150,7 +155,9 @@ export default async function DashboardLayout({
       </NotLimited>
       </div>
       {/* Floating help launcher + panel (bottom-right, all dashboard pages). */}
-      <SupportWidget />
+      <HideDuringInterview>
+        <SupportWidget />
+      </HideDuringInterview>
       <Toaster />
       {/* First-login walkthrough + "Take the tour" (?tour=1 on /leads). */}
       <Suspense fallback={null}>

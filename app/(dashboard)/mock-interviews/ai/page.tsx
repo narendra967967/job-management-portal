@@ -1,15 +1,14 @@
 import type { Metadata } from "next";
-import { Bot } from "lucide-react";
-import { ComingSoon } from "@/components/mock-interviews/coming-soon";
+import { AiComingSoon } from "@/components/mock-interviews/coming-soon";
+import { AiHome } from "@/components/mock-interviews/ai-home";
+import { SHOW_SAMPLE_SCREENS } from "@/lib/mock-interviews/preview";
+import { SAMPLE_ALLOWANCES } from "@/lib/mock-interviews/sample-data";
 
 export const metadata: Metadata = { title: "AI mock interviews" };
 
-export default function AiMockInterviewsPage() {
-  return (
-    <ComingSoon title="AI mock interviews" icon={Bot}>
-      Pick the role you&apos;re going for, add your resume and the job description, and practice with an interviewer that
-      asks the questions that role gets, with follow-ups when an answer is thin. You finish with a scored report
-      showing what went well and what to work on.
-    </ComingSoon>
-  );
+export default async function AiMockInterviewsPage({ searchParams }: { searchParams: Promise<{ allowance?: string }> }) {
+  if (!SHOW_SAMPLE_SCREENS) return <AiComingSoon />;
+  const key = (await searchParams).allowance ?? "plan";
+  const allowanceKey = key in SAMPLE_ALLOWANCES ? key : "plan";
+  return <AiHome allowance={SAMPLE_ALLOWANCES[allowanceKey]} allowanceKey={allowanceKey} />;
 }

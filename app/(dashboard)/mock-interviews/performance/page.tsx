@@ -1,14 +1,10 @@
 import type { Metadata } from "next";
-import { TrendingUp } from "lucide-react";
-import { ComingSoon } from "@/components/mock-interviews/coming-soon";
+import { PerformanceComingSoon } from "@/components/mock-interviews/coming-soon";
+import { PerformanceView } from "@/components/mock-interviews/performance-view";
+import { SHOW_SAMPLE_SCREENS } from "@/lib/mock-interviews/preview";
 
 export const metadata: Metadata = { title: "Performance" };
 
 export default function PerformancePage() {
-  return (
-    <ComingSoon title="Performance" icon={TrendingUp}>
-      Your scores from every mock interview in one place, so you can see which skills are getting stronger and which
-      still need work.
-    </ComingSoon>
-  );
+  return SHOW_SAMPLE_SCREENS ? <PerformanceView /> : <PerformanceComingSoon />;
 }
