@@ -54,15 +54,22 @@ export type MetricKey = (typeof METRICS)[number]["key"];
 export type MetricScores = Record<MetricKey, number>;
 export type MetricWeights = Record<MetricKey, number>;
 
+/** One written point: a short headline shown on the report, and the full text
+ *  shown on demand. Both are produced by the evaluator (AI or interviewer). */
+export interface ReportPoint {
+  headline: string;
+  detail: string;
+}
+
 /** The five written parts of every report (D49). */
 export interface ReportWriting {
-  strengths: string[];
-  improvements: string[];
-  /** Questions answered wrongly or only partly, with what was missing. */
-  missed: { question: string; note: string }[];
+  strengths: ReportPoint[];
+  improvements: ReportPoint[];
+  /** Questions answered wrongly or only partly: a short label and what was missing. */
+  missed: { question: string; headline: string; note: string }[];
   /** A better way to answer, per question. */
   betterAnswers: { question: string; answer: string }[];
-  nextSteps: string[];
+  nextSteps: ReportPoint[];
 }
 
 export type ReportSource = "ai" | "human";

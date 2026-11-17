@@ -62,18 +62,26 @@ export const SAMPLE_INTERVIEWS: SampleInterview[] = [
 export const SAMPLE_WRITING: Record<ReportSource, ReportWriting> = {
   ai: {
     strengths: [
-      "Clear structure in most answers: you set the context, said what you did and finished with the result.",
-      "Good use of real numbers when describing the payments migration (team size, timeline, cost saved).",
-      "You stayed calm on the conflict question and owned your part of the problem.",
+      { headline: "Clear answer structure", detail: "Clear structure in most answers: you set the context, said what you did and finished with the result." },
+      { headline: "Real numbers", detail: "Good use of real numbers when describing the payments migration (team size, timeline, cost saved)." },
+      { headline: "Calm under pressure", detail: "You stayed calm on the conflict question and owned your part of the problem." },
     ],
     improvements: [
-      "Risk management answers stayed general. Name a real risk, how you spotted it and what you changed.",
-      "Several answers ran past two minutes before reaching the point. Lead with the outcome, then explain.",
-      "You described agile ceremonies well but not why you'd adapt them for a distributed team.",
+      { headline: "Make risk stories specific", detail: "Risk management answers stayed general. Name a real risk, how you spotted it and what you changed." },
+      { headline: "Get to the point sooner", detail: "Several answers ran past two minutes before reaching the point. Lead with the outcome, then explain." },
+      { headline: "Explain the why", detail: "You described agile ceremonies well but not why you'd adapt them for a distributed team." },
     ],
     missed: [
-      { question: "How do you decide when to escalate a delayed dependency?", note: "You described the follow-ups but not the trigger: what date or signal makes you escalate, and to whom." },
-      { question: "Walk me through estimating a project with unclear requirements.", note: "Missing: ranges instead of single dates, and how you'd narrow them as you learn more." },
+      {
+        question: "How do you decide when to escalate a delayed dependency?",
+        headline: "No escalation trigger",
+        note: "You described the follow-ups but not the trigger: what date or signal makes you escalate, and to whom.",
+      },
+      {
+        question: "Walk me through estimating a project with unclear requirements.",
+        headline: "Single date, no range",
+        note: "Missing: ranges instead of single dates, and how you'd narrow them as you learn more.",
+      },
     ],
     betterAnswers: [
       {
@@ -88,22 +96,26 @@ export const SAMPLE_WRITING: Record<ReportSource, ReportWriting> = {
       },
     ],
     nextSteps: [
-      "Prepare two risk stories with a clear trigger, action and result.",
-      "Practice answering in under 90 seconds: outcome first.",
-      "Try a Hard difficulty Project management interview next.",
+      { headline: "Two risk stories", detail: "Prepare two risk stories with a clear trigger, action and result." },
+      { headline: "Answers under 90 seconds", detail: "Practice answering in under 90 seconds: outcome first." },
+      { headline: "Try Hard difficulty", detail: "Try a Hard difficulty Project management interview next." },
     ],
   },
   human: {
     strengths: [
-      "Strong stakeholder examples, especially the vendor renegotiation.",
-      "You asked good clarifying questions before the case discussion.",
+      { headline: "Strong stakeholder examples", detail: "Strong stakeholder examples, especially the vendor renegotiation." },
+      { headline: "Good clarifying questions", detail: "You asked good clarifying questions before the case discussion." },
     ],
     improvements: [
-      "Budget questions: talk about variance and forecasting, not only tracking.",
-      "Be more specific about your own decisions versus the team's.",
+      { headline: "Variance and forecasting", detail: "Budget questions: talk about variance and forecasting, not only tracking." },
+      { headline: "Your decisions, not the team's", detail: "Be more specific about your own decisions versus the team's." },
     ],
     missed: [
-      { question: "A key engineer resigns two weeks before launch. What do you do?", note: "You covered hiring but not the short-term plan: knowledge transfer, scope cuts and telling stakeholders." },
+      {
+        question: "A key engineer resigns two weeks before launch. What do you do?",
+        headline: "No short-term plan",
+        note: "You covered hiring but not the short-term plan: knowledge transfer, scope cuts and telling stakeholders.",
+      },
     ],
     betterAnswers: [
       {
@@ -112,7 +124,10 @@ export const SAMPLE_WRITING: Record<ReportSource, ReportWriting> = {
           "First, protect the launch: pair someone with them for handover this week, list what only they know, and agree what scope can move. Tell stakeholders the same day with options, not just the problem. Backfilling the role comes after the launch plan is safe.",
       },
     ],
-    nextSteps: ["Prepare one budget-variance story.", "Practice the case format with a timer."],
+    nextSteps: [
+      { headline: "A budget-variance story", detail: "Prepare one budget-variance story." },
+      { headline: "Timed case practice", detail: "Practice the case format with a timer." },
+    ],
   },
 };
 
