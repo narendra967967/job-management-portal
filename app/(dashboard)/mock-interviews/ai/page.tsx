@@ -6,9 +6,13 @@ import { SAMPLE_ALLOWANCES } from "@/lib/mock-interviews/sample-data";
 
 export const metadata: Metadata = { title: "AI mock interviews" };
 
-export default async function AiMockInterviewsPage({ searchParams }: { searchParams: Promise<{ allowance?: string }> }) {
+export default async function AiMockInterviewsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ allowance?: string; booked?: string }>;
+}) {
   if (!SHOW_SAMPLE_SCREENS) return <AiComingSoon />;
-  const key = (await searchParams).allowance ?? "plan";
-  const allowanceKey = key in SAMPLE_ALLOWANCES ? key : "plan";
-  return <AiHome allowance={SAMPLE_ALLOWANCES[allowanceKey]} allowanceKey={allowanceKey} />;
+  const sp = await searchParams;
+  const allowanceKey = sp.allowance && sp.allowance in SAMPLE_ALLOWANCES ? sp.allowance : "plan";
+  return <AiHome allowance={SAMPLE_ALLOWANCES[allowanceKey]} allowanceKey={allowanceKey} bookedId={sp.booked} />;
 }

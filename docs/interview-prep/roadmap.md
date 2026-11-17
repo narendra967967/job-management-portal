@@ -75,7 +75,8 @@ lead pages locked and Mock interviews open; nothing else in the job tracker chan
   preparation) and topics, typed or picked from the career profile or a lead.
 - Allowance check: interviews left on the plan, or the price for the chosen difficulty and duration (with any discount shown) and a Pay button.
 - The interview: chat screen, timer, wrap-up notice, the 10-minute extension, the end.
-- Interrupted interview: the Resume banner within 15 minutes.
+- Bookings (spec D13a to D13d): "Book interview" / "Pay ₹X and book", the redirect with the new booking highlighted, the bookings table with stat boxes and filters, Start / Resume / View report, Edit setup with difficulty and length locked.
+- Interrupted interview: Resume within 15 minutes, from the bookings list.
 - The shared report page: five scores, the overall score out of 100, the five written parts, the source label.
 - Interview history (a table) and Performance (a trend chart per metric, filter by AI or human).
 - "Prepare for this interview" on leads with status Interview.
@@ -88,7 +89,7 @@ the same format later.
 
 - Mock interviews admin menu with its own settings page (D9): the Open / Coming soon switches; AI provider,
   model and key (write-only); categories; difficulty levels; durations; minutes per question; pace grace period (5 min); wrap-up time;
-  resume window; **price per minute per difficulty, each with a discount on/off and percentage**; prompts (including the question-plan prompt); metric weights.
+  resume window; booking validity and expiry reminder; **price per minute per difficulty, each with a discount on/off and percentage**; prompts (including the question-plan prompt); metric weights.
 - Plan editor: AI mock interviews included (per plan period).
 - AI interview usage: sessions table, cost per session and in total, each session's event log.
 - Credit action on a session (for interviews that broke), with a required note.

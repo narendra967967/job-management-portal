@@ -188,3 +188,51 @@ export const SAMPLE_FOLLOW_UPS = [
 export function sampleInterview(id: string): SampleInterview | undefined {
   return SAMPLE_INTERVIEWS.find((i) => i.id === id);
 }
+
+/* ---------------- AI interview bookings (spec D13a to D13d) ---------------- */
+
+export type BookingStatus = "ready" | "in_progress" | "interrupted" | "completed" | "expired";
+
+export type BookingPayment =
+  | { kind: "paid"; full: number; final: number; percent: number } // paise
+  | { kind: "plan"; planName: string }
+  | { kind: "free" };
+
+export interface SampleBooking {
+  id: string;
+  role: string;
+  category: string;
+  industry: string;
+  difficulty: Difficulty;
+  durationMin: number;
+  topics: string[];
+  bookedAt: string; // ISO
+  validUntil: string; // ISO
+  payment: BookingPayment;
+  status: BookingStatus;
+  /** In progress / stopped early: minutes left to resume. */
+  resumeMinutesLeft?: number;
+  /** Completed: the report to open. */
+  reportId?: string;
+}
+
+/** "Today" for the sample data, so expiry countdowns stay stable. */
+export const SAMPLE_TODAY = "2026-11-17T12:00:00+05:30";
+
+export const SAMPLE_BOOKINGS: SampleBooking[] = [
+  { id: "bk-12", role: "Technical Project Manager", category: "Project management", industry: "Information technology", difficulty: "Hard", durationMin: 30, topics: ["Risk management", "Estimation"], bookedAt: "2026-11-17T10:40:00+05:30", validUntil: "2026-12-17T23:59:00+05:30", payment: { kind: "paid", full: 15000, final: 12000, percent: 20 }, status: "ready" },
+  { id: "ai-9", role: "Technical Project Manager", category: "Project management", industry: "Information technology", difficulty: "Medium", durationMin: 30, topics: ["Stakeholder management"], bookedAt: "2026-11-16T09:50:00+05:30", validUntil: "2026-12-16T23:59:00+05:30", payment: { kind: "plan", planName: "Premium" }, status: "interrupted", resumeMinutesLeft: 11 },
+  { id: "bk-11", role: "Delivery Manager", category: "Leadership", industry: "Consulting", difficulty: "Medium", durationMin: 45, topics: ["Team conflict", "Hiring"], bookedAt: "2026-11-15T20:05:00+05:30", validUntil: "2026-12-15T23:59:00+05:30", payment: { kind: "paid", full: 18000, final: 16200, percent: 10 }, status: "ready" },
+  { id: "bk-10", role: "Scrum Master", category: "Behavioral interview", industry: "Banking and finance", difficulty: "Easy", durationMin: 15, topics: ["Conflict"], bookedAt: "2026-10-20T08:30:00+05:30", validUntil: "2026-11-19T23:59:00+05:30", payment: { kind: "plan", planName: "Premium" }, status: "ready" },
+  { id: "ai-8", role: "Technical Project Manager", category: "Behavioral interview", industry: "Information technology", difficulty: "Medium", durationMin: 30, topics: ["Conflict", "Leadership"], bookedAt: "2026-11-14T19:00:00+05:30", validUntil: "2026-12-14T23:59:00+05:30", payment: { kind: "paid", full: 12000, final: 10800, percent: 10 }, status: "completed", reportId: "ai-8" },
+  { id: "ai-7", role: "Delivery Manager", category: "Leadership", industry: "Consulting", difficulty: "Hard", durationMin: 45, topics: ["Delivery risk"], bookedAt: "2026-11-09T20:40:00+05:30", validUntil: "2026-12-09T23:59:00+05:30", payment: { kind: "plan", planName: "Premium" }, status: "completed", reportId: "ai-7" },
+  { id: "ai-6", role: "Technical Project Manager", category: "Project management", industry: "Information technology", difficulty: "Medium", durationMin: 30, topics: ["Estimation"], bookedAt: "2026-11-02T19:30:00+05:30", validUntil: "2026-12-02T23:59:00+05:30", payment: { kind: "paid", full: 12000, final: 10800, percent: 10 }, status: "completed", reportId: "ai-6" },
+  { id: "bk-4", role: "Product Owner", category: "Product management", industry: "E-commerce and retail", difficulty: "Medium", durationMin: 30, topics: ["Prioritization"], bookedAt: "2026-09-30T18:00:00+05:30", validUntil: "2026-10-30T23:59:00+05:30", payment: { kind: "free" }, status: "expired" },
+  { id: "ai-5", role: "Scrum Master", category: "Behavioral interview", industry: "Banking and finance", difficulty: "Easy", durationMin: 15, topics: ["Teamwork"], bookedAt: "2026-10-28T08:30:00+05:30", validUntil: "2026-11-27T23:59:00+05:30", payment: { kind: "paid", full: 4500, final: 4500, percent: 0 }, status: "completed", reportId: "ai-5" },
+  { id: "ai-4", role: "Technical Project Manager", category: "System design", industry: "Information technology", difficulty: "Hard", durationMin: 45, topics: ["Scalability"], bookedAt: "2026-10-24T21:50:00+05:30", validUntil: "2026-11-23T23:59:00+05:30", payment: { kind: "paid", full: 22500, final: 18000, percent: 20 }, status: "completed", reportId: "ai-4" },
+  { id: "ai-3", role: "Project Manager", category: "HR interview", industry: "E-commerce and retail", difficulty: "Easy", durationMin: 15, topics: ["Why this role"], bookedAt: "2026-10-19T08:50:00+05:30", validUntil: "2026-11-18T23:59:00+05:30", payment: { kind: "plan", planName: "Premium" }, status: "completed", reportId: "ai-3" },
+  { id: "ai-1", role: "Project Manager", category: "Behavioral interview", industry: "E-commerce and retail", difficulty: "Easy", durationMin: 15, topics: ["Teamwork"], bookedAt: "2026-10-10T18:40:00+05:30", validUntil: "2026-11-09T23:59:00+05:30", payment: { kind: "free" }, status: "completed", reportId: "ai-1" },
+];
+
+/** The booking a candidate just made (the redirect after "Book" highlights it). */
+export const SAMPLE_NEW_BOOKING_ID = "bk-12";

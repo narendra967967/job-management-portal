@@ -39,6 +39,10 @@ It sits inside the existing app and account. It doesn't change how the job track
 | D11 | Inputs: target role, industry, category, difficulty, resume, job description and topics. Resume, job description and topics are **required**; "General preparation" counts as a job description. Each can be typed or picked from the career profile or a tracked lead. A lead with status Interview gets a **"Prepare for this interview"** button. |
 | D12 | Coding and System Design run as **discussion interviews** (explain your approach). No code editor or code execution. |
 | D13 | **A broken interview can be resumed within 15 minutes.** Every session records its events (start, each question and answer, disconnects, resume, end) so admin can decide on a credit if it couldn't be finished. |
+| D13a | **AI interviews are booked first, then started** (owner, November 17, 2026). "Book interview" (or "Pay ₹X and book") spends the allowance or takes the payment and creates a **booking**; the candidate lands on AI mock interviews with the new booking highlighted and starts it whenever they're ready. Included and paid interviews work the same way. |
+| D13b | **A booking is valid for a set number of days** (admin setting, 30 to start) with a reminder email before it expires (admin setting, 3 days before). A booking made from a plan allowance stays usable until it expires, even if the plan ends. Unstarted bookings past the date are marked Expired. |
+| D13c | **Before starting, the setup can be edited** (role, industry, kind, resume, job description, topics). Difficulty and length are locked, because they set the price. **Bookings can't be cancelled for now**; cancellation is to be decided later. |
+| D13d | **Bookings list** on AI mock interviews: a table (project rule) with stat boxes as filters (Ready to start, In progress, Expiring soon, Completed this month), search and filters for status, payment and difficulty, and pagination. Two agreed exceptions to the table rule: the **action column comes first** (Start, Resume, View report), so phones see it without scrolling sideways, and there's **no 7-day default**: the list opens on bookings still to do. No multi-select, since there's no bulk action (nothing can be cancelled or deleted). Human interview bookings get their own list on Human interviews (Release 2). |
 
 ### Marketplace: interviewers, services, discovery
 
@@ -127,10 +131,11 @@ It sits inside the existing app and account. It doesn't change how the job track
 ### 2a. Candidate: AI mock interview (Release 1)
 
 1. **Mock interviews → AI mock interviews → New interview.** Pick role, industry, category, difficulty and duration; add or pick a resume, job description (or "General preparation") and topics. From a lead with status Interview, "Prepare for this interview" fills these in.
-2. **Allowance check.** If the plan's allowance has one left, start. If not, show the price and pay through Razorpay (same checkout as plans).
-3. **The interview.** A chat screen: the AI asks, the candidate answers, the AI follows up. A timer shows time left. At the end of the duration the AI wraps up, with up to 10 extra minutes.
-4. **If the connection drops,** the candidate can resume within 15 minutes from where it stopped.
-5. **Results.** The evaluation appears on the shared report page and in Interview history; Performance updates.
+2. **Book.** If the plan's allowance has one left, "Book interview" uses it. If not, the price shows and "Pay ₹X and book" goes through Razorpay (same checkout as plans).
+3. **Bookings.** The candidate lands on AI mock interviews with the booking highlighted, and starts it now or later (D13a to D13d).
+4. **The interview.** A chat screen: the AI asks, the candidate answers, the AI follows up. A timer shows time left. At the end of the duration the AI wraps up, with up to 10 extra minutes.
+5. **If the connection drops,** the candidate can resume within 15 minutes from where it stopped.
+6. **Results.** The evaluation appears on the shared report page and in Interview history; Performance updates.
 
 ### 2b. Candidate: human mock interview (Release 2)
 
@@ -197,7 +202,7 @@ Saved onto each booking or session when it's created (D36). Defaults in brackets
 | Area | Settings |
 |---|---|
 | Switches | AI interviews: **Open** or **Coming soon**; human interviews (the marketplace, for candidates): **Open** or **Coming soon**; new interviewer applications on/off; pause new bookings. "Coming soon" keeps the menu visible with a coming-soon page instead of the feature |
-| AI interviews | AI provider, model and key for this module; categories; difficulty levels; allowed durations (15, 30, 45, 60); minutes per question (2); pace grace period, before the pace meter gives a verdict (5 min); wrap-up extension (10 min); resume window (15 min); **price per minute for each difficulty** (Easy, Medium, Hard), each with a **discount on/off and percentage** (for any interview outside the plan allowance); prompts; metric weights |
+| AI interviews | AI provider, model and key for this module; categories; difficulty levels; allowed durations (15, 30, 45, 60); minutes per question (2); pace grace period, before the pace meter gives a verdict (5 min); wrap-up extension (10 min); resume window (15 min); booking valid for (30 days); expiry reminder (3 days before); **price per minute for each difficulty** (Easy, Medium, Hard), each with a **discount on/off and percentage** (for any interview outside the plan allowance); prompts; metric weights |
 | Plans (in the plan editor) | AI interviews included (per plan period, no carry-over) |
 | Commission | First-time % ; returning % |
 | Pricing | Minimum and maximum service price; allowed durations (15, 30, 45, 60, 90); services per interviewer |
@@ -220,7 +225,7 @@ penalties and refunds are separate entries; only verified no-shows count; every 
 Every automatic email below is added to **admin Engagement → Email templates** with its placeholders and default
 wording, per the project rule. Release 1 needs only the first group.
 
-- **AI interviews:** AI interview purchase receipt (or the existing receipt template extended); feedback ready.
+- **AI interviews:** AI interview purchase receipt (or the existing receipt template extended); booking about to expire; feedback ready.
 - **Interviewer status:** application received; approved; more information needed; rejected; suspended; deactivated; no-show warning; blocked; block lifted.
 - **Bookings:** booking confirmed (candidate, with calendar file); new booking (interviewer); reminder (both); reschedule requested; reschedule accepted; reschedule declined; cancelled by candidate (both); cancelled by interviewer (both); payment received but no booking (candidate, with refund).
 - **Evaluation:** evaluation due (24 h, 40 h); candidate's ping; evaluation submission code; report ready (candidate); review request (candidate).

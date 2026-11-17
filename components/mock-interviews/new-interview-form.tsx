@@ -23,6 +23,7 @@ import {
   HeartHandshake,
   Kanban,
   Loader2,
+  Lock,
   Network,
   Package,
   Rocket,
@@ -45,7 +46,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "@/components/ui/toast";
 import { SampleBanner } from "@/components/mock-interviews/sample-banner";
 import { useLeadDetail, useLeads, useResumes } from "@/lib/mock-store";
-import { SAMPLE_SETTINGS } from "@/lib/mock-interviews/sample-data";
+import { SAMPLE_BOOKINGS, SAMPLE_NEW_BOOKING_ID, SAMPLE_SETTINGS } from "@/lib/mock-interviews/sample-data";
 import {
   AI_DURATIONS,
   DIFFICULTIES,
@@ -86,21 +87,25 @@ export function NewInterviewForm({
   allowance,
   allowanceKey,
   leadId,
+  editId,
 }: {
   allowance: AllowanceState;
   allowanceKey: string;
   leadId?: string;
+  /** Editing a booking before it starts: difficulty and length stay as booked (D13c). */
+  editId?: string;
 }) {
   const router = useRouter();
   const leads = useLeads();
   const resumes = useResumes();
   const fromLead = leadId ? leads.find((l) => l.id === leadId) : undefined;
+  const editing = editId ? SAMPLE_BOOKINGS.find((b) => b.id === editId && b.status === "ready") : undefined;
 
-  const [role, setRole] = useState(fromLead?.title ?? "");
-  const [industry, setIndustry] = useState("");
-  const [category, setCategory] = useState("");
-  const [difficulty, setDifficulty] = useState<Difficulty>("Medium");
-  const [duration, setDuration] = useState<number>(30);
+  const [role, setRole] = useState(editing?.role ?? fromLead?.title ?? "");
+  const [industry, setIndustry] = useState(editing?.industry ?? "");
+  const [category, setCategory] = useState(editing?.category ?? "");
+  const [difficulty, setDifficulty] = useState<Difficulty>(editing?.difficulty ?? "Medium");
+  const [duration, setDuration] = useState<number>(editing?.durationMin ?? 30);
   const [resumeMode, setResumeMode] = useState<ResumeMode>(resumes.length ? "saved" : "upload");
   const [resumeId, setResumeId] = useState(resumes.find((r) => r.isDefault)?.id ?? resumes[0]?.id ?? "");
   const [file, setFile] = useState<File | null>(null);
@@ -108,7 +113,7 @@ export function NewInterviewForm({
   const [jdMode, setJdMode] = useState<JdMode>(fromLead ? "lead" : "paste");
   const [jdLeadId, setJdLeadId] = useState(fromLead?.id ?? "");
   const [jdText, setJdText] = useState("");
-  const [topics, setTopics] = useState<string[]>([]);
+  const [topics, setTopics] = useState<string[]>(editing?.topics ?? []);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [starting, setStarting] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -135,6 +140,8 @@ export function NewInterviewForm({
   const quote = aiInterviewQuote(duration, pricing[difficulty]);
   const price = quote.final;
   const included = left > 0;
+  // Prices only matter for a new booking that isn't included.
+  const showPrices = !included && !editing;
 
   function validate(): Record<string, string> {
     const e: Record<string, string> = {};
@@ -168,9 +175,15 @@ export function NewInterviewForm({
       return;
     }
     setStarting(true);
-    // SAMPLE: R1.5 spends the allowance or opens Razorpay checkout, then creates the session.
+    // SAMPLE: R1.5 saves the setup; for a new booking it spends the allowance or
+    // opens Razorpay checkout, then lands on the bookings list (D13a).
+    if (editing) {
+      toast.success("Changes saved", "Your booking keeps its difficulty and length.");
+      setTimeout(() => router.push(`/mock-interviews/ai?allowance=${allowanceKey}`), 500);
+      return;
+    }
     if (!included) toast.info("Sample: payment happens here", `Razorpay checkout for ${rupees(price)} opens in the real version.`);
-    setTimeout(() => router.push("/mock-interviews/ai/session/sample"), 600);
+    setTimeout(() => router.push(`/mock-interviews/ai?allowance=${allowanceKey}&booked=${SAMPLE_NEW_BOOKING_ID}`), 600);
   }
 
   // After the first Start, errors update as fields are fixed.
@@ -204,7 +217,7 @@ export function NewInterviewForm({
     topics: !problems.topics,
   };
   const withLead = (k: string) => `/mock-interviews/ai/new?allowance=${k}${leadId ? `&lead=${leadId}` : ""}`;
-  const startLabel = included ? "Start interview" : `Pay ${rupees(price)} and start`;
+  const startLabel = editing ? "Save changes" : included ? "Book interview" : `Pay ${rupees(price)} and book`;
 
   return (
     <div className="mx-auto max-w-6xl space-y-4 pb-20 lg:pb-0">
@@ -230,7 +243,7 @@ export function NewInterviewForm({
             <Bot className="size-6" aria-hidden />
           </span>
           <div className="min-w-0 flex-1">
-            <h1 className="text-xl font-semibold tracking-tight">Set up your interview</h1>
+            <h1 className="text-xl font-semibold tracking-tight">{editing ? "Edit your booking" : "Set up your interview"}</h1>
             <p className="mt-0.5 text-sm text-muted-foreground">
               Tell the interviewer what you&apos;re preparing for. It plans its questions around your answers here.
             </p>
@@ -358,7 +371,10 @@ export function NewInterviewForm({
             </fieldset>
 
             <fieldset className="space-y-2">
-              <legend className="mb-2 text-sm font-medium">Difficulty</legend>
+              <legend className="mb-2 flex items-center gap-2 text-sm font-medium">
+                Difficulty
+                {editing && <LockedNote />}
+              </legend>
               <div className="grid grid-cols-3 gap-2">
                 {DIFFICULTIES.map((d) => {
                   const p = pricing[d];
@@ -371,15 +387,16 @@ export function NewInterviewForm({
                       type="button"
                       aria-pressed={on}
                       onClick={() => setDifficulty(d)}
+                      disabled={!!editing && !on}
                       className={cn(
-                        "flex min-h-16 flex-col items-center justify-center gap-0.5 rounded-xl border px-2 py-2 text-sm transition-all focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+                        "flex min-h-16 flex-col items-center justify-center gap-0.5 rounded-xl border px-2 py-2 text-sm transition-all disabled:cursor-not-allowed disabled:opacity-45 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
                         on ? cn(t.on, "shadow-sm") : "bg-white/60 hover:border-slate-300",
                       )}
                     >
                       <Icon className={cn("size-5", on ? t.icon_on : "text-muted-foreground")} aria-hidden />
                       <span className={cn("font-semibold", on && t.text)}>{d}</span>
                       {/* Price per minute only matters when the interview isn't included. */}
-                      {!included && (
+                      {showPrices && (
                         <span className="flex flex-wrap items-center justify-center gap-1 text-[11px] text-muted-foreground">
                           {rupees(p.ratePerMinutePaise)}/min
                           {p.discountOn && p.discountPercent > 0 && (
@@ -398,6 +415,7 @@ export function NewInterviewForm({
             <fieldset className="space-y-2">
               <legend className="mb-2 flex items-center gap-1 text-sm font-medium">
                 Length
+                {editing && <LockedNote />}
                 <InfoTip label="About the length">
                   The interviewer plans its questions to fit the time you pick. If time runs out mid-answer, it takes up to{" "}
                   {SAMPLE_SETTINGS.wrapUpMinutes} more minutes to wrap up.
@@ -412,8 +430,9 @@ export function NewInterviewForm({
                       type="button"
                       aria-pressed={on}
                       onClick={() => setDuration(m)}
+                      disabled={!!editing && !on}
                       className={cn(
-                        "flex min-h-16 flex-col items-center justify-center rounded-xl border px-2 py-2 transition-all focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+                        "flex min-h-16 flex-col items-center justify-center rounded-xl border px-2 py-2 transition-all disabled:cursor-not-allowed disabled:opacity-45 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
                         on ? "border-primary bg-primary/5 shadow-sm ring-1 ring-primary/30" : "bg-white/60 hover:border-primary/40",
                       )}
                     >
@@ -424,7 +443,7 @@ export function NewInterviewForm({
                       <span className="text-[11px] text-muted-foreground">
                         about {plannedQuestions(m, SAMPLE_SETTINGS.minutesPerQuestion)} questions
                       </span>
-                      {!included && (
+                      {showPrices && (
                         <span className="text-[11px] font-semibold">{rupees(aiInterviewQuote(m, pricing[difficulty]).final)}</span>
                       )}
                     </button>
@@ -614,7 +633,9 @@ export function NewInterviewForm({
               <div className="p-3">
                 <dt className="text-[11px] text-muted-foreground">Cost</dt>
                 <dd className="text-lg font-semibold">
-                  {included ? (
+                  {editing ? (
+                    <span className="text-emerald-700">Booked</span>
+                  ) : included ? (
                     <span className="text-emerald-700">Included</span>
                   ) : (
                     <span className="inline-flex flex-wrap items-baseline justify-center gap-1.5">
@@ -628,7 +649,9 @@ export function NewInterviewForm({
 
             <div className="space-y-3 p-4">
               <p className="text-xs text-muted-foreground">
-                {included ? (
+                {editing ? (
+                  "Already booked. Saving changes costs nothing."
+                ) : included ? (
                   allowance.kind === "free" ? (
                     "Uses your one free AI interview."
                   ) : (
@@ -683,7 +706,7 @@ export function NewInterviewForm({
           <p className="text-[11px] text-muted-foreground">
             {readyCount} of {checklist.length} ready · ~{questions} questions
           </p>
-          <p className="truncate text-sm font-semibold">{included ? "Included in your plan" : rupees(price)}</p>
+          <p className="truncate text-sm font-semibold">{editing ? "Already booked" : included ? "Included in your plan" : rupees(price)}</p>
         </div>
         <Button
           className="shrink-0 bg-gradient-to-r from-primary to-violet-600 text-white shadow-sm hover:opacity-90"
@@ -720,6 +743,15 @@ const DIFFICULTY_TONE: Record<Difficulty, { on: string; text: string; icon: Luci
   Medium: { on: "border-amber-400 bg-amber-50 ring-1 ring-amber-300", text: "text-amber-800", icon: SignalMedium, icon_on: "text-amber-600" },
   Hard: { on: "border-rose-400 bg-rose-50 ring-1 ring-rose-300", text: "text-rose-800", icon: SignalHigh, icon_on: "text-rose-600" },
 };
+
+function LockedNote() {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+      <Lock className="size-3" aria-hidden />
+      Set when you booked
+    </span>
+  );
+}
 
 function Step({ n, title, done, children }: { n: number; title: string; done: boolean; children: React.ReactNode }) {
   return (
