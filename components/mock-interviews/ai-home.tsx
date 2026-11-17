@@ -166,7 +166,7 @@ export function AiHome({ allowance, allowanceKey, bookedId }: { allowance: Allow
                 Edit setup
               </Link>
               <Link
-                href={`/mock-interviews/ai/session/${booked.id}`}
+                href={`/mock-interviews/ai/prepare/${booked.id}`}
                 className={cn(buttonVariants({ size: "lg" }), "bg-gradient-to-r from-primary to-violet-600 text-white hover:opacity-90")}
               >
                 <PlayCircle className="size-4" aria-hidden />
@@ -418,7 +418,7 @@ function PrimaryAction({ b }: { b: SampleBooking }) {
   if (b.status === "ready")
     return (
       <Link
-        href={`/mock-interviews/ai/session/${b.id}`}
+        href={`/mock-interviews/ai/prepare/${b.id}`}
         className={cn(buttonVariants(), "w-full bg-gradient-to-r from-primary to-violet-600 text-white hover:opacity-90")}
       >
         <PlayCircle className="size-4" aria-hidden />
@@ -428,7 +428,7 @@ function PrimaryAction({ b }: { b: SampleBooking }) {
   if (b.status === "in_progress" || b.status === "interrupted")
     return (
       <div>
-        <Link href={`/mock-interviews/ai/session/${b.id}`} className={cn(buttonVariants(), "w-full bg-amber-500 text-white hover:bg-amber-600")}>
+        <Link href={`/mock-interviews/ai/prepare/${b.id}`} className={cn(buttonVariants(), "w-full bg-amber-500 text-white hover:bg-amber-600")}>
           <Timer className="size-4" aria-hidden />
           Resume
         </Link>

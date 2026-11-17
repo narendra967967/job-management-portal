@@ -77,6 +77,7 @@ lead pages locked and Mock interviews open; nothing else in the job tracker chan
 - The interview: chat screen, timer, wrap-up notice, the 10-minute extension, the end.
 - Bookings (spec D13a to D13d): "Book interview" / "Pay ₹X and book", the redirect with the new booking highlighted, the bookings table with stat boxes and filters, Start / Resume / View report, Edit setup with difficulty and length locked.
 - Interrupted interview: Resume within 15 minutes, from the bookings list.
+- Briefing page before every start or resume (spec D13e).
 - The shared report page: five scores, the overall score out of 100, the five written parts, the source label.
 - Interview history (a table) and Performance (a trend chart per metric, filter by AI or human).
 - "Prepare for this interview" on leads with status Interview.

@@ -305,7 +305,7 @@ function HistoryRow({
             Waiting
           </Link>
         ) : (
-          <Link href={`/mock-interviews/ai/session/${i.id}`} className={cn(buttonVariants(), "w-full bg-amber-500 text-white hover:bg-amber-600")}>
+          <Link href={`/mock-interviews/ai/prepare/${i.id}`} className={cn(buttonVariants(), "w-full bg-amber-500 text-white hover:bg-amber-600")}>
             <PlayCircle className="size-4" aria-hidden />
             Resume
           </Link>
