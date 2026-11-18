@@ -41,6 +41,8 @@ import {
   type PricingByDifficulty,
 } from "@/lib/mock-interviews/model";
 import { useMounted } from "@/lib/use-mounted";
+import { GetReady } from "@/components/mock-interviews/get-ready";
+import type { Readiness } from "@/lib/mock-interviews/data";
 import { emailAiInterviewReceiptAction } from "@/actions/mock-interviews";
 import { LEVEL_TAG } from "@/components/mock-interviews/visual-kit";
 import { cn } from "@/lib/utils";
@@ -91,11 +93,13 @@ export function AiHome({
   bookings,
   pricing,
   bookedId,
+  readiness,
 }: {
   allowance: AllowanceState;
   bookings: BookingRow[];
   pricing: PricingByDifficulty;
   bookedId?: string;
+  readiness: Readiness;
 }) {
   const mounted = useMounted();
   const router = useRouter();
@@ -143,6 +147,8 @@ export function AiHome({
   return (
     <div className="mx-auto max-w-6xl space-y-4">
       <Hero allowance={allowance} pricing={pricing} mounted={mounted} />
+
+      <GetReady readiness={readiness} allowance={allowance} pricing={pricing} hasBookings={bookings.length > 0} />
 
       {booked && (
         <section className="overflow-hidden rounded-2xl border border-emerald-200 bg-card shadow-sm" aria-label="Your new booking">

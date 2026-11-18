@@ -17,6 +17,8 @@ export interface PromptValues {
   topics: string;
   resume: string;
   job_description: string;
+  /** The candidate's career profile (target roles, skills, experience), or "". */
+  career_profile: string;
 }
 
 /** Fill {{placeholders}}; unknown ones are left as typed. */
@@ -34,6 +36,8 @@ export function materialBlock(v: PromptValues): string {
     `Kind of interview: ${v.category}`,
     `Difficulty: ${v.difficulty}`,
     `Topics the candidate wants covered: ${v.topics || "none given"}`,
+    "",
+    ...(v.career_profile ? ["", "Career profile:", clip(v.career_profile, 4_000)] : []),
     "",
     "Resume:",
     clip(v.resume, 12_000) || "(none)",

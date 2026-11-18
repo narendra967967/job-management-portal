@@ -13,7 +13,6 @@ import {
   type InterviewSettingsSnapshot,
   type ModuleSettings,
 } from "./model";
-import { AI_INTERVIEWS_WIRED } from "./preview";
 
 // Admin → Mock interviews → Module settings, read on the server. The single
 // "app" row is created on the first save; until then the defaults apply.
@@ -81,12 +80,12 @@ export async function getModuleSettings(): Promise<ModuleSettings> {
 }
 
 /**
- * Whether candidates see AI interviews. Admin's Open switch decides; until the
- * interviewer is wired (roadmap R1.5) production keeps Coming soon whatever the
- * switch says, so nobody books an interview that can't run yet.
+ * Whether candidates see AI interviews: admin's Open / Coming soon switch
+ * (Module settings → Availability) alone decides, in every environment. It
+ * starts on Coming soon, so a new environment stays closed until admin opens it.
  */
 export function aiInterviewsOpen(s: Pick<ModuleSettings, "aiState">): boolean {
-  return s.aiState === "open" && (AI_INTERVIEWS_WIRED || process.env.NODE_ENV !== "production");
+  return s.aiState === "open";
 }
 
 export async function candidateAiOpen(): Promise<boolean> {

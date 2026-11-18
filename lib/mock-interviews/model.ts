@@ -247,7 +247,7 @@ export const DEFAULT_PROMPTS: ModuleSettings["prompts"] = {
     "Score the candidate 1 to 10 on communication, technical knowledge, confidence and clarity, problem-solving and answer relevance. For each written part give a short headline and the full text. Base everything on the transcript.",
 };
 
-export const PROMPT_PLACEHOLDERS = ["{{role}}", "{{industry}}", "{{category}}", "{{difficulty}}", "{{question_count}}", "{{topics}}", "{{resume}}", "{{job_description}}"];
+export const PROMPT_PLACEHOLDERS = ["{{role}}", "{{industry}}", "{{category}}", "{{difficulty}}", "{{question_count}}", "{{topics}}", "{{resume}}", "{{job_description}}", "{{career_profile}}"];
 
 /* ---------------- what the candidate screens read ---------------- */
 

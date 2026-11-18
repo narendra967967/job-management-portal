@@ -2,7 +2,9 @@ import "server-only";
 
 import { and, asc, count, desc, eq, inArray, isNotNull, ne, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { aiInterviewMessages, aiInterviews, interviewEvaluations, plans, user } from "@/db/schema";
+import { aiInterviewMessages, aiInterviews, interviewEvaluations, jobLeads, plans, resumes, user } from "@/db/schema";
+import { careerCompletionFor } from "@/lib/career-data";
+import { aiPaymentAvailable } from "@/lib/payments/ai-interview-orders";
 import { settleInterview, type Phase } from "./engine";
 import type {
   AllowanceState,
@@ -363,5 +365,50 @@ export async function getReport(userId: string, id: string): Promise<ReportData 
     overall: e.overall,
     messages: await messagesOf(id),
     all,
+  };
+}
+
+/* ---------------- getting ready to book ---------------- */
+
+export interface Readiness {
+  /** Saved resumes, and how many have text the interviewer can read. */
+  resumes: number;
+  readableResumes: number;
+  /** The career profile the interviewer uses to shape questions. */
+  career: { percent: number; complete: boolean };
+  /** Leads at the Interview stage: practice for a real one. */
+  interviewLeads: { count: number; first?: { id: string; label: string } };
+  /** Paying for interviews outside the allowance is possible right now. */
+  paymentAvailable: boolean;
+}
+
+/** What the AI mock interviews page shows under "Get ready". */
+export async function getReadiness(userId: string): Promise<Readiness> {
+  const [[r], leads, career, paymentAvailable] = await Promise.all([
+    db
+      .select({
+        total: count(),
+        readable: sql<number>`count(*) filter (where length(trim(coalesce(${resumes.resumeText}, ''))) >= 300)::int`,
+      })
+      .from(resumes)
+      .where(eq(resumes.userId, userId)),
+    db
+      .select({ id: jobLeads.id, title: jobLeads.title, company: jobLeads.company })
+      .from(jobLeads)
+      .where(and(eq(jobLeads.userId, userId), eq(jobLeads.status, "interview")))
+      .orderBy(desc(jobLeads.updatedAt))
+      .limit(50),
+    careerCompletionFor(userId),
+    aiPaymentAvailable(),
+  ]);
+  return {
+    resumes: r?.total ?? 0,
+    readableResumes: r?.readable ?? 0,
+    career,
+    interviewLeads: {
+      count: leads.length,
+      ...(leads[0] ? { first: { id: leads[0].id, label: `${leads[0].title} at ${leads[0].company}` } } : {}),
+    },
+    paymentAvailable,
   };
 }

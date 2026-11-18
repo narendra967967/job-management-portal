@@ -1,7 +1,7 @@
 ---
 title: AI mock interviews (Module settings, sessions and giving one back)
 category: AI
-summary: Admin → Mock interviews holds the module's settings and every AI interview session. A booking keeps the settings it was made under, so changes only affect new ones. In production candidates see Coming soon until rollout.
+summary: Admin → Mock interviews holds the module's settings and every AI interview session. A booking keeps the settings it was made under, so changes only affect new ones. The Availability switch alone decides what candidates see.
 keywords: mock interview, interview prep, practice interview, credit, refund interview, give back, allowance, interview price, coming soon, module settings
 ---
 
@@ -9,7 +9,18 @@ AI mock interviews live under **Admin → Mock interviews**. There are two scree
 
 ## What candidates see right now
 
-The **AI interviews** switch in Module settings → Availability decides whether candidates get the feature or a Coming soon page. Until the rollout step (after the quality tuning and safety checks on the roadmap), production keeps showing Coming soon even if you switch it to Open. On a developer machine, Open shows the screens so they can be tried end to end.
+The **AI interviews** switch in Module settings → Availability decides whether candidates get the feature or a Coming soon page, in every environment. It starts on Coming soon, so a new environment stays closed until you open it there. Leave prod on Coming soon until the roadmap's rollout step.
+
+When it's open, the AI mock interviews page starts with a **Get ready** checklist while anything is missing:
+
+| Item | Ready when | If not |
+|---|---|---|
+| An interview to use | The plan has included interviews left, or online payment is available | Needed to book. Links to the plan page |
+| Resume | A saved resume with readable text (300+ characters) | Recommended. They can still paste one while booking |
+| Career profile | The profile is complete | Recommended. The interviewer reads target roles, skills, experience and seniority |
+| A real interview coming up | A lead is at the Interview stage | Optional. Offers "Prepare for it" for that lead |
+
+Once everything is ready and they have bookings, it folds into one line.
 
 The same switch hides "Prepare for this interview" on leads at the Interview stage.
 
@@ -37,7 +48,7 @@ The plan editor has **AI mock interviews included**. On a paid plan it's granted
 
 ## How an interview runs
 
-1. The candidate presses **Start interview** on the briefing page. The AI writes a question plan sized to the length (length ÷ minutes per question), covering their topics. If that fails, the booking stays ready and nothing is used up.
+1. The candidate presses **Start interview** on the briefing page. The AI writes a question plan sized to the length (length ÷ minutes per question), covering their topics. It reads the resume, the job description and the candidate's career profile (the report uses the profile too). If that fails, the booking stays ready and nothing is used up.
 2. Questions come one at a time. After each answer the AI either asks a follow-up (at most two per question) or moves to the next planned question. If the AI doesn't reply, the next planned question is asked as written, so the interview carries on.
 3. **The clock only counts connected time.** The screen checks in every 15 seconds. If nothing arrives for 45 seconds, the candidate counts as disconnected and the clock stops where it was.
 4. A disconnected candidate has the resume window (15 minutes by default) to come back. After that the interview closes with the answers so far and is scored on those.

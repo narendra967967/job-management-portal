@@ -8,6 +8,7 @@ import { moduleAiChat, MODULE_AI_NOT_CONFIGURED, type ChatTurn, type ModuleAiRes
 import { sendTemplateEmail } from "@/lib/email-templates";
 import { greetingName } from "@/lib/email-templates-model";
 import { absoluteUrl } from "@/lib/site-url";
+import { careerBriefFor } from "@/lib/career-data";
 import { getModuleSettings } from "./config";
 import { overallScore, plannedQuestions, type PlannedQuestion } from "./model";
 import {
@@ -140,7 +141,13 @@ function promptValues(i: Row, plan: PlannedQuestion[] | null): PromptValues {
     topics: i.topics.join(", "),
     resume: i.resumeText,
     job_description: i.jobDescription,
+    career_profile: "",
   };
+}
+
+/** Prompt values plus the candidate's career profile (for the plan and the report). */
+async function promptValuesWithProfile(i: Row, plan: PlannedQuestion[] | null): Promise<PromptValues> {
+  return { ...promptValues(i, plan), career_profile: await careerBriefFor(i.userId) };
 }
 
 const aiErrorText = (err: unknown) => {
@@ -196,7 +203,7 @@ export async function settleInterview(id: string): Promise<void> {
 async function writePlan(i: Row): Promise<PlannedQuestion[]> {
   const s = await getModuleSettings();
   const count = plannedQuestions(i.durationMin, i.settings.minutesPerQuestion);
-  const values = promptValues(i, null);
+  const values = await promptValuesWithProfile(i, null);
   const system = `${fillPrompt(s.prompts.questionPlan, values)}\n\n${planFormat(count, i.topics)}`;
   let lastErr: unknown;
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -545,7 +552,7 @@ export async function evaluateInterview(id: string): Promise<boolean> {
     .map((m) => (m.sender === "ai" ? `Interviewer${m.questionNo ? ` (question ${m.questionNo})` : ""}: ${m.text}` : `Candidate: ${m.text}`))
     .join("\n\n");
   const s = await getModuleSettings();
-  const values = promptValues(i, i.questionPlan);
+  const values = await promptValuesWithProfile(i, i.questionPlan);
   const system = `${fillPrompt(s.prompts.evaluation, values)}\n\n${evaluationFormat()}`;
   const user = `${materialBlock(values)}\n\nTranscript:\n\n${transcript.slice(0, 60_000)}`;
 
