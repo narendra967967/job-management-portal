@@ -131,13 +131,13 @@ const score = z.number().int().min(1).max(10);
 
 export const evaluationSchema = z.object({
   scores: z.object({ communication: score, technical: score, confidence: score, problemSolving: score, relevance: score }),
-  strengths: z.array(point).min(1).max(6),
-  improvements: z.array(point).min(1).max(6),
+  strengths: z.array(point).min(1).max(30),
+  improvements: z.array(point).min(1).max(30),
   missed: z
     .array(z.object({ question: z.string().trim().min(1).max(600), headline: z.string().trim().min(1).max(90), note: z.string().trim().min(1).max(1200) }))
-    .max(8),
-  betterAnswers: z.array(z.object({ question: z.string().trim().min(1).max(600), answer: z.string().trim().min(1).max(2000) })).max(8),
-  nextSteps: z.array(point).min(1).max(6),
+    .max(60),
+  betterAnswers: z.array(z.object({ question: z.string().trim().min(1).max(600), answer: z.string().trim().min(1).max(2000) })).max(60),
+  nextSteps: z.array(point).min(1).max(30),
 });
 export type EvaluationReply = z.infer<typeof evaluationSchema>;
 
@@ -154,14 +154,25 @@ export function evaluationFormat(): string {
     "- Use the full scale, strictly, as a demanding interviewer would: 1-2 no relevant answer; 3-4 vague, generic or largely wrong, with no real example; 5-6 relevant but general or partial, few specifics; 7-8 specific and structured, with a real example and its result; 9-10 exceptional, complete on every part, with measurable results and clear reasoning.",
     "- A short, vague or generic answer can't lift a score above 4. 'I'm not sure' counts against technical knowledge and confidence. An average answer is a 5. A well-prepared candidate who answers with specific examples and their results earns 7 to 8; give 9 or 10 only when nearly every answer is exceptional.",
     "- headline: a short label of 2 to 6 words in sentence case (only the first word capitalized, e.g. \"Give a specific example\"). detail / note / answer: the full explanation, specific to this candidate's answers, written to the candidate as \"you\".",
-    "- missed: questions answered wrongly or only partly, with what was missing. betterAnswers: a stronger answer for those questions.",
+    "- missed: questions answered wrongly or only partly, with what was missing, at most 8 and the most important first. betterAnswers: a stronger answer for each of those, in the same order.",
     "- strengths, improvements and nextSteps: 1 to 4 items each. Plain text in every field, no Markdown.",
     "- Questions the candidate never reached aren't failures; don't list them as missed.",
   ].join("\n");
 }
 
+/**
+ * The written parts, trimmed to what the report shows. A reply that lists more
+ * (common for a weak interview with many thin answers) is kept and cut down,
+ * rather than failing the whole report.
+ */
 export function toWriting(r: EvaluationReply): ReportWriting {
-  return { strengths: r.strengths, improvements: r.improvements, missed: r.missed, betterAnswers: r.betterAnswers, nextSteps: r.nextSteps };
+  return {
+    strengths: r.strengths.slice(0, 4),
+    improvements: r.improvements.slice(0, 4),
+    missed: r.missed.slice(0, 8),
+    betterAnswers: r.betterAnswers.slice(0, 8),
+    nextSteps: r.nextSteps.slice(0, 4),
+  };
 }
 
 /** The first JSON object in a reply (some models wrap it in prose or a code fence). */

@@ -175,9 +175,14 @@ await db.query(
 const E = await import("../../lib/mock-interviews/engine.ts");
 const C = await import("../../lib/mock-interviews/config.ts");
 
-const { rows: [u] } = await db.query('select id from "user" where email = $1', [process.env.LOCAL_TEST_EMAIL]);
-if (!u) throw new Error("No LOCAL_TEST_EMAIL user.");
-const userId: string = u.id;
+// A temporary practice user with no career profile, so every run gets only the
+// scenario's own resume and job description (and ui-test's data is untouched).
+// Deleted at the end, with its practice interviews.
+const userId = "practice-r16";
+await db.query(
+  `insert into "user" (id, name, email, email_verified) values ($1, 'Practice Candidate', 'practice-r16@jobtiva.test', true) on conflict (id) do nothing`,
+  [userId],
+);
 
 const outDir = path.join("docs", "interview-prep", "r1.6");
 mkdirSync(outDir, { recursive: true });
@@ -245,6 +250,12 @@ try {
       if (!ev) await new Promise((res) => setTimeout(res, 2000));
     }
     const { rows: [i] } = await db.query("select * from ai_interviews where id=$1", [id]);
+    if (!i) {
+      // Removed from outside (another tool working on the same database).
+      console.log("  the practice interview disappeared mid-run; skipped");
+      results.push({ run: sc.n, model: MODEL, scenario: sc, error: "interview removed mid-run" });
+      continue;
+    }
     const { rows: msgs } = await db.query("select sender, kind, question_no, text, clock_seconds from ai_interview_messages where interview_id=$1 order by seq", [id]);
     const { rows: events } = await db.query("select kind, detail, clock_seconds from ai_interview_events where interview_id=$1 order by created_at", [id]);
     const result = {
@@ -291,6 +302,7 @@ try {
   }
 } finally {
   if (created.length) await db.query("delete from ai_interviews where id = any($1)", [created]);
+  await db.query('delete from "user" where id = $1', [userId]);
   await db.query(`update mock_interview_config set ${TEST_COLS.map((c, k) => `${c} = $${k + 1}`).join(", ")} where id='app'`, TEST_COLS.map((c) => cfgRow[c]));
   const { rows: [now] } = await db.query("select * from mock_interview_config where id='app'");
   const same = TEST_COLS.every((c) => JSON.stringify(now[c]) === JSON.stringify(cfgRow[c]));
