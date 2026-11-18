@@ -95,9 +95,9 @@ export function turnRules(maxFollowUps: number): string {
     "How each turn works:",
     "After every candidate answer you get a short note in [brackets] saying where the interview stands. The candidate doesn't see it. Decide what happens next, then reply with one JSON object only:",
     '{"action": "follow_up" | "next_question" | "end", "message": string}',
-    `- follow_up: one short follow-up on the same question, only when the answer is thin, vague or lacks evidence you'd need to score it. At most ${maxFollowUps} per question.`,
+    `- follow_up: one short follow-up on the same question, only when the answer is thin, vague or lacks evidence you'd need to score it. At most ${maxFollowUps} per question, except once every planned question is done.`,
     "- next_question: a brief, natural transition (no praise or feedback on the last answer), then the next planned question named in the note, kept in meaning.",
-    "- end: one or two sentences thanking the candidate and saying their report is being prepared. Only when the note says time is up or the plan is done, or the candidate asks to stop.",
+    "- end: one or two sentences thanking the candidate and saying their report is being prepared. Only when the note allows it (time is up, or the plan is done and little time is left), or the candidate asks to stop.",
     "- Never give feedback, hints or scores during the interview. Plain text, no Markdown, under 90 words.",
   ].join("\n");
 }
@@ -107,6 +107,10 @@ export function turnNote(s: TurnState): string {
   const parts = [`Planned question ${s.questionNo} of ${s.totalQuestions}; follow-ups on it so far: ${s.followUpsOnQuestion} of ${s.maxFollowUps}.`];
   if (s.wrappingUp) parts.push("Time is up: don't start a new planned question. Ask one last short follow-up to finish this one, or end.");
   else if (s.nextQuestion) parts.push(`About ${s.minutesLeft} minutes left. Next planned question: "${s.nextQuestion}"`);
+  else if (s.minutesLeft >= 3)
+    parts.push(
+      `Every planned question is done, with about ${s.minutesLeft} minutes left. Use the time: ask a follow-up, or a new related question that digs into the area where the candidate's answers were thinnest (action follow_up). Don't end unless the candidate asks to stop.`,
+    );
   else parts.push("That was the last planned question: ask a follow-up if it's needed, otherwise end.");
   return `[Interviewer note, not from the candidate: ${parts.join(" ")}]`;
 }
@@ -142,7 +146,9 @@ export function evaluationFormat(): string {
     ' "missed": [{"question": string, "headline": string, "note": string}],',
     ' "betterAnswers": [{"question": string, "answer": string}],',
     ' "nextSteps": [{"headline": string, "detail": string}]}',
-    "- Each score is a whole number from 1 to 10, judged only on what's in the transcript.",
+    "- Each score is a whole number from 1 to 10, judged only on what the candidate said in the transcript. The resume is context, not evidence.",
+    "- Use the full scale, strictly, as a demanding interviewer would: 1-2 no relevant answer; 3-4 vague, generic or largely wrong, with no real example; 5-6 relevant but general or partial, few specifics; 7-8 specific and structured, with a real example and its result; 9-10 exceptional, complete on every part, with measurable results and clear reasoning.",
+    "- A short, vague or generic answer can't lift a score above 4. 'I'm not sure' counts against technical knowledge and confidence. An average answer is a 5. A well-prepared candidate who answers with specific examples and their results earns 7 to 8; give 9 or 10 only when nearly every answer is exceptional.",
     "- headline: a short label of 2 to 6 words in sentence case (only the first word capitalized, e.g. \"Give a specific example\"). detail / note / answer: the full explanation, specific to this candidate's answers, written to the candidate as \"you\".",
     "- missed: questions answered wrongly or only partly, with what was missing. betterAnswers: a stronger answer for those questions.",
     "- strengths, improvements and nextSteps: 1 to 4 items each. Plain text in every field, no Markdown.",

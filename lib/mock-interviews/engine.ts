@@ -404,7 +404,9 @@ async function interviewerTurn(i: Row, plan: PlannedQuestion[], history: ChatTur
   }
   // The server keeps the rules whatever the reply says.
   if (!decision) decision = next && !wrappingUp ? { action: "next_question", message: `Thank you. Next question: ${next.question}` } : { action: "end", message: CLOSING };
-  if (decision.action === "follow_up" && followUps >= MAX_FOLLOW_UPS) {
+  // With the plan done and time left, the interviewer keeps probing (no follow-up cap).
+  const extraTime = !next && !wrappingUp && state.minutesLeft >= 3;
+  if (decision.action === "follow_up" && followUps >= MAX_FOLLOW_UPS && !extraTime) {
     decision = next && !wrappingUp ? { action: "next_question", message: `Thank you. Next question: ${next.question}` } : { action: "end", message: CLOSING };
   }
   if (decision.action === "next_question" && (!next || wrappingUp)) decision = { action: "end", message: CLOSING };
