@@ -11,7 +11,9 @@
 // window is open, then shows the result.
 
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, CircleAlert, Loader2, Lock, Send } from "lucide-react";
+import { CheckCircle2, CircleAlert, Loader2, Lock, MapPin, Send } from "lucide-react";
+import { BillingDetailsDialog } from "@/components/billing/billing-details-form";
+import { EMPTY_BILLING, SAMPLE_BILLING, billingPlace, isBillingComplete, type BillingDetails } from "@/lib/invoices/billing-details";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useContactSupport } from "@/components/support/contact-support";
@@ -58,6 +60,14 @@ export function CheckoutDialog({
   const [paidUntil, setPaidUntil] = useState<string | null>(null);
   // The server can switch this off (gateway turned off meanwhile).
   const [canPayOnline, setCanPayOnline] = useState(online);
+  // Billing details are required before any payment (invoices spec I4).
+  // PHASE 1: sample details; ?sample=empty shows a user who hasn't given them.
+  const [billing, setBilling] = useState<BillingDetails | null>(SAMPLE_BILLING);
+  const [askBilling, setAskBilling] = useState(false);
+  const billingDone = isBillingComplete(billing);
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("sample") === "empty") setBilling(null);
+  }, []);
 
   // Fresh state each time the dialog opens for a plan.
   useEffect(() => {
@@ -241,7 +251,27 @@ export function CheckoutDialog({
 
                 {canPayOnline ? (
                   <>
-                    <Button className="w-full" onClick={pay} disabled={busy}>
+                    <div className="flex items-center gap-2 rounded-xl border px-3 py-2 text-xs">
+                      <MapPin className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                      {billingDone ? (
+                        <span className="min-w-0 flex-1 truncate">
+                          <span className="text-muted-foreground">Billed to </span>
+                          <span className="font-medium">{billing.businessName || billing.fullName}</span>
+                          <span className="text-muted-foreground">, {billingPlace(billing)}</span>
+                        </span>
+                      ) : (
+                        <span className="flex-1 text-muted-foreground">Billing details needed before you pay</span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setAskBilling(true)}
+                        disabled={busy}
+                        className="inline-flex min-h-11 shrink-0 items-center font-medium text-primary underline-offset-4 hover:underline sm:min-h-0"
+                      >
+                        {billingDone ? "Change" : "Add"}
+                      </button>
+                    </div>
+                    <Button className="w-full" onClick={() => (billingDone ? pay() : setAskBilling(true))} disabled={busy}>
                       {busy ? (
                         <>
                           <Loader2 className="size-4 animate-spin" aria-hidden />
@@ -280,6 +310,22 @@ export function CheckoutDialog({
           </>
         )}
       </DialogContent>
+      <BillingDetailsDialog
+        open={askBilling}
+        onOpenChange={setAskBilling}
+        initial={billing ?? EMPTY_BILLING}
+        reason={billing ? "edit" : "checkout"}
+        submitLabel={billingDone ? "Save details" : "Save and continue to pay"}
+        onSave={async (d) => {
+          // PHASE 1: kept on screen only. Phase 3 saves it to the account first,
+          // and the server refuses to start an order while it's incomplete.
+          const wasDone = billingDone;
+          setBilling(d);
+          setAskBilling(false);
+          if (!wasDone) void pay();
+          return null;
+        }}
+      />
     </Dialog>
   );
 }
