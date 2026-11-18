@@ -1,0 +1,1 @@
+ALTER TABLE "mock_interview_config" ADD COLUMN "ai_cached_input_cost_per_mtok_paise" integer DEFAULT 0 NOT NULL;

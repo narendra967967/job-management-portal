@@ -213,6 +213,8 @@ export interface ModuleSettings {
   keyLast4: string | null;
   /** What the provider charges, in paise per million tokens (admin-set). */
   inputCostPerMTokPaise: number;
+  /** Cached input; 0 means charge it at the input price. */
+  cachedInputCostPerMTokPaise: number;
   outputCostPerMTokPaise: number;
   categories: string[];
   durations: number[];

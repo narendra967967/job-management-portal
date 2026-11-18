@@ -49,6 +49,7 @@ const sectionSchema = z.discriminatedUnion("section", [
     // Blank keeps the saved key.
     key: z.string().trim().max(400).optional().default(""),
     inputCostPerMTokPaise: whole(0, 10_000_000, "Input token price"),
+    cachedInputCostPerMTokPaise: whole(0, 10_000_000, "Cached input token price"),
     outputCostPerMTokPaise: whole(0, 10_000_000, "Output token price"),
   }),
   z.object({
@@ -107,6 +108,7 @@ export async function saveModuleSettingsAction(input: unknown): Promise<Result &
       next.provider = v.provider;
       next.model = v.model;
       next.inputCostPerMTokPaise = v.inputCostPerMTokPaise;
+      next.cachedInputCostPerMTokPaise = v.cachedInputCostPerMTokPaise;
       next.outputCostPerMTokPaise = v.outputCostPerMTokPaise;
       if (v.key) keyPatch = { aiKeyCiphertext: encryptSecret(v.key), aiKeyLast4: v.key.slice(-4) };
       break;
@@ -148,6 +150,7 @@ export async function saveModuleSettingsAction(input: unknown): Promise<Result &
     aiProvider: next.provider,
     aiModel: next.model || null,
     aiInputCostPerMTokPaise: next.inputCostPerMTokPaise,
+    aiCachedInputCostPerMTokPaise: next.cachedInputCostPerMTokPaise,
     aiOutputCostPerMTokPaise: next.outputCostPerMTokPaise,
     categories: next.categories,
     durations: next.durations,

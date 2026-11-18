@@ -374,7 +374,10 @@ export interface ChatTurn {
 
 export interface ModuleAiResult {
   text: string;
+  /** All input tokens, cached ones included. */
   tokensIn: number;
+  /** Input tokens the provider served from its cache (charged less). */
+  tokensCached: number;
   tokensOut: number;
   provider: AiProvider;
   model: string;
@@ -394,7 +397,21 @@ async function getModuleAi(): Promise<UserAi> {
   return { provider: c.provider, model: c.model?.trim() || AI_PROVIDER_DEFAULT_MODEL[c.provider], key: decryptSecret(c.ciphertext) };
 }
 
+/**
+ * OpenAI's newer reasoning models (gpt-5…, gpt-6…, o-series) take
+ * max_completion_tokens, no temperature, and a reasoning effort. Interviews
+ * run them with as little thinking as each allows, so replies stay quick.
+ */
+export function reasoningEffortFor(model: string): string | null {
+  const m = model.replace(/^openai\//, "").toLowerCase();
+  if (/^gpt-6/.test(m)) return "none";
+  if (/^gpt-5/.test(m)) return "minimal";
+  if (/^o\d/.test(m)) return "low";
+  return null;
+}
+
 async function chatOpenAiLike(url: string, ai: UserAi, system: string, turns: ChatTurn[], maxTokens: number, opts: ModuleAiOptions): Promise<Omit<ModuleAiResult, "provider" | "model">> {
+  const effort = reasoningEffortFor(ai.model);
   const res = await fetch(url, {
     method: "POST",
     headers: {
@@ -404,8 +421,11 @@ async function chatOpenAiLike(url: string, ai: UserAi, system: string, turns: Ch
     },
     body: JSON.stringify({
       model: ai.model,
-      temperature: opts.temperature ?? 0.4,
-      max_tokens: maxTokens,
+      ...(effort
+        ? url.includes("openrouter")
+          ? { max_tokens: maxTokens, reasoning: { effort } }
+          : { max_completion_tokens: maxTokens, reasoning_effort: effort }
+        : { temperature: opts.temperature ?? 0.4, max_tokens: maxTokens }),
       ...(opts.json ? { response_format: { type: "json_object" } } : {}),
       messages: [{ role: "system", content: system }, ...turns],
     }),
@@ -416,6 +436,7 @@ async function chatOpenAiLike(url: string, ai: UserAi, system: string, turns: Ch
   return {
     text: (data.choices?.[0]?.message?.content ?? "").trim(),
     tokensIn: Number(data.usage?.prompt_tokens ?? 0),
+    tokensCached: Number(data.usage?.prompt_tokens_details?.cached_tokens ?? 0),
     tokensOut: Number(data.usage?.completion_tokens ?? 0),
   };
 }
@@ -439,7 +460,9 @@ async function chatAnthropic(ai: UserAi, system: string, turns: ChatTurn[], maxT
   const data = await res.json();
   return {
     text: (data.content?.[0]?.text ?? "").trim(),
-    tokensIn: Number(data.usage?.input_tokens ?? 0),
+    // Anthropic reports cache reads separately from input_tokens.
+    tokensIn: Number(data.usage?.input_tokens ?? 0) + Number(data.usage?.cache_read_input_tokens ?? 0),
+    tokensCached: Number(data.usage?.cache_read_input_tokens ?? 0),
     tokensOut: Number(data.usage?.output_tokens ?? 0),
   };
 }

@@ -1725,6 +1725,8 @@ export const mockInterviewConfig = pgTable(
     // cost per interview = tokens x these (0 until set).
     aiInputCostPerMTokPaise: integer("ai_input_cost_per_mtok_paise").notNull().default(0),
     aiOutputCostPerMTokPaise: integer("ai_output_cost_per_mtok_paise").notNull().default(0),
+    // Input the provider served from its cache (much cheaper). 0 = charge it at the input price.
+    aiCachedInputCostPerMTokPaise: integer("ai_cached_input_cost_per_mtok_paise").notNull().default(0),
     categories: text("categories").array().notNull().default(sql`'{}'::text[]`),
     durations: integer("durations").array().notNull().default(sql`'{15,30,45,60}'::integer[]`),
     minutesPerQuestion: real("minutes_per_question").notNull().default(2),

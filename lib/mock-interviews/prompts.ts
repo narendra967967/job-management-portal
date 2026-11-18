@@ -85,33 +85,30 @@ export interface TurnState {
   minutesLeft: number;
 }
 
-export function turnFormat(s: TurnState): string {
-  const lines = [
-    "You've just read the candidate's latest answer. Decide what happens next and write it.",
-    "Reply with one JSON object only:",
+/**
+ * The interviewer's standing rules. They go in the system prompt and never
+ * change during an interview, so together with the conversation so far they
+ * form a stable prefix the provider can cache (much cheaper input).
+ */
+export function turnRules(maxFollowUps: number): string {
+  return [
+    "How each turn works:",
+    "After every candidate answer you get a short note in [brackets] saying where the interview stands. The candidate doesn't see it. Decide what happens next, then reply with one JSON object only:",
     '{"action": "follow_up" | "next_question" | "end", "message": string}',
-    `- You're on planned question ${s.questionNo} of ${s.totalQuestions}. Follow-ups asked on it so far: ${s.followUpsOnQuestion} (at most ${s.maxFollowUps}).`,
-    "- follow_up: ask one short follow-up on the same question, only when the answer is thin, vague or needs evidence for scoring.",
-  ];
-  if (s.wrappingUp) {
-    lines.push(
-      "- Time is up. Don't start a new planned question. Either ask one last short follow-up to finish this question, or end.",
-      '- end: thank the candidate in one or two sentences and say their report is being prepared. Give no scores or feedback.',
-    );
-  } else if (s.nextQuestion) {
-    lines.push(
-      `- next_question: move on. Your message is a brief, natural transition (no feedback on the last answer) followed by this planned question, kept in meaning: "${s.nextQuestion}"`,
-      `- About ${s.minutesLeft} minutes are left.`,
-      "- end: only if the candidate asks to stop.",
-    );
-  } else {
-    lines.push(
-      "- This was the last planned question. Ask a follow-up if it's needed, otherwise end.",
-      '- end: thank the candidate in one or two sentences and say their report is being prepared. Give no scores or feedback.',
-    );
-  }
-  lines.push("- Never give feedback, hints or scores during the interview. Plain text, no Markdown, under 90 words.");
-  return lines.join("\n");
+    `- follow_up: one short follow-up on the same question, only when the answer is thin, vague or lacks evidence you'd need to score it. At most ${maxFollowUps} per question.`,
+    "- next_question: a brief, natural transition (no praise or feedback on the last answer), then the next planned question named in the note, kept in meaning.",
+    "- end: one or two sentences thanking the candidate and saying their report is being prepared. Only when the note says time is up or the plan is done, or the candidate asks to stop.",
+    "- Never give feedback, hints or scores during the interview. Plain text, no Markdown, under 90 words.",
+  ].join("\n");
+}
+
+/** Where the interview stands now, added to the candidate's latest answer (the only part that changes each turn). */
+export function turnNote(s: TurnState): string {
+  const parts = [`Planned question ${s.questionNo} of ${s.totalQuestions}; follow-ups on it so far: ${s.followUpsOnQuestion} of ${s.maxFollowUps}.`];
+  if (s.wrappingUp) parts.push("Time is up: don't start a new planned question. Ask one last short follow-up to finish this one, or end.");
+  else if (s.nextQuestion) parts.push(`About ${s.minutesLeft} minutes left. Next planned question: "${s.nextQuestion}"`);
+  else parts.push("That was the last planned question: ask a follow-up if it's needed, otherwise end.");
+  return `[Interviewer note, not from the candidate: ${parts.join(" ")}]`;
 }
 
 export const turnSchema = z.object({

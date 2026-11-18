@@ -246,7 +246,7 @@ function TokenPrice({ label, paise, onChange }: { label: string; paise: number; 
 function AiService({ s, set }: SectionProps) {
   const [key, setKey] = useState("");
   const [testing, setTesting] = useState(false);
-  const priceBad = [s.inputCostPerMTokPaise, s.outputCostPerMTokPaise].some((p) => !Number.isFinite(p) || p < 0 || p > 10_000_000);
+  const priceBad = [s.inputCostPerMTokPaise, s.cachedInputCostPerMTokPaise, s.outputCostPerMTokPaise].some((p) => !Number.isFinite(p) || p < 0 || p > 10_000_000);
   const keyError = key && key.trim().length < 20 ? "That doesn't look like a full API key." : priceBad ? "Fix the token prices marked in red." : "";
   async function test() {
     setTesting(true);
@@ -289,6 +289,7 @@ function AiService({ s, set }: SectionProps) {
           </div>
         </Field>
         <TokenPrice label="Input tokens" paise={s.inputCostPerMTokPaise} onChange={(v) => set("inputCostPerMTokPaise", v)} />
+        <TokenPrice label="Cached input tokens" paise={s.cachedInputCostPerMTokPaise} onChange={(v) => set("cachedInputCostPerMTokPaise", v)} />
         <TokenPrice label="Output tokens" paise={s.outputCostPerMTokPaise} onChange={(v) => set("outputCostPerMTokPaise", v)} />
       </div>
       {keyError && <p className="mt-2 text-xs text-destructive">{keyError}</p>}
@@ -298,7 +299,7 @@ function AiService({ s, set }: SectionProps) {
           {testing ? "Testing…" : "Test connection"}
         </Button>
         <InfoTip label="About token prices">
-          Copy them from your provider&apos;s price list, in rupees. Admin → AI interviews works out each interview&apos;s AI cost from the tokens it used and these prices. Leave them at 0 and the cost shows as ₹0.
+          Copy them from your provider&apos;s price list, in rupees. Cached input is the part of each request the provider has seen recently and charges less for; leave it at 0 to charge it at the input price. Admin → AI interviews works out each interview&apos;s AI cost from the tokens it used and these prices.
         </InfoTip>
         <InfoTip label="About this key">
           Used only for mock interviews, separate from users&apos; own keys and the knowledge base key, so its usage and cost are tracked on their own. Stored encrypted and never shown again.
@@ -312,6 +313,7 @@ function AiService({ s, set }: SectionProps) {
           model: s.model,
           key,
           inputCostPerMTokPaise: s.inputCostPerMTokPaise,
+          cachedInputCostPerMTokPaise: s.cachedInputCostPerMTokPaise,
           outputCostPerMTokPaise: s.outputCostPerMTokPaise,
         })}
         onSaved={(r) => {

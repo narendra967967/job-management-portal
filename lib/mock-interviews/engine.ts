@@ -19,7 +19,8 @@ import {
   planFormat,
   planSchema,
   toWriting,
-  turnFormat,
+  turnNote,
+  turnRules,
   turnSchema,
   type PromptValues,
 } from "./prompts";
@@ -111,9 +112,12 @@ async function answersOf(x: Exec, interviewId: string): Promise<number> {
 }
 
 /** Add an AI call's tokens and cost (admin's token prices) to the interview. */
-async function addUsage(x: Exec, interviewId: string, r: Pick<ModuleAiResult, "tokensIn" | "tokensOut" | "provider" | "model">) {
+async function addUsage(x: Exec, interviewId: string, r: Pick<ModuleAiResult, "tokensIn" | "tokensCached" | "tokensOut" | "provider" | "model">) {
   const s = await getModuleSettings();
-  const cost = (r.tokensIn * s.inputCostPerMTokPaise + r.tokensOut * s.outputCostPerMTokPaise) / 1_000_000;
+  // Cached input is charged at its own (lower) price; 0 means the input price.
+  const cachedPrice = s.cachedInputCostPerMTokPaise || s.inputCostPerMTokPaise;
+  const fresh = Math.max(0, r.tokensIn - r.tokensCached);
+  const cost = (fresh * s.inputCostPerMTokPaise + r.tokensCached * cachedPrice + r.tokensOut * s.outputCostPerMTokPaise) / 1_000_000;
   await x
     .update(aiInterviews)
     .set({
@@ -379,12 +383,19 @@ async function interviewerTurn(i: Row, plan: PlannedQuestion[], history: ChatTur
     minutesLeft: Math.max(0, Math.round((i.durationMin * 60 - i.activeSeconds) / 60)),
   };
   const planText = plan.map((q) => `${q.no}. ${q.question}`).join("\n");
-  const system = `${fillPrompt(s.prompts.interviewer, promptValues(i, plan))}\n\nThe planned questions:\n${planText}\n\n${turnFormat(state)}`;
+  // The system prompt and earlier turns stay identical from turn to turn, so
+  // the provider can serve them from its cache; only the note on the latest
+  // answer changes. The whole conversation is sent (an hour is ~60 messages):
+  // trimming its start would change the prefix and lose the cache.
+  const system = `${fillPrompt(s.prompts.interviewer, promptValues(i, plan))}\n\nThe planned questions:\n${planText}\n\n${turnRules(MAX_FOLLOW_UPS)}`;
+  const turns = history.slice(-120);
+  const last = turns.at(-1);
+  if (last?.role === "user") turns[turns.length - 1] = { ...last, content: `${last.content}\n\n${turnNote(state)}` };
 
   let decision: Decision | null = null;
   for (let attempt = 0; attempt < 2 && !decision; attempt++) {
     try {
-      const r = await moduleAiChat(system, history.slice(-30), 500, { json: true, temperature: 0.5, timeoutMs: 45_000 });
+      const r = await moduleAiChat(system, turns, 500, { json: true, temperature: 0.5, timeoutMs: 45_000 });
       await addUsage(db, i.id, r);
       decision = turnSchema.parse(parseJsonObject(r.text));
     } catch (err) {
