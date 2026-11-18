@@ -77,6 +77,7 @@ import { PlanChooser } from "@/components/billing/plan-chooser";
 import { useLimitedMode } from "@/lib/access-mode";
 import { EmailLogCard } from "@/components/forwarding/email-log-card";
 import { PaymentsTab } from "@/components/billing/payments-tab";
+import { BillingDetailsSection } from "@/components/billing/billing-details-card";
 import { DangerZoneCard } from "@/components/account/danger-zone";
 import { CareerProfileTab } from "@/components/career/career-profile-tab";
 import { ResumeAtsStrip, useAtsOverview } from "@/components/career/resume-ats";
@@ -151,7 +152,18 @@ interface SettingsSection {
 }
 
 const SECTION = {
-  profile: { id: "profile", label: "Profile", icon: User, render: () => <ProfileCard /> },
+  profile: {
+    id: "profile",
+    label: "Profile",
+    icon: User,
+    // General details, then billing details in their own box (owner, November 18, 2026).
+    render: () => (
+      <div className="space-y-4">
+        <ProfileCard />
+        <BillingDetailsSection />
+      </div>
+    ),
+  },
   career: { id: "career", label: "Career profile", icon: Briefcase, render: () => <CareerProfileTab /> },
   plan: { id: "plan", label: "Plan", icon: Crown, render: () => <PlanDetailsCard /> },
   payments: { id: "payments", label: "Payments", icon: Receipt, render: () => <PaymentsTab /> },

@@ -1,13 +1,12 @@
 "use client";
 
-// Settings → Payments (docs/invoices/spec.md, section 7): the user's billing
-// details, then every payment they've made or tried, with its invoice.
-// PHASE 1 (UI first): sample rows and sample details. Add ?sample=empty to the
-// URL to see the screen for someone who hasn't given billing details yet.
-// Phase 3 loads the signed-in user's own rows and saves the details for real.
+// Settings → Payments (docs/invoices/spec.md, section 7): every payment the user
+// has made or tried, with its invoice. Billing details live on the Profile tab
+// (components/billing/billing-details-card.tsx).
+// PHASE 1 (UI first): sample rows. Phase 3 loads the signed-in user's own.
 
 import { useEffect, useMemo, useState } from "react";
-import { CircleAlert, Download, Eye, FileText, LifeBuoy, Mail, MapPin, Pencil, Receipt, Search } from "lucide-react";
+import { Download, Eye, FileText, LifeBuoy, Mail, Receipt, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
@@ -30,9 +29,7 @@ import {
   ymd,
 } from "@/components/ui/data-table";
 import { useContactSupport } from "@/components/support/contact-support";
-import { BillingDetailsDialog } from "@/components/billing/billing-details-form";
 import { formatPaise } from "@/lib/invoices/model";
-import { EMPTY_BILLING, SAMPLE_BILLING, billingPlace, isBillingComplete, type BillingDetails } from "@/lib/invoices/billing-details";
 import {
   PAYMENTS_DEFAULT_DAYS,
   PAYMENT_STATUS_LABELS,
@@ -58,91 +55,12 @@ const dateTime = (iso: string) =>
 const shortDay = (iso: string) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 const shortTime = (iso: string) => new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 
-const pdfHref =(r: PaymentRow, download: boolean) => `/api/invoices/sample/${r.id}${download ? "?download=1" : ""}`;
+const pdfHref = (r: PaymentRow, download: boolean) => `/api/invoices/sample/${r.id}${download ? "?download=1" : ""}`;
 
 export function PaymentsTab() {
-  const [billing, setBilling] = useState<BillingDetails | null>(SAMPLE_BILLING);
-  const [editing, setEditing] = useState(false);
-
-  // Phase 1 preview of a user with no billing details yet.
-  useEffect(() => {
-    if (new URLSearchParams(window.location.search).get("sample") === "empty") setBilling(null);
-  }, []);
-
-  return (
-    <div className="space-y-4">
-      <BillingCard billing={billing} onEdit={() => setEditing(true)} />
-      <PaymentsCard />
-      <BillingDetailsDialog
-        open={editing}
-        onOpenChange={setEditing}
-        initial={billing ?? EMPTY_BILLING}
-        reason={billing ? "edit" : "add"}
-        onSave={async (d) => {
-          // Phase 3 saves this on the server, with the same checks.
-          setBilling(d);
-          setEditing(false);
-          toast.success("Billing details saved", "Future invoices will use them.");
-          return null;
-        }}
-      />
-    </div>
-  );
+  return <PaymentsCard />;
 }
 
-function BillingCard({ billing, onEdit }: { billing: BillingDetails | null; onEdit: () => void }) {
-  const complete = isBillingComplete(billing);
-  return (
-    <section className="rounded-2xl border bg-card p-4 md:p-5">
-      <div className="flex items-start justify-between gap-3">
-        <h2 className="flex items-center gap-2 text-sm font-medium">
-          <MapPin className="size-4 text-muted-foreground" aria-hidden />
-          Billing details
-        </h2>
-        <Button variant="outline" size="sm" className="h-11 shrink-0 gap-1.5 bg-white/50 sm:h-9" onClick={onEdit}>
-          <Pencil className="size-4" aria-hidden />
-          {billing ? "Edit" : "Add details"}
-        </Button>
-      </div>
-      {!billing ? (
-        <div className="mt-3 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-          <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
-          <p>Add your billing details before your first payment. They go on your invoices, and you&apos;re asked only once.</p>
-        </div>
-      ) : (
-        <dl className="mt-3 grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
-          <div>
-            <dt className="text-xs text-muted-foreground">Name on invoices</dt>
-            <dd className="font-medium">{billing.businessName || billing.fullName}</dd>
-            {billing.businessName && <dd className="text-xs text-muted-foreground">Attn: {billing.fullName}</dd>}
-          </div>
-          <div>
-            <dt className="text-xs text-muted-foreground">Mobile</dt>
-            <dd>+91 {billing.mobile}</dd>
-          </div>
-          <div className="sm:col-span-2">
-            <dt className="text-xs text-muted-foreground">Address</dt>
-            <dd>{billing.addressLine}</dd>
-            <dd>{billingPlace(billing)}, India</dd>
-          </div>
-          {billing.gstin && (
-            <div>
-              <dt className="text-xs text-muted-foreground">GSTIN</dt>
-              <dd className="font-mono text-[13px]">{billing.gstin}</dd>
-            </div>
-          )}
-          {billing.pan && (
-            <div>
-              <dt className="text-xs text-muted-foreground">PAN</dt>
-              <dd className="font-mono text-[13px]">{billing.pan}</dd>
-            </div>
-          )}
-          {!complete && <dd className="text-xs text-destructive sm:col-span-2">Some details are missing. Edit them before your next payment.</dd>}
-        </dl>
-      )}
-    </section>
-  );
-}
 
 function PaymentsCard() {
   const mounted = useMounted();

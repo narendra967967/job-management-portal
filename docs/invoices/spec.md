@@ -27,7 +27,7 @@ CA before GST is switched on.
 ## 2. Billing details (required before paying)
 
 Asked once, in a short form that opens when the user clicks **Pay** with details missing, and editable any
-time in Settings → Payments. Each invoice keeps its own copy (I3), so editing changes only future invoices.
+time in Settings → Profile, in their own Billing details box. Each invoice keeps its own copy (I3), so editing changes only future invoices.
 
 | Field | Required | Notes |
 |---|---|---|
@@ -102,8 +102,9 @@ at our volume is nothing. If volume ever grows a lot, a short cache can be added
 
 - **Email on payment**: the existing "Payment received" and AI interview receipt emails, now with the invoice
   number and the PDF attached. Their wording stays editable in Email templates.
+- **Settings → Profile**: billing details in their own box below the general profile, with **Edit** (owner,
+  November 18: all personal details together, billing kept in a separate box).
 - **Settings → Payments** (new tab):
-  - Billing details, with **Edit**.
   - A payments table: Date, Invoice number, Item, Amount, Status (Paid, Failed, Pending, Cancelled), and an
     Action column: **Download invoice**, **Email me the invoice** (paid only), **View details**.
   - Filters by status and date, pagination, and the multi-select the table rule asks for (bulk download as

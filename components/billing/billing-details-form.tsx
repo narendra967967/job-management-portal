@@ -224,7 +224,7 @@ export function BillingDetailsDialog({
           <DialogDescription>
             {reason === "edit"
               ? "Changes apply to future invoices. Invoices you already have stay as they were."
-              : "These go on your invoices. We ask for them once, and you can change them later in Settings."}
+              : "These go on your invoices. We ask for them once, and you can change them later in Settings, under Profile."}
           </DialogDescription>
         </DialogHeader>
         <BillingDetailsForm initial={initial} submitLabel={submitLabel} onSave={onSave} onCancel={() => onOpenChange(false)} />
