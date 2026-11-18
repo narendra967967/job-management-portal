@@ -1,7 +1,7 @@
 # Invoices, billing details and payment history: spec
 
-Status: **draft for the owner's approval, November 18, 2026.** Nothing is built yet. Decisions marked
-"owner" were given on November 18; items marked "proposed" need a yes or a change.
+Status: **owner's answers in (November 18, 2026); PDF design under review.** The layout exists with sample
+data (section 10a); nothing else is built. Decisions marked "owner" were given on November 18.
 
 This covers every sale on Jobtiva (plans, AI mock interviews, and anything sold later). It works with GST off
 (today) and on. The bigger GST work (the GST panel, reports, thresholds, credit notes) stays in
@@ -22,7 +22,7 @@ CA before GST is switched on.
 | I6 | **Money records are never deleted**: orders, invoices and (later) credit notes survive account reset and account deletion. They keep the copied buyer details; the link to the account is cleared on deletion. No data retention setting may ever include them. | owner |
 | I7 | **Payment history is its own tab in user Settings** ("Payments"), not under Plan. A table with an Action column. | owner |
 | I8 | **PDFs are made on request and never stored** (see section 6). | proposed, replaces the owner's two options |
-| I9 | **PDF library: `@react-pdf/renderer`** (MIT). | owner approved "any suitable library"; choice proposed |
+| I9 | **PDF library: `@react-pdf/renderer` 4.9.0** (MIT), installed November 18. | owner approved "any suitable library" |
 
 ## 2. Billing details (required before paying)
 
@@ -40,7 +40,7 @@ time in Settings → Payments. Each invoice keeps its own copy (I3), so editing 
 | PIN code | Yes | 6 digits, not starting with 0 |
 | Country | Yes | India only for now (GST spec G8) |
 | Buying as a business? (GSTIN) | Optional | If given: 15-character format, state code must match the chosen state. Makes it a business (B2B) invoice and adds the registered business name |
-| PAN | **Proposed optional** | See section 10, question 1 |
+| PAN | Optional | Owner, November 18: not needed for a consumer invoice, and sensitive personal data |
 
 Server checks the same rules with Zod; checkout refuses to start an order while the profile is incomplete, so
 the rule holds even if the form is skipped.
@@ -104,7 +104,8 @@ at our volume is nothing. If volume ever grows a lot, a short cache can be added
   - A payments table: Date, Invoice number, Item, Amount, Status (Paid, Failed, Pending, Cancelled), and an
     Action column: **Download invoice**, **Email me the invoice** (paid only), **View details**.
   - Filters by status and date, pagination, and the multi-select the table rule asks for (bulk download as
-    one ZIP is proposed for later, not now). Date range default: see section 10, question 2.
+    one ZIP is proposed for later, not now). Date range defaults to the **last 6 months** (owner, November
+    18; an exception to the 7-day table rule).
 - Failed or cancelled attempts show in the table without an invoice, so users can see what happened.
 
 ## 8. What admin gets
@@ -126,17 +127,42 @@ Billing.
 credit notes for refunds, GST reports, the turnover and e-invoicing threshold tracker. Until the GST panel
 exists, GST on/off, rate and SAC come from today's Billing fields.
 
-## 10. Questions for the owner
+## 10. Answered questions (owner, November 18, 2026)
 
-1. **PAN required for every buyer?** Proposed: optional. It isn't needed for a consumer invoice, it's
-   sensitive personal data that Indian privacy law (DPDP Act) expects us not to collect without a need, and
-   asking every job seeker for PAN to buy a ₹499 plan will lose sales. Business buyers give a GSTIN, which
-   contains their PAN anyway.
-2. **Payments table date range.** The table rule says "last 7 days" by default. For payment history that hides
-   almost everything. Proposed: default to the last 12 months for this table.
-3. **Existing paid orders** (made before invoices exist): give them invoices now, numbered from 1 in date order,
-   using the details copied on the order? Or leave them with their old receipt number? Proposed: give them
-   invoices, so every payment has one; their buyer address will be blank because we didn't ask then.
+1. **PAN:** optional for buyers.
+2. **Payments table:** defaults to the last 6 months.
+3. **Existing paid orders** get invoices, numbered from 1 in date order, using the details copied on the order.
+   Only local and preprod have paid orders today (prod has no real customers yet), so this changes nothing a
+   customer has seen.
+
+## 10a. The PDF design (owner reviewing, November 18, 2026)
+
+Built as the real layout (`lib/invoices/pdf.tsx`) with sample data (`lib/invoices/sample.ts`); samples are
+drawn with `scripts/invoices/render-samples.mts`.
+
+- **A4**, one page for a normal order. A thin brand-colored band at the top; logo and app name left; "INVOICE"
+  or "TAX INVOICE" right with a green **PAID** mark.
+- A row of key facts: invoice number, invoice date, order number, and place of supply (tax invoice only).
+- **From** and **Billed to** side by side: address and tax ID in body text, email and mobile smaller underneath.
+  A business buyer shows the business name with "Attn:" and the person.
+- The item table (SAC and taxable value columns only on a tax invoice), amount in words, and the totals: the
+  CGST and SGST lines for a same-state buyer, IGST for another state.
+- A payment box: paid on, method, payment ID, processed by.
+- The declaration line, then **Terms and conditions** (up to 5 points).
+- Footer on every page: links to Terms & conditions, Privacy policy and Refund & cancellation policy (full
+  `https://jobtiva.in/...` addresses, clickable), the app name, site, support email, "This is a
+  computer-generated invoice.", and page numbers.
+- **Amounts read "INR 499.00"**: the built-in PDF font (Helvetica, which matches the app's own font) has no
+  rupee sign. Showing "₹" means bundling a font file; possible later if wanted.
+- **Terms are per kind of sale and frozen.** Plans use the 5 points in `DEFAULT_INVOICE_TERMS`, taken from the
+  current Terms and Refund & cancellation policy. AI mock interviews need their own set once their refund rules
+  are published (interview-prep spec D57); until then an interview invoice must not print the plan terms.
+  Admin edits the terms in Settings → Billing (phase 3), and each invoice keeps the copy it was issued with.
+- **Signature:** no handwritten or scanned signature is printed. While Jobtiva isn't GST-registered, no GST
+  invoice rule applies. After registration, CGST Rule 46 says a signature isn't required on an electronic
+  invoice issued under the IT Act (proviso added by Notification 74/2018). Whether a plain PDF qualifies, or
+  a digital signature certificate is better, is on the CA list. A scanned signature image isn't a valid digital
+  signature and would let anyone copy it from any invoice.
 
 ## 11. Build plan (UI first)
 
