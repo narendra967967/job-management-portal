@@ -185,7 +185,14 @@ export function RowActions({
       >
         <MoreHorizontal className="size-4" aria-hidden />
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">{children}</DropdownMenuContent>
+      {/* Sized to its labels (not to the small trigger), one line each, with
+          44px-tall items on phones. */}
+      <DropdownMenuContent
+        align="end"
+        className="w-max min-w-44 max-w-[calc(100vw-2rem)] [&_[data-slot=dropdown-menu-item]]:min-h-11 [&_[data-slot=dropdown-menu-item]]:whitespace-nowrap sm:[&_[data-slot=dropdown-menu-item]]:min-h-9"
+      >
+        {children}
+      </DropdownMenuContent>
     </DropdownMenu>
   );
 }
