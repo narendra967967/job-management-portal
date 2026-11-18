@@ -10,7 +10,7 @@
 // filters work on that range in the browser.
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Copy, Download, Eye, MoreHorizontal, Search, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Copy, Download, Eye, MoreHorizontal, Search, Send, X } from "lucide-react";
 import { Button } from "@/components/admin/ui/button";
 import { Input } from "@/components/admin/ui/input";
 import { Badge } from "@/components/admin/ui/badge";
@@ -22,6 +22,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/admin/ui/dropdown-menu";
 import { OrderDetailsDialog } from "@/components/admin/orders/order-details-dialog";
+import { invoiceHref, sendInvoiceSoon } from "@/components/admin/orders/invoice-links";
 import {
   GATEWAY_LABELS,
   ORDER_STATUS_LABELS,
@@ -356,13 +357,14 @@ export function OrdersClient() {
 
       {/* Table (scrolls sideways inside its box on small screens) */}
       <div className="overflow-x-auto rounded-xl border border-border bg-card">
-        <table className="w-full min-w-[920px] text-sm">
+        <table className="w-full min-w-[1040px] text-sm">
           <thead>
             <tr className="border-b border-border text-left text-xs text-muted-foreground">
               <th className="w-10 px-3 py-2.5">
                 <input ref={headerRef} type="checkbox" className={checkboxCls} checked={allSelected} onChange={toggleAll} aria-label="Select all" />
               </th>
               <th className="px-4 py-2.5 font-medium">Date</th>
+              <th className="px-4 py-2.5 font-medium">Invoice</th>
               <th className="px-4 py-2.5 font-medium">User</th>
               <th className="px-4 py-2.5 font-medium">Plan</th>
               <th className="px-4 py-2.5 font-medium">Status</th>
@@ -387,6 +389,15 @@ export function OrdersClient() {
                   />
                 </td>
                 <td className="px-4 py-2.5 whitespace-nowrap text-muted-foreground">{formatDateTime(r.createdAt)}</td>
+                <td className="px-4 py-2.5 whitespace-nowrap">
+                  {r.invoiceNumber ? (
+                    <a href={invoiceHref(r.id, false)} target="_blank" rel="noopener" className="font-mono text-xs text-primary underline-offset-4 hover:underline">
+                      {r.invoiceNumber}
+                    </a>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">None</span>
+                  )}
+                </td>
                 <td className="px-4 py-2.5">
                   <span className="block truncate">{r.user?.name ?? "Deleted user"}</span>
                   <span className="block truncate text-xs text-muted-foreground">{r.user?.email}</span>
@@ -426,6 +437,16 @@ export function OrdersClient() {
                       >
                         <Eye /> View details
                       </DropdownMenuItem>
+                      {r.invoiceNumber && (
+                        <>
+                          <DropdownMenuItem onClick={() => window.open(invoiceHref(r.id, true), "_self")}>
+                            <Download /> Download invoice
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={sendInvoiceSoon}>
+                            <Send /> Send invoice
+                          </DropdownMenuItem>
+                        </>
+                      )}
                       {r.gatewayPaymentId && (
                         <DropdownMenuItem onClick={() => copy(r.gatewayPaymentId, "Payment ID")}>
                           <Copy /> Copy payment ID
@@ -443,7 +464,7 @@ export function OrdersClient() {
             ))}
             {mounted && filtered.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-4 py-10 text-center text-sm text-muted-foreground">
+                <td colSpan={9} className="px-4 py-10 text-center text-sm text-muted-foreground">
                   {inRange.length === 0 ? "No orders in these dates." : "No orders match these filters."}
                 </td>
               </tr>

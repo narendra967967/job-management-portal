@@ -12,6 +12,7 @@ import {
   CircleAlert,
   Clock,
   Copy,
+  Download,
   CreditCard,
   ExternalLink,
   Mail,
@@ -35,6 +36,7 @@ import {
 } from "@/lib/billing-model";
 import { cn, formatDateTime } from "@/lib/utils";
 import { resendReceiptAction } from "@/actions/admin-payments";
+import { invoiceHref } from "@/components/admin/orders/invoice-links";
 
 const STATUS_VARIANT: Record<OrderStatus, "success" | "danger" | "warning" | "neutral"> = {
   paid: "success",
@@ -175,6 +177,9 @@ export function OrderDetailsDialog({
                   <Row label="Gateway">
                     {gatewayName} {o.mode === "test" && <span className="text-muted-foreground">(test)</span>}
                   </Row>
+                  <Row label="Invoice">
+                    {o.invoiceNumber ? <CopyValue value={o.invoiceNumber} onCopy={() => copy(o.invoiceNumber!, "Invoice number")} /> : "None (not paid)"}
+                  </Row>
                   <Row label="Receipt">
                     <CopyValue value={o.receipt} onCopy={() => copy(o.receipt, "Receipt number")} />
                   </Row>
@@ -220,6 +225,11 @@ export function OrderDetailsDialog({
                 </a>
               )}
               <div className="ml-auto flex flex-wrap gap-2">
+                {o.invoiceNumber && (
+                  <a href={invoiceHref(o.id, true)} className={buttonVariants({ variant: "outline", className: "min-h-9" })}>
+                    <Download className="size-4" aria-hidden /> Download invoice
+                  </a>
+                )}
                 {o.status === "paid" && o.user?.email && (
                   <Button variant="outline" className="min-h-9" onClick={resendReceipt} disabled={resending}>
                     <Mail className="size-4" aria-hidden /> {resending ? "Sending…" : "Resend receipt"}

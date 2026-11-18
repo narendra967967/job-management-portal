@@ -27,6 +27,7 @@ import {
   smtpConfig,
   user,
 } from "@/db/schema";
+import { invoicePrefixError } from "@/lib/invoices/model";
 import { isValidGstin, isValidPan, isValidSac } from "@/lib/billing-model";
 
 type Result = { ok: true } | { ok: false; error: string };
@@ -297,6 +298,9 @@ export async function updateBillingAction(input: unknown): Promise<Result> {
   const gstin = v.gstin.trim().toUpperCase();
   const pan = v.pan.trim().toUpperCase();
   const sacCode = v.sacCode.trim();
+  // The prefix starts every invoice number, which must stay within 16 characters (CGST Rule 46(b)).
+  const prefixError = v.invoicePrefix.trim() ? invoicePrefixError(v.invoicePrefix.trim()) : "";
+  if (prefixError) return { ok: false, error: `Invoice number prefix: ${prefixError}` };
   if (gstin && !isValidGstin(gstin)) return { ok: false, error: "That GSTIN isn't valid. Check all 15 characters." };
   if (pan && !isValidPan(pan)) return { ok: false, error: "That PAN isn't valid. It's 5 letters, 4 digits, 1 letter." };
   if (sacCode && !isValidSac(sacCode)) return { ok: false, error: "A SAC code for services is 6 digits starting with 99." };
@@ -310,7 +314,7 @@ export async function updateBillingAction(input: unknown): Promise<Result> {
     pricesIncludeTax: v.pricesIncludeTax,
     companyName: v.companyName || null,
     companyAddress: v.companyAddress || null,
-    invoicePrefix: v.invoicePrefix || "JOB-",
+    invoicePrefix: v.invoicePrefix.trim() || "JOB-",
   };
   await db.insert(billingConfig).values({ id: "app", ...data }).onConflictDoUpdate({ target: billingConfig.id, set: data });
   revalidate();

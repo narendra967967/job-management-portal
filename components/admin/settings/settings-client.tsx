@@ -55,6 +55,9 @@ import { PaymentsCard } from "@/components/admin/settings/payments-card";
 import { EmailDeliverySection } from "@/components/admin/settings/email-delivery-card";
 import { Badge } from "@/components/admin/ui/badge";
 import { billingMissing, isValidGstin, isValidPan, isValidSac } from "@/lib/billing-model";
+import { InvoiceTermsEditor, invoiceTermsError } from "@/components/admin/settings/invoice-terms-editor";
+import { INDIA_STATES } from "@/lib/india-states";
+import { DEFAULT_INVOICE_TERMS, INVOICE_PREFIX_MAX, financialYear, formatInvoiceNumber, invoicePrefixError } from "@/lib/invoices/model";
 
 interface SettingsSection {
   id: string;
@@ -509,6 +512,13 @@ function BillingCard({ initial }: { initial: AdminSettings["billing"] }) {
   const [taxRate, setTaxRate] = useState(String(initial.taxRate));
   const [pricesIncludeTax, setPricesIncludeTax] = useState(initial.pricesIncludeTax);
   const [invoicePrefix, setInvoicePrefix] = useState(initial.invoicePrefix);
+  // INVOICES PHASE 1 (UI first, docs/invoices/spec.md): the business state and
+  // the invoice terms are on screen only; they're saved from phase 3.
+  const [businessState, setBusinessState] = useState("06");
+  const [planTerms, setPlanTerms] = useState<string[]>(DEFAULT_INVOICE_TERMS);
+  const [interviewTerms, setInterviewTerms] = useState<string[]>([]);
+  const prefixError = invoicePrefixError(invoicePrefix);
+  const termsError = invoiceTermsError("Plans", planTerms) || invoiceTermsError("AI mock interviews", interviewTerms);
   const sv = useSaver();
 
   const profile = {
@@ -571,12 +581,31 @@ function BillingCard({ initial }: { initial: AdminSettings["billing"] }) {
               <Field label="Business name" hint="As registered; shown on invoices">
                 <Input value={companyName} onChange={(e) => setCompanyName(e.target.value)} />
               </Field>
-              <Field label="Invoice number prefix" hint="e.g. JOB- gives JOB-000123">
-                <Input value={invoicePrefix} onChange={(e) => setInvoicePrefix(e.target.value)} maxLength={12} />
+              <Field
+                label="Invoice number prefix"
+                hint={prefixError ? undefined : `Next invoice: ${formatInvoiceNumber(invoicePrefix, financialYear(new Date()), 1)} (restarts every April 1)`}
+              >
+                <Input
+                  value={invoicePrefix}
+                  onChange={(e) => setInvoicePrefix(e.target.value.toUpperCase().replace(/\s/g, ""))}
+                  maxLength={INVOICE_PREFIX_MAX}
+                  aria-invalid={!!prefixError}
+                  className="font-mono"
+                />
+                {prefixError && <span className="block text-[11px] text-destructive">{prefixError}</span>}
               </Field>
             </div>
             <Field label="Business address" hint="Full postal address, shown on invoices">
               <textarea className={textareaCls} value={companyAddress} onChange={(e) => setCompanyAddress(e.target.value)} />
+            </Field>
+            <Field label="State" hint={gstRegistered ? "Where you're registered for GST. Decides CGST + SGST or IGST" : "Shown on invoices"}>
+              <select className={cn(selectCls, "w-full sm:max-w-xs")} value={businessState} onChange={(e) => setBusinessState(e.target.value)}>
+                {INDIA_STATES.map((s) => (
+                  <option key={s.code} value={s.code}>
+                    {s.name} ({s.code})
+                  </option>
+                ))}
+              </select>
             </Field>
           </div>
 
@@ -631,11 +660,29 @@ function BillingCard({ initial }: { initial: AdminSettings["billing"] }) {
                 </Field>
               </div>
               <p className="text-xs text-muted-foreground">
-                No GST is charged. Invoices are commercial invoices that say &ldquo;Not registered under GST law;
-                no tax collected.&rdquo;
+                No GST is charged. Invoices are titled &ldquo;Invoice&rdquo; and say{" "}
+                &ldquo;{companyName.trim() || "Your business"} is not registered under GST, so no GST has been charged on
+                this invoice.&rdquo;
               </p>
             </div>
           )}
+
+          <SubHead>Invoice terms</SubHead>
+          <div className="space-y-3">
+            <InvoiceTermsEditor
+              label="Plans"
+              terms={planTerms}
+              onChange={setPlanTerms}
+              emptyNote="Plan invoices print no terms."
+            />
+            <InvoiceTermsEditor
+              label="AI mock interviews"
+              terms={interviewTerms}
+              onChange={setInterviewTerms}
+              emptyNote="Interview invoices print no terms. Add them once the interview refund rules are on the Refund & cancellation policy page."
+            />
+            {termsError && <p className="text-xs text-destructive">{termsError}</p>}
+          </div>
         </>
       )}
 
@@ -645,7 +692,9 @@ function BillingCard({ initial }: { initial: AdminSettings["billing"] }) {
         error={sv.error}
         onSave={() =>
           sv.save(() =>
-            updateBillingAction({
+            prefixError || termsError
+              ? Promise.resolve({ ok: false, error: prefixError || termsError })
+              : updateBillingAction({
               currency,
               gstRegistered,
               pan,

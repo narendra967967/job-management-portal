@@ -144,7 +144,7 @@ export function InvoicePdf({ doc }: { doc: InvoiceDoc }) {
   ];
   const buyerLines = [
     ...buyer.addressLines,
-    `${buyer.state.name}${tax ? ` (${buyer.state.code})` : ""} ${buyer.pin}`,
+    buyer.state.name ? `${buyer.state.name}${tax ? ` (${buyer.state.code})` : ""} ${buyer.pin}`.trim() : "",
     buyer.gstin ? `GSTIN ${buyer.gstin}` : buyer.pan ? `PAN ${buyer.pan}` : "",
   ];
 
@@ -182,7 +182,7 @@ export function InvoicePdf({ doc }: { doc: InvoiceDoc }) {
             name={buyer.businessName ?? buyer.name}
             sub={buyer.businessName ? `Attn: ${buyer.name}` : null}
             lines={buyerLines}
-            contact={[buyer.email, `+91 ${buyer.mobile}`]}
+            contact={[buyer.email, buyer.mobile ? `+91 ${buyer.mobile}` : ""]}
           />
         </View>
 

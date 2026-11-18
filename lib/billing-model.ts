@@ -298,6 +298,8 @@ export interface AdminOrderRow {
   method: string | null;
   /** Our receipt number (billing invoice prefix + sequence). */
   receipt: string;
+  /** The order's invoice number, paid orders only (invoices spec I5; phase 1: the backfill's preview). */
+  invoiceNumber?: string | null;
   gatewayOrderId: string | null;
   gatewayPaymentId: string | null;
   failureReason: string | null;

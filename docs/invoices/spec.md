@@ -70,6 +70,9 @@ checkout handler and the webhook go through it; a unique key on the order makes 
   number always fits.
 - Restarts at 1 every April 1. Assigned at payment inside the transaction, so two payments at the same moment
   can never share or skip a number.
+- **Test-mode payments** (gateway test keys, no real money) get invoices from a separate `TEST/` series and are
+  marked as test, so they never use up or leave gaps in the real series (decided November 18, 2026).
+- The prefix is at most 5 characters (checked on screen and on the server). `JT/` reads best: `JT/26-27/00001`.
 
 ## 5. The two layouts
 

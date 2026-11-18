@@ -9,6 +9,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { paymentGateways, paymentOrders } from "@/db/schema";
+import { previewInvoiceNumbers } from "@/lib/invoices/preview-numbers";
 import { requireAdmin } from "@/lib/current-user";
 import { encryptSecret } from "@/lib/crypto";
 import { credsOf, gatewayComplete, getGatewayRow, listGatewaySettings } from "@/lib/payments/gateways";
@@ -143,6 +144,8 @@ export async function listOrdersAction(raw: unknown): Promise<{ rows: AdminOrder
     .where(and(gte(paymentOrders.createdAt, from), lte(paymentOrders.createdAt, to)))
     .orderBy(desc(paymentOrders.createdAt))
     .limit(MAX_ROWS + 1);
+  // INVOICES PHASE 1: the numbers the backfill will give (lib/invoices/preview-numbers.ts).
+  const invoiceNumbers = await previewInvoiceNumbers();
   return {
     capped: list.length > MAX_ROWS,
     rows: list.slice(0, MAX_ROWS).map((o) => ({
@@ -167,6 +170,7 @@ export async function listOrdersAction(raw: unknown): Promise<{ rows: AdminOrder
       status: o.status,
       method: o.method,
       receipt: receiptOf(o),
+      invoiceNumber: invoiceNumbers.get(o.id) ?? null,
       gatewayOrderId: o.gatewayOrderId,
       gatewayPaymentId: o.gatewayPaymentId,
       failureReason: o.failureReason,

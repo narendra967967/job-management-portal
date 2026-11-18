@@ -77,6 +77,33 @@ export interface InvoiceDoc {
 
 export const invoiceTitle = (d: InvoiceDoc) => (d.gst.registered ? "Tax Invoice" : "Invoice");
 
+/* ---------------- numbering (spec section 4) ---------------- */
+
+/** Longest prefix that keeps the whole number within CGST Rule 46(b)'s 16 characters. */
+export const INVOICE_PREFIX_MAX = 5;
+const SEQ_DIGITS = 5;
+
+/** India's financial year (April to March) for a date, as "26-27". Dated in IST. */
+export function financialYear(at: Date | string): string {
+  const d = new Date(new Date(at).toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+  const start = d.getMonth() >= 3 ? d.getFullYear() : d.getFullYear() - 1;
+  const yy = (n: number) => String(n % 100).padStart(2, "0");
+  return `${yy(start)}-${yy(start + 1)}`;
+}
+
+/** "JT/" + "26-27" + "/" + "00001" → "JT/26-27/00001". */
+export function formatInvoiceNumber(prefix: string, fy: string, seq: number): string {
+  return `${prefix}${fy}/${String(seq).padStart(SEQ_DIGITS, "0")}`;
+}
+
+/** Problem with an invoice prefix, or "" when it's fine. Letters, digits, "-" and "/" only (Rule 46(b)). */
+export function invoicePrefixError(prefix: string): string {
+  if (!prefix) return "Enter a prefix, for example JT/.";
+  if (!/^[A-Za-z0-9/-]+$/.test(prefix)) return "Use only letters, digits, - and /.";
+  if (prefix.length > INVOICE_PREFIX_MAX) return `Keep it to ${INVOICE_PREFIX_MAX} characters, so the full number fits the 16-character limit.`;
+  return "";
+}
+
 /**
  * The terms printed under every invoice until admin can edit them (phase 3).
  * Taken from the Terms and the Refund & cancellation policy as they stand on
