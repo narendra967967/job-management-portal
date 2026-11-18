@@ -17,5 +17,6 @@ export default async function AiInterviewSessionPage({ params }: { params: Promi
   const session = await getSession(await getCurrentUserId(), id);
   if (session === "not_started") redirect(`/mock-interviews/ai/prepare/${id}`);
   if (!session) notFound();
-  return <InterviewChat session={session} />;
+  // Keyed on status and messages, so a refresh after ending shows the server's copy.
+  return <InterviewChat key={`${session.status}-${session.messages.length}`} session={session} />;
 }

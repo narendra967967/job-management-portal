@@ -146,7 +146,7 @@ export function evaluationFormat(): string {
     ' "betterAnswers": [{"question": string, "answer": string}],',
     ' "nextSteps": [{"headline": string, "detail": string}]}',
     "- Each score is a whole number from 1 to 10, judged only on what's in the transcript.",
-    "- headline: a short label of 2 to 6 words. detail / note / answer: the full explanation, specific to this candidate's answers.",
+    "- headline: a short label of 2 to 6 words in sentence case (only the first word capitalized, e.g. \"Give a specific example\"). detail / note / answer: the full explanation, specific to this candidate's answers, written to the candidate as \"you\".",
     "- missed: questions answered wrongly or only partly, with what was missing. betterAnswers: a stronger answer for those questions.",
     "- strengths, improvements and nextSteps: 1 to 4 items each. Plain text in every field, no Markdown.",
     "- Questions the candidate never reached aren't failures; don't list them as missed.",
