@@ -12,8 +12,11 @@ import { useRecaptcha } from "@/components/auth/use-recaptcha";
 export function LoginForm({
   signupAllowed = false,
   captchaSiteKey = null,
+  next = null,
 }: {
   signupAllowed?: boolean;
+  /** Where to go after signing in (already checked with safeNextPath), else Leads. */
+  next?: string | null;
   /** reCAPTCHA v3 site key when the check is on (lib/captcha.ts). */
   captchaSiteKey?: string | null;
 }) {
@@ -52,7 +55,7 @@ export function LoginForm({
       setBusy(false);
       return;
     }
-    window.location.href = "/leads";
+    window.location.href = next ?? "/leads";
   }
 
   return (

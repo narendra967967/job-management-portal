@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getSessionUserId } from "@/lib/current-user";
+import { invoiceDenied } from "@/lib/invoices/denied";
 import { logoForInvoice } from "@/lib/invoices/logo";
 import { renderInvoicePdf } from "@/lib/invoices/pdf";
 import { samplePayments } from "@/lib/invoices/payments-model";
@@ -14,10 +15,10 @@ import { sampleInvoiceGstOff } from "@/lib/invoices/sample";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  if (!(await getSessionUserId())) return NextResponse.json({ error: "Sign in first." }, { status: 401 });
+  if (!(await getSessionUserId())) return invoiceDenied(request, "signin");
   const { id } = await params;
   const row = samplePayments().find((r) => r.id === id);
-  if (!row || row.status !== "paid" || !row.invoiceNumber) return NextResponse.json({ error: "No invoice for this payment." }, { status: 404 });
+  if (!row || row.status !== "paid" || !row.invoiceNumber) return invoiceDenied(request, "missing");
 
   const base = sampleInvoiceGstOff(await logoForInvoice());
   const pdf = await renderInvoicePdf({
