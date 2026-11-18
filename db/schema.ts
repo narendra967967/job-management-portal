@@ -820,6 +820,37 @@ export const billingConfig = pgTable("billing_config", {
   companyName: text("company_name"),
   companyAddress: text("company_address"),
   invoicePrefix: text("invoice_prefix").notNull().default("JOB-"),
+  // Invoices (docs/invoices/spec.md): the GST state code of the business
+  // (decides CGST + SGST or IGST), and the terms printed under each kind of
+  // sale's invoices. Null terms = lib/invoices/model DEFAULT_INVOICE_TERMS.
+  businessState: text("business_state"),
+  invoiceTerms: jsonb("invoice_terms").$type<{ plan: string[]; ai_interview: string[] }>(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date()),
+});
+
+/**
+ * A user's billing details (docs/invoices/spec.md, section 2): required before
+ * any payment. Personal data, so it goes with the account; every order and
+ * invoice keeps its own copy (payment_orders.buyer_snapshot, invoices.doc).
+ */
+export const billingProfiles = pgTable("billing_profiles", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  fullName: text("full_name").notNull(),
+  mobile: text("mobile").notNull(),
+  addressLine: text("address_line").notNull(),
+  city: text("city").notNull(),
+  stateCode: text("state_code").notNull(),
+  pin: text("pin").notNull(),
+  country: text("country").notNull().default("IN"),
+  gstin: text("gstin"),
+  businessName: text("business_name"),
+  pan: text("pan"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .defaultNow()
@@ -902,6 +933,16 @@ export const paymentOrders = pgTable(
     // Seller + tax details at payment time (lib/billing-model BillingSnapshot),
     // so later Billing changes never alter a payment or its invoice.
     billingSnapshot: jsonb("billing_snapshot"),
+    // The buyer's billing details when checkout started (lib/invoices/
+    // billing-details BillingDetails); null on orders from before invoices.
+    buyerSnapshot: jsonb("buyer_snapshot"),
+    // The tax split, fixed with the amount when the order is created: CGST +
+    // SGST (or UTGST, kept in sgst) for a buyer in the business's state, IGST
+    // otherwise. All 0 when GST is off. Place of supply = the buyer's state code.
+    cgstAmount: integer("cgst_amount").notNull().default(0),
+    sgstAmount: integer("sgst_amount").notNull().default(0),
+    igstAmount: integer("igst_amount").notNull().default(0),
+    placeOfSupply: text("place_of_supply"),
     failureReason: text("failure_reason"),
     paidAt: timestamp("paid_at", { withTimezone: true }),
     failedAt: timestamp("failed_at", { withTimezone: true }),
@@ -933,8 +974,65 @@ export const paymentOrders = pgTable(
     ),
     // One paid order per AI interview (a failed try can be retried).
     uniqueIndex("payment_orders_ai_interview_paid_uq").on(t.aiInterviewId).where(sql`${t.status} = 'paid'`),
+    // The split is either not recorded (GST off, older orders) or adds up to the tax.
+    check(
+      "payment_orders_tax_split_ck",
+      sql`${t.cgstAmount} >= 0 and ${t.sgstAmount} >= 0 and ${t.igstAmount} >= 0 and (${t.cgstAmount} + ${t.sgstAmount} + ${t.igstAmount} = 0 or ${t.cgstAmount} + ${t.sgstAmount} + ${t.igstAmount} = ${t.taxAmount})`,
+    ),
   ],
 );
+
+/**
+ * One invoice per paid order (docs/invoices/spec.md). `doc` is everything
+ * printed (lib/invoices/model InvoiceDoc), frozen at payment: the PDF is drawn
+ * from it alone. The database refuses any change to an issued invoice and any
+ * delete (migration 0068, trigger forbid_invoice_change); the one change allowed
+ * is clearing user_id when the account is deleted.
+ */
+export const invoices = pgTable(
+  "invoices",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orderId: uuid("order_id")
+      .notNull()
+      .references(() => paymentOrders.id, { onDelete: "restrict" }),
+    userId: text("user_id").references(() => user.id, { onDelete: "set null" }),
+    number: text("number").notNull(),
+    // invoice_counters.series this number came from, e.g. "live|JT/|26-27".
+    series: text("series").notNull(),
+    seq: integer("seq").notNull(),
+    financialYear: text("financial_year").notNull(),
+    mode: gatewayMode("mode").notNull(),
+    issuedAt: timestamp("issued_at", { withTimezone: true }).notNull(),
+    templateVersion: integer("template_version").notNull(),
+    totalAmount: integer("total_amount").notNull(),
+    doc: jsonb("doc").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("invoices_order_uq").on(t.orderId),
+    uniqueIndex("invoices_number_uq").on(t.number),
+    uniqueIndex("invoices_series_seq_uq").on(t.series, t.seq),
+    index("invoices_user_issued_idx").on(t.userId, t.issuedAt.desc()),
+    check("invoices_seq_ck", sql`${t.seq} >= 1`),
+    // CGST Rule 46(b): at most 16 characters, letters, digits, - and /.
+    check("invoices_number_ck", sql`length(${t.number}) <= 16 and ${t.number} ~ '^[A-Za-z0-9/-]+$'`),
+  ],
+);
+
+/**
+ * The last number used in each invoice series (prefix + financial year, live
+ * and test apart). Taken with an upsert inside the same transaction as the
+ * invoice, so a rolled-back payment never leaves a gap.
+ */
+export const invoiceCounters = pgTable("invoice_counters", {
+  series: text("series").primaryKey(),
+  lastSeq: integer("last_seq").notNull().default(0),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date()),
+});
 
 /** Renewal reminders sent: one row per user, plan expiry and day (7 … 1 days
  *  before). The primary key makes the daily job safe to run twice. */

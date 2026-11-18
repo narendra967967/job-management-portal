@@ -179,3 +179,25 @@ drawn with `scripts/invoices/render-samples.mts`.
 | 3. Wiring | The checkout gate (I4), invoice creation at payment for plans and AI interviews, tax split, PDF on request, email attachments, invoice number replacing the receipt number, admin actions, existing orders (question 3) |
 | 4. Safety | Check script: no paid order without exactly one invoice, numbers unbroken per financial year and at most 16 characters, an invoice reads the same after every setting and profile change, PDFs never touch disk, money tables untouched by reset, deletion and retention, signed-out and other-user access refused |
 | 5. Content and rollout | Knowledge-base articles, Privacy Policy lines (billing details collected; money records kept by law after deletion), preprod, then prod with the payment module |
+
+Progress: phase 1 done (screens, November 18, 2026). Phase 2 done (database, November 18).
+
+## 12. The database (phase 2)
+
+Migrations 0067 (tables) and 0068 (guards).
+
+| Table or column | Holds |
+|---|---|
+| `billing_profiles` | One row per user: the section 2 details. Deleted with the account (personal data) |
+| `payment_orders.buyer_snapshot` | The buyer's details when checkout starts. Tax is worked out when the order is created, so the buyer's state is fixed then too |
+| `payment_orders.cgst_amount`, `sgst_amount`, `igst_amount`, `place_of_supply` | The split, fixed with the amount. UTGST is kept in `sgst_amount`. A check makes the three add up to the tax, or all be 0 |
+| `invoices` | One per paid order: number, series, sequence, financial year, live or test, issue time, layout version, total, and `doc`, the frozen InvoiceDoc the PDF is drawn from. Unique per order, per number, and per series position; number at most 16 characters |
+| `invoice_counters` | The last number used per series (`live|JT/|26-27`, `test|TEST/|26-27`). Taken with an upsert in the same transaction as the invoice, so a rolled-back payment leaves no gap |
+| `billing_config.business_state`, `invoice_terms` | The business's GST state code; the terms per kind of sale (null means the defaults) |
+
+**Guards in the database (0068):** an invoice can't be changed or deleted; the only change allowed is
+`user_id` becoming empty when the account is deleted. A payment order can't be deleted. Deleting an account
+keeps its orders and invoices (their link to the account is cleared) and removes the billing profile.
+Local check scripts clean up their own test rows through a superuser session
+(`session_replication_role = replica`); the server's app database users aren't superusers, so the live app
+never can.

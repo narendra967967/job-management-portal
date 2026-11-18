@@ -580,8 +580,23 @@ async function main() {
     );
     await q("update billing_config set gst_registered = $1, tax_rate = $2, company_name = $3", [billing.gst_registered, billing.tax_rate, billing.company_name]);
     await q(`update "user" set plan_id = $1, plan_expires_at = $2, status = $3 where id = $4`, [u.plan_id, u.plan_expires_at, u.status, u.id]);
-    await q("delete from payment_orders where user_id = $1 and created_at >= $2", [u.id, startedAt]);
-    if (tempOrders.length) await q("delete from payment_orders where id = any($1)", [tempOrders]);
+    // The database refuses to delete orders and invoices (migration 0068); a
+    // superuser session can skip that for the check's own test rows. On the
+    // server the app's database user isn't a superuser, so it never can.
+    const cleanup = await db.connect();
+    try {
+      await cleanup.query("begin");
+      await cleanup.query("set local session_replication_role = replica");
+      const ownOrders = `(select id from payment_orders where (user_id = $1 and created_at >= $2) or id = any($3::uuid[]))`;
+      await cleanup.query(`delete from invoices where order_id in ${ownOrders}`, [u.id, startedAt, tempOrders]);
+      await cleanup.query(`delete from payment_orders where id in ${ownOrders}`, [u.id, startedAt, tempOrders]);
+      await cleanup.query("commit");
+    } catch (e) {
+      await cleanup.query("rollback");
+      console.error("Couldn't remove the check's test orders (needs a local superuser database account):", e instanceof Error ? e.message : e);
+    } finally {
+      cleanup.release();
+    }
     await q("delete from plan_reminders_sent where user_id = $1 and sent_at >= $2", [u.id, startedAt]);
     await q("delete from job_leads where user_id = $1 and company = 'Sec Check Co'", [u.id]);
     const [g2] = await q("select * from payment_gateways where id = 'razorpay'");
