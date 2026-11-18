@@ -44,7 +44,7 @@ The plan editor has **AI mock interviews included**. On a paid plan it's granted
 5. When the time is up, the wrap-up starts: no new planned questions, and the interview ends when the AI closes it or the wrap-up time runs out.
 6. The report is written right after. If the AI reply doesn't fit the report format it's retried; if it still fails, the upkeep job tries again (up to six times) and the interview shows as waiting for its report. The candidate gets an "Interview report ready" email.
 
-An interview that ends with no answers at all (ended straight away, or never resumed) shows as **failed**, so you can give it back.
+An interview that ends with no answers at all (ended straight away, or never resumed) has nothing to score and no report. Here it shows as **Failed**, so you can give it back. The candidate sees it as **Ended before answering**, with a Book again button. An interview stopped by a problem on our side (the AI not answering) shows to the candidate as **Stopped by a problem**, with a link to support.
 
 Every AI call adds its tokens to the interview, and the cost uses the token prices in AI service at that moment.
 

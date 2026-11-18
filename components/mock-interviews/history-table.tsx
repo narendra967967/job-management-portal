@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Bot, Clock3, FileText, Hourglass, PlayCircle, RotateCcw, Search, Trophy, UserRound, type LucideIcon } from "lucide-react";
+import { Bot, Clock3, FileText, Hourglass, LifeBuoy, PlayCircle, Plus, RotateCcw, Search, Trophy, UserRound, type LucideIcon } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
@@ -29,14 +29,16 @@ const STATUS_TEXT: Record<InterviewStatus, string> = {
   awaiting_report: "Waiting for evaluation",
   interrupted: "Stopped early",
   in_progress: "In progress",
-  failed: "Couldn't finish",
+  no_answers: "Ended before answering",
+  failed: "Stopped by a problem",
 };
 const STATUS_TONE: Record<InterviewStatus, string> = {
   completed: "bg-emerald-50 text-emerald-800",
   awaiting_report: "bg-amber-50 text-amber-800",
   interrupted: "bg-slate-100 text-slate-700",
   in_progress: "bg-sky-50 text-sky-800",
-  failed: "bg-rose-50 text-rose-800",
+  no_answers: "bg-slate-100 text-slate-700",
+  failed: "bg-amber-50 text-amber-800",
 };
 
 type TypeFilter = "all" | "ai" | "human";
@@ -266,8 +268,16 @@ function HistoryRow({
             <Hourglass className="size-4" aria-hidden />
             Waiting
           </Link>
+        ) : i.status === "no_answers" ? (
+          <Link href="/mock-interviews/ai/new" className={cn(buttonVariants({ variant: "outline" }), "w-full")}>
+            <Plus className="size-4" aria-hidden />
+            Book again
+          </Link>
         ) : i.status === "failed" ? (
-          <span className="block text-center text-xs text-muted-foreground">Couldn&apos;t finish</span>
+          <Link href="/support" className={cn(buttonVariants({ variant: "outline" }), "w-full")}>
+            <LifeBuoy className="size-4" aria-hidden />
+            Get help
+          </Link>
         ) : (
           <Link href={`/mock-interviews/ai/prepare/${i.id}`} className={cn(buttonVariants(), "w-full bg-amber-500 text-white hover:bg-amber-600")}>
             <PlayCircle className="size-4" aria-hidden />
@@ -277,7 +287,7 @@ function HistoryRow({
       </td>
       <td className="px-3 py-2">
         {overall === null ? (
-          <span className="text-xs text-muted-foreground">No score yet</span>
+          <span className="text-xs text-muted-foreground">{i.status === "no_answers" || i.status === "failed" ? "Not scored" : "No score yet"}</span>
         ) : (
           <span className="inline-flex items-center gap-2">
             <ScoreRing value={overall} size={38} />

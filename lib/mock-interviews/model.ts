@@ -250,7 +250,9 @@ export const PROMPT_PLACEHOLDERS = ["{{role}}", "{{industry}}", "{{category}}", 
 /* ---------------- what the candidate screens read ---------------- */
 
 /** A booking as the candidate sees it. "interrupted" can still be resumed. */
-export type BookingStatus = "ready" | "in_progress" | "interrupted" | "completed" | "failed" | "expired";
+/** no_answers: ended (or never resumed) before any answer, so there's nothing to score.
+ *  failed: stopped by a problem on our side (the AI or the system). */
+export type BookingStatus = "ready" | "in_progress" | "interrupted" | "completed" | "no_answers" | "failed" | "expired";
 
 export type BookingPayment =
   | { kind: "paid"; full: number; final: number; percent: number } // paise
@@ -277,7 +279,7 @@ export interface BookingRow {
 }
 
 /** One interview in History, Performance and report comparisons. */
-export type InterviewStatus = "completed" | "awaiting_report" | "interrupted" | "in_progress" | "failed";
+export type InterviewStatus = "completed" | "awaiting_report" | "interrupted" | "in_progress" | "no_answers" | "failed";
 
 export interface InterviewSummary {
   id: string;

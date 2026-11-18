@@ -12,6 +12,7 @@ import {
   FileText,
   Pencil,
   PlayCircle,
+  LifeBuoy,
   Plus,
   Receipt,
   RotateCcw,
@@ -56,7 +57,8 @@ const STATUS: Record<BookingStatus, { label: string; cls: string }> = {
   in_progress: { label: "In progress", cls: "bg-sky-50 text-sky-800" },
   interrupted: { label: "Stopped early", cls: "bg-amber-50 text-amber-800" },
   completed: { label: "Completed", cls: "bg-emerald-50 text-emerald-800" },
-  failed: { label: "Couldn't finish", cls: "bg-rose-50 text-rose-800" },
+  no_answers: { label: "Ended before answering", cls: "bg-slate-100 text-slate-700" },
+  failed: { label: "Stopped by a problem", cls: "bg-amber-50 text-amber-800" },
   expired: { label: "Expired", cls: "bg-slate-100 text-slate-600" },
 };
 
@@ -72,7 +74,8 @@ const VIEW_LABEL: Record<View, string> = {
   in_progress: "In progress",
   interrupted: "Stopped early",
   completed: "Completed",
-  failed: "Couldn't finish",
+  no_answers: "Ended before answering",
+  failed: "Stopped by a problem",
   expired: "Expired",
   expiring: "Expiring soon",
   month: "Completed this month",
@@ -97,7 +100,8 @@ export function AiHome({
   const mounted = useMounted();
   const router = useRouter();
   const [now] = useState(() => Date.now());
-  const [view, setView] = useState<View>("todo");
+  // Everything by default, so a booking that just ended is still in the list.
+  const [view, setView] = useState<View>("all");
   const [query, setQuery] = useState("");
   const [pay, setPay] = useState<PayFilter>("all");
   const [level, setLevel] = useState<"all" | Difficulty>("all");
@@ -134,7 +138,7 @@ export function AiHome({
     });
   }, [bookings, view, pay, level, query, now]);
   const paging = usePagination(rows, `${view}|${pay}|${level}|${query}`);
-  const toggle = (v: View) => setView((cur) => (cur === v ? "todo" : v));
+  const toggle = (v: View) => setView((cur) => (cur === v ? "all" : v));
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
@@ -198,7 +202,7 @@ export function AiHome({
             <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search role, kind or topic" className="h-11 pl-9 sm:h-9" />
           </label>
           <select aria-label="Status" className={cn(tableSelectCls, "h-11 sm:h-9")} value={view} onChange={(e) => setView(e.target.value as View)}>
-            {(["todo", "all", "ready", "in_progress", "completed", "failed", "expired", "expiring"] as View[]).map((v) => (
+            {(["all", "todo", "ready", "in_progress", "completed", "no_answers", "failed", "expired", "expiring"] as View[]).map((v) => (
               <option key={v} value={v}>
                 {VIEW_LABEL[v]}
               </option>
@@ -451,8 +455,21 @@ function PrimaryAction({ b }: { b: BookingRow }) {
         View report
       </Link>
     );
-  const label = b.status === "completed" ? "Report on its way" : b.status === "failed" ? "Couldn't finish" : "Expired";
-  return <span className="block text-center text-xs text-muted-foreground">{label}</span>;
+  if (b.status === "no_answers")
+    return (
+      <Link href="/mock-interviews/ai/new" className={cn(buttonVariants({ variant: "outline" }), "w-full")}>
+        <Plus className="size-4" aria-hidden />
+        Book again
+      </Link>
+    );
+  if (b.status === "failed")
+    return (
+      <Link href="/support" className={cn(buttonVariants({ variant: "outline" }), "w-full")}>
+        <LifeBuoy className="size-4" aria-hidden />
+        Get help
+      </Link>
+    );
+  return <span className="block text-center text-xs text-muted-foreground">{b.status === "completed" ? "Report on its way" : "Expired"}</span>;
 }
 
 function PaidChip({ b }: { b: BookingRow }) {
@@ -472,7 +489,7 @@ function PaidChip({ b }: { b: BookingRow }) {
 function ValidUntil({ b, mounted }: { b: BookingRow; mounted: boolean }) {
   if (!mounted) return null;
   if (b.status === "expired") return <span className="text-muted-foreground">Expired {shortDate(b.validUntil)}</span>;
-  if (b.status === "completed" || b.status === "failed") return <span className="text-muted-foreground">-</span>;
+  if (b.status === "completed" || b.status === "failed" || b.status === "no_answers") return <span className="text-muted-foreground">-</span>;
   const d = daysLeft(b, Date.now());
   return (
     <span className="inline-flex flex-col">

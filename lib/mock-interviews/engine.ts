@@ -330,7 +330,8 @@ async function finish(tx: Tx, i: Row, reason: string, closing: string | null): P
       seq: await nextSeq(tx, i.id),
       sender: "ai",
       kind: "closing",
-      text: closing,
+      // With no answers there's nothing to score, so the line mustn't promise a report.
+      text: answers > 0 ? closing : "Thank you. We've stopped here. As no questions were answered, there's nothing to score this time.",
       clockSeconds: i.activeSeconds,
     });
   }

@@ -8,6 +8,8 @@ import {
   Bot,
   CheckCircle2,
   FileText,
+  LifeBuoy,
+  Plus,
   SendHorizontal,
   Square,
   WifiOff,
@@ -161,6 +163,9 @@ export function InterviewChat({ session }: { session: SessionData }) {
   const yourAnswers = messages.filter((m) => m.from === "you");
   const totalWords = yourAnswers.reduce((n, m) => n + words(m.text), 0);
   const waitingForAnswer = messages.at(-1)?.from === "ai" && messages.at(-1)?.kind !== "closing";
+  // How it ended: with no answers there's nothing to score; a problem on our side needs support.
+  const noAnswers = session.noAnswers || (ended && yourAnswers.length === 0);
+  const problem = session.status === "failed" && !noAnswers;
 
   const panel: PanelData = useMemo(
     () => ({
@@ -428,8 +433,11 @@ export function InterviewChat({ session }: { session: SessionData }) {
                   That&apos;s the end of the interview
                 </p>
                 <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-                  Your report is being written now. It usually takes under a
-                  minute, and it&apos;ll be in Interview history too.
+                  {noAnswers
+                    ? "You ended it before answering a question, so there's nothing to score this time and no report. Book another whenever you're ready."
+                    : problem
+                      ? "Something went wrong on our side and the interview had to stop. Contact support and we'll look into it."
+                      : "Your report is being written now. It usually takes under a minute, and it'll be in Interview history too."}
                 </p>
               </div>
               <dl className="grid grid-cols-3 divide-x border-t text-center">
@@ -446,14 +454,14 @@ export function InterviewChat({ session }: { session: SessionData }) {
               </dl>
               <div className="flex flex-wrap justify-center gap-2 border-t p-4">
                 <Link
-                  href={`/mock-interviews/report/${session.id}`}
+                  href={noAnswers ? "/mock-interviews/ai/new" : problem ? "/support" : `/mock-interviews/report/${session.id}`}
                   className={cn(
                     buttonVariants({ size: "lg" }),
                     "bg-gradient-to-r from-primary to-violet-600 text-white hover:opacity-90",
                   )}
                 >
-                  <FileText className="size-4" aria-hidden />
-                  See your report
+                  {noAnswers ? <Plus className="size-4" aria-hidden /> : problem ? <LifeBuoy className="size-4" aria-hidden /> : <FileText className="size-4" aria-hidden />}
+                  {noAnswers ? "Book another interview" : problem ? "Contact support" : "See your report"}
                 </Link>
                 <Link
                   href="/mock-interviews/ai"

@@ -74,6 +74,11 @@ function resumeMinutesLeft(i: InterviewRow, now: number): number {
   return Math.max(0, Math.ceil((end - now) / 60_000));
 }
 
+/** Ended with nothing to score: ended before answering, or dropped and never resumed. */
+function endedWithoutAnswers(i: Pick<InterviewRow, "status" | "endReason">): boolean {
+  return i.status === "failed" && (!!i.endReason?.endsWith("_no_answers") || i.endReason === "abandoned");
+}
+
 function bookingStatus(i: InterviewRow, now: number): BookingStatus {
   switch (i.status) {
     case "ready":
@@ -81,6 +86,8 @@ function bookingStatus(i: InterviewRow, now: number): BookingStatus {
       return i.validUntil.getTime() <= now ? "expired" : "ready";
     case "stopped":
       return "completed";
+    case "failed":
+      return endedWithoutAnswers(i) ? "no_answers" : "failed";
     case "pending_payment":
       return "ready"; // never listed (filtered out); here for completeness
     default:
@@ -247,6 +254,8 @@ export interface SessionData {
   status: string;
   /** Ended: whether the report exists yet. */
   reportReady: boolean;
+  /** Ended with nothing to score (no answers given). */
+  noAnswers: boolean;
 }
 
 /** The interview screen. A booking that hasn't started yet returns "not started" (it starts from the briefing). */
@@ -272,6 +281,7 @@ export async function getSession(userId: string, id: string): Promise<SessionDat
     phase,
     status: i.status,
     reportReady,
+    noAnswers: endedWithoutAnswers(i),
   };
 }
 
@@ -289,7 +299,8 @@ function scoresOf(e: EvaluationRow): MetricScores {
 
 function historyStatus(i: InterviewRow, report: EvaluationRow | undefined): InterviewStatus {
   if (i.status === "completed" || i.status === "stopped") return report ? "completed" : "awaiting_report";
-  if (i.status === "in_progress" || i.status === "interrupted" || i.status === "failed") return i.status;
+  if (i.status === "failed") return endedWithoutAnswers(i) ? "no_answers" : "failed";
+  if (i.status === "in_progress" || i.status === "interrupted") return i.status;
   return "in_progress";
 }
 
