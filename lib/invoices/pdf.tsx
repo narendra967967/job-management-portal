@@ -5,12 +5,27 @@ import "server-only";
 // layout serves both cases: "Invoice" when GST is off, "Tax Invoice" with the
 // SAC, place of supply and tax split when it's on.
 //
-// Helvetica is built into every PDF reader and matches the app's own font, but
-// it has no rupee sign, so amounts read "INR 499.00" and the total is also
-// written out in words, as Indian invoices usually do.
+// Text is Helvetica, built into every PDF reader and matching the app's own
+// font. Helvetica has no rupee sign, so only the "₹" is drawn in Noto Sans
+// Devanagari (OFL, @fontsource/noto-sans-devanagari), whose latin-ext file
+// carries it. The total is also written out in words, as Indian invoices do.
+// The font files must ship with the server build (next.config
+// outputFileTracingIncludes, phase 3).
 
-import { Document, Image, Link, Page, StyleSheet, Text, View, renderToBuffer } from "@react-pdf/renderer";
+import path from "node:path";
+import { Document, Font, Image, Link, Page, StyleSheet, Text, View, renderToBuffer } from "@react-pdf/renderer";
 import { amountInWords, formatPaise, invoiceDate, invoiceTitle, type InvoiceDoc } from "@/lib/invoices/model";
+
+const FONT_DIR = path.join(process.cwd(), "node_modules", "@fontsource", "noto-sans-devanagari", "files");
+Font.register({
+  family: "Rupee",
+  fonts: [
+    { src: path.join(FONT_DIR, "noto-sans-devanagari-latin-ext-400-normal.woff"), fontWeight: 400 },
+    { src: path.join(FONT_DIR, "noto-sans-devanagari-latin-ext-700-normal.woff"), fontWeight: 700 },
+  ],
+});
+// Words never break across lines with a hyphen on an invoice.
+Font.registerHyphenationCallback((word) => [word]);
 
 const INK = "#111827";
 const MUTED = "#6B7280";
@@ -51,7 +66,7 @@ const s = StyleSheet.create({
   cDesc: { flex: 1 },
   cSac: { width: 58 },
   cQty: { width: 36, textAlign: "right" },
-  cAmt: { width: 96, textAlign: "right" },
+  cAmt: { width: 122, textAlign: "right" },
 
   below: { flexDirection: "row", gap: 24, marginTop: 14 },
   words: { flex: 1 },
@@ -74,7 +89,15 @@ const s = StyleSheet.create({
   link: { color: BRAND, textDecoration: "none" },
 });
 
-const inr = (paise: number) => `INR ${formatPaise(paise)}`;
+/** "₹499.00": the sign in the rupee font, the digits in the surrounding text's font. Use inside a Text. */
+function Money({ paise, bold = false }: { paise: number; bold?: boolean }) {
+  return (
+    <>
+      <Text style={{ fontFamily: "Rupee", fontWeight: bold ? 700 : 400 }}>₹</Text>
+      {formatPaise(paise)}
+    </>
+  );
+}
 
 type PdfStyle = NonNullable<React.ComponentProps<typeof View>["style"]>;
 
@@ -169,7 +192,9 @@ export function InvoicePdf({ doc }: { doc: InvoiceDoc }) {
             <Text style={[s.cell, s.cDesc, s.thText]}>Description</Text>
             {tax ? <Text style={[s.cell, s.cSac, s.thText]}>SAC</Text> : null}
             <Text style={[s.cell, s.cQty, s.thText]}>Qty</Text>
-            <Text style={[s.cell, s.cAmt, s.thText]}>{tax ? "Taxable value" : "Amount"}</Text>
+            <Text style={[s.cell, s.cAmt, s.thText]}>
+              {tax ? "Taxable value" : "Amount"} (<Text style={{ fontFamily: "Rupee", fontWeight: 700 }}>₹</Text>)
+            </Text>
           </View>
           {doc.lines.map((l, i) => (
             <View key={i} style={s.tr} wrap={false}>
@@ -195,30 +220,30 @@ export function InvoicePdf({ doc }: { doc: InvoiceDoc }) {
               <>
                 <View style={s.totRow}>
                   <Text style={s.small}>Taxable value</Text>
-                  <Text>{inr(doc.totals.taxable)}</Text>
+                  <Text><Money paise={doc.totals.taxable} /></Text>
                 </View>
                 {doc.gst.split === "intra" ? (
                   <>
                     <View style={s.totRow}>
                       <Text style={s.small}>CGST at {half}%</Text>
-                      <Text>{inr(doc.totals.cgst)}</Text>
+                      <Text><Money paise={doc.totals.cgst} /></Text>
                     </View>
                     <View style={s.totRow}>
                       <Text style={s.small}>SGST at {half}%</Text>
-                      <Text>{inr(doc.totals.sgst)}</Text>
+                      <Text><Money paise={doc.totals.sgst} /></Text>
                     </View>
                   </>
                 ) : (
                   <View style={s.totRow}>
                     <Text style={s.small}>IGST at {doc.gst.rate}%</Text>
-                    <Text>{inr(doc.totals.igst)}</Text>
+                    <Text><Money paise={doc.totals.igst} /></Text>
                   </View>
                 )}
               </>
             ) : null}
             <View style={s.totFinal}>
               <Text style={s.totFinalText}>Total paid</Text>
-              <Text style={s.totFinalText}>{inr(doc.totals.total)}</Text>
+              <Text style={s.totFinalText}><Money paise={doc.totals.total} bold /></Text>
             </View>
           </View>
         </View>

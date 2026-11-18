@@ -10,11 +10,11 @@
 //   npx esbuild scripts/invoices/render-samples.mts --bundle --platform=node --format=esm \
 //     --jsx=automatic --packages=external --alias:server-only=./node_modules/.cache/empty.mjs \
 //     --outfile=node_modules/.cache/invoice-samples.mjs
-//   node node_modules/.cache/invoice-samples.mjs <out-dir>
+//   node --env-file=.env.local node_modules/.cache/invoice-samples.mjs <out-dir>
 
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import sharp from "sharp";
+import { logoForInvoice } from "../../lib/invoices/logo.ts";
 import { renderInvoicePdf } from "../../lib/invoices/pdf.tsx";
 import { sampleInvoiceGstInterB2b, sampleInvoiceGstIntra, sampleInvoiceGstOff } from "../../lib/invoices/sample.ts";
 
@@ -25,9 +25,9 @@ if (!out) {
 }
 mkdirSync(out, { recursive: true });
 
-// The logo as an invoice would keep it: small, so every PDF stays light.
-const png = await sharp(readFileSync("public/logo.png")).resize(120, 120, { fit: "inside" }).png().toBuffer();
-const logo = `data:image/png;base64,${png.toString("base64")}`;
+// The logo uploaded in admin Branding, as an invoice keeps it.
+const logo = await logoForInvoice();
+console.log(logo ? "Using the logo uploaded in admin Branding." : "No logo uploaded in admin Branding: the name only.");
 
 for (const [name, doc] of [
   ["invoice-gst-off.pdf", sampleInvoiceGstOff(logo)],
@@ -39,3 +39,5 @@ for (const [name, doc] of [
   writeFileSync(join(out, name), pdf);
   console.log(`${name}: ${(pdf.length / 1024).toFixed(1)} KB in ${Date.now() - t} ms`);
 }
+
+process.exit(0); // the database pool would keep the process open
