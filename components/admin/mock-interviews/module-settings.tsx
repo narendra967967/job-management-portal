@@ -176,31 +176,63 @@ function PartSwitch({ label, value, onChange, note }: { label: string; value: Pa
   );
 }
 
+type AvailabilityValues = Pick<ModuleSettings, "aiState" | "humanState" | "applicationsOpen" | "pauseBookings">;
+
+/** Switches take effect the moment they're changed (no separate Save). */
 function Availability({ s, set }: SectionProps) {
+  const router = useRouter();
   const [confirm, setConfirm] = useState<PartState | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function apply(patch: Partial<AvailabilityValues>, done: string) {
+    const before: AvailabilityValues = { aiState: s.aiState, humanState: s.humanState, applicationsOpen: s.applicationsOpen, pauseBookings: s.pauseBookings };
+    const next = { ...before, ...patch };
+    for (const [k, v] of Object.entries(patch)) set(k as keyof AvailabilityValues, v as never);
+    setBusy(true);
+    try {
+      const r = await saveModuleSettingsAction({ section: "availability", ...next });
+      if (!r.ok) throw new Error(r.error);
+      toast.success(done);
+      router.refresh();
+    } catch (err) {
+      // Put the switch back, so the screen never shows something that isn't saved.
+      for (const [k, v] of Object.entries(before)) set(k as keyof AvailabilityValues, v as never);
+      toast.error("Not saved", err instanceof Error && err.message ? err.message : "Something went wrong. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
-    <section className={cardCls}>
+    <section className={cardCls} aria-busy={busy}>
       <h2 className="text-base font-semibold">Availability</h2>
       <div className="mt-4 space-y-2">
         <PartSwitch
           label="AI interviews"
           value={s.aiState}
-          onChange={(v) => v !== s.aiState && setConfirm(v)}
-          note="Coming soon keeps the menu visible with a coming-soon page. Open lets candidates book and start AI interviews."
+          onChange={(v) => !busy && v !== s.aiState && setConfirm(v)}
+          note="Coming soon shows candidates a coming-soon page instead. Open lets them book and start AI interviews. Changes apply right away."
         />
         <PartSwitch
           label="Human interviews"
           value={s.humanState}
-          onChange={(v) => set("humanState", v)}
+          onChange={(v) => !busy && v !== s.humanState && void apply({ humanState: v }, v === "open" ? "Human interviews are open" : "Human interviews show Coming soon")}
           note="For Release 2. Keep it on Coming soon until interviewers are set up."
         />
       </div>
       <SubHead>Release 2</SubHead>
       <div className="space-y-3">
-        <Toggle checked={s.applicationsOpen} onChange={(v) => set("applicationsOpen", v)} label="Accept new interviewer applications" />
-        <Toggle checked={s.pauseBookings} onChange={(v) => set("pauseBookings", v)} label="Pause new bookings" />
+        <Toggle
+          checked={s.applicationsOpen}
+          onChange={(v) => !busy && void apply({ applicationsOpen: v }, v ? "Interviewer applications are open" : "Interviewer applications are closed")}
+          label="Accept new interviewer applications"
+        />
+        <Toggle
+          checked={s.pauseBookings}
+          onChange={(v) => !busy && void apply({ pauseBookings: v }, v ? "New bookings are paused" : "New bookings are back on")}
+          label="Pause new bookings"
+        />
       </div>
-      <Save payload={() => ({ section: "availability", aiState: s.aiState, humanState: s.humanState, applicationsOpen: s.applicationsOpen, pauseBookings: s.pauseBookings })} />
       <ConfirmDialog
         open={confirm !== null}
         onOpenChange={(o) => !o && setConfirm(null)}
@@ -208,12 +240,13 @@ function Availability({ s, set }: SectionProps) {
         description={
           confirm === "open"
             ? "Candidates can book and start AI interviews right away."
-            : "Candidates can't book new AI interviews. Existing bookings stay, and can still be started."
+            : "Candidates see a Coming soon page instead, from now on. Their bookings, history and reports are kept and come back when you open it again. Anyone in the middle of an interview can't carry on until then."
         }
         confirmLabel={confirm === "open" ? "Open" : "Switch to Coming soon"}
         onConfirm={() => {
-          if (confirm) set("aiState", confirm);
+          const v = confirm;
           setConfirm(null);
+          if (v) void apply({ aiState: v }, v === "open" ? "AI interviews are open" : "AI interviews now show Coming soon");
         }}
       />
     </section>
