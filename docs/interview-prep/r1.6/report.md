@@ -68,6 +68,23 @@ Read these to judge for yourself (all in this folder):
 - **Newer models need different settings.** gpt-5 and gpt-6 models take a different output limit and no temperature, and run with "thinking" off so replies stay quick. The app handles both kinds.
 - **Cheaper repeated input.** The interviewer's instructions were reordered so each call starts the same way, letting OpenAI charge its lower cached rate. Module settings has a box for that price.
 
+## Follow-up test: scoring each answer separately
+
+To pull average and weak candidates further apart, the report was changed to rate every answer on its own and build the skill scores from those ratings. Six of the interviews were run again on gpt-6-luna to test it:
+
+| Run | Candidate | Before | After |
+|---|---|---|---|
+| 1 | strong | 76 | 82 |
+| 5 | strong | 76 | 78 |
+| 6 | average | 50 | 60 |
+| 2 | weak | 46 | 50 |
+| 7 | weak | 50 | 50 |
+| 18 | weak (Coding) | 60 | 60 |
+
+It didn't help. Strong candidates rose a little, the average one rose 10 points and the weak ones barely moved, so the gap that mattered got smaller. Run 18 also showed why its 60 isn't a scoring fault: the "weak" practice candidate wrote correct SQL and sensible validation answers, ignoring its instructions on technical questions. The simulator can't produce answers bad enough to test the low end.
+
+So the change was not kept. The scoring stays as it was, and the spread between average and weak candidates gets judged on real interviews. The tried change is saved as `per-answer-scoring.patch` in this folder in case it's wanted later.
+
 ## What's left for you
 
 1. **Read the transcripts above** and decide whether the quality is good enough to launch.

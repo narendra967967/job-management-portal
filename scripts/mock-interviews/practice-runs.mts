@@ -187,7 +187,9 @@ await db.query(
 
 const outDir = path.join("docs", "interview-prep", "r1.6");
 mkdirSync(outDir, { recursive: true });
-const outFile = path.join(outDir, `${MODEL}.json`);
+// --tag keeps a separate results file, e.g. to compare a change against the baseline.
+const TAG = args.get("tag");
+const outFile = path.join(outDir, TAG ? `${MODEL}-${TAG}.json` : `${MODEL}.json`);
 const results: Record<string, unknown>[] = existsSync(outFile) ? JSON.parse(readFileSync(outFile, "utf8")) : [];
 const created: string[] = [];
 const words = (t: string) => t.trim().split(/\s+/).filter(Boolean).length;

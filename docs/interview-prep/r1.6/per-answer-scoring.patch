@@ -1,0 +1,128 @@
+diff --git a/lib/mock-interviews/engine.ts b/lib/mock-interviews/engine.ts
+index c42b6d0..3382e5c 100644
+--- a/lib/mock-interviews/engine.ts
++++ b/lib/mock-interviews/engine.ts
+@@ -17,6 +17,7 @@ import {
+   fillPrompt,
+   materialBlock,
+   parseJsonObject,
++  skillScores,
+   planFormat,
+   planSchema,
+   toWriting,
+@@ -548,8 +549,17 @@ export async function evaluateInterview(id: string): Promise<boolean> {
+ 
+   const msgs = await db.select().from(aiInterviewMessages).where(eq(aiInterviewMessages.interviewId, id)).orderBy(asc(aiInterviewMessages.seq));
+   if (!msgs.some((m) => m.sender === "candidate")) return false;
++  // Each answer is labelled with the question it belongs to (follow-ups count
++  // with their question), so the report can rate answers one by one.
++  let currentQ = 0;
+   const transcript = msgs
+-    .map((m) => (m.sender === "ai" ? `Interviewer${m.questionNo ? ` (question ${m.questionNo})` : ""}: ${m.text}` : `Candidate: ${m.text}`))
++    .map((m) => {
++      if (m.sender === "ai") {
++        if (m.questionNo) currentQ = m.questionNo;
++        return `Interviewer (${m.questionNo ? `question ${m.questionNo}` : m.kind === "follow_up" ? `follow-up on question ${currentQ}` : "closing"}): ${m.text}`;
++      }
++      return `Candidate (answer to question ${currentQ}): ${m.text}`;
++    })
+     .join("\n\n");
+   const s = await getModuleSettings();
+   const values = await promptValuesWithProfile(i, i.questionPlan);
+@@ -559,10 +569,12 @@ export async function evaluateInterview(id: string): Promise<boolean> {
+   let lastErr: unknown;
+   for (let attempt = 0; attempt < 3; attempt++) {
+     try {
+-      const r = await moduleAiChat(system, [{ role: "user", content: user }], 3500, { json: true, temperature: 0.2, timeoutMs: 120_000 });
++      // Room for a rating per answer: an hour can have 30 or more.
++      const r = await moduleAiChat(system, [{ role: "user", content: user }], 7000, { json: true, temperature: 0.2, timeoutMs: 150_000 });
+       await addUsage(db, id, r);
+       const e = evaluationSchema.parse(parseJsonObject(r.text));
+-      const overall = overallScore(e.scores, i.settings.weights);
++      const scores = skillScores(e);
++      const overall = overallScore(scores, i.settings.weights);
+       const inserted = await db
+         .insert(interviewEvaluations)
+         .values({
+@@ -570,7 +582,7 @@ export async function evaluateInterview(id: string): Promise<boolean> {
+           source: "ai",
+           aiInterviewId: id,
+           status: "submitted",
+-          ...e.scores,
++          ...scores,
+           weights: i.settings.weights,
+           overall,
+           writing: toWriting(e),
+diff --git a/lib/mock-interviews/prompts.ts b/lib/mock-interviews/prompts.ts
+index 60272e4..b22fd14 100644
+--- a/lib/mock-interviews/prompts.ts
++++ b/lib/mock-interviews/prompts.ts
+@@ -1,7 +1,7 @@
+ import "server-only";
+ 
+ import { z } from "zod";
+-import { METRICS, type ReportWriting } from "./model";
++import { METRICS, type MetricScores, type ReportWriting } from "./model";
+ 
+ // The three AI calls of an interview (spec D10, D49): the question plan, each
+ // interviewer turn, and the evaluation. Admin edits the wording of each prompt
+@@ -129,8 +129,16 @@ export const turnSchema = z.object({
+ const point = z.object({ headline: z.string().trim().min(1).max(90), detail: z.string().trim().min(1).max(1200) });
+ const score = z.number().int().min(1).max(10);
+ 
++const skillRatings = z.object({ communication: score, technical: score, confidence: score, problemSolving: score, relevance: score });
++
+ export const evaluationSchema = z.object({
+-  scores: z.object({ communication: score, technical: score, confidence: score, problemSolving: score, relevance: score }),
++  /** Every answered question rated on its own: the skill scores are built from these. */
++  answers: z
++    .array(z.object({ q: z.number().int().min(0).max(500), ratings: skillRatings, note: z.string().trim().max(400).optional() }))
++    .max(200)
++    .optional(),
++  /** The AI's overall view; used only when no answer ratings come back. */
++  scores: skillRatings,
+   strengths: z.array(point).min(1).max(30),
+   improvements: z.array(point).min(1).max(30),
+   missed: z
+@@ -144,13 +152,16 @@ export type EvaluationReply = z.infer<typeof evaluationSchema>;
+ export function evaluationFormat(): string {
+   return [
+     "Reply with one JSON object only, in this shape:",
+-    '{"scores": {"communication": n, "technical": n, "confidence": n, "problemSolving": n, "relevance": n},',
++    '{"answers": [{"q": n, "ratings": {"communication": n, "technical": n, "confidence": n, "problemSolving": n, "relevance": n}, "note": string}],',
++    ' "scores": {"communication": n, "technical": n, "confidence": n, "problemSolving": n, "relevance": n},',
+     ' "strengths": [{"headline": string, "detail": string}],',
+     ' "improvements": [{"headline": string, "detail": string}],',
+     ' "missed": [{"question": string, "headline": string, "note": string}],',
+     ' "betterAnswers": [{"question": string, "answer": string}],',
+     ' "nextSteps": [{"headline": string, "detail": string}]}',
+-    "- Each score is a whole number from 1 to 10, judged only on what the candidate said in the transcript. The resume is context, not evidence.",
++    "- answers: rate every question the candidate answered, one entry each, in order. q is the question number shown in the transcript; a planned question and its follow-ups count as one answer. Rate that answer alone on all five skills, and say in a few words what was missing (or empty when nothing was). Don't rate questions the candidate never reached.",
++    "- scores: your overall view of the whole interview. The final skill scores are worked out from the answer ratings, so rate each answer on its own merits rather than balancing them out.",
++    "- Each score and rating is a whole number from 1 to 10, judged only on what the candidate said in the transcript. The resume is context, not evidence.",
+     "- Use the full scale, strictly, as a demanding interviewer would: 1-2 no relevant answer; 3-4 vague, generic or largely wrong, with no real example; 5-6 relevant but general or partial, few specifics; 7-8 specific and structured, with a real example and its result; 9-10 exceptional, complete on every part, with measurable results and clear reasoning.",
+     "- A short, vague or generic answer can't lift a score above 4. 'I'm not sure' counts against technical knowledge and confidence. An average answer is a 5. A well-prepared candidate who answers with specific examples and their results earns 7 to 8; give 9 or 10 only when nearly every answer is exceptional.",
+     "- headline: a short label of 2 to 6 words in sentence case (only the first word capitalized, e.g. \"Give a specific example\"). detail / note / answer: the full explanation, specific to this candidate's answers, written to the candidate as \"you\".",
+@@ -160,6 +171,22 @@ export function evaluationFormat(): string {
+   ].join("\n");
+ }
+ 
++/**
++ * The five skill scores, built from the per-answer ratings: each skill is the
++ * average of its rating across the answers, so a run of vague answers pulls it
++ * down instead of being smoothed over. Falls back to the AI's overall view
++ * when the reply has no ratings.
++ */
++export function skillScores(r: EvaluationReply): MetricScores {
++  const answers = r.answers ?? [];
++  if (!answers.length) return r.scores;
++  const avg = (k: keyof MetricScores) => {
++    const v = answers.reduce((n, a) => n + a.ratings[k], 0) / answers.length;
++    return Math.min(10, Math.max(1, Math.round(v)));
++  };
++  return { communication: avg("communication"), technical: avg("technical"), confidence: avg("confidence"), problemSolving: avg("problemSolving"), relevance: avg("relevance") };
++}
++
+ /**
+  * The written parts, trimmed to what the report shows. A reply that lists more
+  * (common for a weak interview with many thin answers) is kept and cut down,
