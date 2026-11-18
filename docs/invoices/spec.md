@@ -1,0 +1,149 @@
+# Invoices, billing details and payment history: spec
+
+Status: **draft for the owner's approval, November 18, 2026.** Nothing is built yet. Decisions marked
+"owner" were given on November 18; items marked "proposed" need a yes or a change.
+
+This covers every sale on Jobtiva (plans, AI mock interviews, and anything sold later). It works with GST off
+(today) and on. The bigger GST work (the GST panel, reports, thresholds, credit notes) stays in
+`docs/gst/spec.md`; section 9 says where the line is.
+
+This is a design for software, not tax advice. Wording and treatments marked "CA" are confirmed by the owner's
+CA before GST is switched on.
+
+## 1. Decisions
+
+| # | Decision | Source |
+|---|---|---|
+| I1 | **One invoice per successful payment**, for every kind of sale. A failed, pending or cancelled order gets no invoice. No separate "order slip": the invoice is the document. | owner |
+| I2 | **Works with GST on or off.** Off: an "Invoice" with no tax and a not-registered line. On: a "Tax Invoice" with the tax split. Which one is decided at the moment of payment. | owner |
+| I3 | **An invoice never changes.** Everything printed on it (Jobtiva's details, the buyer's details, the item, amounts, tax, GST status, numbers, dates) is copied into the invoice record at payment. Later changes to GST settings, Billing, the buyer's profile or their address never alter it. | owner |
+| I4 | **Billing details are required before any payment**, GST on or off. If anything required is missing, checkout stops and asks for it first. Nothing is charged until the details are complete. | owner |
+| I5 | **The invoice number replaces the receipt number everywhere** (emails, admin, user screens), for every kind of sale. | owner |
+| I6 | **Money records are never deleted**: orders, invoices and (later) credit notes survive account reset and account deletion. They keep the copied buyer details; the link to the account is cleared on deletion. No data retention setting may ever include them. | owner |
+| I7 | **Payment history is its own tab in user Settings** ("Payments"), not under Plan. A table with an Action column. | owner |
+| I8 | **PDFs are made on request and never stored** (see section 6). | proposed, replaces the owner's two options |
+| I9 | **PDF library: `@react-pdf/renderer`** (MIT). | owner approved "any suitable library"; choice proposed |
+
+## 2. Billing details (required before paying)
+
+Asked once, in a short form that opens when the user clicks **Pay** with details missing, and editable any
+time in Settings → Payments. Each invoice keeps its own copy (I3), so editing changes only future invoices.
+
+| Field | Required | Notes |
+|---|---|---|
+| Full name (as it should appear on invoices) | Yes | Prefilled from the account name |
+| Email | Yes | The account email, already verified at sign-up. Shown, not editable here |
+| Mobile number | Yes | Indian 10-digit mobile. Prefilled from the account if already there |
+| Address line | Yes | |
+| City | Yes | |
+| State | Yes | Dropdown of states and UTs. Decides the place of supply when GST is on (CBIC Circular 242/36/2024-GST: the buyer's state must be on the invoice for every online service) |
+| PIN code | Yes | 6 digits, not starting with 0 |
+| Country | Yes | India only for now (GST spec G8) |
+| Buying as a business? (GSTIN) | Optional | If given: 15-character format, state code must match the chosen state. Makes it a business (B2B) invoice and adds the registered business name |
+| PAN | **Proposed optional** | See section 10, question 1 |
+
+Server checks the same rules with Zod; checkout refuses to start an order while the profile is incomplete, so
+the rule holds even if the form is skipped.
+
+## 3. What's frozen on each invoice
+
+One `invoices` row per paid order, written in the same transaction that marks the order paid (both the
+checkout handler and the webhook go through it; a unique key on the order makes the second a no-op).
+
+- **Number and dates**: invoice number, invoice date, financial year, payment date and ID, gateway.
+- **Seller**: business name, address, state and state code, PAN, GSTIN (when registered), support email, the
+  app name, and a copy of the logo as it was (a few KB, so a later logo change doesn't alter old invoices).
+- **Buyer**: everything from section 2 as entered at payment.
+- **Item lines**: description (for example "Pro plan, monthly, December 1, 2026 to December 31, 2026" or "AI
+  mock interview: 30 min, Medium"), SAC code, quantity, amounts.
+- **Money** (paise): taxable value, CGST, SGST/UTGST, IGST, rate, total, amount in words.
+- **Tax status**: GST on or off, place of supply (state and code), B2B or B2C, and the exact declaration lines
+  printed.
+- **Template version**: which layout drew it. The content never changes. Layout fixes can be applied to old
+  invoices only by keeping the old version available, so we keep each version's renderer.
+
+## 4. Numbering
+
+- One series for the whole platform, separate from order numbers (orders have gaps; invoices must not).
+- Format: `prefix` + financial year + `/` + sequence, for example `JT/26-27/00001`. At most 16 characters,
+  only letters, digits, `-` and `/` (CGST Rule 46(b)). The prefix is set in admin and checked so the full
+  number always fits.
+- Restarts at 1 every April 1. Assigned at payment inside the transaction, so two payments at the same moment
+  can never share or skip a number.
+
+## 5. The two layouts
+
+| | GST off: "Invoice" | GST on: "Tax Invoice" |
+|---|---|---|
+| Seller | Name, address, PAN | Name, address, GSTIN, state and code |
+| Buyer | Name, address, state, contact | Same, plus GSTIN and business name for B2B |
+| Lines | Description, amount | Description, SAC, taxable value, rate, tax |
+| Tax | None | CGST + SGST (or UTGST) when the buyer's state matches Jobtiva's, IGST otherwise |
+| Place of supply | Not shown | Buyer's state name and code |
+| Declaration | "Not registered under GST. No GST charged." (wording: CA) | As required (CA) |
+| Footer | Paid on, payment ID | Same |
+| Signature | CA: how a computer-generated PDF meets the signature requirement (Rule 46 lists the supplier's signature or digital signature for a tax invoice) | Same question |
+
+## 6. PDFs: made on request, never stored (proposed)
+
+The owner suggested either deleting each PDF right after use, or keeping it one or two days with an admin
+setting. Proposed instead: **never write the file at all.** The PDF is drawn in memory from the frozen
+invoice record, sent straight to the browser (download) or attached to the email, and discarded. Drawing one
+takes a fraction of a second.
+
+This saves the same space as both options, with nothing to clean up: no files on disk, no cleanup job, no
+setting, and no stale copy if something fails halfway. The cost is a little server work per download, which
+at our volume is nothing. If volume ever grows a lot, a short cache can be added then.
+
+## 7. What the user gets
+
+- **Email on payment**: the existing "Payment received" and AI interview receipt emails, now with the invoice
+  number and the PDF attached. Their wording stays editable in Email templates.
+- **Settings → Payments** (new tab):
+  - Billing details, with **Edit**.
+  - A payments table: Date, Invoice number, Item, Amount, Status (Paid, Failed, Pending, Cancelled), and an
+    Action column: **Download invoice**, **Email me the invoice** (paid only), **View details**.
+  - Filters by status and date, pagination, and the multi-select the table rule asks for (bulk download as
+    one ZIP is proposed for later, not now). Date range default: see section 10, question 2.
+- Failed or cancelled attempts show in the table without an invoice, so users can see what happened.
+
+## 8. What admin gets
+
+- **Orders & payments**: invoice number on each paid order, and **Download invoice** and **Send invoice** in the
+  row menu and the details window (approved November 8).
+- **Settings → Billing**: Jobtiva's state (new, a dropdown: it decides CGST/SGST vs IGST), the invoice prefix
+  with a live preview of the next number, and a check that the seller details an invoice needs are complete.
+  Online payment stays off until they are (existing rule).
+- Users: an admin can view a user's billing details (personal data, admin only).
+
+## 9. Where this ends and the GST spec begins
+
+**In this build:** billing details, the invoice record and numbering, both layouts, the tax split by state
+(needed for a correct Tax Invoice), PDFs, emails, the user Payments tab, admin actions, Jobtiva's state in
+Billing.
+
+**Stays in `docs/gst/spec.md`:** the GST panel (effective date, per-product SAC and rate, states table),
+credit notes for refunds, GST reports, the turnover and e-invoicing threshold tracker. Until the GST panel
+exists, GST on/off, rate and SAC come from today's Billing fields.
+
+## 10. Questions for the owner
+
+1. **PAN required for every buyer?** Proposed: optional. It isn't needed for a consumer invoice, it's
+   sensitive personal data that Indian privacy law (DPDP Act) expects us not to collect without a need, and
+   asking every job seeker for PAN to buy a ₹499 plan will lose sales. Business buyers give a GSTIN, which
+   contains their PAN anyway.
+2. **Payments table date range.** The table rule says "last 7 days" by default. For payment history that hides
+   almost everything. Proposed: default to the last 12 months for this table.
+3. **Existing paid orders** (made before invoices exist): give them invoices now, numbered from 1 in date order,
+   using the details copied on the order? Or leave them with their old receipt number? Proposed: give them
+   invoices, so every payment has one; their buyer address will be blank because we didn't ask then.
+
+## 11. Build plan (UI first)
+
+| Phase | Work |
+|---|---|
+| 1. Screens | Billing details form (checkout and Settings), Settings → Payments tab with its table, the two invoice layouts as PDFs on sample data, admin Billing additions, at 375px and 768px |
+| 2. Database | Billing details on the profile, `invoices` table with the frozen copy, the numbering series, Jobtiva's state in Billing |
+| 3. Wiring | The checkout gate (I4), invoice creation at payment for plans and AI interviews, tax split, PDF on request, email attachments, invoice number replacing the receipt number, admin actions, existing orders (question 3) |
+| 4. Safety | Check script: no paid order without exactly one invoice, numbers unbroken per financial year and at most 16 characters, an invoice reads the same after every setting and profile change, PDFs never touch disk, money tables untouched by reset, deletion and retention, signed-out and other-user access refused |
+| 5. Content and rollout | Knowledge-base articles, Privacy Policy lines (billing details collected; money records kept by law after deletion), preprod, then prod with the payment module |
