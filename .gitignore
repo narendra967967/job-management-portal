@@ -52,3 +52,6 @@ next-env.d.ts
 # Local Claude Code branch guard: untracked so it stays in place on every branch
 .claude/settings.local.json
 .claude/hooks/
+
+# R1.6 practice-run raw results (large; regenerate tables with scripts/mock-interviews/practice-report.mts)
+docs/interview-prep/r1.6/*.json
