@@ -165,10 +165,11 @@ async function candidateAnswer(persona: Persona, pack: (typeof PACKS)[keyof type
 
 /* ---------------- settings for this model, restored afterwards ---------------- */
 
-const TEST_COLS = ["ai_state", "ai_model", "ai_input_cost_per_mtok_paise", "ai_cached_input_cost_per_mtok_paise", "ai_output_cost_per_mtok_paise", "updated_at"];
+// The Open / Coming soon switch is the owner's: these runs call the engine directly and never touch it.
+const TEST_COLS = ["ai_model", "ai_input_cost_per_mtok_paise", "ai_cached_input_cost_per_mtok_paise", "ai_output_cost_per_mtok_paise", "updated_at"];
 const [pin, pcached, pout] = PRICES_USD[MODEL];
 await db.query(
-  "update mock_interview_config set ai_state='open', ai_model=$1, ai_input_cost_per_mtok_paise=$2, ai_cached_input_cost_per_mtok_paise=$3, ai_output_cost_per_mtok_paise=$4 where id='app'",
+  "update mock_interview_config set ai_model=$1, ai_input_cost_per_mtok_paise=$2, ai_cached_input_cost_per_mtok_paise=$3, ai_output_cost_per_mtok_paise=$4 where id='app'",
   [MODEL, paise(pin), paise(pcached), paise(pout)],
 );
 
