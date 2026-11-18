@@ -1,4 +1,4 @@
-// User Settings → Payments (docs/invoices/spec.md, section 7): one row per
+// User Orders & payments page (/orders, docs/invoices/spec.md, section 7): one row per
 // payment attempt. Only a paid order has an invoice. Shapes are shared by the
 // screen and (phase 3) the server action that loads the user's own rows.
 

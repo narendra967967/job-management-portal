@@ -1,7 +1,7 @@
 "use client";
 
 // Billing details (docs/invoices/spec.md, section 2): asked before the first
-// payment and editable in Settings → Payments. Every invoice keeps a copy of
+// payment and editable in Settings → Profile. Every invoice keeps a copy of
 // what was entered when it was paid, so editing here changes future invoices
 // only. The same checks run on the server (phase 3).
 

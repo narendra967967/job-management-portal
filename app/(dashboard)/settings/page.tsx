@@ -32,7 +32,6 @@ import {
   Briefcase,
   Inbox,
   Megaphone,
-  Receipt,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
@@ -76,7 +75,6 @@ import { EmailForwardingCard } from "@/components/forwarding/email-forwarding-ca
 import { PlanChooser } from "@/components/billing/plan-chooser";
 import { useLimitedMode } from "@/lib/access-mode";
 import { EmailLogCard } from "@/components/forwarding/email-log-card";
-import { PaymentsTab } from "@/components/billing/payments-tab";
 import { BillingDetailsSection } from "@/components/billing/billing-details-card";
 import { DangerZoneCard } from "@/components/account/danger-zone";
 import { CareerProfileTab } from "@/components/career/career-profile-tab";
@@ -166,7 +164,6 @@ const SECTION = {
   },
   career: { id: "career", label: "Career profile", icon: Briefcase, render: () => <CareerProfileTab /> },
   plan: { id: "plan", label: "Plan", icon: Crown, render: () => <PlanDetailsCard /> },
-  payments: { id: "payments", label: "Payments", icon: Receipt, render: () => <PaymentsTab /> },
   notifications: { id: "notifications", label: "Notifications", icon: Megaphone, render: () => <NotificationPrefsCard /> },
   forwarding: { id: "forwarding", label: "Email forwarding", icon: Forward, render: () => <EmailForwardingCard /> },
   google: { id: "google", label: "Gmail connection", icon: Mail, render: () => <GoogleCard /> },
@@ -208,7 +205,7 @@ const SECTION = {
 // Gmail switch is on (docs/email-forwarding.md §4a); forwarding is always listed.
 function settingsGroups(gmailEnabled: boolean): { label: string; items: SettingsSection[] }[] {
   return [
-    { label: "General", items: [SECTION.profile, SECTION.career, SECTION.plan, SECTION.payments, SECTION.notifications] },
+    { label: "General", items: [SECTION.profile, SECTION.career, SECTION.plan, SECTION.notifications] },
     {
       label: "Email & sync",
       items: gmailEnabled

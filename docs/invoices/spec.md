@@ -104,7 +104,9 @@ at our volume is nothing. If volume ever grows a lot, a short cache can be added
   number and the PDF attached. Their wording stays editable in Email templates.
 - **Settings → Profile**: billing details in their own box below the general profile, with **Edit** (owner,
   November 18: all personal details together, billing kept in a separate box).
-- **Settings → Payments** (new tab):
+- **Orders & payments** (`/orders`), its own page in the sidebar's account group just above the profile, with
+  Settings below it, also in the phone menu (owner, November 18). Open in limited mode, so invoices
+  stay reachable and renewals possible after a plan ends.
   - A payments table: Date, Invoice number, Item, Amount, Status (Paid, Failed, Pending, Cancelled), and an
     Action column: **Download invoice**, **Email me the invoice** (paid only), **View details**.
   - Filters by status and date, pagination, and the multi-select the table rule asks for (bulk download as
@@ -172,7 +174,7 @@ drawn with `scripts/invoices/render-samples.mts`.
 
 | Phase | Work |
 |---|---|
-| 1. Screens | Billing details form (checkout and Settings), Settings → Payments tab with its table, the two invoice layouts as PDFs on sample data, admin Billing additions, at 375px and 768px |
+| 1. Screens | Billing details form (checkout and Settings → Profile), the Orders & payments page with its table, the two invoice layouts as PDFs on sample data, admin Billing additions, at 375px and 768px |
 | 2. Database | Billing details on the profile, `invoices` table with the frozen copy, the numbering series, Jobtiva's state in Billing |
 | 3. Wiring | The checkout gate (I4), invoice creation at payment for plans and AI interviews, tax split, PDF on request, email attachments, invoice number replacing the receipt number, admin actions, existing orders (question 3) |
 | 4. Safety | Check script: no paid order without exactly one invoice, numbers unbroken per financial year and at most 16 characters, an invoice reads the same after every setting and profile change, PDFs never touch disk, money tables untouched by reset, deletion and retention, signed-out and other-user access refused |

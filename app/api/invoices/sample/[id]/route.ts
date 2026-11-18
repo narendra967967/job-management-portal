@@ -6,7 +6,7 @@ import { samplePayments } from "@/lib/invoices/payments-model";
 import { sampleInvoiceGstOff } from "@/lib/invoices/sample";
 
 // PHASE 1 (UI first, docs/invoices/spec.md): the invoice PDF for a SAMPLE row in
-// Settings → Payments, so Download shows the real layout. Signed-in users only.
+// Orders & payments, so Download shows the real layout. Signed-in users only.
 // Phase 3 replaces this with the real route, which loads the signed-in user's
 // own invoice by its order and refuses anyone else's.
 // The PDF is drawn in memory and streamed; nothing is written to disk (I8).

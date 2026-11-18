@@ -1,6 +1,6 @@
 "use client";
 
-// Settings → Payments (docs/invoices/spec.md, section 7): every payment the user
+// Orders & payments (/orders, docs/invoices/spec.md, section 7): every payment the user
 // has made or tried, with its invoice. Billing details live on the Profile tab
 // (components/billing/billing-details-card.tsx).
 // PHASE 1 (UI first): sample rows. Phase 3 loads the signed-in user's own.

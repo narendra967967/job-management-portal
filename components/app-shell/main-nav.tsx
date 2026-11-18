@@ -21,7 +21,7 @@ import {
   Lock,
   type LucideIcon,
 } from "lucide-react";
-import { BookOpen, Bot, Briefcase, Compass, History, LifeBuoy, MessagesSquare, Sparkles, TrendingUp, UserRound } from "lucide-react";
+import { BookOpen, Bot, Briefcase, Compass, History, LifeBuoy, MessagesSquare, Receipt, Sparkles, TrendingUp, UserRound } from "lucide-react";
 import { useNavArea } from "@/components/app-shell/use-nav-area";
 import { LEADS_HOME, MOCK_INTERVIEWS_HOME, type NavArea } from "@/lib/nav-area";
 import { Logo } from "@/components/app-shell/logo";
@@ -340,6 +340,7 @@ export function SidebarFooter() {
   const profile = useProfile();
   const active = isActive(pathname, "/settings");
   const guidesActive = isActive(pathname, "/guides");
+  const ordersActive = isActive(pathname, "/orders");
   return (
     <div className="mt-auto border-t p-3">
       <div data-tour="help">
@@ -369,6 +370,21 @@ export function SidebarFooter() {
       </Link>
       )}
       </div>
+      {/* Account: orders and settings, just above the profile (owner, November 18, 2026). */}
+      <div className="my-2 border-t" aria-hidden />
+      <Link
+        href="/orders"
+        onClick={() => freshNavigation("/orders")}
+        className={cn(
+          "relative mb-1 flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
+          ordersActive
+            ? "bg-gradient-to-r from-primary/12 to-primary/[0.03] font-semibold text-primary before:absolute before:top-1/2 before:left-0 before:h-5 before:w-1 before:-translate-y-1/2 before:rounded-r-full before:bg-primary"
+            : "font-medium text-muted-foreground hover:bg-sidebar-accent hover:text-foreground",
+        )}
+      >
+        <Receipt className="size-5 shrink-0" aria-hidden />
+        Orders &amp; payments
+      </Link>
       <Link
         href="/settings"
         onClick={() => freshNavigation("/settings")}
@@ -429,6 +445,10 @@ export function AccountMenu() {
           </DropdownMenuLabel>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => router.push("/orders")}>
+          <Receipt className="size-4" aria-hidden />
+          Orders &amp; payments
+        </DropdownMenuItem>
         <DropdownMenuItem onClick={() => router.push("/settings")}>
           <Settings className="size-4" aria-hidden />
           Settings
