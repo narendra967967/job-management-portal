@@ -239,11 +239,26 @@ export function InterviewBriefing({ data }: { data: BriefingData }) {
           </section>
         </div>
 
-        {/* Side: setup, what's scored, the button */}
+        {/* Side: the button first (the page's one main action), then setup and what's scored */}
         <aside className="space-y-4 lg:sticky lg:top-0">
+          <section className="hidden rounded-2xl border border-primary/20 bg-card p-4 shadow-sm lg:block">
+            <p className="text-sm font-semibold">{resuming ? "Ready to carry on?" : ticked === checklist.length ? "All set. Good luck!" : "Ready when you are"}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {resuming
+                ? `${booking.resumeMinutesLeft ?? settings.resumeWindowMinutes} min left to resume`
+                : `${booking.durationMin} min · about ${questions} questions`}
+            </p>
+            <div className="mt-3">
+              <StartButton resuming={resuming} href={sessionHref} />
+            </div>
+            <Link href="/mock-interviews/ai" className={cn(buttonVariants({ variant: "ghost" }), "mt-1 w-full text-muted-foreground")}>
+              Not now
+            </Link>
+          </section>
+
           <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-            <div className="bg-gradient-to-br from-primary to-violet-600 p-4 text-white">
-              <p className="text-[11px] font-semibold tracking-wide text-white/75 uppercase">Your setup</p>
+            <div className="border-b bg-primary/8 p-4">
+              <p className="text-[11px] font-semibold tracking-wide text-primary/80 uppercase">Your setup</p>
               <p className="mt-1 font-semibold">{booking.role}</p>
             </div>
             <dl className="space-y-2 p-4 text-sm">
@@ -286,18 +301,12 @@ export function InterviewBriefing({ data }: { data: BriefingData }) {
             </ul>
           </section>
 
-          <div className="hidden space-y-2 lg:block">
-            <StartButton resuming={resuming} href={sessionHref} />
-            <Link href="/mock-interviews/ai" className={cn(buttonVariants({ variant: "ghost" }), "w-full")}>
-              Not now
-            </Link>
-          </div>
         </aside>
       </div>
 
       {/* Phones and tablets: the button stays in reach (right padding clears the help bubble). */}
       <div className="sticky bottom-0 z-10 -mx-1 flex items-center gap-3 rounded-2xl border bg-card/95 p-3 pr-[4.75rem] shadow-md backdrop-blur sm:pr-[5.25rem] lg:hidden">
-        <p className="min-w-0 flex-1 text-xs text-muted-foreground">
+        <p className="hidden min-w-0 flex-1 text-xs text-muted-foreground sm:block">
           {resuming ? `${booking.resumeMinutesLeft ?? settings.resumeWindowMinutes} min left to resume` : `${booking.durationMin} min · about ${questions} questions`}
         </p>
         <StartButton resuming={resuming} href={sessionHref} compact />
@@ -331,27 +340,40 @@ function StartButton({ resuming, href, compact }: { resuming: boolean; href: str
       setBusy(false);
     }
   }
+  const gradient = resuming ? "from-amber-500 via-orange-500 to-rose-500" : "from-primary via-violet-600 to-fuchsia-600";
   return (
-    <button
-      type="button"
-      onClick={go}
-      disabled={busy}
-      className={cn(
-        buttonVariants({ size: "lg" }),
-        compact ? "shrink-0" : "w-full",
-        "text-white shadow-sm hover:opacity-90",
-        resuming ? "bg-gradient-to-r from-amber-500 to-orange-500" : "bg-gradient-to-r from-primary to-violet-600",
-      )}
-    >
-      {busy ? (
-        <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden />
-      ) : resuming ? (
-        <RefreshCw className="size-4" aria-hidden />
-      ) : (
-        <PlayCircle className="size-4" aria-hidden />
-      )}
-      {busy ? (resuming ? "Resuming…" : "Preparing your questions…") : resuming ? "Resume interview" : "Start interview"}
-    </button>
+    // A soft glowing halo behind the button marks it as the page's main action;
+    // it holds still for anyone who prefers reduced motion.
+    <span className={cn("relative inline-flex", compact ? "flex-1 sm:flex-none sm:shrink-0" : "w-full")}>
+      <span
+        aria-hidden
+        className={cn(
+          "pointer-events-none absolute -inset-1 rounded-2xl bg-gradient-to-r opacity-50 blur-md",
+          gradient,
+          !busy && "animate-pulse motion-reduce:animate-none",
+        )}
+      />
+      <button
+        type="button"
+        onClick={go}
+        disabled={busy}
+        className={cn(
+          "relative inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r font-semibold text-white shadow-lg ring-1 ring-white/25 transition-transform focus-visible:ring-4 focus-visible:ring-primary/40 focus-visible:outline-none disabled:opacity-90 motion-safe:hover:-translate-y-0.5",
+          gradient,
+          resuming ? "shadow-orange-500/30" : "shadow-primary/30",
+          compact ? "h-12 w-full px-4 text-sm sm:w-auto" : "h-14 w-full px-5 text-base",
+        )}
+      >
+        {busy ? (
+          <Loader2 className="size-5 animate-spin motion-reduce:animate-none" aria-hidden />
+        ) : resuming ? (
+          <RefreshCw className="size-5" aria-hidden />
+        ) : (
+          <PlayCircle className="size-5" aria-hidden />
+        )}
+        {busy ? (resuming ? "Resuming…" : "Preparing your questions…") : resuming ? "Resume interview" : "Start interview"}
+      </button>
+    </span>
   );
 }
 
