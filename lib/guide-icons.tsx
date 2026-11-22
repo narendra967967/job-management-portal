@@ -13,6 +13,7 @@ import {
   LifeBuoy,
   Lightbulb,
   Mail,
+  MessageCircle,
   NotebookPen,
   Rocket,
   Send,
@@ -43,6 +44,7 @@ export const GUIDE_ICONS: Record<GuideIconKey, LucideIcon> = {
   gauge: Gauge,
   wallet: Wallet,
   notebook: NotebookPen,
+  "message-circle": MessageCircle,
 };
 
 /** Icon for a stored key (unknown keys fall back to a book). */

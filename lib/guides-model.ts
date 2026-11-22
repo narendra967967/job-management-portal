@@ -45,6 +45,7 @@ export const GUIDE_ICON_KEYS = [
   "gauge",
   "wallet",
   "notebook",
+  "message-circle",
 ] as const;
 export type GuideIconKey = (typeof GUIDE_ICON_KEYS)[number];
 
