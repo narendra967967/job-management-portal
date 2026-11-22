@@ -10,7 +10,6 @@ import { invoices } from "@/db/schema";
 import type { MailAttachment } from "@/lib/mailer";
 import { ensureInvoice } from "@/lib/invoices/issue";
 import type { InvoiceDoc } from "@/lib/invoices/model";
-import { renderInvoicePdf } from "@/lib/invoices/pdf";
 
 export interface InvoiceFile {
   number: string;
@@ -23,6 +22,10 @@ export async function invoiceFile(orderId: string): Promise<InvoiceFile | null> 
   if (!issued) return null;
   const [inv] = await db.select({ number: invoices.number, doc: invoices.doc }).from(invoices).where(eq(invoices.id, issued.id)).limit(1);
   if (!inv) return null;
+  // Loaded only when a PDF is actually drawn: the payment code imports this
+  // file, and tsx-run check scripts can't load the PDF library (it's fine
+  // under Next.js). A failure here only drops the attachment; the email still goes.
+  const { renderInvoicePdf } = await import("@/lib/invoices/pdf");
   return {
     number: inv.number,
     attachment: {

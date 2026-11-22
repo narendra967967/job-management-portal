@@ -287,6 +287,18 @@ async function main() {
   const settings = await getModuleSettings();
   CATEGORY = settings.categories[0];
   const tempPlanIds: string[] = [];
+  // Invoices (docs/invoices/spec.md): every paid order gets an invoice and a
+  // number from its series, and paying needs billing details. Keep the
+  // counters to put back, and give ui-test made-up billing details if it has none.
+  const countersBefore = await q("select series, last_seq, updated_at from invoice_counters");
+  const [billingBefore] = await q("select user_id from billing_profiles where user_id = $1", [u.id]);
+  if (!billingBefore) {
+    await q(
+      `insert into billing_profiles (user_id, full_name, mobile, address_line, city, state_code, pin)
+       values ($1, 'Check Buyer', '9876543210', '1 Check Lane', 'Pune', '27', '411045')`,
+      [u.id],
+    );
+  }
 
   try {
     await q("update mock_interview_config set ai_state = 'open' where id = 'app'");
@@ -320,7 +332,7 @@ async function main() {
       "interviewHeartbeatAction",
       "answerInterviewAction",
       "endInterviewAction",
-      "emailAiInterviewReceiptAction",
+      "emailMyInvoicesAction",
       "saveModuleSettingsAction",
       "testModuleAiAction",
       "getAiInterviewEventsAction",
@@ -376,7 +388,7 @@ async function main() {
         "interviewHeartbeatAction",
         "answerInterviewAction",
         "endInterviewAction",
-        "emailAiInterviewReceiptAction",
+        "emailMyInvoicesAction",
         "saveModuleSettingsAction",
         "testModuleAiAction",
         "getAiInterviewEventsAction",
@@ -443,7 +455,7 @@ async function main() {
         await action("answerInterviewAction", [otherLive, "My answer"], userCookie),
         await action("endInterviewAction", [otherLive], userCookie),
         await formAction("updateAiBookingAction", [otherReady], setup({ role: "Taken over" }), userCookie),
-        await action("emailAiInterviewReceiptAction", [otherReady], userCookie),
+        await action("emailMyInvoicesAction", [[otherReady]], userCookie),
       ];
       const ready = await rowOf(otherReady);
       const live = await rowOf(otherLive);
@@ -808,6 +820,9 @@ async function main() {
       const [inv] = (await client.query("select 1 from information_schema.columns where table_name = 'invoices' and column_name = 'order_id'")).rows;
       if (inv) await client.query("delete from invoices where order_id = any($1::uuid[])", [orders]);
       await client.query("delete from payment_orders where id = any($1::uuid[])", [orders]);
+      // The invoice numbers those test orders took go back too.
+      await client.query("delete from invoice_counters");
+      for (const r of countersBefore) await client.query("insert into invoice_counters (series, last_seq, updated_at) values ($1, $2, $3)", [r.series, r.last_seq, r.updated_at]);
       await client.query("commit");
     } catch (err) {
       await client.query("rollback");
@@ -817,6 +832,7 @@ async function main() {
       client.release();
     }
     await q("delete from ai_interviews where id = any($1::uuid[])", [ids]);
+    if (!billingBefore) await q("delete from billing_profiles where user_id = $1", [u.id]);
     await q("delete from sent_email_log where sent_at >= $1 and to_address = $2 and template_key like 'mock_interview%'", [startedAt, u.email]);
     for (const id of tempPlanIds) await q("delete from plans where id = $1", [id]);
 
