@@ -94,12 +94,15 @@ export function AiHome({
   pricing,
   bookedId,
   readiness,
+  plansInclude = false,
 }: {
   allowance: AllowanceState;
   bookings: BookingRow[];
   pricing: PricingByDifficulty;
   bookedId?: string;
   readiness: Readiness;
+  /** A paid plan on the pricing page includes AI interviews. */
+  plansInclude?: boolean;
 }) {
   const mounted = useMounted();
   const router = useRouter();
@@ -146,7 +149,7 @@ export function AiHome({
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
-      <Hero allowance={allowance} pricing={pricing} mounted={mounted} />
+      <Hero allowance={allowance} pricing={pricing} mounted={mounted} plansInclude={plansInclude} />
 
       <GetReady readiness={readiness} allowance={allowance} pricing={pricing} hasBookings={bookings.length > 0} />
 
@@ -330,7 +333,7 @@ export function AiHome({
 
 /* ---------------- pieces ---------------- */
 
-function Hero({ allowance, pricing, mounted }: { allowance: AllowanceState; pricing: PricingByDifficulty; mounted: boolean }) {
+function Hero({ allowance, pricing, mounted, plansInclude }: { allowance: AllowanceState; pricing: PricingByDifficulty; mounted: boolean; plansInclude: boolean }) {
   const rate = rupees(lowestRatePerMinute(pricing));
   const example = aiInterviewQuote(30, pricing.Medium).final;
   const left = allowanceLeft(allowance);
@@ -340,11 +343,11 @@ function Hero({ allowance, pricing, mounted }: { allowance: AllowanceState; pric
     headline = `${left} of ${allowance.included} included on ${allowance.planName}`;
     note = `Renews with your plan${mounted ? ` on ${longDate(allowance.periodEnds)}` : ""}; unused ones don't carry over. After that, from ${rate} a minute.`;
   } else if (allowance.kind === "free") {
-    headline = left > 0 ? "1 free interview ready" : "Free interview used";
-    note = left > 0 ? "The Free plan includes one AI interview, once, at any length." : `From ${rate} a minute; a 30-minute Medium interview is ${rupees(example)}.`;
+    headline = left > 1 ? `${left} free interviews ready` : left === 1 ? "1 free interview ready" : "Free interview used";
+    note = left > 0 ? "Free plan interviews are given once, not every month, and can be any length." : `From ${rate} a minute; a 30-minute Medium interview is ${rupees(example)}.`;
   } else {
     headline = `From ${rate} a minute`;
-    note = `Depends on difficulty; a 30-minute Medium interview is ${rupees(example)}. Paid plans include some interviews.`;
+    note = `Depends on difficulty; a 30-minute Medium interview is ${rupees(example)}.${plansInclude ? " Some paid plans include interviews." : ""}`;
   }
   const pct = allowance.kind === "plan" ? (left / Math.max(1, allowance.included)) * 100 : left > 0 ? 100 : 0;
 
