@@ -23,7 +23,7 @@ export default async function RefundsPage() {
   const [appName, supportEmail, business] = await Promise.all([getAppName(), getSupportEmail(), getPublicBusiness()]);
   const email = supportEmail ? <a href={`mailto:${supportEmail}`}>{supportEmail}</a> : <span>our support address</span>;
   return (
-    <LegalLayout title="Refund & cancellation policy" updated="November 8, 2026">
+    <LegalLayout title="Refund & cancellation policy" updated="November 22, 2026">
       <p>
         This policy covers payments for {appName} plans. It sits alongside our{" "}
         <a href="/terms">Terms &amp; conditions</a>.
@@ -65,8 +65,8 @@ export default async function RefundsPage() {
 
       <h2>How to ask</h2>
       <p>
-        Email {email}, or send a request from Help &amp; support in the app. Include the receipt number from
-        your payment email and a line about what happened. If your plan didn&rsquo;t change after paying,
+        Email {email}, or send a request from Help &amp; support in the app. Include the invoice number from
+        your payment email, or from Orders &amp; payments in the app, and a line about what happened. If your plan didn&rsquo;t change after paying,
         it&rsquo;s worth waiting a few minutes first: a payment confirmed late by your bank still updates
         your plan on its own.
       </p>

@@ -87,7 +87,7 @@ export default async function PricingPage() {
     {
       q: "How do I pay?",
       a: online
-        ? "Go to Settings → Plan, pick a plan and a monthly or yearly term, and pay online with UPI, a card or another method shown in the payment window. Payments go through Razorpay, and your plan changes as soon as the payment is confirmed. We email you a receipt."
+        ? "Go to Settings → Plan, pick a plan and a monthly or yearly term, and pay online with UPI, a card or another method shown in the payment window. Payments go through Razorpay, and your plan changes as soon as the payment is confirmed. The first time, we ask for your billing details for the invoice. We email you the invoice, and it stays in Orders & payments to download any time."
         : "Go to Settings → Plan and choose the plan and billing period you want. Send the request, and our team will get back to you to complete the payment and switch your plan.",
     },
     {

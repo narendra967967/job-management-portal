@@ -2,10 +2,10 @@
 title: Changing the wording of automatic emails (email templates)
 category: Settings and data
 summary: Engagement → Email templates holds the wording of all 15 emails the app sends on its own. Edit the subject, heading, message, button label and footer, using placeholders like {{user_name}}. The next email sent uses it.
-keywords: email template, email wording, edit email text, password reset email text, welcome email text, receipt wording, placeholder, merge tag, variables, change subject line, automatic emails
+keywords: email template, email wording, edit email text, password reset email text, welcome email text, receipt wording, invoice email, placeholder, merge tag, variables, change subject line, automatic emails
 ---
 
-Every email the app sends by itself lives under **Engagement → Email templates**: sign-in emails, confirmation codes, account notices, plan reminders, payment receipts, the old-leads cleanup notice, support replies and the reactivation request that comes to your own support inbox. There are 15, in six groups. Whatever you save there is what the next email uses. There's no publish step.
+Every email the app sends by itself lives under **Engagement → Email templates**: sign-in emails, confirmation codes, account notices, plan reminders, payment emails, the invoice copy, the old-leads cleanup notice, support replies and the reactivation request that comes to your own support inbox. There are 19, in seven groups. Whatever you save there is what the next email uses. There's no publish step.
 
 Two kinds of email aren't here. Broadcasts are written each time you send one, and the two test emails in Settings → Email delivery (SMTP and Amazon SES) are fixed.
 
@@ -23,8 +23,8 @@ The parts that change per person are placeholders in double braces, like `{{user
 
 A few things to know:
 - `{{user_name}}` is the person's first name, or "there" when we don't have one, so "Hi {{user_name}}" always reads naturally.
-- Placeholders marked with a star are required. The code emails can't be saved without `{{code}}`, the receipt needs `{{receipt_details}}` and the resolved-ticket email needs `{{conversation}}`.
-- Dashed placeholders are whole blocks the app builds, such as the receipt table or the ticket conversation. They can only go in the message.
+- Placeholders marked with a star are required. The code emails can't be saved without `{{code}}`, the payment emails need `{{receipt_details}}` (the payment table, led by the invoice number), the invoice copy needs `{{invoice_list}}` and the resolved-ticket email needs `{{conversation}}`.
+- Dashed placeholders are whole blocks the app builds, such as the payment table or the ticket conversation. They can only go in the message.
 - "Your plan ends soon" has two blocks the app writes for you, `{{leads_line}}` and `{{upgrade_line}}`, because those sentences depend on whether it's a trial, how many leads the person has and whether there's a bigger plan to suggest. The button text there is a placeholder too, for the same reason. Everything around them is yours.
 - Values go in as plain text. A user who puts HTML in their name just gets odd-looking text, never formatting.
 

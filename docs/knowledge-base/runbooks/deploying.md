@@ -63,6 +63,18 @@ It confirms signed-out visitors and candidate accounts are turned away from ever
 
 It never calls OpenAI, Razorpay or a mail server: inside the script those are stand-ins, and its HTTP requests are all ones that must be refused before any of that happens. It flips Module settings, the Razorpay row, the Free plan's allowance and ui-test's plan while it runs, then puts every one back exactly and deletes the bookings and orders it made. The price checks need Billing complete locally and fewer than 7 payment orders on ui-test in the last hour.
 
+## Before deploying payment or invoice changes
+
+Anything that touches checkout, billing details, orders or invoices gets the invoice check. Run it with the app running locally:
+
+```bash
+APP_URL=http://localhost:3000 node --env-file=.env.local --require ./scripts/security/server-only-stub.cjs --import tsx scripts/security/invoices-checks.mts
+```
+
+It confirms every paid order has exactly one invoice, the numbers in each series run without gaps, and test payments stay out of the real series. It also checks that the database refuses to change or delete an invoice or delete an order, that nobody can pay without billing details, and that one person can't open another's invoice. It issues invoices for two throwaway test orders to prove two requests at once still give one invoice, then removes them and puts the counters back. Nothing is emailed and Razorpay isn't contacted.
+
+After a deploy that brings invoices for the first time, set the business **State** in Settings → Billing straight away. Until it's set, Billing counts as incomplete and online payment shows "Request this plan".
+
 ## Promote, don't rebuild
 
 To release what preprod tested, fast-forward `prod` to it with `git merge --ff-only preprod`. The commit is the same, so the exact image that ran on preprod goes live without being rebuilt.

@@ -5,7 +5,7 @@ summary: Settings → Email delivery picks the service every email goes out thro
 keywords: amazon ses, aws ses, smtp, email provider, email service, switch email, sandbox, production access, sending quota, send rate, access key, iam, email not sending, bounce, which mail server
 ---
 
-Everything the app emails goes out through one service, picked in **Settings → Email delivery** under **Send emails with**: SMTP or Amazon SES. That includes sign-in links, codes, receipts, plan reminders, support emails and broadcasts. Switching takes effect for the very next email.
+Everything the app emails goes out through one service, picked in **Settings → Email delivery** under **Send emails with**: SMTP or Amazon SES. That includes sign-in links, codes, payment emails with invoices, plan reminders, support emails and broadcasts. Switching takes effect for the very next email.
 
 You can only pick a service that has its settings saved. The other one keeps its settings, so switching back is one click.
 

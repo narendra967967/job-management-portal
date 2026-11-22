@@ -5,7 +5,7 @@ summary: Admin Settings → Data retention sets how many days each kind of log i
 keywords: retention, data retention, delete logs, how long, notifications, email log, processed ledger, conversations, history, mock interview events
 ---
 
-**Admin Settings → Data retention** sets a window in days for each kind of log. The daily cron job deletes anything older. Leads themselves are never removed by this, only by the user, or by Lead retention when it's switched on.
+**Admin Settings → Data retention** sets a window in days for each kind of log. The daily cron job deletes anything older. Leads themselves are never removed by this, only by the user, or by Lead retention when it's switched on. Orders and invoices are never removed at all, by this or anything else: tax law needs them, and the database refuses to delete them.
 
 | Type | What it is | Default | Allowed |
 |---|---|---|---|

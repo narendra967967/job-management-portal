@@ -83,9 +83,15 @@ export default async function PrivacyPage() {
         )}
         <li>
           <strong>Payments:</strong> when you buy a plan{interviews ? " or an AI mock interview" : ""}, what you bought{interviews ? " (the plan and billing period, or the interview)" : " (the plan and billing period)"}, the amounts
-          (including any GST), the date, your receipt number, our payment provider&rsquo;s order and payment
+          (including any GST), the date, your invoice and its number, our payment provider&rsquo;s order and payment
           references, and the kind of method you used, such as UPI or card. Your card, UPI and bank details
           go straight to our payment provider, Razorpay. We never see or store them.
+        </li>
+        <li>
+          <strong>Billing details:</strong> before your first payment we ask for the name and address your
+          invoices go to, your mobile number and state, and, if you choose to give them, a GSTIN and business
+          name or a PAN. We use them to issue your invoices, which tax law requires. Each invoice keeps a copy
+          of the details as they were when you paid; changing them later only affects future invoices.
         </li>
         <li><strong>Usage data:</strong> basic technical logs needed to operate and secure the Service.</li>
         <li>
@@ -277,7 +283,7 @@ export default async function PrivacyPage() {
 
       <h2>Messages from us</h2>
       <p>
-        Some emails are part of having an account, so they can&rsquo;t be turned off: payment receipts,
+        Some emails are part of having an account, so they can&rsquo;t be turned off: payment confirmations with your invoice,
         and a reminder each day during the last week before your plan or free trial ends. The reminders
         stop as soon as you renew.
       </p>
@@ -332,7 +338,8 @@ export default async function PrivacyPage() {
         <li>
           Request deletion of your account and all associated data from Settings → Account, or by contacting
           us. When it&rsquo;s done we delete everything, including stored résumé files, and email you; we keep
-          only an anonymized record that the request was handled.
+          only an anonymized record that the request was handled, and the payment records the law requires
+          (see Data retention).
         </li>
       </ul>
 
@@ -356,8 +363,10 @@ export default async function PrivacyPage() {
         files and everything taken from your job-alert emails, within 30 days and email you when
         it&rsquo;s done. Copies in backups expire within a further 30 days. We keep only an anonymized record that your
         request was handled, and limited records that the law requires. Those include payment records
-        (the payment details above, with the name and email on the account when you paid), which we
-        keep for as long as tax and accounting law requires, even after your account is deleted.
+        (the payment details above, with the name and email on the account when you paid) and your
+        invoices, with the billing details printed on them, which we keep for as long as tax and accounting
+        law requires, even after your account is deleted. The billing details saved on your account are
+        deleted with it.
       </p>
 
       <h2>Changes to this policy</h2>

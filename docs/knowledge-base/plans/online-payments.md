@@ -2,10 +2,10 @@
 title: How online plan payments work
 category: Plans and billing
 summary: Users pay through Razorpay only when a gateway is on in Settings → Payments and Billing is complete; otherwise plans show "Request this plan". Each payment is confirmed on the server before the plan changes and listed in Orders & payments.
-keywords: checkout, razorpay, pay, buy plan, payment failed, payment not showing, request this plan, fallback, receipt, orders, webhook, upgrade credit, renew, refund, money back, charged twice, cancel plan, auto renew
+keywords: checkout, razorpay, pay, buy plan, payment failed, payment not showing, request this plan, fallback, receipt, invoice, billing details, orders, webhook, upgrade credit, renew, refund, money back, charged twice, cancel plan, auto renew
 ---
 
-Two things have to be true before users see a **Pay** button: a gateway is turned on in admin **Settings → Payments**, and admin **Settings → Billing** shows **Ready**. If either is missing, checkout quietly falls back to **Request this plan**, which opens a support ticket so you can sort the payment out by hand. Settings → Payments warns you when Billing is the thing holding it up.
+Two things have to be true before users see a **Pay** button: a gateway is turned on in admin **Settings → Payments**, and admin **Settings → Billing** shows **Ready** (which includes the business State). If either is missing, checkout quietly falls back to **Request this plan**, which opens a support ticket so you can sort the payment out by hand. Settings → Payments warns you when Billing is the thing holding it up.
 
 Razorpay is the only gateway for now.
 
@@ -37,11 +37,11 @@ GST follows Billing as it was when the order was created. Each order keeps a cop
 
 The amount is worked out on the server, never taken from the browser. When Razorpay reports success, the server checks the signature, fetches the payment from Razorpay, and only applies the plan if the amount and currency match the order. The checkout window and the webhook both do this, and whichever arrives second changes nothing.
 
-The paid user gets a "Payment received" email with the receipt. A user can start at most 10 payments an hour.
+Before the payment window opens, the user needs complete billing details; if they're missing, Pay asks for them first. The invoice is issued the moment the payment is confirmed, and the "Payment received" email carries it as a PDF (more in the invoices article). A user can start at most 10 payments an hour.
 
 ## Orders & payments
 
-Admin **Orders & payments** lists every attempt: Paid, Pending (window opened, not paid), Failed (with the reason), and Cancelled (window closed). The details window has **Resend receipt** for paid orders, **Open in Razorpay** and **View user**. An order keeps the user's name and email even if the account is deleted later.
+Admin **Orders & payments** lists every attempt: Paid, Pending (window opened, not paid), Failed (with the reason), and Cancelled (window closed). Paid orders show their invoice number. The details window has **Download invoice**, **Send invoice** and **Resend payment email** for paid orders, plus **Open in Razorpay** and **View user**. Users see their own attempts on their **Orders & payments** page in the sidebar. An order keeps the user's name and email even if the account is deleted later.
 
 If a user says they paid but their plan didn't change, find the order here first. A Paid order means the plan was applied. A Pending one with a payment in Razorpay usually means the webhook isn't set up or its secret doesn't match.
 

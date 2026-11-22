@@ -26,7 +26,7 @@ export default async function TermsPage() {
     getPublicBusiness(),
   ]);
   return (
-    <LegalLayout title="Terms & conditions" updated="November 8, 2026">
+    <LegalLayout title="Terms & conditions" updated="November 22, 2026">
       <p>
         These Terms &amp; Conditions (&ldquo;Terms&rdquo;) apply to your use of {appName} (the
         &ldquo;Service&rdquo;). By creating an account or using the Service, you agree to them. If you
@@ -94,7 +94,11 @@ export default async function TermsPage() {
         </li>
         <li>
           Your new plan starts once the payment is confirmed. If you&rsquo;re charged and your plan
-          doesn&rsquo;t change, contact us with your receipt number.
+          doesn&rsquo;t change, contact us with your invoice number.
+        </li>
+        <li>
+          Before your first payment we ask for your billing details, because every payment gets an invoice.
+          You can download your invoices any time from Orders &amp; payments.
         </li>
         <li>
           Plans aren&rsquo;t refundable once they&rsquo;ve started, except for payment errors such as a double
