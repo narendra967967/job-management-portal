@@ -512,11 +512,11 @@ function BillingCard({ initial }: { initial: AdminSettings["billing"] }) {
   const [taxRate, setTaxRate] = useState(String(initial.taxRate));
   const [pricesIncludeTax, setPricesIncludeTax] = useState(initial.pricesIncludeTax);
   const [invoicePrefix, setInvoicePrefix] = useState(initial.invoicePrefix);
-  // INVOICES PHASE 1 (UI first, docs/invoices/spec.md): the business state and
-  // the invoice terms are on screen only; they're saved from phase 3.
-  const [businessState, setBusinessState] = useState("06");
-  const [planTerms, setPlanTerms] = useState<string[]>(DEFAULT_INVOICE_TERMS);
-  const [interviewTerms, setInterviewTerms] = useState<string[]>([]);
+  // Invoices (docs/invoices/spec.md): the business state and the terms printed
+  // under each kind of sale's invoices.
+  const [businessState, setBusinessState] = useState(initial.businessState);
+  const [planTerms, setPlanTerms] = useState<string[]>(initial.invoiceTerms?.plan ?? DEFAULT_INVOICE_TERMS);
+  const [interviewTerms, setInterviewTerms] = useState<string[]>(initial.invoiceTerms?.ai_interview ?? []);
   const prefixError = invoicePrefixError(invoicePrefix);
   const termsError = invoiceTermsError("Plans", planTerms) || invoiceTermsError("AI mock interviews", interviewTerms);
   const sv = useSaver();
@@ -531,6 +531,8 @@ function BillingCard({ initial }: { initial: AdminSettings["billing"] }) {
     taxRate: Number(taxRate),
     pricesIncludeTax,
     invoicePrefix,
+    businessState,
+    invoiceTerms: { plan: planTerms, ai_interview: interviewTerms },
   };
   const missing = billingMissing(profile);
   const ready = missing.length === 0;
@@ -600,6 +602,7 @@ function BillingCard({ initial }: { initial: AdminSettings["billing"] }) {
             </Field>
             <Field label="State" hint={gstRegistered ? "Where you're registered for GST. Decides CGST + SGST or IGST" : "Shown on invoices"}>
               <select className={cn(selectCls, "w-full sm:max-w-xs")} value={businessState} onChange={(e) => setBusinessState(e.target.value)}>
+                <option value="">Choose the state</option>
                 {INDIA_STATES.map((s) => (
                   <option key={s.code} value={s.code}>
                     {s.name} ({s.code})
@@ -705,6 +708,8 @@ function BillingCard({ initial }: { initial: AdminSettings["billing"] }) {
               companyName,
               companyAddress,
               invoicePrefix,
+              businessState,
+              invoiceTerms: { plan: planTerms, ai_interview: interviewTerms },
             }),
           )
         }

@@ -28,6 +28,10 @@ import {
   user,
 } from "@/db/schema";
 import { invoicePrefixError } from "@/lib/invoices/model";
+import { stateByCode } from "@/lib/india-states";
+
+// Up to 5 points of up to 300 characters, printed under invoices (docs/invoices/spec.md 10a).
+const zTerms = z.array(z.string().trim().min(1, "An invoice term is empty. Write it or remove it.").max(300, "Keep each invoice term under 300 characters.")).max(5, "At most 5 invoice terms for each kind of sale.");
 import { isValidGstin, isValidPan, isValidSac } from "@/lib/billing-model";
 
 type Result = { ok: true } | { ok: false; error: string };
@@ -289,6 +293,10 @@ export async function updateBillingAction(input: unknown): Promise<Result> {
       companyName: z.string().optional().default(""),
       companyAddress: z.string().optional().default(""),
       invoicePrefix: z.string().optional().default(""),
+      businessState: z.string().max(2).optional().default(""),
+      invoiceTerms: z
+        .object({ plan: zTerms, ai_interview: zTerms })
+        .optional(),
     })
     .safeParse(input);
   if (!p.success) return fail(p.error);
@@ -301,6 +309,7 @@ export async function updateBillingAction(input: unknown): Promise<Result> {
   // The prefix starts every invoice number, which must stay within 16 characters (CGST Rule 46(b)).
   const prefixError = v.invoicePrefix.trim() ? invoicePrefixError(v.invoicePrefix.trim()) : "";
   if (prefixError) return { ok: false, error: `Invoice number prefix: ${prefixError}` };
+  if (v.businessState && !stateByCode(v.businessState)) return { ok: false, error: "Choose the business state from the list." };
   if (gstin && !isValidGstin(gstin)) return { ok: false, error: "That GSTIN isn't valid. Check all 15 characters." };
   if (pan && !isValidPan(pan)) return { ok: false, error: "That PAN isn't valid. It's 5 letters, 4 digits, 1 letter." };
   if (sacCode && !isValidSac(sacCode)) return { ok: false, error: "A SAC code for services is 6 digits starting with 99." };
@@ -315,6 +324,8 @@ export async function updateBillingAction(input: unknown): Promise<Result> {
     companyName: v.companyName || null,
     companyAddress: v.companyAddress || null,
     invoicePrefix: v.invoicePrefix.trim() || "JOB-",
+    businessState: v.businessState || null,
+    ...(v.invoiceTerms ? { invoiceTerms: v.invoiceTerms } : {}),
   };
   await db.insert(billingConfig).values({ id: "app", ...data }).onConflictDoUpdate({ target: billingConfig.id, set: data });
   revalidate();

@@ -19,6 +19,8 @@ export async function getBillingProfile(): Promise<BillingProfile> {
     pricesIncludeTax: b?.pricesIncludeTax ?? false,
     sacCode: b?.sacCode ?? "",
     invoicePrefix: b?.invoicePrefix ?? "JOB-",
+    businessState: b?.businessState ?? "",
+    invoiceTerms: b?.invoiceTerms ?? null,
   };
 }
 

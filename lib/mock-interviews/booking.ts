@@ -13,8 +13,13 @@ import { aiInterviews, jobLeadDetails, jobLeads, plans, resumes, user } from "@/
 import { aiInterviewsOpen, getModuleSettings, settingsSnapshot } from "@/lib/mock-interviews/config";
 import { DIFFICULTIES, INDUSTRIES, aiInterviewQuote } from "@/lib/mock-interviews/model";
 import { aiPaymentAvailable, startAiInterviewCheckout, type AiCheckoutStart } from "@/lib/payments/ai-interview-orders";
+import { BILLING_NEEDED } from "@/lib/payments/orders";
+import { getUserBilling } from "@/lib/invoices/billing-profile";
+import { isBillingComplete } from "@/lib/invoices/billing-details";
 
-export type BookingResult = { ok: true; id: string; checkout?: AiCheckoutStart } | { ok: false; error: string; field?: string };
+export type BookingResult =
+  | { ok: true; id: string; checkout?: AiCheckoutStart }
+  | { ok: false; error: string; field?: string; /** A paid booking needs billing details first (invoices spec I4). */ needsBilling?: boolean };
 type Result = BookingResult;
 
 const LIMITS = { role: 100, paste: 20_000, minJd: 100, minResume: 300, topics: 10, topic: 40, fileBytes: 5 * 1024 * 1024 };
@@ -187,6 +192,8 @@ export async function bookAiInterview(userId: string, form: FormData): Promise<B
     // discount (D5). The booking waits as pending_payment until it's paid.
     const quote = coverage ? null : aiInterviewQuote(v.durationMin, settings.pricing[v.difficulty]);
     if (quote && !(await aiPaymentAvailable())) return { ok: false, error: "Online payment isn't available right now. Please try again later." } as Result;
+    // No payment without complete billing details (invoices spec I4): checked before anything is booked.
+    if (quote && !isBillingComplete(await getUserBilling(userId))) return { ok: false, error: BILLING_NEEDED, needsBilling: true } as Result;
 
     const [row] = await tx
       .insert(aiInterviews)
@@ -215,7 +222,7 @@ export async function bookAiInterview(userId: string, form: FormData): Promise<B
     const start = await startAiInterviewCheckout(userId, booked.id);
     if (!start.ok) {
       await db.delete(aiInterviews).where(and(eq(aiInterviews.id, booked.id), eq(aiInterviews.status, "pending_payment")));
-      return { ok: false, error: start.error };
+      return { ok: false, error: start.error, needsBilling: start.needsBilling };
     }
     return { ok: true, id: booked.id, checkout: start.checkout };
   }

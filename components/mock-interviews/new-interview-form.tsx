@@ -39,6 +39,9 @@ import { bookAiInterviewAction, updateAiBookingAction } from "@/actions/mock-int
 import { closeCheckoutAction, verifyCheckoutAction } from "@/actions/payments";
 import { openRazorpay } from "@/lib/razorpay-checkout";
 import type { AiCheckoutStart } from "@/lib/payments/ai-interview-orders";
+import { BillingDetailsDialog } from "@/components/billing/billing-details-form";
+import { getMyBillingAction, saveMyBillingAction } from "@/actions/billing-details";
+import { EMPTY_BILLING, type BillingDetails } from "@/lib/invoices/billing-details";
 import type { BookingSetup } from "@/lib/mock-interviews/data";
 import {
   DIFFICULTIES,
@@ -122,6 +125,9 @@ export function NewInterviewForm({
   const [topics, setTopics] = useState<string[]>(editing?.topics ?? []);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [starting, setStarting] = useState(false);
+  // A paid booking needs billing details first (invoices spec I4): asked once, then booking carries on.
+  const [askBilling, setAskBilling] = useState(false);
+  const [billingInitial, setBillingInitial] = useState<BillingDetails>(EMPTY_BILLING);
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Select shows the chosen item's label only when it knows the labels.
@@ -211,6 +217,12 @@ export function NewInterviewForm({
     try {
       const r = editing ? await updateAiBookingAction(editing.id, form) : await bookAiInterviewAction(form);
       if (!r.ok) {
+        if ("needsBilling" in r && r.needsBilling) {
+          setBillingInitial((await getMyBillingAction().catch(() => null)) ?? EMPTY_BILLING);
+          setAskBilling(true);
+          setStarting(false);
+          return;
+        }
         if (r.field) {
           setErrors({ [r.field]: r.error });
           scrollIntoMain(document.getElementById(`field-${r.field}`));
@@ -788,6 +800,20 @@ export function NewInterviewForm({
           {startLabel}
         </Button>
       </div>
+      <BillingDetailsDialog
+        open={askBilling}
+        onOpenChange={setAskBilling}
+        initial={billingInitial}
+        reason="checkout"
+        submitLabel="Save and continue to pay"
+        onSave={async (d) => {
+          const r = await saveMyBillingAction(d);
+          if (!r.ok) return r.error;
+          setAskBilling(false);
+          void submit();
+          return null;
+        }}
+      />
     </div>
   );
 }

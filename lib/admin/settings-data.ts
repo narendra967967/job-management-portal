@@ -67,6 +67,8 @@ export interface AdminSettings {
     companyName: string;
     companyAddress: string;
     invoicePrefix: string;
+    businessState: string;
+    invoiceTerms: { plan: string[]; ai_interview: string[] } | null;
   };
   ai: {
     adminProvider: string;
@@ -172,6 +174,8 @@ export async function loadAdminSettings(adminId: string): Promise<AdminSettings>
       companyName: b?.companyName ?? "",
       companyAddress: b?.companyAddress ?? "",
       invoicePrefix: b?.invoicePrefix ?? "JOB-",
+      businessState: b?.businessState ?? "",
+      invoiceTerms: b?.invoiceTerms ?? null,
     },
     ai: {
       adminProvider: a?.adminProvider ?? "openai",

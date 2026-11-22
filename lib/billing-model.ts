@@ -44,6 +44,10 @@ export interface BillingProfile {
   pricesIncludeTax: boolean;
   sacCode: string;
   invoicePrefix: string;
+  /** GST state code of the business (lib/india-states), e.g. "06". */
+  businessState: string;
+  /** Terms printed under each kind of sale's invoices; null = the defaults. */
+  invoiceTerms: { plan: string[]; ai_interview: string[] } | null;
 }
 
 const GSTIN_CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -77,6 +81,8 @@ export function billingMissing(b: BillingProfile): string[] {
   const out: string[] = [];
   if (!b.companyName.trim()) out.push("the business name");
   if (!b.companyAddress.trim()) out.push("the business address");
+  // The state goes on every invoice and decides CGST + SGST or IGST.
+  if (!/^[0-9]{2}$/.test(b.businessState)) out.push("the business state");
   if (b.gstRegistered) {
     if (!isValidGstin(b.gstin)) out.push(b.gstin.trim() ? "a valid GSTIN" : "the GSTIN");
     if (!(b.taxRate > 0 && b.taxRate <= 100)) out.push("a GST rate above 0");
@@ -104,6 +110,8 @@ export interface BillingSnapshot {
   taxRate: number;
   pricesIncludeTax: boolean;
   invoicePrefix: string;
+  /** Missing on orders from before invoices (November 2026). */
+  businessState?: string;
 }
 
 export function billingSnapshot(b: BillingProfile): BillingSnapshot {
@@ -118,6 +126,7 @@ export function billingSnapshot(b: BillingProfile): BillingSnapshot {
     taxRate: reg ? b.taxRate : 0,
     pricesIncludeTax: reg && b.pricesIncludeTax,
     invoicePrefix: b.invoicePrefix.trim(),
+    businessState: b.businessState,
   };
 }
 

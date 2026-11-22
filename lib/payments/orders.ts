@@ -35,6 +35,12 @@ import { greetingName } from "@/lib/email-templates-model";
 import { absoluteUrl } from "@/lib/site-url";
 import { getAppName } from "@/lib/branding";
 import { confirmAiInterviewPayment, sendAiInterviewReceipt } from "@/lib/payments/ai-interview-orders";
+import { getUserBilling } from "@/lib/invoices/billing-profile";
+import { isBillingComplete } from "@/lib/invoices/billing-details";
+import { splitTax } from "@/lib/invoices/tax";
+
+/** Said when checkout is started without complete billing details (invoices spec I4). */
+export const BILLING_NEEDED = "Add your billing details before you pay. They go on your invoice.";
 
 type Order = typeof paymentOrders.$inferSelect;
 
@@ -101,7 +107,9 @@ export interface CheckoutStart {
   prefill: { name: string; email: string; contact: string };
 }
 
-export type StartResult = { ok: true; checkout: CheckoutStart } | { ok: false; error: string; fallback?: boolean };
+export type StartResult =
+  | { ok: true; checkout: CheckoutStart }
+  | { ok: false; error: string; fallback?: boolean; /** Billing details are missing or incomplete. */ needsBilling?: boolean };
 
 /** Create our order + the gateway order for `planId`/`period`. */
 export async function startCheckout(userId: string, planId: string, period: BillingPeriod): Promise<StartResult> {
@@ -127,10 +135,15 @@ export async function startCheckout(userId: string, planId: string, period: Bill
     return { ok: false, error: "Too many payment attempts in the last hour. Please try again a little later." };
   }
 
+  // No payment without complete billing details, GST on or off (invoices spec I4).
+  const buyer = await getUserBilling(userId);
+  if (!isBillingComplete(buyer)) return { ok: false, needsBilling: true, error: BILLING_NEEDED };
+
   const current = await currentPlanInfo(userId);
   const tax = taxOf(billing);
   const q = quote({ plan: toPublicPlan(pl), period, current, tax });
   if (q.total < 100) return { ok: false, error: "That amount is too small to charge online." };
+  const split = splitTax(q.tax, { registered: billing.gstRegistered === true, sellerState: billing.businessState || null, buyerState: buyer.stateCode });
 
   const [order] = await db
     .insert(paymentOrders)
@@ -154,6 +167,12 @@ export async function startCheckout(userId: string, planId: string, period: Bill
       mode: gw.row.mode,
       // Tax + seller details used for this amount; never changed afterwards.
       billingSnapshot: billingSnapshot(billing),
+      // The buyer and the tax split, fixed with the amount (invoices spec section 12).
+      buyerSnapshot: buyer,
+      cgstAmount: split.cgst,
+      sgstAmount: split.sgst,
+      igstAmount: split.igst,
+      placeOfSupply: split.placeOfSupply,
     })
     .returning();
   const receipt = receiptOf(order);

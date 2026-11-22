@@ -16,7 +16,10 @@ import { sendTemplateEmail } from "@/lib/email-templates";
 import { greetingName } from "@/lib/email-templates-model";
 import { absoluteUrl } from "@/lib/site-url";
 import { getAppName } from "@/lib/branding";
-import { receiptOf, taxOf, type ConfirmResult } from "@/lib/payments/orders";
+import { BILLING_NEEDED, receiptOf, taxOf, type ConfirmResult } from "@/lib/payments/orders";
+import { getUserBilling } from "@/lib/invoices/billing-profile";
+import { isBillingComplete } from "@/lib/invoices/billing-details";
+import { splitTax } from "@/lib/invoices/tax";
 
 type Order = typeof paymentOrders.$inferSelect;
 const ORDERS_PER_HOUR = 10;
@@ -41,7 +44,10 @@ export async function aiPaymentAvailable(): Promise<boolean> {
 }
 
 /** Create our order and the gateway's for a pending_payment booking. */
-export async function startAiInterviewCheckout(userId: string, interviewId: string): Promise<{ ok: true; checkout: AiCheckoutStart } | { ok: false; error: string }> {
+export async function startAiInterviewCheckout(
+  userId: string,
+  interviewId: string,
+): Promise<{ ok: true; checkout: AiCheckoutStart } | { ok: false; error: string; /** Billing details are missing or incomplete. */ needsBilling?: boolean }> {
   const [u] = await db.select().from(user).where(eq(user.id, userId));
   if (!u || u.status === "inactive") return { ok: false, error: "Your account can't make payments right now." };
   const [i] = await db
@@ -59,9 +65,14 @@ export async function startAiInterviewCheckout(userId: string, interviewId: stri
     .where(and(eq(paymentOrders.userId, userId), gte(paymentOrders.createdAt, new Date(Date.now() - 3_600_000))));
   if (recent >= ORDERS_PER_HOUR) return { ok: false, error: "Too many payment attempts in the last hour. Please try again a little later." };
 
+  // No payment without complete billing details, GST on or off (invoices spec I4).
+  const buyer = await getUserBilling(userId);
+  if (!isBillingComplete(buyer)) return { ok: false, needsBilling: true, error: BILLING_NEEDED };
+
   // Every price shown is the final price, GST included (D34).
   const split = taxSplit(i.pricePaise / 100, { ...taxOf(billing), pricesIncludeTax: true });
   if (split.total < 100) return { ok: false, error: "That amount is too small to charge online." };
+  const gst = splitTax(split.tax, { registered: billing.gstRegistered === true, sellerState: billing.businessState || null, buyerState: buyer.stateCode });
   const currency = "INR";
   const label = interviewLabel(i);
   const [order] = await db
@@ -84,6 +95,11 @@ export async function startAiInterviewCheckout(userId: string, interviewId: stri
       gateway: gw.id,
       mode: gw.row.mode,
       billingSnapshot: billingSnapshot(billing),
+      buyerSnapshot: buyer,
+      cgstAmount: gst.cgst,
+      sgstAmount: gst.sgst,
+      igstAmount: gst.igst,
+      placeOfSupply: gst.placeOfSupply,
     })
     .returning();
 

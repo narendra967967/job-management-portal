@@ -13,7 +13,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, CircleAlert, Loader2, Lock, MapPin, Send } from "lucide-react";
 import { BillingDetailsDialog } from "@/components/billing/billing-details-form";
-import { EMPTY_BILLING, SAMPLE_BILLING, billingPlace, isBillingComplete, type BillingDetails } from "@/lib/invoices/billing-details";
+import { EMPTY_BILLING, billingPlace, isBillingComplete, type BillingDetails } from "@/lib/invoices/billing-details";
+import { getMyBillingAction, saveMyBillingAction } from "@/actions/billing-details";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useContactSupport } from "@/components/support/contact-support";
@@ -60,14 +61,14 @@ export function CheckoutDialog({
   const [paidUntil, setPaidUntil] = useState<string | null>(null);
   // The server can switch this off (gateway turned off meanwhile).
   const [canPayOnline, setCanPayOnline] = useState(online);
-  // Billing details are required before any payment (invoices spec I4).
-  // PHASE 1: sample details; ?sample=empty shows a user who hasn't given them.
-  const [billing, setBilling] = useState<BillingDetails | null>(SAMPLE_BILLING);
+  // Billing details are required before any payment (invoices spec I4); the
+  // server checks again when the order starts.
+  const [billing, setBilling] = useState<BillingDetails | null>(null);
   const [askBilling, setAskBilling] = useState(false);
   const billingDone = isBillingComplete(billing);
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get("sample") === "empty") setBilling(null);
-  }, []);
+    if (open) getMyBillingAction().then(setBilling).catch(() => setBilling(null));
+  }, [open]);
 
   // Fresh state each time the dialog opens for a plan.
   useEffect(() => {
@@ -94,6 +95,12 @@ export function CheckoutDialog({
     setMessage("");
     const start = await startCheckoutAction({ planId: plan.id, period });
     if (!start.ok) {
+      // Billing details missing or incomplete: ask for them, then the user pays.
+      if (start.needsBilling) {
+        setStatus("idle");
+        setAskBilling(true);
+        return;
+      }
       // Online payment went off meanwhile: show the request flow instead.
       if (start.fallback) {
         setCanPayOnline(false);
@@ -317,10 +324,10 @@ export function CheckoutDialog({
         reason={billing ? "edit" : "checkout"}
         submitLabel={billingDone ? "Save details" : "Save and continue to pay"}
         onSave={async (d) => {
-          // PHASE 1: kept on screen only. Phase 3 saves it to the account first,
-          // and the server refuses to start an order while it's incomplete.
+          const r = await saveMyBillingAction(d);
+          if (!r.ok) return r.error;
           const wasDone = billingDone;
-          setBilling(d);
+          setBilling(r.details);
           setAskBilling(false);
           if (!wasDone) void pay();
           return null;
