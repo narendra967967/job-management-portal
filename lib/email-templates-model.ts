@@ -367,7 +367,7 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
       subject: "Payment received: {{interview_label}}",
       heading: "Your interview is booked",
       bodyHtml:
-        "<p>Hi {{user_name}}, thanks for your payment. Your {{interview_label}} is booked, and you can start it any time until {{valid_until}}.</p>{{receipt_details}}",
+        "<p>Hi {{user_name}}, thanks for your payment. You're booked in for this one:</p><p><strong>{{interview_label}}</strong></p><p>Start it whenever you're ready, any time until {{valid_until}}.</p>{{receipt_details}}",
       buttonLabel: "Go to my interviews",
       footerNote: "Keep this email as your payment receipt.",
     },
