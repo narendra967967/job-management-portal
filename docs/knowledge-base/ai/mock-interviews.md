@@ -11,6 +11,8 @@ AI mock interviews live under **Admin → Mock interviews**. There are two scree
 
 The **AI interviews** switch in Module settings → Availability decides whether candidates get the feature or a Coming soon page, in every environment. It starts on Coming soon, so a new environment stays closed until you open it there. Leave prod on Coming soon until the roadmap's rollout step.
 
+The same switch controls the public side. While it's open, the landing page at `/ai-mock-interviews` is live and linked from the homepage (a band under Features), the header (Mock interviews), the footer, the pricing page (a plan row and a price question), the sitemap and `/llms.txt`. On Coming soon the page is a 404 and every one of those links disappears. Its kinds of interview, lengths and per-minute prices come straight from Module settings, so changing a price changes the page.
+
 When it's open, the AI mock interviews page starts with a **Get ready** checklist while anything is missing:
 
 | Item | Ready when | If not |

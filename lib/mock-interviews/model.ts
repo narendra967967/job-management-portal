@@ -138,7 +138,8 @@ export function scoreBand(overall: number): string {
 /** Indian rupees from paise, e.g. 12000 → "₹120". */
 export function rupees(paise: number): string {
   const r = paise / 100;
-  return `₹${r.toLocaleString("en-IN", { maximumFractionDigits: r % 1 ? 2 : 0 })}`;
+  // ₹3, ₹4.50 (never ₹4.5).
+  return `₹${r.toLocaleString("en-IN", r % 1 ? { minimumFractionDigits: 2, maximumFractionDigits: 2 } : { maximumFractionDigits: 0 })}`;
 }
 
 /** What the candidate has left before paying (D5). */

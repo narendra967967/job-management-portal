@@ -36,6 +36,8 @@ export interface PublicPlan {
   allowAtsCheck: boolean;
   allowCustomPrompts: boolean;
   prioritySupport: boolean;
+  /** AI mock interviews included: once ever on the Free plan, per purchase or renewal on a paid one. */
+  aiInterviewsIncluded: number;
 }
 
 function toText(html: string): string {
@@ -74,6 +76,7 @@ export function toPublicPlan(r: typeof plans.$inferSelect): PublicPlan {
     allowAtsCheck: r.allowAtsCheck,
     allowCustomPrompts: r.allowCustomPrompts,
     prioritySupport: r.prioritySupport,
+    aiInterviewsIncluded: r.aiInterviewsIncluded,
   };
 }
 

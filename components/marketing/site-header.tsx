@@ -3,7 +3,8 @@
 // Public marketing header — a floating glass bar (firmer once you scroll), with smooth-scroll
 // anchor nav (Home/Features/About/Contact are sections on the landing page) and
 // auth CTAs. "Sign up" shows only when the admin has self-registration enabled;
-// a signed-in visitor sees "Dashboard" instead of the auth buttons.
+// a signed-in visitor sees "Dashboard" instead of the auth buttons. "Mock
+// interviews" shows only while AI interviews are switched to Open.
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -24,11 +25,14 @@ export function SiteHeader({
   appName,
   signupAllowed,
   loggedIn,
+  aiInterviews = false,
 }: {
   appName: string;
   signupAllowed: boolean;
   loggedIn: boolean;
+  aiInterviews?: boolean;
 }) {
+  const nav = aiInterviews ? [...NAV.slice(0, 2), { href: "/ai-mock-interviews", label: "Mock interviews" }, ...NAV.slice(2)] : NAV;
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
 
@@ -63,7 +67,7 @@ export function SiteHeader({
         </Link>
 
         <nav className="ml-6 hidden items-center gap-1 lg:flex">
-          {NAV.map((n) => (
+          {nav.map((n) => (
             <Link
               key={n.href}
               href={n.href}
@@ -140,7 +144,7 @@ export function SiteHeader({
               </button>
             </div>
             <nav className="mt-4 flex flex-col">
-              {NAV.map((n) => (
+              {nav.map((n) => (
                 <Link
                   key={n.href}
                   href={n.href}

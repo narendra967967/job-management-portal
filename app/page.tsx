@@ -9,6 +9,8 @@
 // explains its Gmail access — Google's OAuth verification requires that.
 // AI features run on the user's OWN key (OpenAI / Anthropic / OpenRouter) — the
 // copy must never imply built-in AI. Premium features say "on supported plans".
+// The one exception is AI mock interviews (the module's own AI, paid per minute),
+// mentioned only while admin has them switched to Open.
 
 import Link from "next/link";
 import {
@@ -25,6 +27,7 @@ import {
   ImagePlus,
   FileCheck2,
   UserRound,
+  MessageCircle,
 } from "lucide-react";
 import { SiteHeader } from "@/components/marketing/site-header";
 import { SiteFooter } from "@/components/marketing/site-footer";
@@ -41,6 +44,8 @@ import { absoluteUrl, siteUrl } from "@/lib/site-url";
 import type { Metadata } from "next";
 import { getPublicBusiness } from "@/lib/billing-data";
 import { BusinessAddress } from "@/components/marketing/business-address";
+import { getPublicAiInterviews } from "@/lib/mock-interviews/public";
+import { rupees } from "@/lib/mock-interviews/model";
 
 export const dynamic = "force-dynamic";
 
@@ -75,7 +80,7 @@ const BOARD: { label: string; count: number; cards: { role: string; co: string; 
 ];
 
 export default async function LandingPage() {
-  const [appName, tagline, signupAllowed, supportEmail, sessionId, gmailOn, sites, freeStart, pricingPlans, business] = await Promise.all([
+  const [appName, tagline, signupAllowed, supportEmail, sessionId, gmailOn, sites, freeStart, pricingPlans, business, ai] = await Promise.all([
     getAppName(),
     getTagline(),
     isRegistrationOpen(),
@@ -86,7 +91,9 @@ export default async function LandingPage() {
     freeStartLabel(),
     getPricingPlans(),
     getPublicBusiness(),
+    getPublicAiInterviews(),
   ]);
+  const aiInterviews = !!ai;
   const upgrade = upgradeSentence(pricingPlans);
   const trial = freeStart.trialDays > 0;
   const loggedIn = !!sessionId;
@@ -139,7 +146,9 @@ export default async function LandingPage() {
     },
     {
       q: `How does ${appName} use AI?`,
-      a: "AI summarizes job descriptions, scores how well each role fits your résumé, drafts applications and outreach, and fills in job details from a pasted post or screenshot. On supported plans it also estimates salaries and checks your résumé for ATS. It runs on your own API key from OpenAI, Anthropic or OpenRouter, so you choose the model and pay your provider directly.",
+      a: `AI summarizes job descriptions, scores how well each role fits your résumé, drafts applications and outreach, and fills in job details from a pasted post or screenshot. On supported plans it also estimates salaries and checks your résumé for ATS. It runs on your own API key from OpenAI, Anthropic or OpenRouter, so you choose the model and pay your provider directly.${
+        ai ? " AI mock interviews are the one exception: they run on our AI and are paid per minute, unless your plan includes them." : ""
+      }`,
     },
     {
       q: "What is an ATS résumé check?",
@@ -226,7 +235,7 @@ export default async function LandingPage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
       />
       <GlassBackdrop />
-      <SiteHeader appName={appName} signupAllowed={signupAllowed} loggedIn={loggedIn} />
+      <SiteHeader appName={appName} signupAllowed={signupAllowed} loggedIn={loggedIn} aiInterviews={aiInterviews} />
 
       <main>
         {/* Hero */}
@@ -330,6 +339,32 @@ export default async function LandingPage() {
             </div>
           </div>
         </section>
+
+        {/* AI mock interviews: only while admin has them switched to Open */}
+        {ai && (
+          <section>
+            <div className="mx-auto max-w-6xl px-4 sm:px-6">
+              <div className="glass grid items-center gap-6 rounded-3xl p-6 sm:p-8 md:grid-cols-[auto_1fr_auto]">
+                <span className="flex size-12 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/15 to-[oklch(0.62_0.21_330_/_0.14)] text-primary ring-1 ring-white/70">
+                  <MessageCircle className="size-6" aria-hidden />
+                </span>
+                <div>
+                  <h2 className="text-xl font-semibold tracking-tight sm:text-2xl">Got the interview? Practice it first.</h2>
+                  <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+                    AI mock interviews built from your résumé and the job description, with follow-up questions and a scored report
+                    straight after. From {rupees(ai.fromPerMinutePaise)} a minute.
+                  </p>
+                </div>
+                <Link
+                  href="/ai-mock-interviews"
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-medium text-primary-foreground shadow-sm transition-all hover:bg-primary/90 active:translate-y-px"
+                >
+                  See how it works <ArrowRight className="size-4" aria-hidden />
+                </Link>
+              </div>
+            </div>
+          </section>
+        )}
 
         {/* How it works — timeline on a glass panel */}
         <section>
@@ -483,7 +518,7 @@ export default async function LandingPage() {
         </section>
       </main>
 
-      <SiteFooter appName={appName} tagline={tagline.text} />
+      <SiteFooter appName={appName} tagline={tagline.text} aiInterviews={aiInterviews} />
       <BackToTop />
     </div>
   );

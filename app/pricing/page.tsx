@@ -19,6 +19,8 @@ import { absoluteUrl, siteUrl } from "@/lib/site-url";
 import { orList } from "@/lib/plan-highlights";
 import { onlinePaymentAvailable } from "@/lib/payments/orders";
 import { getBillingProfile } from "@/lib/billing-data";
+import { getPublicAiInterviews } from "@/lib/mock-interviews/public";
+import { rupees } from "@/lib/mock-interviews/model";
 import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
@@ -51,7 +53,7 @@ const EVERY_PLAN = [
 ];
 
 export default async function PricingPage() {
-  const [appName, tagline, signupAllowed, sessionId, freeStart, plans, online, billing] = await Promise.all([
+  const [appName, tagline, signupAllowed, sessionId, freeStart, plans, online, billing, ai] = await Promise.all([
     getAppName(),
     getTagline(),
     isRegistrationOpen(),
@@ -60,7 +62,9 @@ export default async function PricingPage() {
     getPricingPlans(),
     onlinePaymentAvailable(),
     getBillingProfile(),
+    getPublicAiInterviews(),
   ]);
+  const aiInterviews = !!ai;
   const loggedIn = !!sessionId;
   const currentPlanId = await getUserPlanId(sessionId);
   const trial = freeStart.trialDays > 0;
@@ -100,8 +104,25 @@ export default async function PricingPage() {
     },
     {
       q: "Is AI usage included in the price?",
-      a: `${appName}'s AI features run on your own API key from OpenAI, Anthropic or OpenRouter. You choose the model and pay your provider directly, which for most job searches comes to very little. Your plan decides which AI features you can use.`,
+      a: `${appName}'s AI features run on your own API key from OpenAI, Anthropic or OpenRouter. You choose the model and pay your provider directly, which for most job searches comes to very little. Your plan decides which AI features you can use.${
+        ai ? " AI mock interviews are the exception: they run on our AI, not your key, and are charged per minute unless your plan includes them." : ""
+      }`,
     },
+    ...(ai
+      ? [
+          {
+            q: "How much does an AI mock interview cost?",
+            a: `You pay per minute for the length you book: ${ai.levels
+              .map((l) => `${rupees(l.finalPerMinutePaise)} for ${l.difficulty}${l.discountPercent ? ` (${l.discountPercent}% off ${rupees(l.ratePerMinutePaise)})` : ""}`)
+              .join(", ")
+              .replace(/, ([^,]*)$/, " and $1")}. A ${ai.example.durationMin}-minute ${ai.example.difficulty} interview is ${rupees(ai.example.pricePaise)}. ${
+              plans.some((p) => p.aiInterviewsIncluded > 0)
+                ? "Plans that include interviews are marked in the comparison above; those are booked at no charge until they're used. "
+                : ""
+            }That's the full price, with nothing added at checkout, and a booking can be used for ${ai.bookingValidDays} days.`,
+          },
+        ]
+      : []),
     ...(freeLeadCap !== null && free
       ? [
           {
@@ -161,7 +182,7 @@ export default async function PricingPage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
       />
       <GlassBackdrop />
-      <SiteHeader appName={appName} signupAllowed={signupAllowed} loggedIn={loggedIn} />
+      <SiteHeader appName={appName} signupAllowed={signupAllowed} loggedIn={loggedIn} aiInterviews={aiInterviews} />
 
       <main>
         <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:py-20">
@@ -175,7 +196,7 @@ export default async function PricingPage() {
           </div>
 
           {plans.length > 0 ? (
-            <PricingPlans plans={plans} cta={cta} trial={trial} currentPlanId={currentPlanId} />
+            <PricingPlans plans={plans} cta={cta} trial={trial} currentPlanId={currentPlanId} aiInterviews={aiInterviews} />
           ) : (
             <p className="glass mx-auto mt-12 max-w-md rounded-2xl p-6 text-center text-sm text-muted-foreground">
               Plans are being updated. Please check back soon.
@@ -205,7 +226,7 @@ export default async function PricingPage() {
         </section>
       </main>
 
-      <SiteFooter appName={appName} tagline={tagline.text} />
+      <SiteFooter appName={appName} tagline={tagline.text} aiInterviews={aiInterviews} />
       <BackToTop />
     </div>
   );

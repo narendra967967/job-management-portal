@@ -46,22 +46,30 @@ const ROWS: { label: string; value: (p: PublicPlan) => string | boolean }[] = [
   { label: "Priority support", value: (p) => p.prioritySupport },
 ];
 
+// Shown only while AI mock interviews are open. Free: once ever; paid: with each purchase or renewal.
+const AI_INTERVIEWS_ROW: (typeof ROWS)[number] = {
+  label: "AI mock interviews included",
+  value: (p) => (p.aiInterviewsIncluded <= 0 ? false : p.isFree ? `${p.aiInterviewsIncluded}, once` : `${p.aiInterviewsIncluded} per billing period`),
+};
+
 export function PricingPlans({
   plans,
   cta,
   trial,
   currentPlanId,
+  aiInterviews = false,
 }: {
   plans: PublicPlan[];
   cta: PricingCta;
   trial: boolean;
   currentPlanId: string | null;
+  aiInterviews?: boolean;
 }) {
   const [interval, setBilling] = useState<Interval>("yearly");
   const hasBoth = plans.some((p) => !p.isFree && p.monthlyPrice > 0 && p.yearlyPrice > 0);
   const bestSaving = Math.max(0, ...plans.map((p) => savingsPct(p) ?? 0));
   // Only show rows where the plans actually differ.
-  const rows = ROWS.filter((r) => new Set(plans.map((p) => String(r.value(p)))).size > 1);
+  const rows = [...ROWS, ...(aiInterviews ? [AI_INTERVIEWS_ROW] : [])].filter((r) => new Set(plans.map((p) => String(r.value(p)))).size > 1);
 
   return (
     <>

@@ -8,6 +8,7 @@ import { SiteHeader } from "@/components/marketing/site-header";
 import { SiteFooter } from "@/components/marketing/site-footer";
 import { GlassBackdrop } from "@/components/marketing/glass-backdrop";
 import { BackToTop } from "@/components/marketing/back-to-top";
+import { publicAiInterviewsOpen } from "@/lib/mock-interviews/config";
 
 const prose =
   "mt-8 text-sm leading-relaxed text-muted-foreground " +
@@ -25,16 +26,17 @@ export async function LegalLayout({
   updated: string;
   children: React.ReactNode;
 }) {
-  const [appName, tagline, signupAllowed, sessionId] = await Promise.all([
+  const [appName, tagline, signupAllowed, sessionId, aiInterviews] = await Promise.all([
     getAppName(),
     getTagline(),
     isRegistrationOpen(),
     getSessionUserId(),
+    publicAiInterviewsOpen(),
   ]);
   return (
     <div className="relative isolate min-h-dvh">
       <GlassBackdrop />
-      <SiteHeader appName={appName} signupAllowed={signupAllowed} loggedIn={!!sessionId} />
+      <SiteHeader appName={appName} signupAllowed={signupAllowed} loggedIn={!!sessionId} aiInterviews={aiInterviews} />
       <main className="mx-auto max-w-3xl px-4 py-10 sm:px-6 lg:py-16">
         {/* Long-form reading: the more opaque glass keeps body text crisp. */}
         <div className="glass-strong rounded-3xl px-5 py-8 sm:px-10 sm:py-12">
@@ -45,7 +47,7 @@ export async function LegalLayout({
           <article className={prose}>{children}</article>
         </div>
       </main>
-      <SiteFooter appName={appName} tagline={tagline.text} />
+      <SiteFooter appName={appName} tagline={tagline.text} aiInterviews={aiInterviews} />
       <BackToTop />
     </div>
   );

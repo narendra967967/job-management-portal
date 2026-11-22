@@ -4,6 +4,8 @@ import { absoluteUrl } from "@/lib/site-url";
 import { freeStartLabel } from "@/lib/plans";
 import { getPricingPlans } from "@/lib/pricing";
 import { upgradeSentence } from "@/lib/plan-highlights";
+import { getPublicAiInterviews } from "@/lib/mock-interviews/public";
+import { rupees } from "@/lib/mock-interviews/model";
 
 // /llms.txt — a plain summary of the product for AI assistants and answer
 // engines (llmstxt.org format). Public facts only; no infrastructure details.
@@ -11,11 +13,12 @@ import { upgradeSentence } from "@/lib/plan-highlights";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const [appName, sites, freeStart, pricingPlans] = await Promise.all([
+  const [appName, sites, freeStart, pricingPlans, ai] = await Promise.all([
     getAppName(),
     supportedSiteExamples().catch(() => "LinkedIn and Naukri"),
     freeStartLabel().catch(() => ({ label: "free trial", trialDays: 14 })),
     getPricingPlans(),
+    getPublicAiInterviews(), // null while AI mock interviews are on Coming soon
   ]);
   const upgrade = upgradeSentence(pricingPlans, 20);
 
@@ -32,7 +35,11 @@ export async function GET() {
 - Checks résumés for ATS: a score out of 100, missing keywords and specific fixes (supported plans).
 - Keeps a career profile (target roles, skills, preferences) that the AI uses for scoring, résumé checks and drafts.
 - Drafts tailored applications and recruiter or referral outreach; the user edits and sends them.
-- Reminders, to-dos and recruiter contacts kept with each job.
+- Reminders, to-dos and recruiter contacts kept with each job.${
+    ai
+      ? `\n- AI mock interviews: an AI interviewer asks questions built from the user's résumé and the job description, follows up on vague answers, and gives a report scoring five skills with better answers. Paid per minute (from ${rupees(ai.fromPerMinutePaise)}), ${ai.durations.join(", ")} minutes long.`
+      : ""
+  }
 
 ## Who it is for
 
@@ -42,14 +49,16 @@ Job seekers who prefer to apply carefully to fewer, well-matched roles rather th
 
 - Not an auto-apply tool: the user always reviews and applies.
 - Privacy: it never connects to the user's mailbox; it only receives the job alerts they forward and keeps the job details, not the emails. Data is not sold or used for advertising.
-- AI runs on the user's own API key from OpenAI, Anthropic or OpenRouter.
+- AI runs on the user's own API key from OpenAI, Anthropic or OpenRouter.${ai ? " AI mock interviews are the exception: they run on the product's own AI." : ""}
 - Users can see every email that reached their address, export their leads, reset them, or request account deletion from Settings.
 - Plans: new accounts start with a ${freeStart.label}.${upgrade ? ` ${upgrade}` : ""} Prices are on the pricing page.
 
 ## Pages
 
 - [Home](${absoluteUrl("/")}): product overview and FAQ
-- [Pricing](${absoluteUrl("/pricing")}): plans, prices and what each includes
+- [Pricing](${absoluteUrl("/pricing")}): plans, prices and what each includes${
+    ai ? `\n- [AI mock interviews](${absoluteUrl("/ai-mock-interviews")}): how practice interviews work and what they cost` : ""
+  }
 - [Sign up](${absoluteUrl("/signup")}): create a free account
 - [Privacy policy](${absoluteUrl("/privacy")})
 - [Terms & conditions](${absoluteUrl("/terms")})

@@ -1,9 +1,10 @@
-// Public marketing footer — brand, quick nav, legal links, copyright.
+// Public marketing footer — brand, quick nav, legal links, copyright. The AI
+// mock interviews link shows only while AI interviews are switched to Open.
 
 import Link from "next/link";
 import { Logo } from "@/components/app-shell/logo";
 
-export function SiteFooter({ appName, tagline }: { appName: string; tagline?: string }) {
+export function SiteFooter({ appName, tagline, aiInterviews = false }: { appName: string; tagline?: string; aiInterviews?: boolean }) {
   const year = new Date().getFullYear();
   return (
     <footer className="glass-subtle mt-8 rounded-none border-x-0 border-b-0">
@@ -22,6 +23,9 @@ export function SiteFooter({ appName, tagline }: { appName: string; tagline?: st
           <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Product</p>
           <ul className="mt-3 space-y-2 text-sm">
             <li><Link href="/#features" className="text-muted-foreground hover:text-foreground">Features</Link></li>
+            {aiInterviews && (
+              <li><Link href="/ai-mock-interviews" className="text-muted-foreground hover:text-foreground">AI mock interviews</Link></li>
+            )}
             <li><Link href="/pricing" className="text-muted-foreground hover:text-foreground">Pricing</Link></li>
             <li><Link href="/#about" className="text-muted-foreground hover:text-foreground">About</Link></li>
             <li><Link href="/#contact" className="text-muted-foreground hover:text-foreground">Contact</Link></li>

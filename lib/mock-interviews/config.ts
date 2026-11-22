@@ -92,6 +92,19 @@ export async function candidateAiOpen(): Promise<boolean> {
   return aiInterviewsOpen(await getModuleSettings());
 }
 
+/**
+ * For the public site: whether the AI mock interviews landing page and its
+ * links show (only while the switch is Open). False when the database can't be
+ * reached, as during `next build`.
+ */
+export async function publicAiInterviewsOpen(): Promise<boolean> {
+  try {
+    return await candidateAiOpen();
+  } catch {
+    return false;
+  }
+}
+
 /** The settings a new booking keeps for itself (D36). */
 export function settingsSnapshot(s: ModuleSettings, difficulty: Difficulty): InterviewSettingsSnapshot {
   return {
