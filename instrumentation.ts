@@ -18,5 +18,15 @@ export async function register() {
     } catch (e) {
       console.error("knowledge base sync failed at startup", e);
     }
+    // Invoices (docs/invoices/spec.md): any paid order still without one gets
+    // it, oldest payment first. The first start after deploying invoices
+    // issues them for every earlier paid order; after that it's a safety net.
+    try {
+      const { issueMissingInvoices } = await import("./lib/invoices/issue");
+      const n = await issueMissingInvoices();
+      if (n) console.log(`invoices: issued ${n} missing invoice${n === 1 ? "" : "s"}`);
+    } catch (e) {
+      console.error("invoice catch-up failed at startup", e);
+    }
   }
 }

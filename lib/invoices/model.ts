@@ -64,6 +64,8 @@ export interface InvoiceDoc {
     placeOfSupply: StateRef | null;
     /** Same state as the seller: CGST + SGST. Different: IGST. */
     split: "intra" | "inter" | null;
+    /** The state-level part is UTGST (seller in a union territory without its own legislature). */
+    utgst?: boolean;
   };
   lines: InvoiceLine[];
   totals: { taxable: number; cgst: number; sgst: number; igst: number; total: number };

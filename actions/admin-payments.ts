@@ -4,12 +4,11 @@
 // Zod-validated. Gateway secrets are encrypted at rest and write-only: the
 // screen only learns whether each one is set.
 
-import { and, desc, gte, lte, eq } from "drizzle-orm";
+import { and, desc, gte, inArray, lte, eq } from "drizzle-orm";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
-import { paymentGateways, paymentOrders } from "@/db/schema";
-import { previewInvoiceNumbers } from "@/lib/invoices/preview-numbers";
+import { invoices, paymentGateways, paymentOrders } from "@/db/schema";
 import { requireAdmin } from "@/lib/current-user";
 import { encryptSecret } from "@/lib/crypto";
 import { credsOf, gatewayComplete, getGatewayRow, listGatewaySettings } from "@/lib/payments/gateways";
@@ -144,8 +143,12 @@ export async function listOrdersAction(raw: unknown): Promise<{ rows: AdminOrder
     .where(and(gte(paymentOrders.createdAt, from), lte(paymentOrders.createdAt, to)))
     .orderBy(desc(paymentOrders.createdAt))
     .limit(MAX_ROWS + 1);
-  // INVOICES PHASE 1: the numbers the backfill will give (lib/invoices/preview-numbers.ts).
-  const invoiceNumbers = await previewInvoiceNumbers();
+  const ids = list.slice(0, MAX_ROWS).map((o) => o.id);
+  const invoiceNumbers = new Map(
+    ids.length
+      ? (await db.select({ orderId: invoices.orderId, number: invoices.number }).from(invoices).where(inArray(invoices.orderId, ids))).map((r) => [r.orderId, r.number])
+      : [],
+  );
   return {
     capped: list.length > MAX_ROWS,
     rows: list.slice(0, MAX_ROWS).map((o) => ({

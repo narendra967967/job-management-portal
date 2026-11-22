@@ -38,6 +38,7 @@ import { confirmAiInterviewPayment, sendAiInterviewReceipt } from "@/lib/payment
 import { getUserBilling } from "@/lib/invoices/billing-profile";
 import { isBillingComplete } from "@/lib/invoices/billing-details";
 import { splitTax } from "@/lib/invoices/tax";
+import { ensureInvoice } from "@/lib/invoices/issue";
 
 /** Said when checkout is started without complete billing details (invoices spec I4). */
 export const BILLING_NEEDED = "Add your billing details before you pay. They go on your invoice.";
@@ -311,10 +312,21 @@ export async function confirmPayment(order: Order, payment: RazorpayPayment, cre
   });
 
   if (!result) return { ok: false, error: "Order not found." };
-  if (!result.alreadyPaid) {
-    sendReceipt(order.id).catch((err) => console.error("[payments] receipt email failed:", err instanceof Error ? err.message : err));
-  }
+  if (!result.alreadyPaid) afterPaid(order.id, sendReceipt);
   return { ok: true, expiresAt: result.expiresAt.toISOString(), planName: result.planName, alreadyPaid: result.alreadyPaid };
+}
+
+/**
+ * Right after a payment is saved: issue its invoice, then email the receipt
+ * (which carries the invoice). In the background, so the buyer isn't kept
+ * waiting; a failure is logged, the payment stands, and the startup catch-up
+ * (issueMissingInvoices) issues a missed invoice later.
+ */
+export function afterPaid(orderId: string, sendEmail: (orderId: string) => Promise<void>): void {
+  void (async () => {
+    await ensureInvoice(orderId).catch((err) => console.error("[invoices] issue after payment failed:", err instanceof Error ? err.message : err));
+    await sendEmail(orderId).catch((err) => console.error("[payments] receipt email failed:", err instanceof Error ? err.message : err));
+  })();
 }
 
 /** Record a failed or abandoned attempt. Never touches a paid order. */

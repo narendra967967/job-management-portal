@@ -16,7 +16,7 @@ import { sendTemplateEmail } from "@/lib/email-templates";
 import { greetingName } from "@/lib/email-templates-model";
 import { absoluteUrl } from "@/lib/site-url";
 import { getAppName } from "@/lib/branding";
-import { BILLING_NEEDED, receiptOf, taxOf, type ConfirmResult } from "@/lib/payments/orders";
+import { BILLING_NEEDED, afterPaid, receiptOf, taxOf, type ConfirmResult } from "@/lib/payments/orders";
 import { getUserBilling } from "@/lib/invoices/billing-profile";
 import { isBillingComplete } from "@/lib/invoices/billing-details";
 import { splitTax } from "@/lib/invoices/tax";
@@ -179,9 +179,7 @@ export async function confirmAiInterviewPayment(order: Order, payment: RazorpayP
     return { validUntil, label: o.planName, alreadyPaid: false };
   });
   if (!result) return { ok: false, error: "Order not found." };
-  if (!result.alreadyPaid) {
-    sendAiInterviewReceipt(order.id).catch((err) => console.error("[payments] receipt email failed:", err instanceof Error ? err.message : err));
-  }
+  if (!result.alreadyPaid) afterPaid(order.id, sendAiInterviewReceipt);
   return { ok: true, expiresAt: result.validUntil.toISOString(), planName: result.label, alreadyPaid: result.alreadyPaid };
 }
 

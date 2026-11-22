@@ -73,17 +73,3 @@ export const isBillingComplete = (b: BillingDetails | null): b is BillingDetails
 export function billingPlace(b: BillingDetails): string {
   return `${b.city.trim()}, ${stateByCode(b.stateCode)?.name ?? ""} ${b.pin.trim()}`.trim();
 }
-
-/** Sample details for the phase 1 screens (made up). */
-export const SAMPLE_BILLING: BillingDetails = {
-  fullName: "Priya Sharma",
-  mobile: "9876543210",
-  addressLine: "Flat 12, Sample Apartments, Baner Road",
-  city: "Pune",
-  stateCode: "27",
-  pin: "411045",
-  country: "IN",
-  gstin: "",
-  businessName: "",
-  pan: "",
-};

@@ -229,7 +229,7 @@ export function InvoicePdf({ doc }: { doc: InvoiceDoc }) {
                       <Text><Money paise={doc.totals.cgst} /></Text>
                     </View>
                     <View style={s.totRow}>
-                      <Text style={s.small}>SGST at {half}%</Text>
+                      <Text style={s.small}>{doc.gst.utgst ? "UTGST" : "SGST"} at {half}%</Text>
                       <Text><Money paise={doc.totals.sgst} /></Text>
                     </View>
                   </>

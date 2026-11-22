@@ -3,7 +3,8 @@
 // Orders & payments (/orders, docs/invoices/spec.md, section 7): every payment the user
 // has made or tried, with its invoice. Billing details live on the Profile tab
 // (components/billing/billing-details-card.tsx).
-// PHASE 1 (UI first): sample rows. Phase 3 loads the signed-in user's own.
+// Rows come from actions/my-payments.ts (the signed-in user's own orders);
+// invoices from /api/invoices/[orderId], drawn on request.
 
 import { useEffect, useMemo, useState } from "react";
 import { Download, Eye, FileText, LifeBuoy, Mail, Receipt, Search } from "lucide-react";
@@ -29,12 +30,12 @@ import {
   ymd,
 } from "@/components/ui/data-table";
 import { useContactSupport } from "@/components/support/contact-support";
+import { listMyPaymentsAction } from "@/actions/my-payments";
 import { formatPaise } from "@/lib/invoices/model";
 import {
   PAYMENTS_DEFAULT_DAYS,
   PAYMENT_STATUS_LABELS,
   SALE_KIND_LABELS,
-  samplePayments,
   type PaymentRow,
   type PaymentStatus,
   type SaleKind,
@@ -55,7 +56,7 @@ const dateTime = (iso: string) =>
 const shortDay = (iso: string) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 const shortTime = (iso: string) => new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 
-const pdfHref = (r: PaymentRow, download: boolean) => `/api/invoices/sample/${r.id}${download ? "?download=1" : ""}`;
+const pdfHref = (r: PaymentRow, download: boolean) => `/api/invoices/${r.id}${download ? "?download=1" : ""}`;
 
 export function PaymentsTab() {
   return <PaymentsCard />;
@@ -65,7 +66,18 @@ export function PaymentsTab() {
 function PaymentsCard() {
   const mounted = useMounted();
   const { open: openSupport } = useContactSupport();
-  const all = useMemo(() => samplePayments(), []);
+  // null while loading.
+  const [loaded, setLoaded] = useState<PaymentRow[] | null>(null);
+  const [loadError, setLoadError] = useState("");
+  useEffect(() => {
+    listMyPaymentsAction()
+      .then(setLoaded)
+      .catch(() => {
+        setLoaded([]);
+        setLoadError("Couldn't load your payments. Reload the page to try again.");
+      });
+  }, []);
+  const all = useMemo(() => loaded ?? [], [loaded]);
   const initial = useMemo(() => lastDays(PAYMENTS_DEFAULT_DAYS), []);
   const [from, setFrom] = useState(initial.from);
   const [to, setTo] = useState(initial.to);
@@ -181,11 +193,20 @@ function PaymentsCard() {
         </Button>
       </BulkBar>
 
-      {rows.length === 0 ? (
+      {loadError && (
+        <p className="text-xs text-destructive" role="alert">
+          {loadError}
+        </p>
+      )}
+      {loaded === null ? (
+        <div className="h-40 animate-pulse rounded-xl bg-muted/40" aria-busy />
+      ) : rows.length === 0 ? (
         <div className="rounded-xl border border-dashed p-8 text-center">
           <Receipt className="mx-auto size-8 text-primary/60" aria-hidden />
           <p className="mt-2 text-sm font-medium">{all.length === 0 ? "No payments yet" : "No payments match these filters"}</p>
-          <p className="mt-1 text-xs text-muted-foreground">Try a wider date range, or clear the filters.</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {all.length === 0 ? "When you buy a plan or an AI mock interview, it shows up here with its invoice." : "Try a wider date range, or clear the filters."}
+          </p>
         </div>
       ) : (
         <TableBox minWidth={680}>
