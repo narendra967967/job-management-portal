@@ -51,6 +51,18 @@ node --env-file=.env.local --require ./scripts/security/server-only-stub.cjs --i
 
 It never contacts AWS. It runs its own stand-in for the SES API and confirms that the chosen service is the one used, that requests are signed and never carry the secret key, that the admin screen never receives it, that unsubscribe headers survive, that AWS errors come out in plain words, and that an incomplete SES setup fails rather than quietly using SMTP. Its test SES details are made up and assembled when it runs, so secret scanners don't mistake them for real keys. They're saved for a moment and then removed, leaving the table exactly as it was.
 
+## Before deploying Mock interviews changes
+
+Anything that touches AI interviews (booking, the interviewer, reports, the allowance, AI interview payments or Module settings) gets its check. Run it with the app running locally; the dev server on port 3000 is fine:
+
+```bash
+APP_URL=http://localhost:3000 node --env-file=.env.local --require ./scripts/security/server-only-stub.cjs --import tsx scripts/security/mock-interviews-checks.mts
+```
+
+It confirms signed-out visitors and candidate accounts are turned away from every AI interview page and action, that nobody can open, answer or edit someone else's interview, and that the allowance can't be spent twice, even by bookings made at the same moment. Paid bookings must charge the level's rate for the length, with the discount only when it's switched on, and one payment confirmed three times must still give one booking, one order and one receipt. Unusable AI replies must never become a report, the module key must stay out of every page and browser script, and Coming soon must refuse the actions as well as hide the pages.
+
+It never calls OpenAI, Razorpay or a mail server: inside the script those are stand-ins, and its HTTP requests are all ones that must be refused before any of that happens. It flips Module settings, the Razorpay row, the Free plan's allowance and ui-test's plan while it runs, then puts every one back exactly and deletes the bookings and orders it made. The price checks need Billing complete locally and fewer than 7 payment orders on ui-test in the last hour.
+
 ## Promote, don't rebuild
 
 To release what preprod tested, fast-forward `prod` to it with `git merge --ff-only preprod`. The commit is the same, so the exact image that ran on preprod goes live without being rebuilt.

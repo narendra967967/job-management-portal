@@ -74,3 +74,16 @@ It lists interviews that have started, from the last 7 days by default. The boxe
 For an interview that **stopped early** or **failed**, the row menu has **Give interview back**. It creates a new booking with the same setup (role, kind, level, length, resume and job description) at no charge, valid for the current booking validity. No money moves; it isn't a refund.
 
 You must write a reason of at least 10 characters. It's kept on the new booking along with who gave it back. Each interview can be given back once; a second attempt is refused, even from a double click.
+
+## What's enforced on the server
+
+None of these rely on the screens hiding a button:
+
+- **Coming soon closes everything.** With AI interviews on Coming soon, every AI interview page shows the Coming soon panel, and booking, editing a booking, starting, answering and ending are all refused, even for bookings made while it was open. Receipts for interviews already paid can still be emailed.
+- **Each candidate sees only their own.** Every booking, interview, report and receipt is looked up with the signed-in account, so someone else's link shows nothing.
+- **The allowance is counted under a lock.** Two bookings made at the same moment can't both take the last included interview. The price comes from Module settings on the server; the browser can't send a price, a discount or "covered by my plan".
+- **A paid booking is charged once.** Razorpay's confirmation and the webhook can both arrive. The first one books the interview and sends the receipt; later ones change nothing. A payment for the wrong amount or another order is refused.
+- **A report is saved only in the report's format.** If the AI's reply has a score outside 1 to 10, a missing part or no JSON, it's tried again, and after three failures the interview waits for the upkeep job to retry rather than getting a broken report.
+- **The module key stays on the server.** Module settings shows only its last four characters.
+
+`scripts/security/mock-interviews-checks.mts` tests all of this. Run it before deploying Mock interviews changes (see the deploy runbook).
