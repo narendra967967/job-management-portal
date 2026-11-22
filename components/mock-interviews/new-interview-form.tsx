@@ -5,37 +5,26 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
-  BookOpenCheck,
   Bot,
   Briefcase,
   Building2,
-  ChartColumn,
   Check,
   CheckCircle2,
   Circle,
   ClipboardPaste,
   Clock3,
-  CodeXml,
-  Cpu,
-  Crown,
   FileText,
   FileUp,
-  HeartHandshake,
-  Kanban,
   Loader2,
   Lock,
   MessagesSquare,
-  Network,
-  Package,
   Rocket,
   SignalHigh,
   SignalLow,
   SignalMedium,
   Sparkles,
   Target,
-  Trophy,
   Upload,
-  Users,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -66,6 +55,7 @@ import {
 import { cn } from "@/lib/utils";
 import { scrollIntoMain } from "@/components/mock-interviews/scroll-into-main";
 import { LeadPicker } from "@/components/mock-interviews/lead-picker";
+import { CATEGORY_ICON } from "@/components/mock-interviews/category-icons";
 
 // New AI interview (spec D10, D11). R1.2: the form validates on the client and
 // "starts" a sample session; R1.5 wires the allowance, payment and the AI.
@@ -801,22 +791,6 @@ export function NewInterviewForm({
     </div>
   );
 }
-
-// Admin can add kinds of interview; those without an icon here get a speech bubble.
-const CATEGORY_ICON: Partial<Record<string, LucideIcon>> = {
-  "HR interview": Users,
-  "Technical interview": Cpu,
-  "Behavioral interview": HeartHandshake,
-  "Managerial interview": Briefcase,
-  "Product management": Package,
-  "Project management": Kanban,
-  "System design": Network,
-  Coding: CodeXml,
-  "Data analytics": ChartColumn,
-  Leadership: Crown,
-  "Case study": BookOpenCheck,
-  "Final round": Trophy,
-};
 
 /** Difficulty colors: green, amber, red, always with the word and a signal icon. */
 const DIFFICULTY_TONE: Record<Difficulty, { on: string; text: string; icon: LucideIcon; icon_on: string }> = {

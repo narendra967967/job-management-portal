@@ -8,7 +8,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { ArrowRight, BarChart3, Check, ClipboardList, FileText, MessageCircle, Mic, ShieldCheck, Sparkles, Timer } from "lucide-react";
+import { ArrowRight, BarChart3, Check, Mic, ShieldCheck, Sparkles, Timer } from "lucide-react";
 import { SiteHeader } from "@/components/marketing/site-header";
 import { SiteFooter } from "@/components/marketing/site-footer";
 import { Faq } from "@/components/marketing/faq";
@@ -20,7 +20,12 @@ import { getPricingPlans } from "@/lib/pricing";
 import { getSessionUserId } from "@/lib/current-user";
 import { absoluteUrl, siteUrl } from "@/lib/site-url";
 import { getPublicAiInterviews } from "@/lib/mock-interviews/public";
-import { DISCUSSION_CATEGORIES, METRICS, rupees } from "@/lib/mock-interviews/model";
+import { DISCUSSION_CATEGORIES, rupees } from "@/lib/mock-interviews/model";
+import { categoryIcon } from "@/components/mock-interviews/category-icons";
+import { InterviewMock, ReportMock, SampleReport, SetupMock } from "@/components/marketing/ai-interviews-showcase";
+
+// Where "Book an interview" goes; signed-out visitors sign in first and land on it.
+const BOOK = "/mock-interviews/ai/new";
 
 export const dynamic = "force-dynamic";
 
@@ -48,8 +53,6 @@ const EXCHANGE = [
   { from: "ai", text: "What did that week cost, and how did you explain it to the directors?" },
 ] as const;
 
-const SAMPLE_SKILLS = [7, 6, 8, 6, 7];
-
 export default async function AiMockInterviewsPage() {
   const [ai, appName, tagline, signupAllowed, sessionId, plans] = await Promise.all([
     getPublicAiInterviews(),
@@ -69,24 +72,19 @@ export default async function AiMockInterviewsPage() {
 
   const STEPS = [
     {
-      icon: ClipboardList,
+      Mock: SetupMock,
       title: "Tell it about the interview",
-      body: "Pick the role, the kind of interview and how hard you want it. Add your résumé and the job description, or choose one of your leads and its description comes with it. You can also name the topics you want covered.",
+      body: "Pick the role, the kind of interview, the level and the length. Add your résumé and the job description, or choose one of your leads and its description comes with it.",
     },
     {
-      icon: MessageCircle,
+      Mock: InterviewMock,
       title: "Answer one question at a time",
-      body: "Type your answers, or tap the mic and speak, then check the words before you send. A short or vague answer gets a follow-up question, the way a real interviewer would push.",
+      body: "Type your answers, or tap the mic and speak, then check the words before you send. A short or vague answer gets a follow-up, the way a real interviewer would push.",
     },
     {
-      icon: FileText,
+      Mock: ReportMock,
       title: "Read your report a minute later",
-      body: "A score out of 100, a score for each of five skills, what went well, the answers to work on with a stronger version of each, and what to practice next. We email you when it's ready.",
-    },
-    {
-      icon: BarChart3,
-      title: "See whether you're improving",
-      body: "Every report stays in your history, and the Performance page shows how your scores change from one interview to the next.",
+      body: "See what went well, the answers to work on with a stronger version of each, and what to practice before the next round.",
     },
   ];
 
@@ -152,20 +150,12 @@ export default async function AiMockInterviewsPage() {
 
   const primary =
     "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-medium text-primary-foreground shadow-sm transition-all hover:bg-primary/90 active:translate-y-px";
-  const PrimaryCta = ({ className = primary }: { className?: string }) =>
-    loggedIn ? (
-      <Link href="/mock-interviews/ai/new" className={className}>
-        Book an interview <ArrowRight className="size-4" aria-hidden />
-      </Link>
-    ) : signupAllowed ? (
-      <Link href="/signup" className={className}>
-        Create an account <ArrowRight className="size-4" aria-hidden />
-      </Link>
-    ) : (
-      <Link href="/login" className={className}>
-        Sign in to book <ArrowRight className="size-4" aria-hidden />
-      </Link>
-    );
+  // Signed out, booking goes through the login page and comes back to the form.
+  const PrimaryCta = ({ className = primary }: { className?: string }) => (
+    <Link href={loggedIn ? BOOK : `/login?next=${encodeURIComponent(BOOK)}`} className={className}>
+      Book an interview <ArrowRight className="size-4" aria-hidden />
+    </Link>
+  );
 
   return (
     <div className="relative isolate min-h-dvh">
@@ -192,9 +182,9 @@ export default async function AiMockInterviewsPage() {
               </p>
               <div className="mt-8 flex flex-wrap items-center gap-3">
                 <PrimaryCta />
-                {!loggedIn && (
-                  <Link href="/login" className="glass inline-flex min-h-11 items-center justify-center rounded-xl px-5 py-3 text-sm font-medium transition-colors hover:bg-white/80">
-                    Log in
+                {!loggedIn && signupAllowed && (
+                  <Link href="/signup" className="glass inline-flex min-h-11 items-center justify-center rounded-xl px-5 py-3 text-sm font-medium transition-colors hover:bg-white/80">
+                    Create an account
                   </Link>
                 )}
               </div>
@@ -244,64 +234,91 @@ export default async function AiMockInterviewsPage() {
           </div>
         </section>
 
-        {/* How it works */}
+        {/* How it works: three steps, each with a small picture of the real screen */}
         <section>
           <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:py-24">
-            <h2 className="max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">Built around the job you&apos;re going for</h2>
-            <p className="mt-4 max-w-2xl text-base text-muted-foreground">
-              Generic question lists don&apos;t prepare you for the questions about your own résumé. These interviews start from it.
-            </p>
-            <ol className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {STEPS.map(({ icon: Icon, title, body }, i) => (
-                <li key={title} className="glass rounded-2xl p-5">
-                  <div className="flex items-center gap-3">
-                    <span className="flex size-11 items-center justify-center rounded-xl bg-gradient-to-br from-primary/15 to-[oklch(0.62_0.21_330_/_0.14)] text-primary ring-1 ring-white/70">
-                      <Icon className="size-5.5" aria-hidden />
-                    </span>
-                    <span className="text-xs font-semibold text-muted-foreground">Step {i + 1}</span>
+            <div className="mx-auto max-w-2xl text-center">
+              <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">Built around the job you&apos;re going for</h2>
+              <p className="mt-4 text-base text-muted-foreground">
+                Generic question lists don&apos;t prepare you for questions about your own résumé. These interviews start from it.
+              </p>
+            </div>
+            <ol className="relative mt-12 grid gap-5 lg:grid-cols-3">
+              <span aria-hidden className="absolute top-5 right-[16%] left-[16%] hidden h-0.5 bg-gradient-to-r from-primary/40 via-primary/30 to-primary/10 lg:block" />
+              {STEPS.map(({ title, body, Mock }, i) => (
+                <li key={title} className="relative flex flex-col">
+                  <span className="relative z-10 mx-auto flex size-10 items-center justify-center rounded-full bg-gradient-to-br from-primary to-[oklch(0.5_0.2_308)] text-sm font-semibold text-primary-foreground shadow-sm ring-4 ring-white/70">
+                    {i + 1}
+                  </span>
+                  <div className="glass mt-4 flex flex-1 flex-col rounded-3xl p-4 sm:p-5">
+                    <Mock />
+                    <h3 className="mt-5 text-base font-semibold">{title}</h3>
+                    <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{body}</p>
                   </div>
-                  <h3 className="mt-4 text-base font-semibold">{title}</h3>
-                  <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{body}</p>
                 </li>
               ))}
             </ol>
           </div>
         </section>
 
-        {/* Kinds of interview + the report */}
+        {/* A sample report, drawn with the app's own report charts */}
         <section>
-          <div className="mx-auto grid max-w-6xl items-start gap-12 px-4 py-16 sm:px-6 lg:grid-cols-2 lg:py-24">
+          <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 py-16 sm:px-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:py-24">
             <div>
-              <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">Pick the round you&apos;re preparing for</h2>
+              <span className="glass-subtle inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium text-primary">
+                <BarChart3 className="size-3.5" aria-hidden /> Your report
+              </span>
+              <h2 className="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl">Know exactly what to fix before the real one</h2>
               <p className="mt-4 text-base leading-relaxed text-muted-foreground">
+                Every interview ends with a report on your own answers: a score, how five skills compare with last time, the answers
+                that fell short with a stronger version of each, and a short plan for what to practice next.
+              </p>
+              <ul className="mt-6 space-y-3">
+                {[
+                  "Ready about a minute after you finish, and we email you",
+                  "Better answers written from what you actually said",
+                  "Your Performance page charts every interview, so you can see the trend",
+                ].map((p) => (
+                  <li key={p} className="flex items-start gap-2.5 text-sm">
+                    <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                      <Check className="size-3.5" aria-hidden />
+                    </span>
+                    {p}
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-6 text-xs text-muted-foreground">The report on the right is a made-up sample.</p>
+            </div>
+            <SampleReport />
+          </div>
+        </section>
+
+        {/* Kinds of interview */}
+        <section>
+          <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:py-24">
+            <div className="mx-auto max-w-2xl text-center">
+              <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">Pick the round you&apos;re preparing for</h2>
+              <p className="mt-4 text-base text-muted-foreground">
                 Easy, Medium or Hard, for {lengthText}. Start easy a few days out, and do a Hard one the night before.
               </p>
-              <ul className="mt-6 flex flex-wrap gap-2">
-                {ai.categories.map((c) => (
-                  <li key={c} className="glass-subtle rounded-full px-3 py-1.5 text-sm">
-                    {c}
-                  </li>
-                ))}
-              </ul>
             </div>
-
-            <div className="glass rounded-3xl p-6 sm:p-8">
-              <p className="text-sm font-semibold">What every report scores</p>
-              <ul className="mt-4 space-y-3">
-                {METRICS.map((m, i) => (
-                  <li key={m.key}>
-                    <div className="flex items-center justify-between text-sm">
-                      <span>{m.label}</span>
-                      <span className="text-muted-foreground tabular-nums">{SAMPLE_SKILLS[i]}/10</span>
-                    </div>
-                    <div className="mt-1.5 h-2 rounded-full bg-white/60">
-                      <div className="h-2 rounded-full bg-primary" style={{ width: `${SAMPLE_SKILLS[i] * 10}%` }} />
-                    </div>
+            <ul className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              {ai.categories.map((c) => {
+                const Icon = categoryIcon(c);
+                const talk = (DISCUSSION_CATEGORIES as readonly string[]).includes(c);
+                return (
+                  <li key={c} className="glass flex min-h-16 items-center gap-3 rounded-2xl p-3 transition-transform duration-200 hover:-translate-y-0.5 motion-reduce:hover:translate-y-0">
+                    <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary/15 to-[oklch(0.62_0.21_330_/_0.14)] text-primary ring-1 ring-white/70">
+                      <Icon className="size-5" aria-hidden />
+                    </span>
+                    <span className="min-w-0 text-sm leading-tight font-medium">
+                      {c}
+                      {talk && <span className="mt-0.5 block text-[11px] font-normal text-muted-foreground">Talked through</span>}
+                    </span>
                   </li>
-                ))}
-              </ul>
-              <p className="mt-5 text-xs text-muted-foreground">Example scores. Your report also lists your strengths, the answers to work on with a better version of each, and next steps.</p>
-            </div>
+                );
+              })}
+            </ul>
           </div>
         </section>
 
