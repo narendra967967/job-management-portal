@@ -180,7 +180,7 @@ drawn with `scripts/invoices/render-samples.mts`.
 | 4. Safety | Check script: no paid order without exactly one invoice, numbers unbroken per financial year and at most 16 characters, an invoice reads the same after every setting and profile change, PDFs never touch disk, money tables untouched by reset, deletion and retention, signed-out and other-user access refused |
 | 5. Content and rollout | Knowledge-base articles, Privacy Policy lines (billing details collected; money records kept by law after deletion), preprod, then prod with the payment module |
 
-Progress: phase 1 done (screens, November 18, 2026). Phase 2 done (database, November 18). Phase 3 done (wiring, November 22): billing details saved and required, buyer + split frozen on orders, invoices issued at payment and backfilled at startup, real downloads, Invoice copy email, PDFs attached to payment emails, invoice number replaces the receipt number, the Plan and AI-booking links. Left for phase 5: the public pages that still say "receipt" (Pricing, Privacy, Refunds, Terms) and the Privacy lines.
+Progress: phase 1 done (screens, November 18, 2026). Phase 2 done (database, November 18). Phase 3 done (wiring, November 22): billing details saved and required, buyer + split frozen on orders, invoices issued at payment and backfilled at startup, real downloads, Invoice copy email, PDFs attached to payment emails, invoice number replaces the receipt number, the Plan and AI-booking links. Phase 4 done (scripts/security/invoices-checks.mts, 58 checks). Phase 5 content done (Privacy, Terms, Refunds, Pricing, knowledge base, November 22); what remains is the owner's deploy to preprod, then prod with the payment module.
 
 ## 12. The database (phase 2)
 
