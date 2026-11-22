@@ -27,7 +27,7 @@ import { cn } from "@/lib/utils";
 const STATUS_TEXT: Record<InterviewStatus, string> = {
   completed: "Report ready",
   awaiting_report: "Waiting for evaluation",
-  interrupted: "Stopped early",
+  interrupted: "Paused",
   in_progress: "In progress",
   no_answers: "Ended before answering",
   failed: "Stopped by a problem",

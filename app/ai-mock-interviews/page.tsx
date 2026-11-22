@@ -115,7 +115,7 @@ export default async function AiMockInterviewsPage() {
     },
     {
       q: "What if my connection drops halfway through?",
-      a: `The clock only runs while you're connected. Come back within ${ai.resumeWindowMinutes} minutes and you pick up at the same question, with the time you had left.`,
+      a: `The clock only runs while you're connected, so you pick up at the same question with the time you had left. You get ${ai.resumeWindowMinutes} minutes away in total for the whole interview, however many times the connection drops.`,
     },
     {
       q: "Can I speak my answers instead of typing?",

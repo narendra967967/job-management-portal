@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -58,7 +58,7 @@ const EXPIRING_DAYS = 7;
 const STATUS: Record<BookingStatus, { label: string; cls: string }> = {
   ready: { label: "Ready to start", cls: "bg-primary/10 text-primary" },
   in_progress: { label: "In progress", cls: "bg-sky-50 text-sky-800" },
-  interrupted: { label: "Stopped early", cls: "bg-amber-50 text-amber-800" },
+  interrupted: { label: "Paused", cls: "bg-amber-50 text-amber-800" },
   completed: { label: "Completed", cls: "bg-emerald-50 text-emerald-800" },
   no_answers: { label: "Ended before answering", cls: "bg-slate-100 text-slate-700" },
   failed: { label: "Stopped by a problem", cls: "bg-amber-50 text-amber-800" },
@@ -75,7 +75,7 @@ const VIEW_LABEL: Record<View, string> = {
   all: "All bookings",
   ready: "Ready to start",
   in_progress: "In progress",
-  interrupted: "Stopped early",
+  interrupted: "Paused",
   completed: "Completed",
   no_answers: "Ended before answering",
   failed: "Stopped by a problem",
@@ -460,8 +460,11 @@ function PrimaryAction({ b }: { b: BookingRow }) {
           <Timer className="size-4" aria-hidden />
           Resume
         </Link>
-        {b.resumeMinutesLeft !== undefined && (
-          <p className="mt-0.5 text-center text-[10px] text-amber-700">{b.resumeMinutesLeft} min left to resume</p>
+        {/* Phones see the Action column first, so the countdown sits here too; wider screens have it under Valid until. */}
+        {b.resumeSecondsLeft !== undefined && (
+          <p className="mt-0.5 text-center sm:hidden">
+            <ResumeCountdown seconds={b.resumeSecondsLeft} compact />
+          </p>
         )}
       </div>
     );
@@ -503,10 +506,57 @@ function PaidChip({ b }: { b: BookingRow }) {
   );
 }
 
+const mmss = (sec: number) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
+
+/**
+ * A paused interview's time left to resume, ticking down (D13f). The first
+ * render uses the server's figure so it matches; the clock time ("by 4:32 PM")
+ * fills in once the browser's clock is running. At zero the list refreshes and
+ * the server closes the interview.
+ */
+function ResumeCountdown({ seconds, compact = false, refreshAtZero = false }: { seconds: number; compact?: boolean; refreshAtZero?: boolean }) {
+  const router = useRouter();
+  const [left, setLeft] = useState(seconds);
+  const [by, setBy] = useState<string | null>(null);
+  useEffect(() => {
+    const end = Date.now() + seconds * 1000;
+    const tick = () => {
+      setLeft(Math.max(0, Math.ceil((end - Date.now()) / 1000)));
+      setBy(new Date(end).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }));
+    };
+    const first = setTimeout(tick, 0);
+    const t = setInterval(tick, 1000);
+    return () => {
+      clearTimeout(first);
+      clearInterval(t);
+    };
+  }, [seconds]);
+  const done = left === 0;
+  useEffect(() => {
+    if (!done || !refreshAtZero) return;
+    const t = setTimeout(() => router.refresh(), 3000);
+    return () => clearTimeout(t);
+  }, [done, refreshAtZero, router]);
+
+  if (compact)
+    return <span className="text-[11px] font-semibold text-amber-700 tabular-nums">{done ? "Closing…" : `${mmss(left)} left`}</span>;
+  return (
+    <span className="inline-flex flex-col" role="timer" aria-live="off">
+      <span className="inline-flex items-center gap-1 font-semibold text-amber-800 tabular-nums">
+        <Timer className="size-3.5" aria-hidden />
+        {done ? "Closing…" : `${mmss(left)} left to resume`}
+      </span>
+      {!done && by && <span className="mt-0.5 text-[11px] text-muted-foreground">Come back by {by}</span>}
+    </span>
+  );
+}
+
 function ValidUntil({ b, mounted }: { b: BookingRow; mounted: boolean }) {
   if (!mounted) return null;
   if (b.status === "expired") return <span className="text-muted-foreground">Expired {shortDate(b.validUntil)}</span>;
   if (b.status === "completed" || b.status === "failed" || b.status === "no_answers") return <span className="text-muted-foreground">-</span>;
+  // Paused: what matters now is the time left to come back, not the booking date.
+  if (b.status === "interrupted" && b.resumeSecondsLeft !== undefined) return <ResumeCountdown seconds={b.resumeSecondsLeft} refreshAtZero />;
   const d = daysLeft(b, Date.now());
   return (
     <span className="inline-flex flex-col">

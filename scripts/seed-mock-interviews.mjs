@@ -153,7 +153,7 @@ for (const [daysAgo, role, category, industry, difficulty, minutes, status, cove
     const events = [["start", `Started: ${category}, ${difficulty}, ${minutes} min`, 0], ["question", "Question 1 asked", 5], ["answer", "Answer received", 78]];
     if (status === "failed") events.push(["error", "AI service didn't respond (timeout), retried", 250], ["error", "AI service didn't respond (timeout); interview stopped", 280]);
     if (status === "interrupted") events.push(["disconnect", "Connection lost; clock paused", 230]);
-    if (status === "stopped") events.push(["disconnect", "Connection lost; clock paused", 400], ["end", "Not resumed within 15 minutes; closed with the answers so far", 400], ["evaluation", "Report generated", 400]);
+    if (status === "stopped") events.push(["disconnect", "Connection lost; clock paused", 400], ["end", "Time away used up (15 min in total); closed with the answers so far", 400], ["evaluation", "Report generated", 400]);
     if (status === "completed") events.push(["wrapup", "Time up; wrap-up started", minutes * 60], ["end", `Interview ended after ${questions} questions`, minutes * 60 + 90], ["evaluation", "Report generated", minutes * 60 + 110]);
     for (const [kind, detail, at] of events) {
       await db.query("insert into ai_interview_events (interview_id, kind, detail, clock_seconds, created_at) values ($1,$2,$3,$4,$5)", [

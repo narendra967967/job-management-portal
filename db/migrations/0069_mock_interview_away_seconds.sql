@@ -1,0 +1,1 @@
+ALTER TABLE "ai_interviews" ADD COLUMN "away_seconds" integer DEFAULT 0 NOT NULL;

@@ -479,7 +479,7 @@ function Rules({ s, set }: SectionProps) {
       <div className="grid gap-4 sm:grid-cols-2">
         <NumberField label="Minutes per question" value={s.minutesPerQuestion} onChange={(v) => set("minutesPerQuestion", v)} min={1} max={5} step={0.5} suffix="min" hint="Sets how many questions are planned" />
         <NumberField label="Wrap-up extension" value={s.wrapUpMinutes} onChange={(v) => set("wrapUpMinutes", v)} min={0} max={20} suffix="min" />
-        <NumberField label="Resume window" value={s.resumeWindowMinutes} onChange={(v) => set("resumeWindowMinutes", v)} min={5} max={60} suffix="min" hint="After a disconnection" />
+        <NumberField label="Time away allowed" value={s.resumeWindowMinutes} onChange={(v) => set("resumeWindowMinutes", v)} min={5} max={60} suffix="min" hint="In total, across every disconnection" />
         <NumberField label="Pace grace period" value={s.paceGraceMinutes} onChange={(v) => set("paceGraceMinutes", v)} min={0} max={15} suffix="min" hint="Before the pace meter judges" />
       </div>
       <Save

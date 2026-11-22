@@ -1908,6 +1908,9 @@ export const aiInterviews = pgTable(
     questionPlan: jsonb("question_plan").$type<PlannedQuestion[]>(),
     questionsAsked: integer("questions_asked").notNull().default(0),
     activeSeconds: integer("active_seconds").notNull().default(0),
+    // Time away so far, across every drop (D13f): the settings' resume window is
+    // one allowance for the whole interview, not a fresh window per drop.
+    awaySeconds: integer("away_seconds").notNull().default(0),
     startedAt: timestamp("started_at", { withTimezone: true }),
     lastActiveAt: timestamp("last_active_at", { withTimezone: true }),
     interruptedAt: timestamp("interrupted_at", { withTimezone: true }),

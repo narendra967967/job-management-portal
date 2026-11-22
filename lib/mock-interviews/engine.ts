@@ -32,7 +32,9 @@ import {
 // The clock counts connected time only (D13e): the interview screen sends a
 // heartbeat every 15 seconds, and each one adds the time since the last, up to
 // BEAT_CAP_SEC. No heartbeat for DISCONNECT_SEC means the candidate dropped: the
-// clock stops there, and they have the resume window to come back.
+// clock stops there. Time away is one allowance for the whole interview (D13f,
+// the settings' resume window): every drop spends from it, and when it runs out
+// the interview closes with the answers so far.
 
 const BEAT_CAP_SEC = 25;
 export const DISCONNECT_SEC = 45;
@@ -49,6 +51,8 @@ export interface LiveState {
   status: Row["status"];
   phase: Phase;
   activeSeconds: number;
+  /** Time away the candidate has left for the rest of the interview (D13f). */
+  awayLeftSeconds: number;
 }
 export interface NewMessage {
   id: string;
@@ -80,7 +84,7 @@ function phaseOf(i: Pick<Row, "status" | "wrapUpStartedAt">): Phase {
 }
 
 function stateOf(i: Row): LiveState {
-  return { status: i.status, phase: phaseOf(i), activeSeconds: i.activeSeconds };
+  return { status: i.status, phase: phaseOf(i), activeSeconds: i.activeSeconds, awayLeftSeconds: awayLeftSeconds(i, Date.now()) };
 }
 
 async function logEvent(x: Exec, interviewId: string, kind: string, detail: string, clockSeconds: number) {
@@ -175,27 +179,58 @@ export async function settleInterview(id: string): Promise<void> {
       i.interruptedAt = i.lastActiveAt;
     }
     if (i.status === "interrupted" && i.interruptedAt) {
-      const deadline = i.interruptedAt.getTime() + i.settings.resumeWindowMinutes * 60_000;
-      if (now > deadline) {
-        const answers = await answersOf(tx, id);
-        await tx
-          .update(aiInterviews)
-          .set({ status: answers > 0 ? "stopped" : "failed", endedAt: new Date(deadline), endReason: answers > 0 ? "not_resumed" : "abandoned" })
-          .where(eq(aiInterviews.id, id));
-        await logEvent(
-          tx,
-          id,
-          "end",
-          answers > 0
-            ? `Not resumed within ${i.settings.resumeWindowMinutes} minutes; closed with the answers so far`
-            : `Not resumed within ${i.settings.resumeWindowMinutes} minutes, with no answers`,
-          i.activeSeconds,
-        );
-        evaluateAfter = answers > 0;
-      }
+      const deadline = i.interruptedAt.getTime() + Math.max(0, awayAllowance(i) - i.awaySeconds) * 1000;
+      if (now > deadline) evaluateAfter = (await closeAwayUsedUp(tx, i, new Date(deadline))).evaluate;
     }
   });
   if (evaluateAfter) later(() => evaluateInterview(id));
+}
+
+/** The whole interview's time away, in seconds (D13f). */
+const awayAllowance = (i: Pick<Row, "settings">) => i.settings.resumeWindowMinutes * 60;
+
+/** Seconds of time away the candidate still has, counting a drop that's still going on. */
+export function awayLeftSeconds(i: Pick<Row, "settings" | "awaySeconds" | "status" | "interruptedAt">, now: number): number {
+  const away = i.status === "interrupted" && i.interruptedAt ? (now - i.interruptedAt.getTime()) / 1000 : 0;
+  return Math.max(0, Math.floor(awayAllowance(i) - i.awaySeconds - away));
+}
+
+const minutes = (sec: number) => `${Math.max(0, Math.round(sec / 60))} min`;
+
+const AWAY_CLOSING =
+  "You were away longer than this interview allows, so we've stopped here. Your report on the answers you gave is being prepared.";
+const AWAY_CLOSING_EMPTY =
+  "You were away longer than this interview allows, so we've stopped here. As no questions were answered, there's nothing to score this time.";
+
+/** Close an interview whose time away ran out (D13f). `evaluate`: there are answers to score. */
+async function closeAwayUsedUp(tx: Tx, i: Row, endedAt: Date): Promise<{ evaluate: boolean; text: string }> {
+  const answers = await answersOf(tx, i.id);
+  const text = answers > 0 ? AWAY_CLOSING : AWAY_CLOSING_EMPTY;
+  await tx.insert(aiInterviewMessages).values({
+    interviewId: i.id,
+    seq: await nextSeq(tx, i.id),
+    sender: "ai",
+    kind: "closing",
+    text,
+    clockSeconds: i.activeSeconds,
+  });
+  const status = answers > 0 ? "stopped" : "failed";
+  await tx
+    .update(aiInterviews)
+    .set({ status, awaySeconds: awayAllowance(i), endedAt, endReason: answers > 0 ? "not_resumed" : "abandoned" })
+    .where(eq(aiInterviews.id, i.id));
+  await logEvent(
+    tx,
+    i.id,
+    "end",
+    answers > 0
+      ? `Time away used up (${i.settings.resumeWindowMinutes} min in total); closed with the answers so far`
+      : `Time away used up (${i.settings.resumeWindowMinutes} min in total), with no answers`,
+    i.activeSeconds,
+  );
+  i.status = status;
+  i.awaySeconds = awayAllowance(i);
+  return { evaluate: answers > 0, text };
 }
 
 /* ---------------- start, resume ---------------- */
@@ -251,10 +286,20 @@ export async function startInterview(userId: string, id: string): Promise<{ ok: 
       return { row: { ...i, status: "in_progress" as const, startedAt: now, lastActiveAt: now } };
     }
     if (i.status === "interrupted") {
-      const away = i.interruptedAt ? Math.max(1, Math.round((now.getTime() - i.interruptedAt.getTime()) / 60_000)) : 0;
-      await tx.update(aiInterviews).set({ status: "in_progress", interruptedAt: null, lastActiveAt: now }).where(eq(aiInterviews.id, id));
-      await logEvent(tx, id, "resume", `Resumed after ${away} minute${away === 1 ? "" : "s"}; clock picked up where it stopped`, i.activeSeconds);
-      return { row: { ...i, status: "in_progress" as const, lastActiveAt: now } };
+      const awaySec = i.interruptedAt ? Math.max(0, Math.round((now.getTime() - i.interruptedAt.getTime()) / 1000)) : 0;
+      const awaySeconds = Math.min(awayAllowance(i), i.awaySeconds + awaySec);
+      await tx
+        .update(aiInterviews)
+        .set({ status: "in_progress", interruptedAt: null, lastActiveAt: now, awaySeconds })
+        .where(eq(aiInterviews.id, id));
+      await logEvent(
+        tx,
+        id,
+        "resume",
+        `Resumed after ${minutes(awaySec)} away; ${minutes(awayAllowance(i) - awaySeconds)} of time away left`,
+        i.activeSeconds,
+      );
+      return { row: { ...i, status: "in_progress" as const, lastActiveAt: now, awaySeconds, interruptedAt: null } };
     }
     if (i.status === "in_progress") {
       // Rejoining (a reload or a second tab): the clock carries on as it was.
@@ -305,14 +350,23 @@ export async function startInterview(userId: string, id: string): Promise<{ ok: 
 
 /* ---------------- the clock ---------------- */
 
-/** Count the time since the last heartbeat (or log a reconnection). Mutates `i`. */
-async function tick(tx: Tx, i: Row, now: Date): Promise<void> {
-  if (i.status !== "in_progress") return;
+type Ticked = { closed: false } | { closed: true; evaluate: boolean; text: string };
+
+/**
+ * Count the time since the last heartbeat. A gap past DISCONNECT_SEC (the tab
+ * was there but offline) is time away instead; if that used up the allowance,
+ * the interview closes. Mutates `i`.
+ */
+async function tick(tx: Tx, i: Row, now: Date): Promise<Ticked> {
+  if (i.status !== "in_progress") return { closed: false };
   const gap = i.lastActiveAt ? (now.getTime() - i.lastActiveAt.getTime()) / 1000 : 0;
   if (gap > DISCONNECT_SEC) {
-    // The tab was there but offline: the clock stayed stopped meanwhile.
+    // The clock stayed stopped meanwhile; the gap comes out of the time away.
     await logEvent(tx, i.id, "disconnect", "Connection lost; clock paused", i.activeSeconds);
-    await logEvent(tx, i.id, "resume", `Reconnected after ${Math.max(1, Math.round(gap / 60))} min`, i.activeSeconds);
+    const left = awayAllowance(i) - i.awaySeconds;
+    if (gap > left) return { closed: true, ...(await closeAwayUsedUp(tx, i, new Date(now.getTime() - (gap - left) * 1000))) };
+    i.awaySeconds += Math.round(gap);
+    await logEvent(tx, i.id, "resume", `Reconnected after ${minutes(gap)} away; ${minutes(left - gap)} of time away left`, i.activeSeconds);
   } else {
     i.activeSeconds += Math.round(Math.min(gap, BEAT_CAP_SEC));
   }
@@ -324,8 +378,9 @@ async function tick(tx: Tx, i: Row, now: Date): Promise<void> {
   }
   await tx
     .update(aiInterviews)
-    .set({ activeSeconds: i.activeSeconds, lastActiveAt: now, wrapUpStartedAt: i.wrapUpStartedAt })
+    .set({ activeSeconds: i.activeSeconds, lastActiveAt: now, wrapUpStartedAt: i.wrapUpStartedAt, awaySeconds: i.awaySeconds })
     .where(eq(aiInterviews.id, i.id));
+  return { closed: false };
 }
 
 const overTime = (i: Row) => i.activeSeconds >= (i.durationMin + i.settings.wrapUpMinutes) * 60;
@@ -358,13 +413,25 @@ async function finish(tx: Tx, i: Row, reason: string, closing: string | null): P
 
 /** The interview screen's heartbeat, every 15 seconds while connected. */
 export async function heartbeat(userId: string, id: string): Promise<LiveState | null> {
+  const state = await beat(userId, id);
+  // The screen is open again after the upkeep job marked the interview paused
+  // (a long time offline): being back on the screen is resuming it.
+  if (state?.status === "interrupted") {
+    await startInterview(userId, id);
+    return beat(userId, id);
+  }
+  return state;
+}
+
+async function beat(userId: string, id: string): Promise<LiveState | null> {
   let evaluate = false;
   const state = await db.transaction(async (tx) => {
     const i = await lockOwn(tx, userId, id);
     if (!i) return null;
     if (i.status === "in_progress") {
-      await tick(tx, i, new Date());
-      if (overTime(i)) evaluate = await finish(tx, i, "time_up", CLOSING);
+      const t = await tick(tx, i, new Date());
+      if (t.closed) evaluate = t.evaluate;
+      else if (overTime(i)) evaluate = await finish(tx, i, "time_up", CLOSING);
     }
     return stateOf(i);
   });
@@ -442,7 +509,8 @@ export async function submitAnswer(
       .orderBy(sql`${aiInterviewMessages.seq} desc`)
       .limit(1);
     if (!last || last.sender !== "ai" || last.kind === "closing") return { error: "Wait for the next question." };
-    await tick(tx, i, now);
+    const t = await tick(tx, i, now);
+    if (t.closed) return { closedAway: t, row: i };
     const [m] = await tx
       .insert(aiInterviewMessages)
       .values({ interviewId: id, seq: last.seq + 1, sender: "candidate", kind: "answer", text, clockSeconds: i.activeSeconds })
@@ -452,7 +520,15 @@ export async function submitAnswer(
     return { row: i, answer: m };
   });
   if ("error" in saved) return { ok: false, error: saved.error ?? "This interview isn't running." };
+  if (saved.closedAway?.closed) {
+    // Away longer than the interview allows: it has closed, and the answer isn't taken.
+    const closed = saved.closedAway;
+    if (closed.evaluate) later(() => evaluateInterview(id));
+    const r = saved.row;
+    return { ok: true, messages: [{ id: "closing", from: "ai", text: closed.text, at: r.activeSeconds, kind: "closing" }], state: stateOf(r) };
+  }
   const i = saved.row;
+  if (!saved.answer) return { ok: false, error: "This interview isn't running." };
   const out: NewMessage[] = [{ id: saved.answer.id, from: "you", text, at: saved.answer.clockSeconds, kind: "answer" }];
 
   if (overTime(i)) {
@@ -524,7 +600,13 @@ export async function endInterview(userId: string, id: string): Promise<{ ok: tr
   const ok = await db.transaction(async (tx) => {
     const i = await lockOwn(tx, userId, id);
     if (!i || (i.status !== "in_progress" && i.status !== "interrupted")) return false;
-    if (i.status === "in_progress") await tick(tx, i, new Date());
+    if (i.status === "in_progress") {
+      const t = await tick(tx, i, new Date());
+      if (t.closed) {
+        evaluate = t.evaluate;
+        return true;
+      }
+    }
     evaluate = await finish(tx, i, "ended_by_candidate", "Thank you. We've stopped here, and your report on the questions you answered is being prepared.");
     return true;
   });

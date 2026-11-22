@@ -101,6 +101,19 @@ export function InterviewChat({ session }: { session: SessionData }) {
   // it stops here and no heartbeats go out, so the server doesn't count the
   // time either; a closed tab or crashed browser stops the heartbeats too.
   const [offline, setOffline] = useState(false);
+  // Time away is one allowance for the whole interview (D13f). The server keeps
+  // the real figure; while offline this counts it down so the candidate sees it.
+  const [awayLeft, setAwayLeft] = useState(session.awayLeftSeconds);
+  const [offlineFor, setOfflineFor] = useState(0);
+  useEffect(() => {
+    if (!offline) return;
+    const since = Date.now();
+    const t = setInterval(() => setOfflineFor(Math.floor((Date.now() - since) / 1000)), 1000);
+    return () => {
+      clearInterval(t);
+      setOfflineFor(0);
+    };
+  }, [offline]);
   useEffect(() => {
     const update = () => setOffline(!navigator.onLine);
     update();
@@ -138,6 +151,7 @@ export function InterviewChat({ session }: { session: SessionData }) {
         const r = await interviewHeartbeatAction(session.id);
         if (!live || !r) return;
         setActive(r.activeSeconds);
+        setAwayLeft(r.awayLeftSeconds);
         setState(r.phase);
       } catch {
         /* the next beat tries again */
@@ -219,6 +233,7 @@ export function InterviewChat({ session }: { session: SessionData }) {
       }
       setMessages((m) => [...m.filter((x) => x.id !== tempId), ...r.messages]);
       setActive(r.state.activeSeconds);
+      setAwayLeft(r.state.awayLeftSeconds);
       setState(r.state.phase);
     } catch {
       setMessages((m) => m.filter((x) => x.id !== tempId));
@@ -332,7 +347,9 @@ export function InterviewChat({ session }: { session: SessionData }) {
               <WifiOff className="mt-0.5 size-4 shrink-0" aria-hidden />
               <span>
                 <span className="font-semibold">You&apos;re offline. The clock is paused.</span>{" "}
-                It picks up from {mmss(secondsLeft)} as soon as you&apos;re back. Your answers so far are kept.
+                It picks up from {mmss(secondsLeft)} as soon as you&apos;re back, and your answers so far are kept. You have about{" "}
+                <span className="font-semibold tabular-nums">{mmss(Math.max(0, awayLeft - offlineFor))}</span> of time away left
+                for this interview. After that, it ends with what you&apos;ve answered.
               </span>
             </p>
           )}

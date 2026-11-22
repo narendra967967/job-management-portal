@@ -229,8 +229,9 @@ export function InterviewBriefing({ data }: { data: BriefingData }) {
             </h2>
             <ul className="mt-3 space-y-2.5 text-sm">
               <Note icon={RefreshCw}>
-                If your connection drops or the tab closes, you can resume within {settings.resumeWindowMinutes} minutes from where
-                you stopped.
+                If your connection drops or the tab closes, the clock pauses and you pick up where you stopped. You get{" "}
+                {settings.resumeWindowMinutes} minutes away in total for the whole interview, however many times that happens. After
+                that, it ends with the answers you&apos;ve given.
               </Note>
               <Note icon={Flag}>Ending early is allowed. Questions you haven&apos;t answered won&apos;t be scored.</Note>
               {!resuming && <Note icon={AlarmClock}>Once you start, this booking is used. It can&apos;t be started again from the beginning.</Note>}

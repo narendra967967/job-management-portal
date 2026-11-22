@@ -720,6 +720,58 @@ async function main() {
       check("E7", "every saved AI report has scores 1 to 10, the right overall and the report's parts", bad.length === 0, bad.join(", ") || `${rows.length} reports`);
     }
 
+    /* ---- R: time away is one allowance for the whole interview (D13f) ---- */
+    {
+      const allowance = snap.resumeWindowMinutes * 60;
+      const plan = JSON.stringify([{ no: 1, question: "Tell me about a project you led.", tip: "Be specific." }]);
+      const started = { started_at: new Date(Date.now() - 10 * 60_000), question_plan: plan, questions_asked: 1, active_seconds: 300 };
+      const state = async (id: string) =>
+        (await q<{ status: string; away_seconds: number; active_seconds: number; closing: number }>(
+          `select status, away_seconds, active_seconds,
+             (select count(*)::int from ai_interview_messages m where m.interview_id = i.id and m.kind = 'closing') closing
+           from ai_interviews i where id = $1`,
+          [id],
+        ))[0];
+
+      // A second drop gets only what the first left: 2 min left, 1 min already gone.
+      const paused = await insertInterview(u.id, MARK, "interrupted", {
+        ...started,
+        away_seconds: allowance - 120,
+        interrupted_at: new Date(Date.now() - 60_000),
+        last_active_at: new Date(Date.now() - 60_000),
+      });
+      const listed = (await listBookings(u.id)).find((b) => b.id === paused);
+      const left = listed?.resumeSecondsLeft ?? -1;
+      check("R1", "a paused interview shows the time away left, not a fresh window", listed?.status === "interrupted" && left >= 55 && left <= 61, `${left}s left of ${allowance}s`);
+      const resumed = await startInterview(u.id, paused);
+      const r2 = await state(paused);
+      check("R2", "resuming spends the time away", resumed.ok && r2.status === "in_progress" && Math.abs(r2.away_seconds - (allowance - 60)) <= 2, `${r2.status}, ${r2.away_seconds}s away of ${allowance}s`);
+      await q("update ai_interviews set status = 'interrupted', interrupted_at = $2, last_active_at = $2 where id = $1", [paused, new Date(Date.now() - 70_000)]);
+      await listBookings(u.id); // settles it
+      const r3 = await state(paused);
+      check("R3", "a later drop longer than what's left closes the interview", r3.status === "failed" && r3.away_seconds === allowance && r3.closing === 1, `${r3.status}, closing messages ${r3.closing}`);
+
+      // The tab stayed open but offline: the gap is time away too.
+      const offline = await insertInterview(u.id, MARK, "in_progress", { ...started, away_seconds: allowance - 60, last_active_at: new Date(Date.now() - 90_000) });
+      const beat1 = await heartbeat(u.id, offline);
+      const r4 = await state(offline);
+      check("R4", "an offline gap past what's left closes it on the next heartbeat", beat1?.phase === "ended" && r4.status === "failed" && r4.active_seconds === 300, `${beat1?.phase}, ${r4.status}`);
+      const shortGap = await insertInterview(u.id, MARK, "in_progress", { ...started, away_seconds: 0, last_active_at: new Date(Date.now() - 90_000) });
+      const beat2 = await heartbeat(u.id, shortGap);
+      const r5 = await state(shortGap);
+      check(
+        "R5",
+        "a gap within the allowance is counted as away, and the clock doesn't run",
+        beat2?.phase === "live" && r5.status === "in_progress" && Math.abs(r5.away_seconds - 90) <= 2 && r5.active_seconds === 300 && Math.abs((beat2?.awayLeftSeconds ?? 0) - (allowance - 90)) <= 2,
+        `${r5.away_seconds}s away, clock ${r5.active_seconds}s`,
+      );
+      // Back on the screen after the upkeep job paused it: the heartbeat resumes it.
+      const marked = await insertInterview(u.id, MARK, "interrupted", { ...started, interrupted_at: new Date(Date.now() - 120_000), last_active_at: new Date(Date.now() - 120_000) });
+      const beat3 = await heartbeat(u.id, marked);
+      const r6 = await state(marked);
+      check("R6", "a heartbeat from the screen resumes a paused interview", beat3?.status === "in_progress" && r6.status === "in_progress" && Math.abs(r6.away_seconds - 120) <= 2, `${r6.status}, ${r6.away_seconds}s away`);
+    }
+
     /* ---- F: the module key never reaches the browser ---- */
     {
       const clientFiles = [...walk("components"), ...walk("app")].filter((f) => /\.(tsx?|jsx?)$/.test(f) && /^["']use client["']/m.test(readFileSync(f, "utf8")));

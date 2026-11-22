@@ -276,8 +276,9 @@ export interface BookingRow {
   validUntil: string; // ISO
   payment: BookingPayment;
   status: BookingStatus;
-  /** Interrupted: minutes left to resume. */
+  /** Paused (interrupted): time away left, so minutes and seconds left to resume (D13f). */
   resumeMinutesLeft?: number;
+  resumeSecondsLeft?: number;
   /** Completed with a report: the report to open. */
   reportId?: string;
 }

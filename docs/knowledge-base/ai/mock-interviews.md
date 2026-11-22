@@ -36,7 +36,7 @@ Each section has its own **Save changes** button and only saves that section.
 |---|---|
 | Availability | Open or Coming soon for AI interviews and for human interviews. Changing the AI switch asks you to confirm. Interviewer applications and Pause new bookings are for the human release |
 | AI service | Provider, model, the module's own API key, and what the provider charges in ₹ per million input and output tokens. The key is stored encrypted and only its last four characters are shown; leave the box empty to keep it. **Test connection** sends a tiny request with the saved key |
-| Interview rules | Kinds of interview, the lengths candidates can pick (15, 30, 45, 60 minutes), minutes per question (sets how many questions are planned), wrap-up extension, the resume window after a disconnection, and the pace grace period |
+| Interview rules | Kinds of interview, the lengths candidates can pick (15, 30, 45, 60 minutes), minutes per question (sets how many questions are planned), wrap-up extension, **Time away allowed** (in total, across every disconnection) and the pace grace period |
 | Pricing | A rate per minute for Easy, Medium and Hard, each with its own discount switch and percentage. The preview shows what each length costs |
 | Bookings | How many days a booking stays valid, and how many days before expiry the reminder goes out (0 sends none) |
 | Scoring | The weight of each of the five skills in the overall score. They must add up to 100% |
@@ -55,7 +55,9 @@ The plan editor has **AI mock interviews included**. On a paid plan it's granted
 1. The candidate presses **Start interview** on the briefing page. The AI writes a question plan sized to the length (length ÷ minutes per question), covering their topics. It reads the resume, the job description and the candidate's career profile (the report uses the profile too). If that fails, the booking stays ready and nothing is used up.
 2. Questions come one at a time. After each answer the AI either asks a follow-up (at most two per question) or moves to the next planned question. If the AI doesn't reply, the next planned question is asked as written, so the interview carries on.
 3. **The clock only counts connected time.** The screen checks in every 15 seconds. If nothing arrives for 45 seconds, the candidate counts as disconnected and the clock stops where it was.
-4. A disconnected candidate has the resume window (15 minutes by default) to come back. After that the interview closes with the answers so far and is scored on those.
+4. Time away is one allowance for the whole interview: **Time away allowed**, 15 minutes by default. Every disconnection spends from it, and the next one only gets what's left, so a candidate can't close the tab after each question to look things up. A shaky connection that drops for half a minute a few times barely touches it. When it runs out, the interview closes with the answers so far and is scored on those. The clock itself never restarts; it always picks up from where it stopped.
+
+   While it's paused, the candidate's bookings list shows it as **Paused**, with a countdown ("7:56 left to resume") and the time to be back by. If the tab stays open but goes offline, the screen shows the time away left counting down, and the gap is taken from the allowance when it reconnects.
 5. When the time is up, the wrap-up starts: no new planned questions, and the interview ends when the AI closes it or the wrap-up time runs out.
 6. The report is written right after. If the AI reply doesn't fit the report format it's retried; if it still fails, the upkeep job tries again (up to six times) and the interview shows as waiting for its report. The candidate gets an "Interview report ready" email.
 
@@ -65,7 +67,7 @@ Every AI call adds its tokens to the interview, and the cost uses the token pric
 
 ## The upkeep job
 
-Every 5 minutes the server runs **Mock interview upkeep** (job "interviews"). It closes interviews not resumed in time, retries reports that failed, marks unstarted bookings as expired once their date passes, sends the "booking expires soon" email (Module settings → Bookings; 0 turns it off) and clears unpaid bookings older than a day.
+Every 5 minutes the server runs **Mock interview upkeep** (job "interviews"). It closes interviews whose time away has run out, retries reports that failed, marks unstarted bookings as expired once their date passes, sends the "booking expires soon" email (Module settings → Bookings; 0 turns it off) and clears unpaid bookings older than a day.
 
 ## The AI interviews screen
 

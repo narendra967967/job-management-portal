@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { aiInterviewMessages, aiInterviews, interviewEvaluations, jobLeads, paymentOrders, plans, resumes, user } from "@/db/schema";
 import { careerCompletionFor } from "@/lib/career-data";
 import { aiPaymentAvailable } from "@/lib/payments/ai-interview-orders";
-import { settleInterview, type Phase } from "./engine";
+import { awayLeftSeconds, settleInterview, type Phase } from "./engine";
 import type {
   AllowanceState,
   BookingRow,
@@ -70,11 +70,6 @@ async function settleUser(userId: string): Promise<void> {
   for (const r of running) await settleInterview(r.id);
 }
 
-function resumeMinutesLeft(i: InterviewRow, now: number): number {
-  if (!i.interruptedAt) return i.settings.resumeWindowMinutes;
-  const end = i.interruptedAt.getTime() + i.settings.resumeWindowMinutes * 60_000;
-  return Math.max(0, Math.ceil((end - now) / 60_000));
-}
 
 /** Ended with nothing to score: ended before answering, or dropped and never resumed. */
 function endedWithoutAnswers(i: Pick<InterviewRow, "status" | "endReason">): boolean {
@@ -118,7 +113,9 @@ function toBooking(i: InterviewRow, reportId: string | undefined, now: number, o
             ? { kind: "credit" }
             : { kind: "free" },
     status,
-    ...(status === "interrupted" ? { resumeMinutesLeft: resumeMinutesLeft(i, now) } : {}),
+    ...(status === "interrupted"
+      ? { resumeSecondsLeft: awayLeftSeconds(i, now), resumeMinutesLeft: Math.ceil(awayLeftSeconds(i, now) / 60) }
+      : {}),
     ...(reportId ? { reportId } : {}),
   };
 }
@@ -260,6 +257,8 @@ export interface SessionData {
   plan: PlannedQuestion[];
   messages: ChatMessage[];
   activeSeconds: number;
+  /** Time away left for the rest of the interview (D13f). */
+  awayLeftSeconds: number;
   /** live, wrapup, or ended (finished, stopped or failed). */
   phase: Phase;
   status: string;
@@ -289,6 +288,7 @@ export async function getSession(userId: string, id: string): Promise<SessionDat
     plan,
     messages: await messagesOf(i.id),
     activeSeconds: i.activeSeconds,
+    awayLeftSeconds: awayLeftSeconds(i, Date.now()),
     phase,
     status: i.status,
     reportReady,

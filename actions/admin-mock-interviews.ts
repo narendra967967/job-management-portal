@@ -61,7 +61,7 @@ const sectionSchema = z.discriminatedUnion("section", [
     durations: z.array(z.union([z.literal(15), z.literal(30), z.literal(45), z.literal(60)])).min(1, "Allow at least one length."),
     minutesPerQuestion: z.number().min(1, "Minutes per question: at least 1.").max(5, "Minutes per question: at most 5.").multipleOf(0.5, "Minutes per question: steps of 0.5."),
     wrapUpMinutes: whole(0, 20, "Wrap-up extension"),
-    resumeWindowMinutes: whole(5, 60, "Resume window"),
+    resumeWindowMinutes: whole(5, 60, "Time away allowed"),
     paceGraceMinutes: whole(0, 15, "Pace grace period"),
   }),
   z.object({
