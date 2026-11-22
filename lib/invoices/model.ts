@@ -120,6 +120,20 @@ export const DEFAULT_INVOICE_TERMS: string[] = [
   "For anything about this payment, email us or use Help & support in the app, and quote the invoice number. The full rules are in the policies linked at the bottom of this page.",
 ];
 
+/**
+ * The terms printed under AI mock interview invoices until admin edits them.
+ * Facts only, from how bookings work (docs/interview-prep/spec.md D13b; the
+ * admin "Give interview back" action). No refund promise: the Refund &
+ * cancellation policy doesn't cover AI interviews yet.
+ */
+export const DEFAULT_AI_INTERVIEW_TERMS: string[] = [
+  "This payment covers the one AI mock interview named above, at that level and length. The price shown is the full price.",
+  "Start the interview any time up to the date shown above. A booking that isn't started by then expires.",
+  "If the interview stops because of a problem on our side, contact us and we'll set up the same interview again at no charge.",
+  "Payments are handled by Razorpay. We never see or store your card, UPI or bank details.",
+  "For anything about this payment, email us or use Help & support in the app, and quote the invoice number. Our policies are linked at the bottom of this page.",
+];
+
 /** What's printed under the totals, decided at payment. Wording to be confirmed by the CA. */
 export function defaultDeclarations(registered: boolean, sellerName: string): string[] {
   return registered

@@ -19,6 +19,7 @@ import { stateByCode } from "@/lib/india-states";
 import type { BillingDetails } from "@/lib/invoices/billing-details";
 import { logoForInvoice } from "@/lib/invoices/logo";
 import {
+  DEFAULT_AI_INTERVIEW_TERMS,
   DEFAULT_INVOICE_TERMS,
   INVOICE_PREFIX_MAX,
   INVOICE_TEMPLATE_VERSION,
@@ -148,7 +149,7 @@ export function buildInvoiceDoc(
       orderNumber: String(o.number),
       gateway: GATEWAY_LABELS[o.gateway as keyof typeof GATEWAY_LABELS] ?? o.gateway,
     },
-    terms: isPlan ? (ctx.terms?.plan ?? DEFAULT_INVOICE_TERMS) : (ctx.terms?.ai_interview ?? []),
+    terms: isPlan ? (ctx.terms?.plan ?? DEFAULT_INVOICE_TERMS) : (ctx.terms?.ai_interview ?? DEFAULT_AI_INTERVIEW_TERMS),
     links: { terms: `${ctx.website}/terms`, privacy: `${ctx.website}/privacy`, refunds: `${ctx.website}/refunds` },
     declarations,
   };

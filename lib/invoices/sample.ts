@@ -2,7 +2,7 @@
 // Every business and personal detail here is made up: the PAN, GSTINs,
 // addresses, people and payment IDs are placeholders, not real records.
 
-import { DEFAULT_INVOICE_TERMS, INVOICE_TEMPLATE_VERSION, defaultDeclarations, type InvoiceDoc, type InvoiceSeller } from "@/lib/invoices/model";
+import { DEFAULT_AI_INTERVIEW_TERMS, DEFAULT_INVOICE_TERMS, INVOICE_TEMPLATE_VERSION, defaultDeclarations, type InvoiceDoc, type InvoiceSeller } from "@/lib/invoices/model";
 
 const HARYANA = { name: "Haryana", code: "06" };
 const MAHARASHTRA = { name: "Maharashtra", code: "27" };
@@ -99,8 +99,9 @@ export function sampleInvoiceGstInterB2b(logo: string | null): InvoiceDoc {
       pan: null,
     },
     gst: { registered: true, rate: 18, placeOfSupply: KARNATAKA, split: "inter" },
-    lines: [{ description: "AI mock interview: 30 min, Medium", detail: "Valid until December 18, 2026", sac: "998314", quantity: 1, taxable: 50000 }],
+    lines: [{ description: "AI mock interview: 30 min, Medium", detail: "Start it by December 18, 2026", sac: "998314", quantity: 1, taxable: 50000 }],
     totals: { taxable: 50000, cgst: 0, sgst: 0, igst: 9000, total: 59000 },
     payment: { paidAt: "2026-11-18T06:42:00Z", method: "Netbanking", paymentId: "pay_SAMPLE0000000003", orderNumber: "JT-001209", gateway: "Razorpay" },
+    terms: DEFAULT_AI_INTERVIEW_TERMS,
   };
 }

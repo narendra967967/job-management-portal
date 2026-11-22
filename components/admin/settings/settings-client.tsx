@@ -57,7 +57,7 @@ import { Badge } from "@/components/admin/ui/badge";
 import { billingMissing, isValidGstin, isValidPan, isValidSac } from "@/lib/billing-model";
 import { InvoiceTermsEditor, invoiceTermsError } from "@/components/admin/settings/invoice-terms-editor";
 import { INDIA_STATES } from "@/lib/india-states";
-import { DEFAULT_INVOICE_TERMS, INVOICE_PREFIX_MAX, financialYear, formatInvoiceNumber, invoicePrefixError } from "@/lib/invoices/model";
+import { DEFAULT_AI_INTERVIEW_TERMS, DEFAULT_INVOICE_TERMS, INVOICE_PREFIX_MAX, financialYear, formatInvoiceNumber, invoicePrefixError } from "@/lib/invoices/model";
 
 interface SettingsSection {
   id: string;
@@ -516,7 +516,7 @@ function BillingCard({ initial }: { initial: AdminSettings["billing"] }) {
   // under each kind of sale's invoices.
   const [businessState, setBusinessState] = useState(initial.businessState);
   const [planTerms, setPlanTerms] = useState<string[]>(initial.invoiceTerms?.plan ?? DEFAULT_INVOICE_TERMS);
-  const [interviewTerms, setInterviewTerms] = useState<string[]>(initial.invoiceTerms?.ai_interview ?? []);
+  const [interviewTerms, setInterviewTerms] = useState<string[]>(initial.invoiceTerms?.ai_interview ?? DEFAULT_AI_INTERVIEW_TERMS);
   const prefixError = invoicePrefixError(invoicePrefix);
   const termsError = invoiceTermsError("Plans", planTerms) || invoiceTermsError("AI mock interviews", interviewTerms);
   const sv = useSaver();
@@ -682,7 +682,7 @@ function BillingCard({ initial }: { initial: AdminSettings["billing"] }) {
               label="AI mock interviews"
               terms={interviewTerms}
               onChange={setInterviewTerms}
-              emptyNote="Interview invoices print no terms. Add them once the interview refund rules are on the Refund & cancellation policy page."
+              emptyNote="Interview invoices print no terms."
             />
             {termsError && <p className="text-xs text-destructive">{termsError}</p>}
           </div>
