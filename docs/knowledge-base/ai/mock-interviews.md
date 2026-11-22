@@ -13,6 +13,8 @@ The **AI interviews** switch in Module settings → Availability decides whether
 
 The same switch controls the public side. While it's open, the landing page at `/ai-mock-interviews` is live and linked from the homepage (a band under Features), the header (Mock interviews), the footer, the pricing page (a plan row and a price question), the sitemap and `/llms.txt`. On Coming soon the page is a 404 and every one of those links disappears. Its kinds of interview, lengths and per-minute prices come straight from Module settings, so changing a price changes the page.
 
+The Privacy Policy covers AI interviews while they're open, and permanently once anyone has booked one: what an interview stores, what goes to the module's AI service, that spoken answers are turned into text by the browser's own speech service (the app never gets audio), and how long the event logs are kept (Settings → Data retention).
+
 When it's open, the AI mock interviews page starts with a **Get ready** checklist while anything is missing:
 
 | Item | Ready when | If not |

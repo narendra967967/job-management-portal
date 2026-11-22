@@ -2,6 +2,8 @@ import "server-only";
 
 import { aiInterviewQuote, lowestRatePerMinute, DIFFICULTIES, type Difficulty, type DifficultyPricing } from "./model";
 import { aiInterviewsOpen, getModuleSettings } from "./config";
+import { db } from "@/lib/db";
+import { aiInterviews } from "@/db/schema";
 
 // What the public site may say about AI mock interviews: only while admin has
 // switched them to Open (Module settings → Availability), straight from the
@@ -18,6 +20,21 @@ export interface PublicAiInterviews {
   example: { difficulty: Difficulty; durationMin: number; pricePaise: number };
   bookingValidDays: number;
   resumeWindowMinutes: number;
+}
+
+/**
+ * Whether the Privacy Policy describes AI mock interviews: while they're open,
+ * and for good once anyone has booked one (that data exists even if the
+ * feature is closed again later).
+ */
+export async function aiInterviewsInPrivacyPolicy(): Promise<boolean> {
+  try {
+    if (aiInterviewsOpen(await getModuleSettings())) return true;
+    const [any] = await db.select({ id: aiInterviews.id }).from(aiInterviews).limit(1);
+    return !!any;
+  } catch {
+    return false;
+  }
 }
 
 /** null while AI interviews are on Coming soon, or when the database can't be reached (as in `next build`). */

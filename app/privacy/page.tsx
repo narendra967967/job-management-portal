@@ -6,10 +6,13 @@ import { getRetentionConfig } from "@/lib/retention";
 import { captchaSiteKey } from "@/lib/captcha";
 import { getPublicBusiness } from "@/lib/billing-data";
 import { BusinessAddress } from "@/components/marketing/business-address";
+import { aiInterviewsInPrivacyPolicy } from "@/lib/mock-interviews/public";
 
 // The Gmail / Google Limited Use section shows only while "Connect Gmail" is
 // switched on (admin), the reCAPTCHA line only while the check is on; retention periods come from admin Settings → Data
-// retention, so the policy always states what the Service actually does.
+// retention, so the policy always states what the Service actually does. The AI
+// mock interview lines (spec D57) show while they're open, and for good once
+// anyone has booked one.
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +28,7 @@ export async function generateMetadata(): Promise<Metadata> {
 const days = (n: number) => `${n} ${n === 1 ? "day" : "days"}`;
 
 export default async function PrivacyPage() {
-  const [appName, supportEmail, gmailOn, sites, retention, captchaKey, business] = await Promise.all([
+  const [appName, supportEmail, gmailOn, sites, retention, captchaKey, business, interviews] = await Promise.all([
     getAppName(),
     getSupportEmail(),
     isGmailOAuthEnabled(),
@@ -33,10 +36,11 @@ export default async function PrivacyPage() {
     getRetentionConfig(),
     captchaSiteKey(),
     getPublicBusiness(),
+    aiInterviewsInPrivacyPolicy(),
   ]);
   const contact = supportEmail || "our support address";
   return (
-    <LegalLayout title="Privacy policy" updated="November 14, 2026">
+    <LegalLayout title="Privacy policy" updated="November 22, 2026">
       <p>
         This Privacy Policy explains what information {appName} (&ldquo;we&rdquo;, &ldquo;us&rdquo;) collects
         when you use our job search tracker (the &ldquo;Service&rdquo;), how we use it and how we keep it
@@ -62,6 +66,14 @@ export default async function PrivacyPage() {
           veteran status. These are entirely optional, kept private to your account, never sent to an AI
           provider, and never used to score or rank you. You can clear them at any time.
         </li>
+        {interviews && (
+          <li>
+            <strong>AI mock interviews:</strong> the setup you choose (role, industry, kind of interview, level,
+            length and topics), the résumé and job description you give it, the questions and your answers, your
+            report, and a log of each interview&rsquo;s events, such as when it started, lost connection, resumed
+            and ended.
+          </li>
+        )}
         <li>
           <strong>Job-alert emails you forward:</strong> the emails you, or a filter you set up, send to your
           private {appName} address (see &ldquo;Email forwarding&rdquo; below).
@@ -70,7 +82,7 @@ export default async function PrivacyPage() {
           <li><strong>Gmail data:</strong> if you connect Google, we read email in your Gmail account to find and parse your LinkedIn job-alert messages (see below).</li>
         )}
         <li>
-          <strong>Payments:</strong> when you buy a plan, the plan and billing period, the amounts
+          <strong>Payments:</strong> when you buy a plan{interviews ? " or an AI mock interview" : ""}, what you bought{interviews ? " (the plan and billing period, or the interview)" : " (the plan and billing period)"}, the amounts
           (including any GST), the date, your receipt number, our payment provider&rsquo;s order and payment
           references, and the kind of method you used, such as UPI or card. Your card, UPI and bank details
           go straight to our payment provider, Razorpay. We never see or store them.
@@ -237,6 +249,23 @@ export default async function PrivacyPage() {
         This uses your key, so your provider&rsquo;s terms and charges apply. We keep the text only until it
         has been read, then delete it.
       </p>
+      {interviews && (
+        <>
+          <p>
+            <strong>AI mock interviews</strong> are the exception to using your key: they run on an AI service
+            we pay for. To plan your questions, run the interview and write your report, we send it the interview
+            setup, your résumé text, the job description, the same parts of your career profile as for fit scores,
+            and the questions and answers so far. The service processes them to produce your interview and
+            report, under its own terms. We send nothing else, and we never use your interviews to train AI models.
+          </p>
+          <p>
+            <strong>Speaking your answers:</strong> if you use the mic during an interview, your browser turns
+            your speech into text with its own speech service (for example, Google&rsquo;s in Chrome or
+            Apple&rsquo;s in Safari), under that company&rsquo;s terms. We only receive the text you send. We
+            never receive or keep any audio.
+          </p>
+        </>
+      )}
 
       <h2>How we store and protect your data</h2>
       <p>
@@ -280,7 +309,7 @@ export default async function PrivacyPage() {
       <p>
         We do <strong>not</strong> sell your personal information. We share data only with the service
         providers we need to run {appName}, such as {gmailOn ? "Google (for Gmail access you authorize), " : ""}
-        the AI provider you use, Razorpay (to take payments, under{" "}
+        the AI provider you use, {interviews ? "the AI service that runs mock interviews, " : ""}Razorpay (to take payments, under{" "}
         <a href="https://razorpay.com/privacy/" target="_blank" rel="noopener noreferrer">its privacy policy</a>) and our
         hosting and email providers, and only as far as needed to deliver the Service or comply with the
         law.
@@ -318,6 +347,9 @@ export default async function PrivacyPage() {
         {days(retention.broadcastQueueDays)}, the record of each email we send you after{" "}
         {days(retention.sentEmailLogDays)}, and the history of automatic status changes on your leads
         after {days(retention.autoActionDays)}, except changes you undid, which stay with the lead.
+        {interviews
+          ? ` AI mock interviews and their reports stay in your account until it's deleted; the log of each interview's events is deleted after ${days(retention.aiInterviewEventDays)}.`
+          : ""}
         {gmailOn ? " Disconnecting Google stops all further reading of your mailbox." : ""} Confirmation
         codes expire shortly and are then deleted. When you reset your leads they are deleted
         right away. When you ask us to delete your account, we delete your data, including résumé
