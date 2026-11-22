@@ -68,6 +68,21 @@ async function getAdminAi(): Promise<UserAi> {
   };
 }
 
+/**
+ * The token and temperature fields for an OpenAI-style chat request. OpenAI's
+ * newer reasoning models (gpt-5…, gpt-6…, o-series) refuse `temperature` and
+ * `max_tokens` with a 400, so they get `max_completion_tokens` (or
+ * OpenRouter's `reasoning`) and the lowest thinking effort each allows, the
+ * same rule the mock interviews use (reasoningEffortFor). Thinking counts
+ * against the limit, so above "none" it gets room of its own.
+ */
+export function generationFields(url: string, model: string, maxTokens: number, temperature: number): Record<string, unknown> {
+  const effort = reasoningEffortFor(model);
+  if (!effort) return { temperature, max_tokens: maxTokens };
+  const limit = effort === "none" ? maxTokens : maxTokens + 2048;
+  return url.includes("openrouter") ? { max_tokens: limit, reasoning: { effort } } : { max_completion_tokens: limit, reasoning_effort: effort };
+}
+
 async function callOpenAI(
   ai: UserAi,
   system: string,
@@ -83,8 +98,7 @@ async function callOpenAI(
     },
     body: JSON.stringify({
       model: ai.model,
-      temperature: opts.temperature ?? 0.4,
-      max_tokens: maxTokens,
+      ...generationFields("https://api.openai.com/v1/chat/completions", ai.model, maxTokens, opts.temperature ?? 0.4),
       messages: [
         { role: "system", content: system },
         { role: "user", content: user },
@@ -118,8 +132,7 @@ async function callOpenRouter(
     },
     body: JSON.stringify({
       model: ai.model,
-      temperature: opts.temperature ?? 0.4,
-      max_tokens: maxTokens,
+      ...generationFields("https://openrouter.ai/api/v1/chat/completions", ai.model, maxTokens, opts.temperature ?? 0.4),
       messages: [
         { role: "system", content: system },
         { role: "user", content: user },
@@ -247,8 +260,7 @@ async function callOpenAIVision(
     },
     body: JSON.stringify({
       model: ai.model,
-      temperature: 0.2,
-      max_tokens: maxTokens,
+      ...generationFields(base, ai.model, maxTokens, 0.2),
       messages: [
         { role: "system", content: system },
         {

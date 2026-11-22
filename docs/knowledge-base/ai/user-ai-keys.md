@@ -2,7 +2,7 @@
 title: How users connect their own AI key
 category: AI
 summary: Every AI feature runs on the user's own key from OpenAI, Claude (Anthropic) or OpenRouter, added in Settings → AI provider. The key is encrypted, only its last 4 characters are ever shown, and Test key checks it works.
-keywords: ai key, api key, openai, anthropic, claude, openrouter, test key, model, ai provider, no key
+keywords: ai key, api key, openai, anthropic, claude, openrouter, test key, model, ai provider, no key, gpt-5, gpt-6, newer model, model not accepted
 ---
 
 Users bring their own AI key. They add it in **Settings → AI provider**: pick a provider, optionally a model, paste the key and save.
@@ -13,7 +13,9 @@ Users bring their own AI key. They add it in **Settings → AI provider**: pick 
 | Claude (Anthropic) | claude-sonnet-5 |
 | OpenRouter | openai/gpt-4o-mini |
 
-Leaving the model blank uses the default.
+Leaving the model blank uses the default. Any model the provider offers can go in the Model box, including OpenAI's newer ones (the gpt-5 and gpt-6 families and the o-series). Those take their settings differently, and the app sends them the way each model expects, with the least "thinking" it allows so answers stay quick and cheap.
+
+If **Test key** says *"Your provider didn't accept this model"*, the name is usually mistyped, or the user's provider account doesn't have access to that model yet. Clearing the Model box falls back to the default, which works on every account.
 
 ## How the key is kept
 
