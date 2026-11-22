@@ -3,10 +3,14 @@ import { LegalLayout } from "@/components/marketing/legal-layout";
 import { getAppName, getSupportEmail } from "@/lib/branding";
 import { getPublicBusiness } from "@/lib/billing-data";
 import { BusinessAddress } from "@/components/marketing/business-address";
+import { aiInterviewsInPrivacyPolicy } from "@/lib/mock-interviews/public";
 
 // Refund & cancellation policy (owner decision 2026-11-08): plans don't
 // renew automatically, aren't refundable once started, and payment errors are
-// refunded in full. Keep in step with the Payments section of /terms.
+// refunded in full. AI mock interviews (owner, November 22, 2026): not
+// refundable once paid, used or not; payment errors refunded the same way.
+// Keep in step with the Payments section of /terms and the invoice terms
+// (lib/invoices/model.ts).
 
 export const dynamic = "force-dynamic";
 
@@ -14,18 +18,19 @@ export async function generateMetadata(): Promise<Metadata> {
   const appName = await getAppName();
   return {
     title: "Refund & cancellation policy",
-    description: `How ${appName} plans end, when a payment is refunded and how to ask for a refund.`,
+    description: `How ${appName} plans end, when a payment for a plan or an AI mock interview is refunded, and how to ask for a refund.`,
     alternates: { canonical: "/refunds" },
   };
 }
 
 export default async function RefundsPage() {
-  const [appName, supportEmail, business] = await Promise.all([getAppName(), getSupportEmail(), getPublicBusiness()]);
+  // AI mock interviews appear once they're open, or once anyone has booked one.
+  const [appName, supportEmail, business, interviews] = await Promise.all([getAppName(), getSupportEmail(), getPublicBusiness(), aiInterviewsInPrivacyPolicy()]);
   const email = supportEmail ? <a href={`mailto:${supportEmail}`}>{supportEmail}</a> : <span>our support address</span>;
   return (
     <LegalLayout title="Refund & cancellation policy" updated="November 22, 2026">
       <p>
-        This policy covers payments for {appName} plans. It sits alongside our{" "}
+        This policy covers payments for {appName} plans{interviews ? " and AI mock interviews" : ""}. It sits alongside our{" "}
         <a href="/terms">Terms &amp; conditions</a>.
       </p>
 
@@ -51,11 +56,29 @@ export default async function RefundsPage() {
         refund a plan that&rsquo;s still running.
       </p>
 
+      {interviews && (
+        <>
+          <h2>AI mock interviews</h2>
+          <p>
+            A paid AI mock interview can&rsquo;t be refunded, and that includes one you don&rsquo;t start
+            before its booking expires. Please check the level, the length and the price before you pay; the
+            price shown is the full price.
+          </p>
+          <p>
+            If an interview stops because of a problem on our side, we don&rsquo;t refund it. We set up the
+            same interview again for you at no charge instead, so contact us from Help &amp; support.
+          </p>
+        </>
+      )}
+
       <h2>When we do refund</h2>
       <p>If something goes wrong with a payment, we put it right. We refund the extra payment in full if:</p>
       <ul>
-        <li>you were charged more than once for the same plan;</li>
-        <li>your payment went through but your plan didn&rsquo;t change, and we can&rsquo;t apply it; or</li>
+        <li>you were charged more than once for the same {interviews ? "plan or interview" : "plan"};</li>
+        <li>
+          your payment went through but your plan didn&rsquo;t change
+          {interviews ? " or your interview wasn’t booked" : ""}, and we can&rsquo;t put that right; or
+        </li>
         <li>you were charged a different amount from the one shown before you paid.</li>
       </ul>
       <p>

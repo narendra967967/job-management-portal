@@ -35,7 +35,7 @@ PDFs are drawn fresh each time someone downloads or sends one, from the stored i
 
 ## Terms printed on the invoice
 
-Up to 5 short points go under each invoice, set in **Settings → Billing → Invoice terms**, with one set for plans and one for AI mock interviews (up to 300 characters each). Plans start with five points taken from the Terms and the Refund & cancellation policy. AI mock interviews start with five points about the booking itself: what was bought, the date it must be started by, a fresh interview at no charge if one stops because of a problem on our side, Razorpay handling the payment, and how to get help. They make no refund promise, because the Refund & cancellation policy only covers plans so far; if you add interview refund rules to that page, add a matching point here. Each invoice keeps the terms it was issued with, so interview invoices issued before November 22, 2026 have none.
+Up to 5 short points go under each invoice, set in **Settings → Billing → Invoice terms**, with one set for plans and one for AI mock interviews (up to 300 characters each). Plans start with five points taken from the Terms and the Refund & cancellation policy. AI mock interviews start with five points: what was bought, the date it must be started by, no refund once paid (even unused) except for payment errors, a fresh interview at no charge if one stops because of a problem on our side, and how to get help. They match the AI mock interviews section of the Refund & cancellation policy, so if you change one, change the other. Each invoice keeps the terms it was issued with, so interview invoices issued before November 22, 2026 have none.
 
 ## No signature
 

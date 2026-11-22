@@ -122,16 +122,17 @@ export const DEFAULT_INVOICE_TERMS: string[] = [
 
 /**
  * The terms printed under AI mock interview invoices until admin edits them.
- * Facts only, from how bookings work (docs/interview-prep/spec.md D13b; the
- * admin "Give interview back" action). No refund promise: the Refund &
- * cancellation policy doesn't cover AI interviews yet.
+ * Taken from how bookings work (docs/interview-prep/spec.md D13b; the admin
+ * "Give interview back" action) and the Refund & cancellation policy (owner,
+ * November 22, 2026: not refundable once paid, used or not; payment errors
+ * refunded in full). Keep in step with /refunds.
  */
 export const DEFAULT_AI_INTERVIEW_TERMS: string[] = [
   "This payment covers the one AI mock interview named above, at that level and length. The price shown is the full price.",
   "Start the interview any time up to the date shown above. A booking that isn't started by then expires.",
+  "A paid interview can't be refunded, even if you don't use it before it expires. If a payment goes wrong, such as a double charge or an amount different from the one shown, we refund the extra in full once we've checked our records.",
   "If the interview stops because of a problem on our side, contact us and we'll set up the same interview again at no charge.",
-  "Payments are handled by Razorpay. We never see or store your card, UPI or bank details.",
-  "For anything about this payment, email us or use Help & support in the app, and quote the invoice number. Our policies are linked at the bottom of this page.",
+  "Payments are handled by Razorpay, so we never see your card, UPI or bank details. For anything about this payment, use Help & support in the app or email us, and quote the invoice number.",
 ];
 
 /** What's printed under the totals, decided at payment. Wording to be confirmed by the CA. */

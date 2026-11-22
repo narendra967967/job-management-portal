@@ -5,6 +5,7 @@ import { isGmailOAuthEnabled } from "@/lib/email-intake-data";
 import { captchaSiteKey } from "@/lib/captcha";
 import { getPublicBusiness } from "@/lib/billing-data";
 import { BusinessAddress } from "@/components/marketing/business-address";
+import { aiInterviewsInPrivacyPolicy } from "@/lib/mock-interviews/public";
 
 export const dynamic = "force-dynamic";
 
@@ -18,12 +19,14 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function TermsPage() {
-  const [appName, supportEmail, gmailOn, captchaKey, business] = await Promise.all([
+  // AI mock interviews appear once they're open, or once anyone has booked one.
+  const [appName, supportEmail, gmailOn, captchaKey, business, interviews] = await Promise.all([
     getAppName(),
     getSupportEmail(),
     isGmailOAuthEnabled(),
     captchaSiteKey(),
     getPublicBusiness(),
+    aiInterviewsInPrivacyPolicy(),
   ]);
   return (
     <LegalLayout title="Terms & conditions" updated="November 22, 2026">
@@ -104,6 +107,13 @@ export default async function TermsPage() {
           Plans aren&rsquo;t refundable once they&rsquo;ve started, except for payment errors such as a double
           charge. See our <a href="/refunds">Refund &amp; cancellation policy</a>.
         </li>
+        {interviews && (
+          <li>
+            A paid AI mock interview isn&rsquo;t refundable, even if you don&rsquo;t start it before its booking
+            expires, except for payment errors. If one stops because of a problem on our side, we set it up
+            again at no charge.
+          </li>
+        )}
         <li>
           If online payment isn&rsquo;t available, you can ask for a plan from Settings, and we&rsquo;ll help
           you complete the payment.

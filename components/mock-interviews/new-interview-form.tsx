@@ -777,6 +777,14 @@ export function NewInterviewForm({
               <p className="text-[11px] leading-relaxed text-muted-foreground">
                 Your answers are processed by an AI service to produce your feedback.
               </p>
+              {!editing && !included && (
+                <p className="text-[11px] leading-relaxed text-muted-foreground">
+                  A paid interview can&apos;t be refunded, even if you don&apos;t use it before it expires.{" "}
+                  <a href="/refunds" target="_blank" rel="noopener" className="underline underline-offset-2 hover:text-foreground">
+                    Refund policy
+                  </a>
+                </p>
+              )}
             </div>
           </div>
         </aside>
