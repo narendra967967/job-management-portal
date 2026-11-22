@@ -8,7 +8,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { ArrowRight, BarChart3, Check, Mic, ShieldCheck, Sparkles, Timer } from "lucide-react";
+import { ArrowRight, BarChart3, CalendarClock, Check, Clock, Crown, Gift, IndianRupee, Mic, PencilLine, ReceiptText, ShieldCheck, Sparkles, Timer } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { SiteHeader } from "@/components/marketing/site-header";
 import { SiteFooter } from "@/components/marketing/site-footer";
 import { Faq } from "@/components/marketing/faq";
@@ -20,9 +21,28 @@ import { getPricingPlans } from "@/lib/pricing";
 import { getSessionUserId } from "@/lib/current-user";
 import { absoluteUrl, siteUrl } from "@/lib/site-url";
 import { getPublicAiInterviews } from "@/lib/mock-interviews/public";
-import { DISCUSSION_CATEGORIES, rupees } from "@/lib/mock-interviews/model";
+import { DISCUSSION_CATEGORIES, rupees, type Difficulty } from "@/lib/mock-interviews/model";
 import { categoryIcon } from "@/components/mock-interviews/category-icons";
 import { InterviewMock, ReportMock, SampleReport, SetupMock } from "@/components/marketing/ai-interviews-showcase";
+
+// Level colors match the booking form: Easy green, Medium amber, Hard red.
+const LEVEL_LOOK: Record<Difficulty, { bar: string; chip: string; blurb: string }> = {
+  Easy: { bar: "from-emerald-400 to-teal-400", chip: "border-emerald-200 bg-emerald-50 text-emerald-800", blurb: "A gentler warm-up. Good for a first run or a new kind of interview." },
+  Medium: { bar: "from-amber-400 to-orange-400", chip: "border-amber-200 bg-amber-50 text-amber-800", blurb: "Pitched like a typical interview round." },
+  Hard: { bar: "from-rose-400 to-pink-500", chip: "border-rose-200 bg-rose-50 text-rose-800", blurb: "Tougher questions for senior roles and final rounds." },
+};
+
+/** Signal bars for a level, so the word isn't the only cue. */
+function SignalBars({ level }: { level: Difficulty }) {
+  const n = level === "Easy" ? 1 : level === "Medium" ? 2 : 3;
+  return (
+    <span className="flex items-end gap-0.5" aria-hidden>
+      {[1, 2, 3].map((i) => (
+        <span key={i} className={cn("w-1 rounded-sm bg-current", i > n && "opacity-25")} style={{ height: 4 + i * 3 }} />
+      ))}
+    </span>
+  );
+}
 
 // Where "Book an interview" goes; signed-out visitors sign in first and land on it.
 const BOOK = "/mock-interviews/ai/new";
@@ -322,53 +342,102 @@ export default async function AiMockInterviewsPage() {
           </div>
         </section>
 
-        {/* Pricing */}
+        {/* Pricing: one card per level, with every length's full price */}
         <section id="pricing" className="scroll-mt-24">
           <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:py-24">
-            <h2 className="text-center text-3xl font-semibold tracking-tight sm:text-4xl">Pay for the minutes you book</h2>
-            <p className="mx-auto mt-4 max-w-xl text-center text-base text-muted-foreground">
-              The price depends on the level and the length. A {ai.example.durationMin}-minute {ai.example.difficulty} interview is {rupees(ai.example.pricePaise)}.
-            </p>
-            <div className="mx-auto mt-10 grid max-w-3xl gap-4 sm:grid-cols-3">
-              {ai.levels.map((l) => (
-                <div key={l.difficulty} className="glass rounded-2xl p-5 text-center">
-                  <p className="text-sm font-medium text-muted-foreground">{l.difficulty}</p>
-                  <p className="mt-2 text-3xl font-semibold tracking-tight">
-                    {rupees(l.finalPerMinutePaise)}
-                    <span className="text-base font-normal text-muted-foreground"> / min</span>
-                  </p>
-                  {l.discountPercent > 0 && (
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      <s>{rupees(l.ratePerMinutePaise)}</s> · {l.discountPercent}% off
+            <div className="mx-auto max-w-2xl text-center">
+              <span className="glass-subtle inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium text-primary">
+                <IndianRupee className="size-3.5" aria-hidden /> Pricing
+              </span>
+              <h2 className="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl">Pay for the minutes you book</h2>
+              <p className="mt-4 text-base text-muted-foreground">
+                Choose a level, then a length. The price on the card is what you pay, and you only pay for the interviews you book.
+              </p>
+            </div>
+
+            <div className="mx-auto mt-12 grid max-w-md gap-5 lg:max-w-none lg:grid-cols-3">
+              {ai.levels.map((l) => {
+                const t = LEVEL_LOOK[l.difficulty];
+                return (
+                  <div
+                    key={l.difficulty}
+                    className={cn("glass relative flex flex-col overflow-hidden rounded-3xl p-5 sm:p-6", l.difficulty === "Medium" && "lg:-translate-y-2 lg:shadow-xl")}
+                  >
+                    <span aria-hidden className={cn("absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r", t.bar)} />
+                    <div className="flex items-center justify-between gap-3">
+                      <span className={cn("inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm font-semibold", t.chip)}>
+                        <SignalBars level={l.difficulty} /> {l.difficulty}
+                      </span>
+                      {l.discountPercent > 0 && (
+                        <span className="rounded-full bg-emerald-600 px-2.5 py-1 text-xs font-semibold whitespace-nowrap text-white">{l.discountPercent}% off</span>
+                      )}
+                    </div>
+                    <p className="mt-3 text-sm text-muted-foreground">{t.blurb}</p>
+                    <p className="mt-5 flex flex-wrap items-baseline gap-x-2">
+                      <span className="text-4xl font-semibold tracking-tight">{rupees(l.finalPerMinutePaise)}</span>
+                      <span className="text-sm text-muted-foreground">a minute</span>
+                      {l.discountPercent > 0 && <s className="text-sm text-muted-foreground">{rupees(l.ratePerMinutePaise)}</s>}
                     </p>
-                  )}
+                    <ul className="mt-5 divide-y divide-white/70 rounded-2xl bg-white/55 ring-1 ring-white/80">
+                      {l.quotes.map((q) => (
+                        <li key={q.durationMin} className="flex items-center justify-between gap-3 px-3.5 py-2.5">
+                          <span className="flex items-center gap-2.5 text-sm">
+                            <Clock className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                            <span>
+                              <span className="font-medium">{q.durationMin} min</span>
+                              <span className="block text-[11px] text-muted-foreground">about {ai.questions[q.durationMin]} questions</span>
+                            </span>
+                          </span>
+                          <span className="text-right">
+                            <span className="block text-sm font-semibold tabular-nums">{rupees(q.pricePaise)}</span>
+                            {q.fullPaise > q.pricePaise && <s className="block text-[11px] text-muted-foreground tabular-nums">{rupees(q.fullPaise)}</s>}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="glass mx-auto mt-10 grid max-w-4xl gap-5 rounded-3xl p-5 sm:grid-cols-2 sm:p-6 lg:grid-cols-3">
+              {[
+                { icon: ReceiptText, title: "No surprises at checkout", text: "The price you see is the full price." },
+                { icon: CalendarClock, title: `${ai.bookingValidDays} days to use it`, text: "Start whenever you're ready within that time." },
+                { icon: PencilLine, title: "Change it until you start", text: "Everything except the level and length." },
+                ...(free
+                  ? [
+                      {
+                        icon: Gift,
+                        title: `${free.aiInterviewsIncluded === 1 ? "One interview" : `${free.aiInterviewsIncluded} interviews`} on ${free.name}`,
+                        text: "Included once, at no charge, to try it.",
+                      },
+                    ]
+                  : []),
+                ...(paidWithInterviews.length
+                  ? [{ icon: Crown, title: `Included in ${paidWithInterviews.map((p) => p.name).join(" and ")}`, text: "Interviews come with each billing period." }]
+                  : []),
+              ].map(({ icon: Icon, title, text }) => (
+                <div key={title} className="flex items-start gap-3">
+                  <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                    <Icon className="size-5" aria-hidden />
+                  </span>
+                  <span>
+                    <span className="block text-sm font-semibold">{title}</span>
+                    <span className="block text-sm text-muted-foreground">{text}</span>
+                  </span>
                 </div>
               ))}
             </div>
-            <ul className="mx-auto mt-8 max-w-2xl space-y-2.5">
-              {[
-                "The price you see is the full price. Nothing is added at checkout.",
-                `A booking can be used for ${ai.bookingValidDays} days. Until you start, you can change everything except the level and length.`,
-                ...(free ? [`The ${free.name} plan includes ${free.aiInterviewsIncluded === 1 ? "one interview" : `${free.aiInterviewsIncluded} interviews`} to try it, at no charge.`] : []),
-                ...(paidWithInterviews.length
-                  ? [`${paidWithInterviews.map((p) => p.name).join(" and ")} ${paidWithInterviews.length === 1 ? "includes" : "include"} interviews with each billing period. See Pricing for how many.`]
-                  : []),
-              ].map((t) => (
-                <li key={t} className="flex items-start gap-2.5 text-sm">
-                  <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                    <Check className="size-3.5" aria-hidden />
-                  </span>
-                  {t}
-                </li>
-              ))}
-            </ul>
-            {paidWithInterviews.length > 0 && (
-              <p className="mt-6 text-center text-sm">
-                <Link href="/pricing" className="font-medium text-primary underline underline-offset-2">
+
+            <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+              <PrimaryCta />
+              {paidWithInterviews.length > 0 && (
+                <Link href="/pricing" className="glass inline-flex min-h-11 items-center justify-center rounded-xl px-5 py-3 text-sm font-medium transition-colors hover:bg-white/80">
                   Compare plans
                 </Link>
-              </p>
-            )}
+              )}
+            </div>
           </div>
         </section>
 

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { aiInterviewQuote, lowestRatePerMinute, DIFFICULTIES, type Difficulty, type DifficultyPricing } from "./model";
+import { aiInterviewQuote, lowestRatePerMinute, plannedQuestions, DIFFICULTIES, type Difficulty, type DifficultyPricing } from "./model";
 import { aiInterviewsOpen, getModuleSettings } from "./config";
 import { db } from "@/lib/db";
 import { aiInterviews } from "@/db/schema";
@@ -13,7 +13,16 @@ export interface PublicAiInterviews {
   categories: string[];
   durations: number[];
   /** Per level: the rate per minute and its discount when switched on. Paise. */
-  levels: { difficulty: Difficulty; ratePerMinutePaise: number; discountPercent: number; finalPerMinutePaise: number }[];
+  levels: {
+    difficulty: Difficulty;
+    ratePerMinutePaise: number;
+    discountPercent: number;
+    finalPerMinutePaise: number;
+    /** What each length offered costs at this level, exactly as booking charges it. */
+    quotes: { durationMin: number; fullPaise: number; pricePaise: number }[];
+  }[];
+  /** About how many planned questions each length gets. */
+  questions: Record<number, number>;
   /** The lowest per-minute rate after discounts ("from ₹X a minute"). Paise. */
   fromPerMinutePaise: number;
   /** An example: Medium for 30 minutes (or the nearest length offered). */
@@ -52,7 +61,12 @@ export async function getPublicAiInterviews(): Promise<PublicAiInterviews | null
         ratePerMinutePaise: s.pricing[d].ratePerMinutePaise,
         discountPercent: s.pricing[d].discountOn ? s.pricing[d].discountPercent : 0,
         finalPerMinutePaise: perMinute(s.pricing[d]),
+        quotes: s.durations.map((m) => {
+          const q = aiInterviewQuote(m, s.pricing[d]);
+          return { durationMin: m, fullPaise: q.full, pricePaise: q.final };
+        }),
       })),
+      questions: Object.fromEntries(s.durations.map((m) => [m, plannedQuestions(m, s.minutesPerQuestion)])),
       fromPerMinutePaise: lowestRatePerMinute(s.pricing),
       example: { difficulty: "Medium", durationMin: exampleMin, pricePaise: aiInterviewQuote(exampleMin, s.pricing.Medium).final },
       bookingValidDays: s.bookingValidDays,

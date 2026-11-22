@@ -66,12 +66,12 @@ export function SiteHeader({
           <span className="text-base font-semibold tracking-tight">{appName}</span>
         </Link>
 
-        <nav className="ml-6 hidden items-center gap-1 lg:flex">
+        <nav className="ml-3 hidden items-center gap-0.5 lg:flex xl:ml-6 xl:gap-1">
           {nav.map((n) => (
             <Link
               key={n.href}
               href={n.href}
-              className="rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-white/50 hover:text-foreground"
+              className="rounded-lg px-2.5 py-2 text-sm whitespace-nowrap xl:px-3 font-medium text-muted-foreground transition-colors hover:bg-white/50 hover:text-foreground"
             >
               {n.label}
             </Link>
