@@ -174,7 +174,6 @@ export function NewInterviewForm({
     }
     if (jdMode === "paste" && jdText.trim().length < LIMITS.minJd)
       e.jd = `Paste the job description (at least ${LIMITS.minJd} characters), or choose General preparation.`;
-    if (topics.length === 0) e.topics = "Add at least one topic you want covered.";
     return e;
   }
 
@@ -281,7 +280,7 @@ export function NewInterviewForm({
   useEffect(() => {
     if (shownErrors) setErrors(validate());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [role, industry, category, resumeMode, resumeId, file, resumeText, jdMode, jdLeadId, jdText, topics, jdLeadHasText]);
+  }, [role, industry, category, resumeMode, resumeId, file, resumeText, jdMode, jdLeadId, jdText, jdLeadHasText]);
 
   const err = (k: string) =>
     errors[k] ? (
@@ -298,13 +297,12 @@ export function NewInterviewForm({
     { key: "category", label: "Kind of interview" },
     { key: "resume", label: "Resume" },
     { key: "jd", label: "Job description" },
-    { key: "topics", label: "Topics" },
   ].map((c) => ({ ...c, done: !problems[c.key] }));
   const readyCount = checklist.filter((c) => c.done).length;
   const stepDone = {
     interview: !problems.role && !problems.industry && !problems.category,
     job: !problems.resume && !problems.jd,
-    topics: !problems.topics,
+    topics: topics.length > 0,
   };
   const startLabel = editing ? "Save changes" : included ? "Book interview" : `Pay ${rupees(price)} and book`;
 
@@ -675,7 +673,7 @@ export function NewInterviewForm({
           </Step>
 
           {/* ---- Step 3: topics ---- */}
-          <Step n={3} title="Topics to cover" done={stepDone.topics}>
+          <Step n={3} title="Topics to cover (optional)" done={stepDone.topics}>
             <div id="field-topics" className="space-y-1.5">
               <ChipInput
                 value={topics}
@@ -684,10 +682,11 @@ export function NewInterviewForm({
                 suggestions={TOPIC_SUGGESTIONS[category] ?? DEFAULT_TOPICS}
                 placeholder="Type a topic and press Enter"
                 ariaLabel="Topics to cover"
-                invalid={!!errors.topics}
               />
-              <p className="text-xs text-muted-foreground">Up to {LIMITS.topics}. The interviewer makes sure these come up.</p>
-              {err("topics")}
+              <p className="text-xs text-muted-foreground">
+                Add up to {LIMITS.topics} and the interviewer makes sure they come up. Leave it empty and you get questions across
+                the whole role.
+              </p>
             </div>
           </Step>
         </div>

@@ -32,7 +32,7 @@ import { getModuleSettings, settingsSnapshot } from "../../lib/mock-interviews/c
 import { getBookingSetup, getBriefing, getReport, getSession, listBookings, listInterviews } from "../../lib/mock-interviews/data.ts";
 import { endInterview, evaluateInterview, heartbeat, startInterview, submitAnswer } from "../../lib/mock-interviews/engine.ts";
 import { INDUSTRIES, METRICS, overallScore } from "../../lib/mock-interviews/model.ts";
-import { evaluationSchema, parseJsonObject, toWriting } from "../../lib/mock-interviews/prompts.ts";
+import { evaluationSchema, materialBlock, NO_TOPICS, parseJsonObject, planFormat, toWriting } from "../../lib/mock-interviews/prompts.ts";
 import { aiPaymentAvailable } from "../../lib/payments/ai-interview-orders.ts";
 import { confirmPayment } from "../../lib/payments/orders.ts";
 import { db as appDb } from "../../lib/db.ts";
@@ -532,8 +532,10 @@ async function main() {
     {
       const nextEnd = new Date(periodEnd.getTime() + 30 * DAY);
       await q(`update "user" set plan_expires_at = $1 where id = $2`, [nextEnd, u.id]);
-      const r = await bookAiInterview(u.id, form(setup()));
-      check("C5", "a renewed period gets its own allowance (sanity)", r.ok && (await planRows()) === 2, r.ok ? "booked" : r.error);
+      // Topics are optional: this one is booked with none.
+      const r = await bookAiInterview(u.id, form(setup({ topics: [] })));
+      const [noTopics] = r.ok ? await q<{ topics: string[] }>("select topics from ai_interviews where id = $1", [r.id]) : [];
+      check("C5", "a renewed period gets its own allowance, booked with no topics (sanity)", r.ok && (await planRows()) === 2 && noTopics?.topics.length === 0, r.ok ? "booked" : r.error);
     }
     {
       const [{ used }] = await q<{ used: number }>("select count(*)::int used from ai_interviews where user_id = $1 and coverage = 'free'", [u.id]);
@@ -770,6 +772,18 @@ async function main() {
       const beat3 = await heartbeat(u.id, marked);
       const r6 = await state(marked);
       check("R6", "a heartbeat from the screen resumes a paused interview", beat3?.status === "in_progress" && r6.status === "in_progress" && Math.abs(r6.away_seconds - 120) <= 2, `${r6.status}, ${r6.away_seconds}s away`);
+    }
+
+    /* ---- T: with no topics, the AI plans across the whole role ---- */
+    {
+      const none = planFormat(15, []);
+      const some = planFormat(15, ["Planning"]);
+      const block = materialBlock({ role: "PM", industry: "IT", category: CATEGORY, difficulty: "Easy", question_count: 15, topics: "", resume: "", job_description: "", career_profile: "" });
+      check(
+        "T1",
+        "no topics → the plan asks for questions across the whole role; topics → each is covered",
+        /always null/.test(none) && !/Cover every topic/.test(none) && /Cover every topic/.test(some) && block.includes(NO_TOPICS),
+      );
     }
 
     /* ---- F: the module key never reaches the browser ---- */

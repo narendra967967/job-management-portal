@@ -21,6 +21,12 @@ export interface PromptValues {
   career_profile: string;
 }
 
+/**
+ * What {{topics}} becomes when the candidate chose none (topics are optional):
+ * it reads naturally in the admin's plan prompt ("...and these topics: ...").
+ */
+export const NO_TOPICS = "none chosen, so cover the main areas of the role, the job description and the resume";
+
 /** Fill {{placeholders}}; unknown ones are left as typed. */
 export function fillPrompt(template: string, v: PromptValues): string {
   return template.replace(/\{\{(\w+)\}\}/g, (all, key: string) => (key in v ? String(v[key as keyof PromptValues]) : all));
@@ -35,7 +41,7 @@ export function materialBlock(v: PromptValues): string {
     `Industry: ${v.industry}`,
     `Kind of interview: ${v.category}`,
     `Difficulty: ${v.difficulty}`,
-    `Topics the candidate wants covered: ${v.topics || "none given"}`,
+    `Topics the candidate wants covered: ${v.topics || NO_TOPICS}`,
     "",
     ...(v.career_profile ? ["", "Career profile:", clip(v.career_profile, 4_000)] : []),
     "",
@@ -54,7 +60,9 @@ export function planFormat(count: number, topics: string[]): string {
     "Reply with one JSON object only, in this shape:",
     '{"opening": string, "questions": [{"question": string, "topic": string | null, "skill": string, "tip": string}]}',
     `- "questions": exactly ${count} items, in the order they'll be asked, easiest first.`,
-    `- "topic": one of ${JSON.stringify(topics)} when the question covers it, otherwise null. Cover every topic at least once.`,
+    topics.length
+      ? `- "topic": one of ${JSON.stringify(topics)} when the question covers it, otherwise null. Cover every topic at least once.`
+      : '- "topic": always null. The candidate chose no topics, so spread the questions across the main areas of the role, the job description and the resume.',
     `- "skill": the main skill it tests, one of ${JSON.stringify(METRICS.map((m) => m.key))}. Spread them.`,
     '- "tip": one short sentence of advice for answering that question well, written to the candidate.',
     '- "opening": one or two friendly sentences that welcome the candidate before the first question. Don\'t ask a question in it.',

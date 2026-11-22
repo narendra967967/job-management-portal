@@ -181,7 +181,7 @@ export function InterviewBriefing({ data }: { data: BriefingData }) {
             </h2>
             <ol className="mt-3 space-y-3">
               {[
-                { icon: MessageCircle, title: "One question at a time", text: `About ${questions} questions planned around your role, the job and your topics. The interviewer asks follow-ups when an answer needs more.` },
+                { icon: MessageCircle, title: "One question at a time", text: `About ${questions} questions planned around your role, the job${booking.topics.length ? " and your topics" : " and your resume"}. The interviewer asks follow-ups when an answer needs more.` },
                 { icon: Timer, title: `${booking.durationMin} minutes on the clock`, text: `A timer shows the time left. If time runs out mid-answer, the interviewer takes up to ${settings.wrapUpMinutes} more minutes to wrap up, then ends.` },
                 { icon: Mic, title: "Type or speak", text: "Type your answers, or tap the mic to speak and check the words before sending. Speaking works in Chrome, Edge and Safari." },
                 { icon: FileText, title: "Your report straight after", text: "Scores for five skills, what went well, what to fix and better ways to answer. It usually takes under a minute." },
@@ -284,6 +284,7 @@ export function InterviewBriefing({ data }: { data: BriefingData }) {
               <div>
                 <dt className="text-xs text-muted-foreground">Topics</dt>
                 <dd className="mt-1 flex flex-wrap gap-1.5">
+                  {booking.topics.length === 0 && <span className="text-sm">None chosen, so questions cover the whole role</span>}
                   {booking.topics.map((t) => (
                     <span key={t} className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
                       {t}

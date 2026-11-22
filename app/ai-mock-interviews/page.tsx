@@ -111,7 +111,7 @@ export default async function AiMockInterviewsPage() {
   const FAQ_ITEMS = [
     {
       q: "Am I talking to a real person?",
-      a: "No, the interviewer is AI. It asks questions built from your résumé, the job description and the topics you picked, and it doesn't give hints or feedback while you're answering. All of that comes in the report at the end.",
+      a: "No, the interviewer is AI. It asks questions built from your résumé, the job description and any topics you picked, and it doesn't give hints or feedback while you're answering. All of that comes in the report at the end.",
     },
     {
       q: "What if my connection drops halfway through?",

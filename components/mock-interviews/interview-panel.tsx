@@ -221,9 +221,11 @@ export function InterviewPanel({ d }: { d: PanelData }) {
         <QuestionTrack d={d} />
       </Card>
       {d.phase !== "ended" && <TipBlock tip={d.tip} />}
-      <Card title="Your topics">
-        <TopicList d={d} />
-      </Card>
+      {d.topics.length > 0 && (
+        <Card title="Your topics">
+          <TopicList d={d} />
+        </Card>
+      )}
       {d.phase !== "ended" && (
         <Card title="Pace">
           <PaceBlock d={d} />
@@ -264,10 +266,12 @@ export function InterviewPanelCompact({ d }: { d: PanelData }) {
       </summary>
       <div className="space-y-3 border-t p-3">
         {d.phase !== "ended" && <TipBlock tip={d.tip} />}
-        <div>
-          <p className="mb-2 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">Your topics</p>
-          <TopicList d={d} />
-        </div>
+        {d.topics.length > 0 && (
+          <div>
+            <p className="mb-2 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">Your topics</p>
+            <TopicList d={d} />
+          </div>
+        )}
         <PaceBlock d={d} />
       </div>
     </details>

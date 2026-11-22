@@ -266,7 +266,7 @@ export function AiHome({
                   <td className="px-3 py-2">
                     <p className="font-medium">{b.role}</p>
                     <p className="text-xs text-muted-foreground">
-                      {b.category} · {b.topics.length} {b.topics.length === 1 ? "topic" : "topics"}
+                      {b.category} · {b.topics.length === 0 ? "Whole role" : `${b.topics.length} ${b.topics.length === 1 ? "topic" : "topics"}`}
                     </p>
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap">

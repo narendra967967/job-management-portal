@@ -32,7 +32,6 @@ const setupSchema = z.object({
   durationMin: z.number().int(),
   topics: z
     .array(z.string().trim().min(1).max(LIMITS.topic, `Keep each topic under ${LIMITS.topic} characters.`))
-    .min(1, "Add at least one topic you want covered.")
     .max(LIMITS.topics, `Pick up to ${LIMITS.topics} topics.`),
   leadId: z.string().uuid().nullable(),
   resumeMode: z.enum(["saved", "upload", "paste"]),
