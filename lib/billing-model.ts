@@ -305,8 +305,10 @@ export interface AdminOrderRow {
   status: OrderStatus;
   /** How the user paid (from the gateway): UPI, Card, Netbanking, Wallet… */
   method: string | null;
-  /** Our receipt number (billing invoice prefix + sequence). */
+  /** Internal reference sent to the gateway (prefix + order number); not shown to users. */
   receipt: string;
+  /** Our order number, as shown on invoices and in Orders & payments. */
+  orderNumber: number;
   /** The order's invoice number, paid orders only (invoices spec I5; phase 1: the backfill's preview). */
   invoiceNumber?: string | null;
   gatewayOrderId: string | null;

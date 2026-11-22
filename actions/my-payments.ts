@@ -5,12 +5,33 @@
 // Scoped to the session user; allowed in limited mode (invoices stay
 // reachable after a plan ends). Money records are never deleted (spec I6).
 
+import { z } from "zod";
 import { desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { invoices, paymentOrders } from "@/db/schema";
 import { getCurrentUserId } from "@/lib/current-user";
 import { PERIOD_LABELS } from "@/lib/billing-model";
 import type { PaymentRow, PaymentStatus } from "@/lib/invoices/payments-model";
+import { INVOICES_PER_EMAIL, INVOICE_EMAILS_PER_HOUR, emailInvoiceCopies, invoiceEmailsLastHour } from "@/lib/invoices/email";
+import { SMTP_NOT_CONFIGURED } from "@/lib/mailer";
+
+/** Email me the invoice(s): the user's own paid orders only, one email, a few an hour. */
+export async function emailMyInvoicesAction(raw: unknown): Promise<{ ok: true; sent: number } | { ok: false; error: string }> {
+  const userId = await getCurrentUserId();
+  const p = z.array(z.string().uuid()).min(1).max(INVOICES_PER_EMAIL).safeParse(raw);
+  if (!p.success) return { ok: false, error: `Pick between 1 and ${INVOICES_PER_EMAIL} payments.` };
+  if ((await invoiceEmailsLastHour(userId)) >= INVOICE_EMAILS_PER_HOUR) {
+    return { ok: false, error: "You've asked for a lot of invoice emails in the last hour. Download them instead, or try again later." };
+  }
+  try {
+    const r = await emailInvoiceCopies(p.data, userId);
+    return r.sent ? { ok: true, sent: r.sent } : { ok: false, error: r.error ?? "Nothing was sent." };
+  } catch (e) {
+    if (e instanceof Error && e.message === SMTP_NOT_CONFIGURED) return { ok: false, error: "Email isn't working right now. Download the invoice instead." };
+    console.error("[invoices] invoice email failed:", e instanceof Error ? e.message : e);
+    return { ok: false, error: "We couldn't send it. Try again in a moment, or download it instead." };
+  }
+}
 
 const KIND_DETAIL = { new: "New plan", renew: "Renewal", upgrade: "Upgrade" } as const;
 const methodLabel = (m: string | null) => (!m ? null : m.toLowerCase() === "upi" ? "UPI" : m[0].toUpperCase() + m.slice(1));

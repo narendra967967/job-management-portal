@@ -30,7 +30,7 @@ import {
   ymd,
 } from "@/components/ui/data-table";
 import { useContactSupport } from "@/components/support/contact-support";
-import { listMyPaymentsAction } from "@/actions/my-payments";
+import { emailMyInvoicesAction, listMyPaymentsAction } from "@/actions/my-payments";
 import { formatPaise } from "@/lib/invoices/model";
 import {
   PAYMENTS_DEFAULT_DAYS,
@@ -116,11 +116,16 @@ function PaymentsCard() {
   const count = (s: PaymentStatus) => inRange.filter((r) => r.status === s).length;
   const totalPaid = inRange.filter((r) => r.status === "paid").reduce((a, r) => a + r.amount, 0);
 
-  const emailInvoices = (list: PaymentRow[]) => {
+  const [sending, setSending] = useState(false);
+  const emailInvoices = async (list: PaymentRow[]) => {
     const paid = list.filter((r) => r.invoiceNumber);
     if (!paid.length) return toast.info("Nothing to send", "Only paid payments have invoices.");
-    // Phase 3 emails the PDFs to the account's email address.
-    toast.success(paid.length === 1 ? "Invoice on its way" : `${paid.length} invoices on their way`, "Check your inbox in a minute.");
+    setSending(true);
+    const r = await emailMyInvoicesAction(paid.map((p) => p.id)).catch(() => ({ ok: false as const, error: "Check your connection and try again." }));
+    setSending(false);
+    if (!r.ok) return toast.error("Not sent", r.error);
+    toast.success(r.sent === 1 ? "Invoice on its way" : `${r.sent} invoices on their way`, "They're attached to one email to your account's address.");
+    selection.clear();
   };
   const help = (r: PaymentRow) =>
     openSupport({
@@ -187,7 +192,7 @@ function PaymentsCard() {
       )}
 
       <BulkBar selection={selection}>
-        <Button size="sm" variant="outline" className="h-9 gap-1.5 bg-white" onClick={() => emailInvoices(all.filter((r) => selection.isSelected(r.id)))}>
+        <Button size="sm" variant="outline" className="h-9 gap-1.5 bg-white" disabled={sending} onClick={() => void emailInvoices(all.filter((r) => selection.isSelected(r.id)))}>
           <Mail className="size-4" aria-hidden />
           Email me the invoices
         </Button>
@@ -271,7 +276,7 @@ function PaymentsCard() {
                           <Eye className="size-4" aria-hidden />
                           View invoice
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => emailInvoices([r])}>
+                        <DropdownMenuItem onClick={() => void emailInvoices([r])}>
                           <Mail className="size-4" aria-hidden />
                           Email me the invoice
                         </DropdownMenuItem>

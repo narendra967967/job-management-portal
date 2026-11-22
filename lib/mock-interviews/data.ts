@@ -2,7 +2,7 @@ import "server-only";
 
 import { and, asc, count, desc, eq, inArray, isNotNull, ne, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { aiInterviewMessages, aiInterviews, interviewEvaluations, jobLeads, plans, resumes, user } from "@/db/schema";
+import { aiInterviewMessages, aiInterviews, interviewEvaluations, jobLeads, paymentOrders, plans, resumes, user } from "@/db/schema";
 import { careerCompletionFor } from "@/lib/career-data";
 import { aiPaymentAvailable } from "@/lib/payments/ai-interview-orders";
 import { settleInterview, type Phase } from "./engine";
@@ -97,7 +97,7 @@ function bookingStatus(i: InterviewRow, now: number): BookingStatus {
   }
 }
 
-function toBooking(i: InterviewRow, reportId: string | undefined, now: number): BookingRow {
+function toBooking(i: InterviewRow, reportId: string | undefined, now: number, orderId?: string): BookingRow {
   const status = bookingStatus(i, now);
   return {
     id: i.id,
@@ -111,7 +111,7 @@ function toBooking(i: InterviewRow, reportId: string | undefined, now: number): 
     validUntil: i.validUntil.toISOString(),
     payment:
       i.coverage === "paid"
-        ? { kind: "paid", full: i.priceFullPaise, final: i.pricePaise, percent: i.discountPercent }
+        ? { kind: "paid", full: i.priceFullPaise, final: i.pricePaise, percent: i.discountPercent, ...(orderId ? { orderId } : {}) }
         : i.coverage === "plan"
           ? { kind: "plan", planName: i.planName ?? "" }
           : i.coverage === "credit"
@@ -142,8 +142,17 @@ export async function listBookings(userId: string): Promise<BookingRow[]> {
     .where(and(eq(aiInterviews.userId, userId), ne(aiInterviews.status, "pending_payment")))
     .orderBy(desc(aiInterviews.createdAt));
   const reports = await reportsFor(list.map((i) => i.id));
+  // Each paid booking's order, so its invoice can be downloaded or emailed.
+  const paidIds = list.filter((i) => i.coverage === "paid").map((i) => i.id);
+  const orders = paidIds.length
+    ? await db
+        .select({ interviewId: paymentOrders.aiInterviewId, id: paymentOrders.id })
+        .from(paymentOrders)
+        .where(and(inArray(paymentOrders.aiInterviewId, paidIds), eq(paymentOrders.userId, userId), eq(paymentOrders.status, "paid")))
+    : [];
+  const orderOf = new Map(orders.map((o) => [o.interviewId!, o.id]));
   const now = Date.now();
-  return list.map((i) => toBooking(i, reports.has(i.id) ? i.id : undefined, now));
+  return list.map((i) => toBooking(i, reports.has(i.id) ? i.id : undefined, now, orderOf.get(i.id)));
 }
 
 async function ownInterview(userId: string, id: string): Promise<InterviewRow | undefined> {

@@ -80,6 +80,11 @@ const nextConfig: NextConfig = {
   // the email libraries. mailauth bundled spends ~1 minute on a DKIM check that
   // takes 0.4 s unbundled; mailparser goes with it.
   serverExternalPackages: ["mammoth", "nodemailer", "mailauth", "mailparser"],
+  // Invoice PDFs (lib/invoices/pdf.tsx) read the rupee font from disk by path,
+  // which the standalone trace can't see; list it so the server image has it.
+  outputFileTracingIncludes: {
+    "/**": ["./node_modules/@fontsource/noto-sans-devanagari/files/noto-sans-devanagari-latin-ext-*-normal.woff"],
+  },
   experimental: {
     serverActions: {
       // Résumé uploads go through a Server Action (default cap: 1 MB). The app

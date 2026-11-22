@@ -14,6 +14,7 @@ import {
   PlayCircle,
   LifeBuoy,
   Plus,
+  Download,
   Receipt,
   RotateCcw,
   Search,
@@ -43,7 +44,7 @@ import {
 import { useMounted } from "@/lib/use-mounted";
 import { GetReady } from "@/components/mock-interviews/get-ready";
 import type { Readiness } from "@/lib/mock-interviews/data";
-import { emailAiInterviewReceiptAction } from "@/actions/mock-interviews";
+import { emailMyInvoicesAction } from "@/actions/my-payments";
 import { LEVEL_TAG } from "@/components/mock-interviews/visual-kit";
 import { cn } from "@/lib/utils";
 
@@ -300,17 +301,24 @@ export function AiHome({
                           View report
                         </DropdownMenuItem>
                       )}
-                      {b.payment.kind === "paid" && (
-                        <DropdownMenuItem
-                          onClick={() =>
-                            void emailAiInterviewReceiptAction(b.id)
-                              .then((r) => (r.ok ? toast.success("Receipt sent", "Check your inbox for the payment receipt.") : toast.error("Not sent", r.error)))
-                              .catch(() => toast.error("Not sent", "Check your connection and try again."))
-                          }
-                        >
-                          <Receipt className="size-4" aria-hidden />
-                          Email my receipt
-                        </DropdownMenuItem>
+                      {b.payment.kind === "paid" && b.payment.orderId && (
+                        <>
+                          {/* The booking's invoice (also in Orders & payments). */}
+                          <DropdownMenuItem onClick={() => window.open(`/api/invoices/${(b.payment as { orderId: string }).orderId}?download=1`, "_self")}>
+                            <Download className="size-4" aria-hidden />
+                            Download invoice
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() =>
+                              void emailMyInvoicesAction([(b.payment as { orderId: string }).orderId])
+                                .then((r) => (r.ok ? toast.success("Invoice on its way", "Check your inbox in a minute.") : toast.error("Not sent", r.error)))
+                                .catch(() => toast.error("Not sent", "Check your connection and try again."))
+                            }
+                          >
+                            <Receipt className="size-4" aria-hidden />
+                            Email me the invoice
+                          </DropdownMenuItem>
+                        </>
                       )}
                       <DropdownMenuItem onClick={() => router.push("/mock-interviews/ai/new")}>
                         <RotateCcw className="size-4" aria-hidden />

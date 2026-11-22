@@ -9,6 +9,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { invoices, paymentGateways, paymentOrders } from "@/db/schema";
+import { emailInvoiceCopies } from "@/lib/invoices/email";
 import { requireAdmin } from "@/lib/current-user";
 import { encryptSecret } from "@/lib/crypto";
 import { credsOf, gatewayComplete, getGatewayRow, listGatewaySettings } from "@/lib/payments/gateways";
@@ -173,12 +174,27 @@ export async function listOrdersAction(raw: unknown): Promise<{ rows: AdminOrder
       status: o.status,
       method: o.method,
       receipt: receiptOf(o),
+      orderNumber: o.number,
       invoiceNumber: invoiceNumbers.get(o.id) ?? null,
       gatewayOrderId: o.gatewayOrderId,
       gatewayPaymentId: o.gatewayPaymentId,
       failureReason: o.failureReason,
     })),
   };
+}
+
+/** Orders & payments → Send invoice: emails the order's invoice (Invoice copy template) to its account. */
+export async function sendInvoiceAction(raw: unknown): Promise<Result> {
+  await requireAdmin();
+  const parsed = z.object({ orderId: z.string().uuid() }).safeParse(raw);
+  if (!parsed.success) return { ok: false, error: "Invalid input." };
+  try {
+    const r = await emailInvoiceCopies([parsed.data.orderId]);
+    return r.sent ? { ok: true } : { ok: false, error: r.error ?? "Nothing was sent." };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: msg === SMTP_NOT_CONFIGURED ? "Email isn't set up yet (Settings → Email delivery)." : msg };
+  }
 }
 
 export async function resendReceiptAction(raw: unknown): Promise<Result> {

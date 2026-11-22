@@ -20,6 +20,7 @@ import { BILLING_NEEDED, afterPaid, receiptOf, taxOf, type ConfirmResult } from 
 import { getUserBilling } from "@/lib/invoices/billing-profile";
 import { isBillingComplete } from "@/lib/invoices/billing-details";
 import { splitTax } from "@/lib/invoices/tax";
+import { invoiceFile } from "@/lib/invoices/attachment";
 
 type Order = typeof paymentOrders.$inferSelect;
 const ORDERS_PER_HOUR = 10;
@@ -190,10 +191,15 @@ const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replac
 export async function sendAiInterviewReceipt(orderId: string): Promise<void> {
   const [o] = await db.select().from(paymentOrders).where(eq(paymentOrders.id, orderId));
   if (!o || o.status !== "paid" || !o.userEmail) throw new Error("Only a paid order with an email has a receipt.");
+  // The invoice goes with the email; its number replaces the old receipt number (spec I5).
+  const file = await invoiceFile(o.id).catch((err) => {
+    console.error("[invoices] couldn't attach the invoice:", err instanceof Error ? err.message : err);
+    return null;
+  });
   const money = (paise: number) => formatPaise(paise, o.currency);
   const validUntil = o.termEndsAt ? dateOnly(o.termEndsAt) : "";
   const rows: [string, string][] = [
-    ["Receipt number", receiptOf(o)],
+    file ? ["Invoice number", file.number] : ["Order number", String(o.number)],
     ["Date", dateOnly(o.paidAt ?? o.createdAt)],
     ["Item", o.planName],
     ...(validUntil ? ([["Start it by", validUntil]] as [string, string][]) : []),
@@ -224,5 +230,6 @@ export async function sendAiInterviewReceipt(orderId: string): Promise<void> {
       receipt_details: table,
     },
     buttonUrl: absoluteUrl("/mock-interviews/ai"),
+    attachments: file ? [file.attachment] : undefined,
   });
 }

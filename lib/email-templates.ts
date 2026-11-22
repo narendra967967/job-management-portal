@@ -9,6 +9,7 @@ import { db } from "@/lib/db";
 import { emailTemplates, emailTemplateVersions, user } from "@/db/schema";
 import { getAppName } from "@/lib/branding";
 import { sendAppEmail } from "@/lib/email";
+import type { MailAttachment } from "@/lib/mailer";
 import { sanitizeGuideHtml } from "@/lib/guide-html";
 import {
   EMAIL_TEMPLATES,
@@ -191,6 +192,8 @@ export interface TemplateEmailOptions {
   subjectPrefix?: string;
   /** The editor's test email: logged as a test, not as the automatic email. */
   test?: boolean;
+  /** Files sent with it (e.g. the invoice PDF). */
+  attachments?: MailAttachment[];
 }
 
 /**
@@ -227,6 +230,7 @@ export async function sendTemplateEmail(key: EmailTemplateKey, opts: TemplateEma
     footerNote: r.footerNote || undefined,
     text,
     headers: opts.headers,
+    attachments: opts.attachments,
     tag: opts.test
       ? { kind: "test", label: `Template test: ${def.name}`, templateKey: def.key }
       : { kind: "template", label: def.name, templateKey: def.key },

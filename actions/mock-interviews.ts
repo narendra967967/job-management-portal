@@ -10,10 +10,9 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { getCurrentUserId } from "@/lib/current-user";
-import { aiInterviews, paymentOrders } from "@/db/schema";
+import { aiInterviews } from "@/db/schema";
 import { aiInterviewsOpen, getModuleSettings } from "@/lib/mock-interviews/config";
 import { bookAiInterview, material, parseForm, type BookingResult } from "@/lib/mock-interviews/booking";
-import { sendAiInterviewReceipt } from "@/lib/payments/ai-interview-orders";
 import { endInterview, heartbeat, startInterview, submitAnswer, type LiveState } from "@/lib/mock-interviews/engine";
 
 type Result = BookingResult;
@@ -121,22 +120,4 @@ export async function endInterviewAction(id: unknown): Promise<{ ok: true } | { 
   const r = await endInterview(g.userId, g.id);
   revalidatePath("/mock-interviews", "layout");
   return r;
-}
-
-/** Email the receipt for a paid interview again (bookings list → Receipt). */
-export async function emailAiInterviewReceiptAction(id: unknown): Promise<{ ok: true } | { ok: false; error: string }> {
-  const userId = await getCurrentUserId();
-  const p = interviewId.safeParse(id);
-  if (!p.success) return { ok: false, error: "That booking isn't available." };
-  const [o] = await db
-    .select({ id: paymentOrders.id })
-    .from(paymentOrders)
-    .where(and(eq(paymentOrders.aiInterviewId, p.data), eq(paymentOrders.userId, userId), eq(paymentOrders.status, "paid")));
-  if (!o) return { ok: false, error: "There's no payment for this booking." };
-  try {
-    await sendAiInterviewReceipt(o.id);
-    return { ok: true };
-  } catch {
-    return { ok: false, error: "We couldn't send the email just now. Try again in a minute." };
-  }
 }

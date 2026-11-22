@@ -22,7 +22,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/admin/ui/dropdown-menu";
 import { OrderDetailsDialog } from "@/components/admin/orders/order-details-dialog";
-import { invoiceHref, sendInvoiceSoon } from "@/components/admin/orders/invoice-links";
+import { invoiceHref, sendInvoice } from "@/components/admin/orders/invoice-links";
 import {
   GATEWAY_LABELS,
   ORDER_STATUS_LABELS,
@@ -442,7 +442,7 @@ export function OrdersClient() {
                           <DropdownMenuItem onClick={() => window.open(invoiceHref(r.id, true), "_self")}>
                             <Download /> Download invoice
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={sendInvoiceSoon}>
+                          <DropdownMenuItem onClick={() => void sendInvoice(r.id, r.invoiceNumber!)}>
                             <Send /> Send invoice
                           </DropdownMenuItem>
                         </>

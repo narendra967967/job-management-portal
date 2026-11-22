@@ -551,9 +551,18 @@ function PlanDetailsCard() {
   return (
     <>
     <div className="rounded-2xl border bg-card">
-      <div className="border-b p-4 md:p-5">
-        <h2 className="text-sm font-medium">Your plan</h2>
-        <p className="text-xs text-muted-foreground">Your current plan and what&apos;s included.</p>
+      <div className="flex items-start justify-between gap-3 border-b p-4 md:p-5">
+        <div>
+          <h2 className="text-sm font-medium">Your plan</h2>
+          <p className="text-xs text-muted-foreground">Your current plan and what&apos;s included.</p>
+        </div>
+        {/* Past payments and their invoices live on their own page. */}
+        <Link
+          href="/orders"
+          className="inline-flex min-h-11 shrink-0 items-center gap-1 text-sm font-medium text-primary underline-offset-4 hover:underline sm:min-h-0"
+        >
+          See your payments
+        </Link>
       </div>
 
       {loading ? (

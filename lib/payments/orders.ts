@@ -39,6 +39,7 @@ import { getUserBilling } from "@/lib/invoices/billing-profile";
 import { isBillingComplete } from "@/lib/invoices/billing-details";
 import { splitTax } from "@/lib/invoices/tax";
 import { ensureInvoice } from "@/lib/invoices/issue";
+import { invoiceFile } from "@/lib/invoices/attachment";
 
 /** Said when checkout is started without complete billing details (invoices spec I4). */
 export const BILLING_NEEDED = "Add your billing details before you pay. They go on your invoice.";
@@ -363,9 +364,14 @@ export async function sendReceipt(orderId: string): Promise<void> {
   const [o] = await db.select().from(paymentOrders).where(eq(paymentOrders.id, orderId));
   if (!o || o.status !== "paid" || !o.userEmail) throw new Error("Only a paid order with an email has a receipt.");
   if (o.kind === "ai_interview") return sendAiInterviewReceipt(orderId);
+  // The invoice goes with the email; its number replaces the old receipt number (spec I5).
+  const file = await invoiceFile(o.id).catch((err) => {
+    console.error("[invoices] couldn't attach the invoice:", err instanceof Error ? err.message : err);
+    return null;
+  });
   const money = (p: number) => formatPaise(p, o.currency);
   const rows: [string, string][] = [
-    ["Receipt number", receiptOf(o)],
+    file ? ["Invoice number", file.number] : ["Order number", String(o.number)],
     ["Date", dateOnly(o.paidAt ?? o.createdAt)],
     o.period ? ["Plan", `${o.planName}, billed ${PERIOD_LABELS[o.period].toLowerCase()}`] : ["Item", o.planName],
     ["Active until", o.termEndsAt ? dateOnly(o.termEndsAt) : ""],
@@ -396,5 +402,6 @@ export async function sendReceipt(orderId: string): Promise<void> {
       receipt_details: table,
     },
     buttonUrl: absoluteUrl("/settings?tab=plan"),
+    attachments: file ? [file.attachment] : undefined,
   });
 }

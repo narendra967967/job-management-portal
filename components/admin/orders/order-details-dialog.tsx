@@ -1,7 +1,7 @@
 "use client";
 
 // Admin → Orders & Payments → View details: everything about one order in a
-// large modal. Header: receipt number, status, mode and the amount. Body:
+// large modal. Header: order number, status, mode and the amount. Body:
 // customer, plan and access, payment breakdown, gateway references and a
 // timeline. Footer: the actions that apply to this order.
 
@@ -18,6 +18,7 @@ import {
   Mail,
   Package,
   Receipt,
+  Send,
   User,
   XCircle,
 } from "lucide-react";
@@ -36,7 +37,7 @@ import {
 } from "@/lib/billing-model";
 import { cn, formatDateTime } from "@/lib/utils";
 import { resendReceiptAction } from "@/actions/admin-payments";
-import { invoiceHref } from "@/components/admin/orders/invoice-links";
+import { invoiceHref, sendInvoice } from "@/components/admin/orders/invoice-links";
 
 const STATUS_VARIANT: Record<OrderStatus, "success" | "danger" | "warning" | "neutral"> = {
   paid: "success",
@@ -84,7 +85,7 @@ export function OrderDetailsDialog({
     setResending(true);
     const res = await resendReceiptAction({ orderId: order.id });
     setResending(false);
-    if (res.ok) toast.success(`Receipt sent to ${order.user?.email ?? "the user"}`);
+    if (res.ok) toast.success(`Payment email sent to ${order.user?.email ?? "the user"}`);
     else toast.error(res.error);
   }
 
@@ -103,7 +104,7 @@ export function OrderDetailsDialog({
                 <Receipt className="size-5" aria-hidden />
               </div>
               <div className="min-w-0 flex-1">
-                <DialogTitle className="text-lg">Order {o.receipt}</DialogTitle>
+                <DialogTitle className="text-lg">Order {o.orderNumber}</DialogTitle>
                 <DialogDescription className="mt-0.5">
                   {o.planName} · {o.period ? PERIOD_LABELS[o.period] : KIND_LABELS[o.kind]} · {formatDateTime(o.createdAt)}
                 </DialogDescription>
@@ -180,8 +181,8 @@ export function OrderDetailsDialog({
                   <Row label="Invoice">
                     {o.invoiceNumber ? <CopyValue value={o.invoiceNumber} onCopy={() => copy(o.invoiceNumber!, "Invoice number")} /> : "None (not paid)"}
                   </Row>
-                  <Row label="Receipt">
-                    <CopyValue value={o.receipt} onCopy={() => copy(o.receipt, "Receipt number")} />
+                  <Row label="Order number">
+                    <CopyValue value={String(o.orderNumber)} onCopy={() => copy(String(o.orderNumber), "Order number")} />
                   </Row>
                   <Row label="Order ID">
                     <CopyValue value={o.gatewayOrderId} onCopy={() => copy(o.gatewayOrderId, "Order ID")} />
@@ -230,9 +231,14 @@ export function OrderDetailsDialog({
                     <Download className="size-4" aria-hidden /> Download invoice
                   </a>
                 )}
+                {o.invoiceNumber && o.user?.email && (
+                  <Button variant="outline" className="min-h-9" onClick={() => void sendInvoice(o.id, o.invoiceNumber!)}>
+                    <Send className="size-4" aria-hidden /> Send invoice
+                  </Button>
+                )}
                 {o.status === "paid" && o.user?.email && (
                   <Button variant="outline" className="min-h-9" onClick={resendReceipt} disabled={resending}>
-                    <Mail className="size-4" aria-hidden /> {resending ? "Sending…" : "Resend receipt"}
+                    <Mail className="size-4" aria-hidden /> {resending ? "Sending…" : "Resend payment email"}
                   </Button>
                 )}
                 <DialogClose className={buttonVariants({ className: "min-h-9" })}>Close</DialogClose>

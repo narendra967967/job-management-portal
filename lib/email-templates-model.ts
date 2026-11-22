@@ -56,6 +56,7 @@ export type EmailTemplateKey =
   | "account_deleted"
   | "plan_ending"
   | "payment_received"
+  | "invoice_copy"
   | "mock_interview_receipt"
   | "mock_interview_expiring"
   | "mock_interview_report"
@@ -324,9 +325,9 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
       { key: "total_paid", label: "The amount paid", sample: "₹499.00" },
       {
         key: "receipt_details",
-        label: "The receipt table: number, date, plan, tax, total, payment ID",
+        label: "The payment table: invoice number, date, plan, tax, total, payment ID",
         sample:
-          '<table style="width:100%;border-collapse:collapse;margin:8px 0 18px;font-size:14px"><tr><td style="padding:7px 0;border-bottom:1px solid #E5E7EB;color:#6B7280">Receipt number</td><td style="padding:7px 0;border-bottom:1px solid #E5E7EB;text-align:right">RCPT-0007</td></tr><tr><td style="padding:7px 0;border-bottom:1px solid #E5E7EB;color:#6B7280">Total paid</td><td style="padding:7px 0;border-bottom:1px solid #E5E7EB;text-align:right;font-weight:bold">₹499.00</td></tr></table>',
+          '<table style="width:100%;border-collapse:collapse;margin:8px 0 18px;font-size:14px"><tr><td style="padding:7px 0;border-bottom:1px solid #E5E7EB;color:#6B7280">Invoice number</td><td style="padding:7px 0;border-bottom:1px solid #E5E7EB;text-align:right">JT/26-27/00007</td></tr><tr><td style="padding:7px 0;border-bottom:1px solid #E5E7EB;color:#6B7280">Total paid</td><td style="padding:7px 0;border-bottom:1px solid #E5E7EB;text-align:right;font-weight:bold">₹499.00</td></tr></table>',
         required: true,
         block: true,
       },
@@ -336,10 +337,31 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
       heading: "Payment received",
       bodyHtml: "<p>Hi {{user_name}}, thanks for your payment. Your {{plan_name}} plan is active until {{active_until}}.</p>{{receipt_details}}",
       buttonLabel: "See your plan",
-      footerNote: "Keep this email as your payment receipt.",
+      footerNote: "Your invoice is attached as a PDF. You can download it again any time from Orders & payments.",
     },
   },
 
+
+  {
+    key: "invoice_copy",
+    group: "Plans and payments",
+    name: "Invoice copy",
+    trigger: "A user picks Email me the invoice in Orders & payments, or an admin picks Send invoice",
+    recipient: "user",
+    placeholders: [
+      APP,
+      NAME,
+      { key: "invoice_word", label: "\"invoice\" or \"invoices\", to match how many are attached", sample: "invoice" },
+      { key: "invoice_list", label: "The invoice numbers attached", sample: "JT/26-27/00007", required: true },
+    ],
+    defaults: {
+      subject: "Your {{app_name}} {{invoice_word}}",
+      heading: "Your {{invoice_word}}",
+      bodyHtml: "<p>Hi {{user_name}}, here's the copy you asked for: {{invoice_list}}, attached as a PDF.</p><p>You can download any of your invoices again from Orders &amp; payments.</p>",
+      buttonLabel: "Open Orders & payments",
+      footerNote: "You're getting this because a copy was requested from your account or by our support team.",
+    },
+  },
 
   /* ---------------- Mock interviews ---------------- */
   {
@@ -356,9 +378,9 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
       { key: "total_paid", label: "The amount paid", sample: "₹108.00" },
       {
         key: "receipt_details",
-        label: "The receipt table: number, date, interview, tax, total, payment ID",
+        label: "The payment table: invoice number, date, interview, tax, total, payment ID",
         sample:
-          '<table style="width:100%;border-collapse:collapse;margin:8px 0 18px;font-size:14px"><tr><td style="padding:7px 0;border-bottom:1px solid #E5E7EB;color:#6B7280">Receipt number</td><td style="padding:7px 0;border-bottom:1px solid #E5E7EB;text-align:right">RCPT-0008</td></tr><tr><td style="padding:7px 0;border-bottom:1px solid #E5E7EB;color:#6B7280">Total paid</td><td style="padding:7px 0;border-bottom:1px solid #E5E7EB;text-align:right;font-weight:bold">₹108.00</td></tr></table>',
+          '<table style="width:100%;border-collapse:collapse;margin:8px 0 18px;font-size:14px"><tr><td style="padding:7px 0;border-bottom:1px solid #E5E7EB;color:#6B7280">Invoice number</td><td style="padding:7px 0;border-bottom:1px solid #E5E7EB;text-align:right">JT/26-27/00008</td></tr><tr><td style="padding:7px 0;border-bottom:1px solid #E5E7EB;color:#6B7280">Total paid</td><td style="padding:7px 0;border-bottom:1px solid #E5E7EB;text-align:right;font-weight:bold">₹108.00</td></tr></table>',
         required: true,
         block: true,
       },
@@ -369,7 +391,7 @@ export const EMAIL_TEMPLATES: EmailTemplateDef[] = [
       bodyHtml:
         "<p>Hi {{user_name}}, thanks for your payment. You're booked in for this one:</p><p><strong>{{interview_label}}</strong></p><p>Start it whenever you're ready, any time until {{valid_until}}.</p>{{receipt_details}}",
       buttonLabel: "Go to my interviews",
-      footerNote: "Keep this email as your payment receipt.",
+      footerNote: "Your invoice is attached as a PDF. You can download it again any time from Orders & payments.",
     },
   },
   {

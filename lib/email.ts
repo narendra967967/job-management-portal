@@ -6,7 +6,7 @@ import "server-only";
 // plain-text fallback. Use sendAppEmail() everywhere; reach for sendMail()
 // directly only when you need full control of the raw HTML.
 
-import { sendMail, sendMailWith, isMailConfigured, SMTP_NOT_CONFIGURED } from "@/lib/mailer";
+import { sendMail, sendMailWith, isMailConfigured, SMTP_NOT_CONFIGURED, type MailAttachment } from "@/lib/mailer";
 import type { EmailProvider } from "@/lib/email-delivery-model";
 import type { SentEmailTag } from "@/lib/admin/sent-emails-model";
 import { getAppName, getSupportEmail } from "@/lib/branding";
@@ -42,6 +42,8 @@ export interface AppEmailOptions {
   via?: EmailProvider;
   /** Which email this is, for the sent-email log (admin Monitoring → Sent emails). */
   tag: SentEmailTag;
+  /** Files sent with the email (e.g. an invoice PDF), built in memory. */
+  attachments?: MailAttachment[];
 }
 
 function esc(s: string): string {
@@ -136,6 +138,6 @@ export async function sendAppEmail(opts: AppEmailOptions): Promise<void> {
     return;
   }
   const { html, text } = await renderAppEmail(opts);
-  const mail = { to: opts.to, subject: opts.subject, html, text, headers: opts.headers, tag: opts.tag };
+  const mail = { to: opts.to, subject: opts.subject, html, text, headers: opts.headers, tag: opts.tag, attachments: opts.attachments };
   await (opts.via ? sendMailWith(opts.via, mail) : sendMail(mail));
 }

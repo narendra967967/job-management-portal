@@ -30,6 +30,14 @@ export interface MailInput {
   headers?: Record<string, string>;
   /** Which email this is, for the sent-email log. */
   tag: SentEmailTag;
+  /** Files sent with the email, built in memory (e.g. an invoice PDF). */
+  attachments?: MailAttachment[];
+}
+
+export interface MailAttachment {
+  filename: string;
+  content: Buffer;
+  contentType: string;
 }
 
 interface ResolvedSmtp {
@@ -137,6 +145,7 @@ async function deliver(provider: EmailProvider, input: MailInput): Promise<strin
       html: input.html,
       text: input.text,
       headers: input.headers,
+      attachments: input.attachments,
     });
     return info.messageId;
   }
@@ -159,6 +168,7 @@ async function deliver(provider: EmailProvider, input: MailInput): Promise<strin
     html: input.html,
     text: input.text,
     headers: input.headers,
+    attachments: input.attachments,
   });
   return info.messageId;
 }

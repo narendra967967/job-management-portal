@@ -182,7 +182,7 @@ export function CheckoutDialog({
               {q.kind === "renew" ? `${plan.name} is renewed` : `You’re on ${plan.name}`}
             </DialogTitle>
             <DialogDescription className="mt-1.5">
-              Your plan is active until {dateFmt(paidUntil)}. We&rsquo;ve emailed you a receipt.
+              Your plan is active until {dateFmt(paidUntil)}. We&rsquo;ve emailed you the invoice, and it&rsquo;s in Orders &amp; payments too.
             </DialogDescription>
             <Button className="mt-5 w-full" onClick={onPaid}>
               Done

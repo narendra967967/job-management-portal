@@ -272,7 +272,7 @@ export function NewInterviewForm({
       setStarting(false);
       return;
     }
-    toast.success("Paid and booked", "Your receipt is on its way by email.");
+    toast.success("Paid and booked", "Your invoice is on its way by email.");
     router.push(`/mock-interviews/ai?booked=${id}`);
   }
 

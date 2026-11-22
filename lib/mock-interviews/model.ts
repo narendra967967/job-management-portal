@@ -258,7 +258,8 @@ export const PROMPT_PLACEHOLDERS = ["{{role}}", "{{industry}}", "{{category}}", 
 export type BookingStatus = "ready" | "in_progress" | "interrupted" | "completed" | "no_answers" | "failed" | "expired";
 
 export type BookingPayment =
-  | { kind: "paid"; full: number; final: number; percent: number } // paise
+  // paise; orderId: the paid order, for its invoice (Orders & payments)
+  | { kind: "paid"; full: number; final: number; percent: number; orderId?: string }
   | { kind: "plan"; planName: string }
   | { kind: "free" }
   | { kind: "credit" };
