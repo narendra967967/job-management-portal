@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -34,6 +34,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
 import { startInterviewAction } from "@/actions/mock-interviews";
 import { LevelTag } from "@/components/mock-interviews/visual-kit";
+import { useCountdown } from "@/components/mock-interviews/use-countdown";
 import type { BriefingData } from "@/lib/mock-interviews/data";
 import { METRICS, plannedQuestions, type MetricKey } from "@/lib/mock-interviews/model";
 import { cn } from "@/lib/utils";
@@ -61,6 +62,20 @@ export function InterviewBriefing({ data }: { data: BriefingData }) {
   const sessionHref = `/mock-interviews/ai/session/${booking.id}`;
 
   const usedSeconds = data.activeSeconds;
+
+  // Paused: the time left to resume ticks down live, as in the bookings list (D13f).
+  // At zero the server closes the interview, so this page goes back to the list.
+  const router = useRouter();
+  const paused = booking.status === "interrupted" && booking.resumeSecondsLeft !== undefined;
+  const { left: resumeLeft } = useCountdown(booking.resumeSecondsLeft ?? 0);
+  const timeUp = paused && resumeLeft === 0;
+  useEffect(() => {
+    if (!timeUp) return;
+    const t = setTimeout(() => router.replace("/mock-interviews/ai"), 3000);
+    return () => clearTimeout(t);
+  }, [timeUp, router]);
+  const resumeValue = paused ? (timeUp ? "Time's up" : mmss(resumeLeft)) : `${booking.resumeMinutesLeft ?? settings.resumeWindowMinutes} min`;
+  const resumeLine = timeUp ? "Time away used up" : `${resumeValue} left to resume`;
 
   const checklist = [
     { key: "quiet", icon: Headphones, text: "I'm somewhere quiet where I won't be interrupted." },
@@ -129,7 +144,7 @@ export function InterviewBriefing({ data }: { data: BriefingData }) {
                 <Fact label="Time used" value={`${mmss(usedSeconds)} of ${booking.durationMin}:00`} />
                 <Fact
                   label="Resume within"
-                  value={`${booking.resumeMinutesLeft ?? settings.resumeWindowMinutes} min`}
+                  value={resumeValue}
                   tone="text-amber-700"
                 />
               </dl>
@@ -246,7 +261,7 @@ export function InterviewBriefing({ data }: { data: BriefingData }) {
             <p className="text-sm font-semibold">{resuming ? "Ready to carry on?" : ticked === checklist.length ? "All set. Good luck!" : "Ready when you are"}</p>
             <p className="mt-0.5 text-xs text-muted-foreground">
               {resuming
-                ? `${booking.resumeMinutesLeft ?? settings.resumeWindowMinutes} min left to resume`
+                ? resumeLine
                 : `${booking.durationMin} min · about ${questions} questions`}
             </p>
             <div className="mt-3">
@@ -308,7 +323,7 @@ export function InterviewBriefing({ data }: { data: BriefingData }) {
       {/* Phones and tablets: the button stays in reach (right padding clears the help bubble). */}
       <div className="sticky bottom-0 z-10 -mx-1 flex items-center gap-3 rounded-2xl border bg-card/95 p-3 pr-[4.75rem] shadow-md backdrop-blur sm:pr-[5.25rem] lg:hidden">
         <p className="hidden min-w-0 flex-1 text-xs text-muted-foreground sm:block">
-          {resuming ? `${booking.resumeMinutesLeft ?? settings.resumeWindowMinutes} min left to resume` : `${booking.durationMin} min · about ${questions} questions`}
+          {resuming ? resumeLine : `${booking.durationMin} min · about ${questions} questions`}
         </p>
         <StartButton resuming={resuming} href={sessionHref} compact />
       </div>

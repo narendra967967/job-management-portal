@@ -46,6 +46,7 @@ import { GetReady } from "@/components/mock-interviews/get-ready";
 import type { Readiness } from "@/lib/mock-interviews/data";
 import { emailMyInvoicesAction } from "@/actions/my-payments";
 import { LEVEL_TAG } from "@/components/mock-interviews/visual-kit";
+import { useCountdown } from "@/components/mock-interviews/use-countdown";
 import { cn } from "@/lib/utils";
 
 // AI mock interviews: the candidate's booked AI interviews (spec D13a to D13d).
@@ -516,21 +517,8 @@ const mmss = (sec: number) => `${Math.floor(sec / 60)}:${String(sec % 60).padSta
  */
 function ResumeCountdown({ seconds, compact = false, refreshAtZero = false }: { seconds: number; compact?: boolean; refreshAtZero?: boolean }) {
   const router = useRouter();
-  const [left, setLeft] = useState(seconds);
-  const [by, setBy] = useState<string | null>(null);
-  useEffect(() => {
-    const end = Date.now() + seconds * 1000;
-    const tick = () => {
-      setLeft(Math.max(0, Math.ceil((end - Date.now()) / 1000)));
-      setBy(new Date(end).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }));
-    };
-    const first = setTimeout(tick, 0);
-    const t = setInterval(tick, 1000);
-    return () => {
-      clearTimeout(first);
-      clearInterval(t);
-    };
-  }, [seconds]);
+  const { left, end } = useCountdown(seconds);
+  const by = end === null ? null : new Date(end).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
   const done = left === 0;
   useEffect(() => {
     if (!done || !refreshAtZero) return;
