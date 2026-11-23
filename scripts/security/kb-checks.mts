@@ -154,6 +154,8 @@ const answered: [string, string][] = [
   ["How do I change the text of the password reset email?", "wording of automatic emails"],
   ["Where do I edit the welcome email?", "email templates"],
   ["How do I refund a yearly plan?", "online plan payments"],
+  ["How do I issue an invoice to a customer?", "invoices"],
+  ["What do users type when they pick Other?", "Other answers"],
   ["How do I switch email sending to Amazon SES?", "Amazon SES"],
   ["SES test connection says sandbox", "Amazon SES"],
   ["discarding a lead", "discarding"],
@@ -165,7 +167,7 @@ const unanswered = [
   "How do I export all users to a spreadsheet?",
   "What is the company's office address?",
   "Can I change the color theme to dark mode?",
-  "How do I issue an invoice to a customer?",
+  "How do I create a coupon code?",
   "Does Jobtiva integrate with Slack?",
 ];
 for (const [q, expect] of answered) {
