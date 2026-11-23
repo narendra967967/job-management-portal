@@ -27,6 +27,7 @@ import {
   ScrollText,
   Settings,
   LifeBuoy,
+  MessageSquareQuote,
   ChevronDown,
   LogOut,
   Bot,
@@ -71,6 +72,7 @@ const GROUPS: Group[] = [
     items: [
       { href: "/jmp-admin/users", label: "Users", icon: Users },
       { href: "/jmp-admin/tickets", label: "Support tickets", icon: LifeBuoy },
+      { href: "/jmp-admin/other-answers", label: "Other answers", icon: MessageSquareQuote },
     ],
   },
   {
@@ -122,6 +124,7 @@ const TITLES: Record<string, string> = {
   "/jmp-admin/dashboard": "Dashboard",
   "/jmp-admin/users": "Users",
   "/jmp-admin/tickets": "Support tickets",
+  "/jmp-admin/other-answers": "Other answers",
   "/jmp-admin/plans": "Plans & pricing",
   "/jmp-admin/orders": "Orders & payments",
   "/jmp-admin/renewals": "Renewals",

@@ -1341,6 +1341,29 @@ export const adminDashboardLayouts = pgTable("admin_dashboard_layouts", {
     .$onUpdate(() => new Date()),
 });
 
+/**
+ * Admin Customers → Other answers: the status an admin gave one typed "Other"
+ * value (grouped case-insensitively by value_key). No row means New. The
+ * answers stay on their own records, so they go when the account does; a mark
+ * whose answers are all gone is removed the next time the page loads.
+ */
+export const otherAnswerReviews = pgTable(
+  "other_answer_reviews",
+  {
+    /** Which field, e.g. "interview_industry" (OTHER_FIELDS in lib/other-answers-model.ts). */
+    field: text("field").notNull(),
+    /** The value trimmed, spaces collapsed and lower-cased. */
+    valueKey: text("value_key").notNull(),
+    status: text("status").notNull(),
+    updatedBy: text("updated_by").references(() => user.id, { onDelete: "set null" }),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [primaryKey({ columns: [t.field, t.valueKey] }), check("other_answer_reviews_status_ck", sql`${t.status} in ('added', 'not_adding')`)],
+);
+
 /** Emails waiting for the AI reader (no built-in reader, or it found no jobs,
  *  and the user has an AI key). Holds only what the AI needs — the email
  *  reduced to text with numbered link markers, and those links — and is
@@ -1871,6 +1894,8 @@ export const aiInterviews = pgTable(
     // The candidate's setup.
     role: text("role").notNull(),
     industry: text("industry").notNull(),
+    // What the candidate typed when they picked "Other" (Customers → Other answers); null otherwise.
+    industryOther: text("industry_other"),
     category: text("category").notNull(),
     difficulty: text("difficulty").notNull(),
     durationMin: integer("duration_min").notNull(),

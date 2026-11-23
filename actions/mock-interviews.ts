@@ -56,7 +56,7 @@ export async function updateAiBookingAction(id: unknown, form: FormData): Promis
 
   const updated = await db
     .update(aiInterviews)
-    .set({ role: v.role, industry: v.industry, category: v.category, topics: v.topics, ...m })
+    .set({ role: v.role, industry: v.industry, industryOther: v.industryOther || null, category: v.category, topics: v.topics, ...m })
     .where(and(eq(aiInterviews.id, bookingId.data), eq(aiInterviews.userId, userId), eq(aiInterviews.status, "ready")))
     .returning({ id: aiInterviews.id });
   if (!updated.length) return { ok: false, error: "This booking can't be changed any more." };

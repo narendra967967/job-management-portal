@@ -10,7 +10,7 @@ import { greetingName } from "@/lib/email-templates-model";
 import { absoluteUrl } from "@/lib/site-url";
 import { careerBriefFor } from "@/lib/career-data";
 import { getModuleSettings } from "./config";
-import { overallScore, plannedQuestions, type PlannedQuestion } from "./model";
+import { industryShown, overallScore, plannedQuestions, type PlannedQuestion } from "./model";
 import {
   evaluationFormat,
   evaluationSchema,
@@ -146,7 +146,7 @@ async function addUsage(x: Exec, interviewId: string, r: Pick<ModuleAiResult, "t
 function promptValues(i: Row, plan: PlannedQuestion[] | null): PromptValues {
   return {
     role: i.role,
-    industry: i.industry,
+    industry: industryShown(i.industry, i.industryOther),
     category: i.category,
     difficulty: i.difficulty,
     question_count: plan?.length || plannedQuestions(i.durationMin, i.settings.minutesPerQuestion),

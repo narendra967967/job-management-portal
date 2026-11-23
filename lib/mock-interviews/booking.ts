@@ -12,6 +12,7 @@ import { extractResumeText } from "@/lib/resume-extract";
 import { aiInterviews, jobLeadDetails, jobLeads, plans, resumes, user } from "@/db/schema";
 import { aiInterviewsOpen, getModuleSettings, settingsSnapshot } from "@/lib/mock-interviews/config";
 import { DIFFICULTIES, INDUSTRIES, aiInterviewQuote } from "@/lib/mock-interviews/model";
+import { cleanOther, otherError } from "@/lib/other-answers-model";
 import { aiPaymentAvailable, startAiInterviewCheckout, type AiCheckoutStart } from "@/lib/payments/ai-interview-orders";
 import { BILLING_NEEDED } from "@/lib/payments/orders";
 import { getUserBilling } from "@/lib/invoices/billing-profile";
@@ -27,6 +28,8 @@ const LIMITS = { role: 100, paste: 20_000, minJd: 100, minResume: 300, topics: 1
 const setupSchema = z.object({
   role: z.string().trim().min(1, "Enter the role you're interviewing for.").max(LIMITS.role, `Keep the role under ${LIMITS.role} characters.`),
   industry: z.enum(INDUSTRIES, { message: "Pick an industry." }),
+  /** Required when industry is Other (Customers → Other answers); ignored otherwise. */
+  industryOther: z.string().max(500).optional().default(""),
   category: z.string().trim().min(1, "Pick the kind of interview.").max(40),
   difficulty: z.enum(DIFFICULTIES),
   durationMin: z.number().int(),
@@ -138,8 +141,14 @@ export function parseForm(form: FormData): { setup: Setup; file: File | null } |
   }
   const p = setupSchema.safeParse(raw);
   if (!p.success) return { error: p.error.issues[0]?.message ?? "Check the form and try again." };
+  const setup = p.data;
+  if (setup.industry === "Other") {
+    const problem = otherError(setup.industryOther, "interview_industry");
+    if (problem) return { error: problem };
+    setup.industryOther = cleanOther(setup.industryOther);
+  } else setup.industryOther = "";
   const f = form.get("file");
-  return { setup: p.data, file: f instanceof File && f.size > 0 ? f : null };
+  return { setup, file: f instanceof File && f.size > 0 ? f : null };
 }
 
 /**
@@ -201,6 +210,7 @@ export async function bookAiInterview(userId: string, form: FormData): Promise<B
         status: quote ? "pending_payment" : "ready",
         role: v.role,
         industry: v.industry,
+        industryOther: v.industryOther || null,
         category: v.category,
         difficulty: v.difficulty,
         durationMin: v.durationMin,

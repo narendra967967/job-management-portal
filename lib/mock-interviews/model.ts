@@ -35,6 +35,9 @@ export const INDUSTRIES = [
   "Other",
 ] as const;
 
+/** The industry to show and give the AI: what the candidate typed when they picked Other. */
+export const industryShown = (industry: string, other: string | null | undefined) => (industry === "Other" && other ? other : industry);
+
 export const DIFFICULTIES = ["Easy", "Medium", "Hard"] as const;
 export type Difficulty = (typeof DIFFICULTIES)[number];
 

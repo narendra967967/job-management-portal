@@ -52,6 +52,8 @@ The plan editor has **AI mock interviews included**. On a paid plan it's granted
 
 ## How an interview runs
 
+Picking **Other** as the industry on the booking form asks which one. The AI and the candidate's screens use what they typed, and admins see every typed industry in Customers → Other answers.
+
 1. The candidate presses **Start interview** on the briefing page. The AI writes a question plan sized to the length (length ÷ minutes per question). Topics are optional: if the candidate added any, every one is covered; if not, the questions spread across the role, the job description and the resume. The bookings list shows those as "Whole role". It reads the resume, the job description and the candidate's career profile (the report uses the profile too). If that fails, the booking stays ready and nothing is used up.
 2. Questions come one at a time. After each answer the AI either asks a follow-up (at most two per question) or moves to the next planned question. If the AI doesn't reply, the next planned question is asked as written, so the interview carries on.
 3. **The clock only counts connected time.** The screen checks in every 15 seconds. Leaving the interview screen (another page in the app, a reload or closing the tab) pauses the interview at once. If the screen just stops checking in, as with a crash or a lost connection, the candidate shows as away after 20 seconds and counts as disconnected after 45, with the time away dated from the last check-in. Either way the clock stops where it was.

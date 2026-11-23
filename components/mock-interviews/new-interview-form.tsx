@@ -56,6 +56,7 @@ import {
   type PricingByDifficulty,
 } from "@/lib/mock-interviews/model";
 import { cn } from "@/lib/utils";
+import { OTHER_FIELDS, OTHER_MAX, cleanOther, otherError } from "@/lib/other-answers-model";
 import { scrollIntoMain } from "@/components/mock-interviews/scroll-into-main";
 import { LeadPicker } from "@/components/mock-interviews/lead-picker";
 import { CATEGORY_ICON } from "@/components/mock-interviews/category-icons";
@@ -107,6 +108,8 @@ export function NewInterviewForm({
 
   const [role, setRole] = useState(editing?.role ?? fromLead?.title ?? "");
   const [industry, setIndustry] = useState(editing?.industry ?? "");
+  // Picking Other asks what they meant (admin Customers → Other answers).
+  const [industryOther, setIndustryOther] = useState(editing?.industryOther ?? "");
   const [category, setCategory] = useState(editing?.category ?? "");
   const [difficulty, setDifficulty] = useState<Difficulty>(editing?.difficulty ?? "Medium");
   const [duration, setDuration] = useState<number>(editing?.durationMin ?? (options.durations.includes(30) ? 30 : options.durations[0]));
@@ -160,6 +163,10 @@ export function NewInterviewForm({
     if (!role.trim()) e.role = "Enter the role you're interviewing for.";
     else if (role.length > LIMITS.role) e.role = `Keep it under ${LIMITS.role} characters.`;
     if (!industry) e.industry = "Pick an industry.";
+    else if (industry === "Other") {
+      const problem = otherError(industryOther, "interview_industry");
+      if (problem) e.industry = problem;
+    }
     if (!category) e.category = "Pick the kind of interview.";
     if (resumeMode === "saved" && !resumeId) e.resume = "Pick a saved resume, or upload or paste one.";
     if (resumeMode === "upload") {
@@ -199,6 +206,7 @@ export function NewInterviewForm({
       JSON.stringify({
         role: role.trim(),
         industry,
+        industryOther: industry === "Other" ? cleanOther(industryOther) : "",
         category,
         difficulty,
         durationMin: duration,
@@ -280,7 +288,7 @@ export function NewInterviewForm({
   useEffect(() => {
     if (shownErrors) setErrors(validate());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [role, industry, category, resumeMode, resumeId, file, resumeText, jdMode, jdLeadId, jdText, jdLeadHasText]);
+  }, [role, industry, industryOther, category, resumeMode, resumeId, file, resumeText, jdMode, jdLeadId, jdText, jdLeadHasText]);
 
   const err = (k: string) =>
     errors[k] ? (
@@ -382,7 +390,14 @@ export function NewInterviewForm({
               </div>
               <div id="field-industry" className="space-y-1.5">
                 <span className="flex items-center gap-1.5 text-sm font-medium">Industry</span>
-                <Select value={industry} onValueChange={(v) => setIndustry(String(v ?? ""))}>
+                <Select
+                  value={industry}
+                  onValueChange={(v) => {
+                    setIndustry(String(v ?? ""));
+                    // Straight to the box that asks which one.
+                    if (v === "Other") setTimeout(() => document.getElementById("mi-industry-other")?.focus(), 0);
+                  }}
+                >
                   <SelectTrigger aria-label="Industry" aria-invalid={!!errors.industry} className="h-11 w-full sm:h-10">
                     <span className="flex min-w-0 items-center gap-2">
                       <Building2 className="size-4 shrink-0 text-muted-foreground" aria-hidden />
@@ -397,6 +412,23 @@ export function NewInterviewForm({
                     ))}
                   </SelectContent>
                 </Select>
+                {industry === "Other" && (
+                  <>
+                    <label htmlFor="mi-industry-other" className="sr-only">
+                      {OTHER_FIELDS.interview_industry.ask}
+                    </label>
+                    <Input
+                      id="mi-industry-other"
+                      value={industryOther}
+                      maxLength={OTHER_MAX}
+                      onChange={(e) => setIndustryOther(e.target.value)}
+                      placeholder={OTHER_FIELDS.interview_industry.ask}
+                      aria-invalid={!!errors.industry}
+                      aria-required
+                      className="h-11 sm:h-10"
+                    />
+                  </>
+                )}
                 {err("industry")}
               </div>
             </div>

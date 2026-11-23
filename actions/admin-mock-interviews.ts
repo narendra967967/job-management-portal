@@ -232,6 +232,7 @@ export async function creditAiInterviewAction(input: unknown): Promise<Result> {
       status: "ready",
       role: o.role,
       industry: o.industry,
+      industryOther: o.industryOther,
       category: o.category,
       difficulty: o.difficulty,
       durationMin: o.durationMin,

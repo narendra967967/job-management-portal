@@ -27,7 +27,7 @@ import path from "node:path";
 import nodemailer from "nodemailer";
 import pg from "pg";
 import { decryptSecret, encryptSecret } from "../../lib/crypto.ts";
-import { bookAiInterview } from "../../lib/mock-interviews/booking.ts";
+import { bookAiInterview, parseForm } from "../../lib/mock-interviews/booking.ts";
 import { getModuleSettings, settingsSnapshot } from "../../lib/mock-interviews/config.ts";
 import { getBookingSetup, getBriefing, getReport, getSession, listBookings, listInterviews } from "../../lib/mock-interviews/data.ts";
 import { endInterview, evaluateInterview, heartbeat, leaveInterview, startInterview, submitAnswer } from "../../lib/mock-interviews/engine.ts";
@@ -320,7 +320,7 @@ async function main() {
     ])
       await page(p, userCookie);
     const adminWarm: string[] = [];
-    for (const p of ["/jmp-admin/mock-interviews/ai", "/jmp-admin/mock-interviews/settings"]) {
+    for (const p of ["/jmp-admin/mock-interviews/ai", "/jmp-admin/mock-interviews/settings", "/jmp-admin/other-answers"]) {
       const r = await page(p, adminCookie);
       adminWarm.push(`${p} ${r.status}${r.location ? ` → ${r.location}` : ""}`);
     }
@@ -337,6 +337,8 @@ async function main() {
       "testModuleAiAction",
       "getAiInterviewEventsAction",
       "creditAiInterviewAction",
+      "listOtherAnswersAction",
+      "markOtherAnswersAction",
     ];
     // A dev server writes the manifest as it compiles, so give it a moment.
     for (let i = 0; i < 15; i++) {
@@ -348,7 +350,7 @@ async function main() {
     if (missing.length) throw new Error(`actions not in the manifest: ${missing.join(", ")} (admin pages: ${adminWarm.join("; ")})`);
 
     /* ---- A: signed out, and the wrong kind of account ---- */
-    for (const f of ["actions/mock-interviews.ts", "actions/admin-mock-interviews.ts"]) {
+    for (const f of ["actions/mock-interviews.ts", "actions/admin-mock-interviews.ts", "actions/admin-other-answers.ts"]) {
       const a = unguardedActions(f);
       check("A1", `every action in ${f} checks the session (static scan)`, a.unguarded.length === 0, `${a.total} actions; unguarded: ${a.unguarded.join(", ") || "none"}`);
     }
@@ -532,8 +534,8 @@ async function main() {
     {
       const nextEnd = new Date(periodEnd.getTime() + 30 * DAY);
       await q(`update "user" set plan_expires_at = $1 where id = $2`, [nextEnd, u.id]);
-      // Topics are optional: this one is booked with none.
-      const r = await bookAiInterview(u.id, form(setup({ topics: [] })));
+      // Topics are optional: this one is booked with none, and with Other as the industry.
+      const r = await bookAiInterview(u.id, form(setup({ topics: [], industry: "Other", industryOther: `  SEC   Industry ${RUN} ` })));
       const [noTopics] = r.ok ? await q<{ topics: string[] }>("select topics from ai_interviews where id = $1", [r.id]) : [];
       check("C5", "a renewed period gets its own allowance, booked with no topics (sanity)", r.ok && (await planRows()) === 2 && noTopics?.topics.length === 0, r.ok ? "booked" : r.error);
     }
@@ -817,6 +819,56 @@ async function main() {
           r9.active_seconds === 300,
         `${shown?.status}, ${shown?.resumeSecondsLeft}s left; back: ${r9.away_seconds}s away, clock ${r9.active_seconds}s`,
       );
+    }
+
+    /* ---- O: "Other" answers (admin Customers → Other answers) ---- */
+    {
+      const typed = `SEC Industry ${RUN}`;
+      const parse = (over: Record<string, unknown>) => parseForm(form(setup(over)));
+      const missing = parse({ industry: "Other", industryOther: " " });
+      const dropped = parse({ industry: INDUSTRIES[0], industryOther: "Something else" });
+      check(
+        "O1",
+        "Other needs a typed industry; with any other pick the typed text is dropped",
+        "error" in missing && /Which industry/.test(missing.error) && "setup" in dropped && dropped.setup.industryOther === "",
+        "error" in missing ? missing.error : "accepted",
+      );
+      const [stored] = await q<{ id: string; industry: string; industry_other: string | null }>(
+        "select id, industry, industry_other from ai_interviews where user_id = $1 and role = $2 and industry = 'Other' order by created_at desc limit 1",
+        [u.id, MARK],
+      );
+      const shown = stored ? (await listBookings(u.id)).find((b) => b.id === stored.id) : undefined;
+      check(
+        "O2",
+        "the typed industry is kept cleaned up and shown in place of Other",
+        stored?.industry_other === typed && shown?.industry === typed,
+        `${stored?.industry_other ?? "none stored"} / shown ${shown?.industry ?? "-"}`,
+      );
+
+      const key = typed.toLowerCase();
+      const asUser = await action("listOtherAnswersAction", [], userCookie);
+      const asUserMark = await action("markOtherAnswersAction", [{ items: [{ field: "interview_industry", key }], status: "added" }], userCookie);
+      const userMarked = await q("select 1 from other_answer_reviews where value_key = $1", [key]);
+      const listed = await action("listOtherAnswersAction", [], adminCookie);
+      const row = Array.isArray(listed.value) ? (listed.value as { key: string; value: string; answers: number; status: string }[]).find((x) => x.key === key) : undefined;
+      check(
+        "O3",
+        "only an admin can list or mark Other answers; the list groups them",
+        asUser.status === 303 && asUserMark.status === 303 && refused(asUserMark) && userMarked.length === 0 && row?.value === typed && row.answers >= 1 && row.status === "new",
+        `user ${asUser.status}/${asUserMark.status} ${JSON.stringify(asUserMark.value)}; admin row ${row ? `${row.value} ×${row.answers} ${row.status}` : "missing"}`,
+      );
+      const marked = await action("markOtherAnswersAction", [{ items: [{ field: "interview_industry", key }], status: "added" }], adminCookie);
+      const [mark1] = await q<{ status: string }>("select status from other_answer_reviews where field = 'interview_industry' and value_key = $1", [key]);
+      const badKey = await action("markOtherAnswersAction", [{ items: [{ field: "interview_industry", key: typed }], status: "added" }], adminCookie);
+      const back = await action("markOtherAnswersAction", [{ items: [{ field: "interview_industry", key }], status: "new" }], adminCookie);
+      const after = await q("select 1 from other_answer_reviews where value_key = $1", [key]);
+      check(
+        "O4",
+        "marking sets the status, New clears it, and a key the list didn't make is refused",
+        (marked.value as { ok?: boolean })?.ok === true && mark1?.status === "added" && (badKey.value as { ok?: boolean })?.ok === false && (back.value as { ok?: boolean })?.ok === true && after.length === 0,
+        `${mark1?.status ?? "no mark"}; odd key ${JSON.stringify(badKey.value)}; after New ${after.length} marks`,
+      );
+      await q("delete from other_answer_reviews where value_key = $1", [key]);
     }
 
     /* ---- T: with no topics, the AI plans across the whole role ---- */

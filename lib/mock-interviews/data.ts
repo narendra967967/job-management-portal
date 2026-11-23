@@ -20,6 +20,7 @@ import type {
   PlannedQuestion,
   ReportWriting,
 } from "./model";
+import { industryShown } from "./model";
 
 // What the candidate's Mock interviews screens read. Every query is scoped to
 // the signed-in user (callers pass getCurrentUserId()).
@@ -109,7 +110,7 @@ function toBooking(i: InterviewRow, reportId: string | undefined, now: number, o
     id: i.id,
     role: i.role,
     category: i.category,
-    industry: i.industry,
+    industry: industryShown(i.industry, i.industryOther),
     difficulty: i.difficulty as Difficulty,
     durationMin: i.durationMin,
     topics: i.topics,
@@ -221,6 +222,8 @@ export interface BookingSetup {
   id: string;
   role: string;
   industry: string;
+  /** What they typed when industry is Other, or "". */
+  industryOther: string;
   category: string;
   difficulty: Difficulty;
   durationMin: number;
@@ -241,6 +244,7 @@ export async function getBookingSetup(userId: string, id: string): Promise<Booki
     id: i.id,
     role: i.role,
     industry: i.industry,
+    industryOther: i.industryOther ?? "",
     category: i.category,
     difficulty: i.difficulty as Difficulty,
     durationMin: i.durationMin,
@@ -342,7 +346,7 @@ export async function listInterviews(userId: string): Promise<InterviewSummary[]
       source: "ai",
       role: i.role,
       category: i.category,
-      industry: i.industry,
+      industry: industryShown(i.industry, i.industryOther),
       difficulty: i.difficulty as Difficulty,
       durationMin: i.durationMin,
       date: i.startedAt!.toISOString(),
