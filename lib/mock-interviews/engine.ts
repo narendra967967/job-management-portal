@@ -39,6 +39,13 @@ import {
 
 const BEAT_CAP_SEC = 25;
 export const DISCONNECT_SEC = 45;
+/**
+ * No heartbeat for this long (the screen beats every 15 seconds) and the
+ * candidate is shown as away: the bookings list and the prep page count down
+ * their time away from the last heartbeat, before the server marks the drop at
+ * DISCONNECT_SEC. Coming back after this long counts the gap as time away.
+ */
+export const AWAY_SHOWN_SEC = 20;
 const MAX_FOLLOW_UPS = 2;
 /** Report attempts before the cron job gives up on an interview. */
 const MAX_EVALUATION_TRIES = 6;
@@ -304,6 +311,14 @@ export async function startInterview(userId: string, id: string): Promise<{ ok: 
     }
     if (i.status === "in_progress") {
       // Rejoining (a reload or a second tab): the clock carries on as it was.
+      // After a gap the screens already showed as away, that gap is time away.
+      const gap = i.lastActiveAt ? (now.getTime() - i.lastActiveAt.getTime()) / 1000 : 0;
+      if (gap > AWAY_SHOWN_SEC) {
+        const awaySeconds = Math.min(awayAllowance(i), i.awaySeconds + Math.round(gap));
+        await tx.update(aiInterviews).set({ lastActiveAt: now, awaySeconds }).where(eq(aiInterviews.id, id));
+        await logEvent(tx, id, "resume", `Came back after ${Math.round(gap)} seconds away; ${minutes(awayAllowance(i) - awaySeconds)} of time away left`, i.activeSeconds);
+        return { row: { ...i, lastActiveAt: now, awaySeconds } };
+      }
       return { row: i };
     }
     return { error: "This interview has finished." };
@@ -554,7 +569,9 @@ export async function submitAnswer(
   let evaluate = false;
   const reply = await db.transaction(async (tx) => {
     const fresh = await lockOwn(tx, userId, id);
-    if (!fresh || fresh.status !== "in_progress") return null;
+    // Paused while the AI was writing (the candidate left the screen): still save
+    // it, or they'd come back to an interview with no question waiting.
+    if (!fresh || (fresh.status !== "in_progress" && fresh.status !== "interrupted")) return null;
     const seq = await nextSeq(tx, id);
     if (seq !== saved.answer.seq + 1) return null;
     if (decision.action === "end") {
@@ -593,6 +610,33 @@ export async function submitAnswer(
   }
   const { state, ...message } = reply;
   return { ok: true, messages: [...out, message], state };
+}
+
+/**
+ * The candidate left the interview screen (another page in the app, a reload
+ * or a closed tab): pause now instead of waiting DISCONNECT_SEC, so the
+ * bookings list and the prep page show the countdown straight away (D13f).
+ * The time up to now is counted first. Coming back resumes it as usual.
+ */
+export async function leaveInterview(userId: string, id: string): Promise<void> {
+  let evaluate = false;
+  await db.transaction(async (tx) => {
+    const i = await lockOwn(tx, userId, id);
+    if (!i || i.status !== "in_progress") return;
+    const now = new Date();
+    const t = await tick(tx, i, now);
+    if (t.closed) {
+      evaluate = t.evaluate;
+      return;
+    }
+    if (overTime(i)) {
+      evaluate = await finish(tx, i, "time_up", CLOSING);
+      return;
+    }
+    await tx.update(aiInterviews).set({ status: "interrupted", interruptedAt: now }).where(eq(aiInterviews.id, id));
+    await logEvent(tx, id, "disconnect", "Left the interview screen; clock paused", i.activeSeconds);
+  });
+  if (evaluate) later(() => evaluateInterview(id));
 }
 
 /** The candidate ends the interview early (D10): what they answered is scored. */

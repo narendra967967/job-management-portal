@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { aiInterviewMessages, aiInterviews, interviewEvaluations, jobLeads, paymentOrders, plans, resumes, user } from "@/db/schema";
 import { careerCompletionFor } from "@/lib/career-data";
 import { aiPaymentAvailable } from "@/lib/payments/ai-interview-orders";
-import { awayLeftSeconds, settleInterview, type Phase } from "./engine";
+import { AWAY_SHOWN_SEC, awayLeftSeconds, settleInterview, type Phase } from "./engine";
 import type {
   AllowanceState,
   BookingRow,
@@ -92,8 +92,19 @@ function bookingStatus(i: InterviewRow, now: number): BookingStatus {
   }
 }
 
+/**
+ * In progress, but no heartbeat for AWAY_SHOWN_SEC: the candidate isn't on the
+ * interview screen, so show it as paused from the last heartbeat, which is
+ * where the server will date the drop once it marks it (DISCONNECT_SEC).
+ */
+function shownAway(i: InterviewRow, now: number): boolean {
+  return i.status === "in_progress" && !!i.lastActiveAt && now - i.lastActiveAt.getTime() > AWAY_SHOWN_SEC * 1000;
+}
+
 function toBooking(i: InterviewRow, reportId: string | undefined, now: number, orderId?: string): BookingRow {
-  const status = bookingStatus(i, now);
+  const away = shownAway(i, now);
+  const status = away ? "interrupted" : bookingStatus(i, now);
+  const awayLeft = awayLeftSeconds(away ? { ...i, status: "interrupted", interruptedAt: i.lastActiveAt } : i, now);
   return {
     id: i.id,
     role: i.role,
@@ -113,9 +124,9 @@ function toBooking(i: InterviewRow, reportId: string | undefined, now: number, o
             ? { kind: "credit" }
             : { kind: "free" },
     status,
-    ...(status === "interrupted"
-      ? { resumeSecondsLeft: awayLeftSeconds(i, now), resumeMinutesLeft: Math.ceil(awayLeftSeconds(i, now) / 60) }
-      : {}),
+    ...(status === "interrupted" ? { resumeSecondsLeft: awayLeft } : {}),
+    // Also while in progress, so the prep page shows what's really left, not the full allowance.
+    ...(status === "interrupted" || status === "in_progress" ? { resumeMinutesLeft: Math.ceil(awayLeft / 60) } : {}),
     ...(reportId ? { reportId } : {}),
   };
 }

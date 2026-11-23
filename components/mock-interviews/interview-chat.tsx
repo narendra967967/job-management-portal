@@ -72,6 +72,9 @@ function lengthHint(n: number) {
   };
 }
 
+/** Interview screens open in this tab, by interview id (see the leave effect). */
+const openScreens = new Map<string, number>();
+
 export function InterviewChat({ session }: { session: SessionData }) {
   const router = useRouter();
   const profile = useProfile();
@@ -124,6 +127,34 @@ export function InterviewChat({ session }: { session: SessionData }) {
       window.removeEventListener("offline", update);
     };
   }, []);
+
+  // Leaving the screen pauses the interview straight away (D13f) instead of
+  // after the 45-second heartbeat gap, so the bookings list and the prep page
+  // show the countdown at once: another page in the app unmounts this, and a
+  // reload or a closed tab fires pagehide (sendBeacon still gets through then).
+  const endedRef = useRef(ended);
+  useEffect(() => {
+    endedRef.current = ended;
+  }, [ended]);
+  useEffect(() => {
+    const id = session.id;
+    const url = `/api/mock-interviews/${id}/leave`;
+    const leave = () => {
+      if (endedRef.current) return;
+      if (!navigator.sendBeacon?.(url)) void fetch(url, { method: "POST", keepalive: true }).catch(() => {});
+    };
+    openScreens.set(id, (openScreens.get(id) ?? 0) + 1);
+    window.addEventListener("pagehide", leave);
+    return () => {
+      window.removeEventListener("pagehide", leave);
+      openScreens.set(id, (openScreens.get(id) ?? 1) - 1);
+      // The page swaps in a fresh screen when the status changes (and React mounts
+      // twice in development): only leaving with none open a tick later counts.
+      setTimeout(() => {
+        if (!openScreens.get(id)) leave();
+      }, 0);
+    };
+  }, [session.id]);
 
   // Coming back to an interrupted interview resumes it.
   useEffect(() => {

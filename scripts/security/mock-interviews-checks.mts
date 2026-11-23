@@ -30,7 +30,7 @@ import { decryptSecret, encryptSecret } from "../../lib/crypto.ts";
 import { bookAiInterview } from "../../lib/mock-interviews/booking.ts";
 import { getModuleSettings, settingsSnapshot } from "../../lib/mock-interviews/config.ts";
 import { getBookingSetup, getBriefing, getReport, getSession, listBookings, listInterviews } from "../../lib/mock-interviews/data.ts";
-import { endInterview, evaluateInterview, heartbeat, startInterview, submitAnswer } from "../../lib/mock-interviews/engine.ts";
+import { endInterview, evaluateInterview, heartbeat, leaveInterview, startInterview, submitAnswer } from "../../lib/mock-interviews/engine.ts";
 import { INDUSTRIES, METRICS, overallScore } from "../../lib/mock-interviews/model.ts";
 import { evaluationSchema, materialBlock, NO_TOPICS, parseJsonObject, planFormat, toWriting } from "../../lib/mock-interviews/prompts.ts";
 import { aiPaymentAvailable } from "../../lib/payments/ai-interview-orders.ts";
@@ -772,6 +772,51 @@ async function main() {
       const beat3 = await heartbeat(u.id, marked);
       const r6 = await state(marked);
       check("R6", "a heartbeat from the screen resumes a paused interview", beat3?.status === "in_progress" && r6.status === "in_progress" && Math.abs(r6.away_seconds - 120) <= 2, `${r6.status}, ${r6.away_seconds}s away`);
+
+      // Leaving the screen pauses it at once, with the time up to now counted.
+      const leaving = await insertInterview(u.id, MARK, "in_progress", { ...started, last_active_at: new Date(Date.now() - 10_000) });
+      await leaveInterview(u.id, leaving);
+      const [r7] = await q<{ status: string; active_seconds: number; interrupted_at: Date }>("select status, active_seconds, interrupted_at from ai_interviews where id = $1", [leaving]);
+      const leftList = (await listBookings(u.id)).find((b) => b.id === leaving);
+      check(
+        "R7",
+        "leaving the screen pauses the interview at once and counts the time up to then",
+        r7.status === "interrupted" && r7.active_seconds === 310 && Date.now() - r7.interrupted_at.getTime() < 5_000 && (leftList?.resumeSecondsLeft ?? 0) >= allowance - 5,
+        `${r7.status}, clock ${r7.active_seconds}s, ${leftList?.resumeSecondsLeft}s left`,
+      );
+
+      // The leave route: only our own pages, only signed in, only the caller's interview.
+      const url = `${APP}/api/mock-interviews/${leaving}/leave`;
+      const signedOut = await realFetch(url, { method: "POST" });
+      const foreign = await realFetch(url, { method: "POST", headers: { cookie: userCookie, origin: "https://evil.example" } });
+      const otherBefore = await rowOf(otherLive);
+      await leaveInterview(u.id, otherLive);
+      const otherAfter = await rowOf(otherLive);
+      check(
+        "R8",
+        "the leave route refuses signed-out and other-site requests, and can't pause another user's interview",
+        signedOut.status === 401 && foreign.status === 403 && otherAfter.status === otherBefore.status && otherAfter.active_seconds === otherBefore.active_seconds,
+        `${signedOut.status} / ${foreign.status} / other ${otherAfter.status}`,
+      );
+
+      // Not on the screen for over 20 seconds, before the server marks the drop at 45:
+      // shown as paused with the real time left, and that gap is time away on return.
+      const quiet = await insertInterview(u.id, MARK, "in_progress", { ...started, away_seconds: 300, last_active_at: new Date(Date.now() - 30_000) });
+      const shown = (await listBookings(u.id)).find((b) => b.id === quiet);
+      const brief = await getBriefing(u.id, quiet);
+      await startInterview(u.id, quiet);
+      const r9 = await state(quiet);
+      check(
+        "R9",
+        "in the 20 to 45 second gap it shows as paused with the real time left; coming back counts the gap",
+        shown?.status === "interrupted" &&
+          Math.abs((shown?.resumeSecondsLeft ?? 0) - (allowance - 330)) <= 2 &&
+          brief?.booking.resumeSecondsLeft !== undefined &&
+          r9.status === "in_progress" &&
+          Math.abs(r9.away_seconds - 330) <= 2 &&
+          r9.active_seconds === 300,
+        `${shown?.status}, ${shown?.resumeSecondsLeft}s left; back: ${r9.away_seconds}s away, clock ${r9.active_seconds}s`,
+      );
     }
 
     /* ---- T: with no topics, the AI plans across the whole role ---- */
