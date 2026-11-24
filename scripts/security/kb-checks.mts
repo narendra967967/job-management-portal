@@ -158,6 +158,7 @@ const answered: [string, string][] = [
   ["What do users type when they pick Other?", "Other answers"],
   ["What does the Practiced chip on a lead card mean?", "Interview practice on leads"],
   ["How does a user practice for an interview from a lead?", "Interview practice on leads"],
+  ["Why did a lead with an interview date not go stale?", "Interview practice on leads"],
   ["How do I switch email sending to Amazon SES?", "Amazon SES"],
   ["SES test connection says sandbox", "Amazon SES"],
   ["discarding a lead", "discarding"],

@@ -22,6 +22,7 @@ Roles get filled while leads sit untouched, so once a day the system moves quiet
 
 - Top Choice leads
 - Leads with a pending reminder or an open to-do
+- Leads with an interview date still ahead
 - Interview and Offer Received leads
 - Leads the user moved back by hand
 

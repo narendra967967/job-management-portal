@@ -1,5 +1,5 @@
 ---
-title: Interview practice on leads (practice panel, Practiced chip, Interviews coming up)
+title: Interview practice on leads (practice panel, interview dates, practice to-do, Interviews coming up)
 category: Leads and automation
 summary: While AI mock interviews are open, every lead links to practice for that job. The lead page shows past practices and the latest score with its change, cards get a Practiced chip, and moving a lead to Interview offers a practice right away.
 keywords: practice, mock interview from lead, readiness, practiced filter, prepare for interview, interview coming up, practice now, score trend

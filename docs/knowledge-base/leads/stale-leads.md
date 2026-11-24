@@ -9,6 +9,7 @@ A lead goes stale when all of these are true:
 
 - It's **New, Shortlisted or Applied**. Interview and Offer Received leads never go stale, since they're clearly active.
 - It has **no pending reminder**.
+- It has **no interview date still ahead**. A user can give a lead its interview date (set when moving it to Interview, or on the lead page); until that date passes the lead stays put, even on an Applied lead that's gone quiet.
 - **Nothing has happened on it** for longer than the user's limit, set in Settings → Follow-ups under "Flag lead as stale after (days)". The default is 14.
 
 "Something happened" means the latest of: the lead being captured, the user changing it (stage, Top Choice, edits), saving its description, adding a contact, or an alert listing the same job again.

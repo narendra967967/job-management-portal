@@ -1,7 +1,7 @@
 # Linking leads and mock interviews: roadmap
 
-Status: **phases 1 and 2 built** (November 24, 2026). Phases 3 and 4 follow once the owner
-signs off on 1 and 2, built together.
+Status: **all four phases built** (November 24, 2026). Waiting for the owner to deploy
+(migration 0071 goes with phases 3 and 4).
 
 ## Goal
 
@@ -106,6 +106,27 @@ Coming soon; the badge numbers match the reports.
 
 Both touch the schema (two tables in total), so this phase needs sign-off before it starts.
 
+## How phases 3 and 4 were built
+
+- Migration 0071: `task_kind` gets "practice"; `job_leads.interview_at` and
+  `interview_reminded_at`; `ai_interviews.company` (backfilled from existing leads).
+- Item 9: `guessIndustry` (lib/mock-interviews/model.ts) fills the industry when the job
+  description makes it clear. "Suggest topics from this job" calls `suggestTopicsAction` →
+  `suggestTopicsForLead` (lib/mock-interviews/topic-suggest.ts): the user's own key via
+  `aiComplete`, keyword matching (`keywordTopics`) without a key or when the reply is unusable.
+- Item 11: the booking keeps `company`; `{{company}}` placeholder; the material block and
+  `companyNote` tell the interviewer.
+- Item 7: `setInterviewDateAction`; `InterviewPromptHost` (a dialog, replaces the phase 2
+  toast) asks for the date and offers Practice now; `InterviewDateRow` on the lead page;
+  Interviews coming up orders by date. `interviewAhead` keeps a lead from going stale, and the
+  daily rules and lead retention skip it. **Change from the plan:** the reminder is one bell
+  notification under a day before (`sendInterviewReminders`, run by the 5-minute mock
+  interview upkeep job), not a row in Reminders, whose outcomes are all about follow-ups. No
+  email, so no Email templates entry.
+- Item 6: `ensurePracticeTask` on a manual move to Interview (only while AI interviews are
+  open), due the day before the interview; `closePracticeTasks` when a report is saved.
+- Checks P1–P10; KB: interview practice on leads, stale leads, automatic cleanup, lead retention.
+
 ## Owner decisions (November 24, 2026)
 
 1. **Readiness (item 12):** the latest score, with an up or down arrow and the change from the
@@ -138,5 +159,5 @@ Both touch the schema (two tables in total), so this phase needs sign-off before
 |---|---|
 | 1 | Done (November 24, 2026) |
 | 2 | Done (November 24, 2026) |
-| 3 | Not started |
-| 4 | Not started |
+| 3 | Done (November 24, 2026) |
+| 4 | Done (November 24, 2026) |

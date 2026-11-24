@@ -15,7 +15,7 @@ It's set in **admin Settings → Cron & schedule**:
 | Delete leads older than (days) | Measured from last activity, 90 by default |
 | Applies to statuses | Only leads in these statuses are deleted |
 
-It runs in the daily cron job and is skipped while switched off.
+It runs in the daily cron job and is skipped while switched off. A lead whose interview date is still ahead is never deleted, whatever its status, until that date passes.
 
 ## Every run is accounted for
 
