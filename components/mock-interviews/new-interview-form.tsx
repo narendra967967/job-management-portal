@@ -31,7 +31,6 @@ import { Input } from "@/components/ui/input";
 import { MarkdownEditor } from "@/components/ui/markdown-editor";
 import { ChipInput } from "@/components/ui/chip-input";
 import { InfoTip } from "@/components/ui/info-tip";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SearchSelect } from "@/components/ui/search-select";
 import { toast } from "@/components/ui/toast";
 import { useLeadDetail, useLeads, useResumes } from "@/lib/mock-store";
@@ -134,9 +133,8 @@ export function NewInterviewForm({
   const [billingInitial, setBillingInitial] = useState<BillingDetails>(EMPTY_BILLING);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Select shows the chosen item's label only when it knows the labels.
-  const resumeLabels = useMemo(
-    () => Object.fromEntries(resumes.map((r) => [r.id, r.isDefault ? `${r.label} (default)` : r.label])),
+  const resumeOptions = useMemo(
+    () => resumes.map((r) => ({ value: r.id, label: r.isDefault ? `${r.label} (default)` : r.label })),
     [resumes],
   );
   const jdLead = useLeadDetail(jdLeadId);
@@ -578,19 +576,16 @@ export function NewInterviewForm({
               />
               {resumeMode === "saved" &&
                 (resumes.length ? (
-                  <Select items={resumeLabels} value={resumeId} onValueChange={(v) => setResumeId(String(v ?? ""))}>
-                    <SelectTrigger aria-label="Saved resume" className="h-11 w-full sm:h-10">
-                      <SelectValue placeholder="Pick a resume" />
-                    </SelectTrigger>
-                    <SelectContent className="w-auto min-w-(--anchor-width)">
-                      {resumes.map((r) => (
-                        <SelectItem key={r.id} value={r.id}>
-                          {r.label}
-                          {r.isDefault ? " (default)" : ""}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <SearchSelect
+                    value={resumeId}
+                    onChange={setResumeId}
+                    options={resumeOptions}
+                    placeholder="Pick or search your resumes"
+                    icon={FileText}
+                    ariaLabel="Saved resume"
+                    invalid={!!errors.resume}
+                    emptyText="No saved resume matches that."
+                  />
                 ) : (
                   <p className="text-xs text-muted-foreground">
                     You haven&apos;t saved a resume yet. Upload one here, or add it in{" "}

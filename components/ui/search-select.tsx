@@ -64,6 +64,8 @@ export function SearchSelect({
           placeholder={placeholder}
           aria-label={ariaLabel}
           aria-invalid={invalid || undefined}
+          // With something already picked, typing starts a fresh search instead of adding to its name.
+          onFocus={(e) => e.currentTarget.select()}
           className={cn(
             "h-full w-full min-w-0 rounded-lg border-0 bg-transparent pr-10 text-base outline-none placeholder:text-muted-foreground md:text-sm",
             Icon ? "pl-9" : "pl-2.5",
