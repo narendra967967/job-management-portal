@@ -18,7 +18,6 @@ import {
   Receipt,
   RotateCcw,
   Search,
-  Sparkles,
   Timer,
   type LucideIcon,
 } from "lucide-react";
@@ -347,19 +346,41 @@ function Hero({ allowance, pricing, mounted, plansInclude }: { allowance: Allowa
   const rate = rupees(lowestRatePerMinute(pricing));
   const example = aiInterviewQuote(30, pricing.Medium).final;
   const left = allowanceLeft(allowance);
-  let headline: string;
-  let note: string;
+  const from = <strong className="font-semibold text-foreground">from {rate} a minute</strong>;
+  // The subtitle says what booking costs this user right now (it used to be a box beside the title).
+  let line: React.ReactNode;
   if (allowance.kind === "plan") {
-    headline = `${left} of ${allowance.included} included on ${allowance.planName}`;
-    note = `Renews with your plan${mounted ? ` on ${longDate(allowance.periodEnds)}` : ""}; unused ones don't carry over. After that, from ${rate} a minute.`;
-  } else if (allowance.kind === "free") {
-    headline = left > 1 ? `${left} free interviews ready` : left === 1 ? "1 free interview ready" : "Free interview used";
-    note = left > 0 ? "Free plan interviews are given once, not every month, and can be any length." : `From ${rate} a minute; a 30-minute Medium interview is ${rupees(example)}.`;
+    const until = mounted ? ` until ${longDate(allowance.periodEnds)}` : "";
+    line =
+      left > 0 ? (
+        <>
+          <strong className="font-semibold text-foreground">
+            {left} of {allowance.included} included {allowance.included === 1 ? "interview" : "interviews"} left
+          </strong>{" "}
+          on {allowance.planName}{until}. Unused ones don&apos;t carry over; after that, it&apos;s {from}.
+        </>
+      ) : (
+        <>
+          You&apos;ve used the interviews included on {allowance.planName}; more come with your plan{mounted ? ` on ${longDate(allowance.periodEnds)}` : ""}. Until
+          then, it&apos;s {from}.
+        </>
+      );
+  } else if (allowance.kind === "free" && left > 0) {
+    line = (
+      <>
+        <strong className="font-semibold text-foreground">{left === 1 ? "Your free interview is ready" : `${left} free interviews are ready`}</strong>, at any
+        length. Start it whenever you like and get a scored report.
+      </>
+    );
   } else {
-    headline = `From ${rate} a minute`;
-    note = `Depends on difficulty; a 30-minute Medium interview is ${rupees(example)}.${plansInclude ? " Some paid plans include interviews." : ""}`;
+    line = (
+      <>
+        {allowance.kind === "free" ? "Your free interview is used. Book another " : "Book an interview "}
+        {from} (a 30-minute Medium one is {rupees(example)}), start it when you&apos;re ready, and get a scored report.
+        {plansInclude ? " Some paid plans include interviews." : ""}
+      </>
+    );
   }
-  const pct = allowance.kind === "plan" ? (left / Math.max(1, allowance.included)) * 100 : left > 0 ? 100 : 0;
 
   return (
     <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
@@ -370,23 +391,11 @@ function Hero({ allowance, pricing, mounted, plansInclude }: { allowance: Allowa
           </span>
           <div className="min-w-0">
             <h1 className="text-xl font-semibold tracking-tight">AI mock interviews</h1>
-            <p className="text-sm text-muted-foreground">Book an interview, start it when you&apos;re ready, and get a scored report.</p>
+            <p className="text-sm text-muted-foreground">{line}</p>
           </div>
         </div>
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="min-w-0 rounded-xl border bg-white/70 px-3 py-2 sm:w-64">
-            <p className="flex items-center gap-1.5 text-sm font-semibold">
-              <Sparkles className="size-4 text-primary" aria-hidden />
-              {headline}
-            </p>
-            {allowance.kind !== "none" && (
-              <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted" aria-hidden>
-                <div className="h-full rounded-full bg-gradient-to-r from-primary to-violet-500" style={{ width: `${pct}%` }} />
-              </div>
-            )}
-            <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{note}</p>
-          </div>
           <CtaGlow className="w-full shrink-0 sm:w-auto">
             <Link href="/mock-interviews/ai/new" className={cn(ctaClass({ size: "md" }), "w-full sm:w-auto")}>
               <Plus aria-hidden />
