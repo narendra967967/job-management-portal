@@ -35,6 +35,7 @@ import { toast } from "@/components/ui/toast";
 import { startInterviewAction } from "@/actions/mock-interviews";
 import { LevelTag } from "@/components/mock-interviews/visual-kit";
 import { useCountdown } from "@/components/mock-interviews/use-countdown";
+import { CtaGlow, ctaClass } from "@/components/mock-interviews/cta";
 import type { BriefingData } from "@/lib/mock-interviews/data";
 import { METRICS, plannedQuestions, type MetricKey } from "@/lib/mock-interviews/model";
 import { cn } from "@/lib/utils";
@@ -357,29 +358,14 @@ function StartButton({ resuming, href, compact }: { resuming: boolean; href: str
       setBusy(false);
     }
   }
-  const gradient = resuming ? "from-amber-500 via-orange-500 to-rose-500" : "from-primary via-violet-600 to-fuchsia-600";
+  const tone = resuming ? "amber" : "primary";
   return (
-    // A soft glowing halo behind the button marks it as the page's main action;
-    // it holds still for anyone who prefers reduced motion.
-    <span className={cn("relative inline-flex", compact ? "flex-1 sm:flex-none sm:shrink-0" : "w-full")}>
-      <span
-        aria-hidden
-        className={cn(
-          "pointer-events-none absolute -inset-1 rounded-2xl bg-gradient-to-r opacity-50 blur-md",
-          gradient,
-          !busy && "animate-pulse motion-reduce:animate-none",
-        )}
-      />
+    <CtaGlow tone={tone} pulse={!busy} className={compact ? "flex-1 sm:flex-none sm:shrink-0" : "w-full"}>
       <button
         type="button"
         onClick={go}
         disabled={busy}
-        className={cn(
-          "relative inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r font-semibold text-white shadow-lg ring-1 ring-white/25 transition-transform focus-visible:ring-4 focus-visible:ring-primary/40 focus-visible:outline-none disabled:opacity-90 motion-safe:hover:-translate-y-0.5",
-          gradient,
-          resuming ? "shadow-orange-500/30" : "shadow-primary/30",
-          compact ? "h-12 w-full px-4 text-sm sm:w-auto" : "h-14 w-full px-5 text-base",
-        )}
+        className={cn(ctaClass({ tone, size: compact ? "md" : "lg" }), "w-full", compact && "sm:w-auto")}
       >
         {busy ? (
           <Loader2 className="size-5 animate-spin motion-reduce:animate-none" aria-hidden />
@@ -390,7 +376,7 @@ function StartButton({ resuming, href, compact }: { resuming: boolean; href: str
         )}
         {busy ? (resuming ? "Resuming…" : "Preparing your questions…") : resuming ? "Resume interview" : "Start interview"}
       </button>
-    </span>
+    </CtaGlow>
   );
 }
 

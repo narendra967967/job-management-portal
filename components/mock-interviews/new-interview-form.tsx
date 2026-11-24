@@ -27,7 +27,6 @@ import {
   Upload,
   type LucideIcon,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MarkdownEditor } from "@/components/ui/markdown-editor";
 import { ChipInput } from "@/components/ui/chip-input";
@@ -59,6 +58,7 @@ import { cn } from "@/lib/utils";
 import { OTHER_FIELDS, OTHER_MAX, cleanOther, otherError } from "@/lib/other-answers-model";
 import { scrollIntoMain } from "@/components/mock-interviews/scroll-into-main";
 import { LeadPicker } from "@/components/mock-interviews/lead-picker";
+import { CtaGlow, ctaClass } from "@/components/mock-interviews/cta";
 import { CATEGORY_ICON } from "@/components/mock-interviews/category-icons";
 
 // New AI interview (spec D10, D11). R1.2: the form validates on the client and
@@ -796,15 +796,12 @@ export function NewInterviewForm({
                 ))}
               </ul>
 
-              <Button
-                className="hidden w-full bg-gradient-to-r from-primary to-violet-600 text-white shadow-sm hover:opacity-90 lg:inline-flex"
-                size="lg"
-                onClick={start}
-                disabled={starting}
-              >
-                {starting ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Rocket className="size-4" aria-hidden />}
-                {startLabel}
-              </Button>
+              <CtaGlow pulse={!starting} className="hidden w-full lg:inline-flex">
+                <button type="button" className={ctaClass({ full: true })} onClick={start} disabled={starting}>
+                  {starting ? <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden /> : <Rocket aria-hidden />}
+                  {startLabel}
+                </button>
+              </CtaGlow>
               <p className="text-[11px] leading-relaxed text-muted-foreground">
                 Your answers are processed by an AI service to produce your feedback.
               </p>
@@ -823,21 +820,19 @@ export function NewInterviewForm({
 
       {/* Phones and tablets: the start button stays in reach (right padding keeps it clear of the help bubble). */}
       <div className="sticky bottom-0 z-10 -mx-1 flex items-center gap-3 rounded-2xl border bg-card/95 p-3 pr-[4.75rem] shadow-md backdrop-blur sm:pr-[5.25rem] lg:hidden">
-        <div className="min-w-0 flex-1">
+        {/* Phones: the button takes the bar (the price is in its label, the count at the top of the form). */}
+        <div className="hidden min-w-0 flex-1 sm:block">
           <p className="text-[11px] text-muted-foreground">
             {readyCount} of {checklist.length} ready · ~{questions} questions
           </p>
           <p className="truncate text-sm font-semibold">{editing ? "Already booked" : included ? "Included in your plan" : rupees(price)}</p>
         </div>
-        <Button
-          className="shrink-0 bg-gradient-to-r from-primary to-violet-600 text-white shadow-sm hover:opacity-90"
-          size="lg"
-          onClick={start}
-          disabled={starting}
-        >
-          {starting ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Rocket className="size-4" aria-hidden />}
-          {startLabel}
-        </Button>
+        <CtaGlow pulse={!starting} className="flex-1 sm:flex-none sm:shrink-0">
+          <button type="button" className={cn(ctaClass({ size: "md" }), "w-full sm:w-auto")} onClick={start} disabled={starting}>
+            {starting ? <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden /> : <Rocket aria-hidden />}
+            {startLabel}
+          </button>
+        </CtaGlow>
       </div>
       <BillingDetailsDialog
         open={askBilling}

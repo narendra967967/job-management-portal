@@ -47,6 +47,7 @@ import type { Readiness } from "@/lib/mock-interviews/data";
 import { emailMyInvoicesAction } from "@/actions/my-payments";
 import { LEVEL_TAG } from "@/components/mock-interviews/visual-kit";
 import { useCountdown } from "@/components/mock-interviews/use-countdown";
+import { CtaGlow, ctaClass } from "@/components/mock-interviews/cta";
 import { cn } from "@/lib/utils";
 
 // AI mock interviews: the candidate's booked AI interviews (spec D13a to D13d).
@@ -386,13 +387,12 @@ function Hero({ allowance, pricing, mounted, plansInclude }: { allowance: Allowa
             )}
             <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{note}</p>
           </div>
-          <Link
-            href="/mock-interviews/ai/new"
-            className={cn(buttonVariants({ size: "lg" }), "shrink-0 bg-gradient-to-r from-primary to-violet-600 text-white shadow-sm hover:opacity-90")}
-          >
-            <Plus className="size-4" aria-hidden />
-            New interview
-          </Link>
+          <CtaGlow className="w-full shrink-0 sm:w-auto">
+            <Link href="/mock-interviews/ai/new" className={cn(ctaClass({ size: "md" }), "w-full sm:w-auto")}>
+              <Plus aria-hidden />
+              New interview
+            </Link>
+          </CtaGlow>
         </div>
       </div>
     </section>
@@ -565,10 +565,13 @@ function EmptyState() {
       <Bot className="mx-auto size-10 text-primary/60" aria-hidden />
       <p className="mt-2 font-medium">No interviews booked yet</p>
       <p className="mt-1 text-sm text-muted-foreground">Book your first one and it&apos;ll wait here until you&apos;re ready.</p>
-      <Link href="/mock-interviews/ai/new" className={cn(buttonVariants({ size: "lg" }), "mt-4")}>
-        <Plus className="size-4" aria-hidden />
-        New interview
-      </Link>
+      {/* The header has the pulsing one; this one holds still. */}
+      <CtaGlow pulse={false} className="mt-4">
+        <Link href="/mock-interviews/ai/new" className={ctaClass({ size: "md" })}>
+          <Plus aria-hidden />
+          New interview
+        </Link>
+      </CtaGlow>
     </div>
   );
 }
