@@ -151,9 +151,27 @@ export function AiHome({
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
-      <Hero allowance={allowance} pricing={pricing} mounted={mounted} plansInclude={plansInclude} />
+      {/* Wide screens (1280px+): the title on the left and the counts as a 2 × 2 grid on the right, the
+          same height; Get ready below them, full width (a thin bar once everything's done,
+          the list while there's something to do). Phones and tablets: title, Get ready,
+          counts, in one column (the counts four across from 1024px). */}
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]">
+        <div className="min-w-0">
+          <Hero allowance={allowance} pricing={pricing} mounted={mounted} plansInclude={plansInclude} />
+        </div>
 
-      <GetReady readiness={readiness} allowance={allowance} pricing={pricing} hasBookings={bookings.length > 0} />
+        <div className="order-2 min-w-0 xl:order-3 xl:col-span-2">
+          <GetReady readiness={readiness} allowance={allowance} pricing={pricing} hasBookings={bookings.length > 0} />
+        </div>
+
+        {/* Stat tiles: each one filters the list; click again to go back to "To do". */}
+        <div className="order-3 grid grid-cols-2 gap-3 lg:grid-cols-4 xl:order-2 xl:grid-cols-2 xl:grid-rows-2">
+          <Tile icon={PlayCircle} tone="indigo" label="Ready to start" value={counts.ready} active={view === "ready"} onClick={() => toggle("ready")} />
+          <Tile icon={Timer} tone="sky" label="In progress" value={counts.progress} active={view === "in_progress"} onClick={() => toggle("in_progress")} />
+          <Tile icon={AlarmClock} tone="amber" label="Expiring soon" value={counts.expiring} active={view === "expiring"} onClick={() => toggle("expiring")} />
+          <Tile icon={CheckCircle2} tone="emerald" label="Completed this month" value={counts.month} active={view === "month"} onClick={() => toggle("month")} />
+        </div>
+      </div>
 
       {booked && (
         <section className="overflow-hidden rounded-2xl border border-emerald-200 bg-card shadow-sm" aria-label="Your new booking">
@@ -191,14 +209,6 @@ export function AiHome({
           </div>
         </section>
       )}
-
-      {/* Stat tiles: each one filters the list; click again to go back to "To do". */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Tile icon={PlayCircle} tone="indigo" label="Ready to start" value={counts.ready} active={view === "ready"} onClick={() => toggle("ready")} />
-        <Tile icon={Timer} tone="sky" label="In progress" value={counts.progress} active={view === "in_progress"} onClick={() => toggle("in_progress")} />
-        <Tile icon={AlarmClock} tone="amber" label="Expiring soon" value={counts.expiring} active={view === "expiring"} onClick={() => toggle("expiring")} />
-        <Tile icon={CheckCircle2} tone="emerald" label="Completed this month" value={counts.month} active={view === "month"} onClick={() => toggle("month")} />
-      </div>
 
       <section className="space-y-3 rounded-2xl border bg-card p-4 shadow-sm md:p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -383,8 +393,8 @@ function Hero({ allowance, pricing, mounted, plansInclude }: { allowance: Allowa
   }
 
   return (
-    <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-      <div className="flex flex-col gap-4 bg-gradient-to-r from-primary/12 via-violet-500/8 to-transparent p-4 md:flex-row md:items-center md:p-5">
+    <section className="h-full overflow-hidden rounded-2xl border bg-card shadow-sm">
+      <div className="flex h-full flex-col justify-center gap-4 bg-gradient-to-r from-primary/12 via-violet-500/8 to-transparent p-4 md:flex-row md:items-center md:p-5 xl:flex-col xl:items-stretch">
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-violet-600 text-white shadow-sm">
             <Bot className="size-6" aria-hidden />
