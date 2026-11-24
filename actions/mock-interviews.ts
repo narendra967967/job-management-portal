@@ -14,6 +14,7 @@ import { aiInterviews } from "@/db/schema";
 import { aiInterviewsOpen, getModuleSettings } from "@/lib/mock-interviews/config";
 import { bookAiInterview, material, parseForm, type BookingResult } from "@/lib/mock-interviews/booking";
 import { endInterview, heartbeat, startInterview, submitAnswer, type LiveState } from "@/lib/mock-interviews/engine";
+import { suggestTopicsForLead, type TopicSuggestion } from "@/lib/mock-interviews/topic-suggest";
 
 type Result = BookingResult;
 
@@ -68,6 +69,16 @@ export async function updateAiBookingAction(id: unknown, form: FormData): Promis
  *  read this from the workspace, so the browser has no need to call it. */
 async function aiInterviewsOpenNow(): Promise<boolean> {
   return aiInterviewsOpen(await getModuleSettings());
+}
+
+/** "Suggest topics" on the booking form, for a lead's job (roadmap item 9). Uses
+ *  the candidate's own AI key if they have one, keyword matching otherwise. */
+export async function suggestTopicsAction(leadId: unknown, category: unknown): Promise<TopicSuggestion> {
+  const userId = await getCurrentUserId();
+  const p = z.object({ leadId: z.string().uuid(), category: z.string().trim().max(40) }).safeParse({ leadId, category });
+  if (!p.success) return { ok: false, error: "Pick a lead first." };
+  if (!(await aiInterviewsOpenNow())) return { ok: false, error: "AI interviews aren't open right now." };
+  return suggestTopicsForLead(userId, p.data.leadId, p.data.category);
 }
 
 /* ---------------- the interview screen ---------------- */

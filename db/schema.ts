@@ -88,7 +88,9 @@ export const reminderOutcome = pgEnum("reminder_outcome", [
   "closed",
   "not-responded",
 ]);
-export const taskKind = pgEnum("task_kind", ["follow-up", "decision", "manual"]);
+// "practice": made when a lead moves to Interview, done when a practice for it is
+// scored (docs/lead-interview-link/roadmap.md, item 6).
+export const taskKind = pgEnum("task_kind", ["follow-up", "decision", "manual", "practice"]);
 export const taskStatus = pgEnum("task_status", ["open", "done"]);
 export const aiProvider = pgEnum("ai_provider", [
   "openai",
@@ -128,6 +130,12 @@ export const jobLeads = pgTable(
     origin: leadOrigin("origin").notNull().default("manual"),
     // Starred by the user (golden card + Top Choice filter).
     topChoice: boolean("top_choice").notNull().default(false),
+    // When the real interview is, if the user said (lead ↔ interview link, item 7).
+    // Until it passes the lead doesn't go stale or get cleaned up automatically.
+    interviewAt: timestamp("interview_at", { withTimezone: true }),
+    // The "interview tomorrow" notification went out for this date (cleared when
+    // the date changes, so a new date gets its own).
+    interviewRemindedAt: timestamp("interview_reminded_at", { withTimezone: true }),
     // Set when the user manually moves the status BACKWARDS: automatic status
     // changes then leave this lead alone until they move it forward themselves.
     statusPinned: boolean("status_pinned").notNull().default(false),
@@ -1904,6 +1912,9 @@ export const aiInterviews = pgTable(
     // still reads right after the lead is deleted.
     leadId: uuid("lead_id").references(() => jobLeads.id, { onDelete: "set null" }),
     leadLabel: text("lead_label"),
+    // The lead's company, kept for the {{company}} prompt placeholder and the
+    // history's company filter after the lead is gone.
+    company: text("company"),
     // Resume and job description as the AI will read them, copied at booking.
     // An uploaded file is read and discarded; only its text is kept.
     resumeId: uuid("resume_id").references(() => resumes.id, { onDelete: "set null" }),

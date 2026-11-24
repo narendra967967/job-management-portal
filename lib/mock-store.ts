@@ -26,6 +26,7 @@ import {
   getWorkspace,
   markSentAction,
   setLeadStatusAction,
+  setInterviewDateAction,
   setLeadTopChoiceAction,
   undoAutoActionAction,
   undoAutoStatusAction,
@@ -340,13 +341,13 @@ export function useLeadPractice(leadId: string): LeadPracticeRun[] {
   return usePractice().byLead[leadId] ?? NO_RUNS;
 }
 
-/* Moving a lead to Interview asks "Practice for it now?" every time (owner,
-   November 24, 2026). The host component (mounted in the dashboard layout)
-   registers here, since showing it needs the router. */
-type PracticePrompt = (lead: JobLead) => void;
-let practicePrompt: PracticePrompt | null = null;
-export function setPracticePromptHost(fn: PracticePrompt | null) {
-  practicePrompt = fn;
+/* Moving a lead to Interview by hand asks, every time (owner, November 24,
+   2026), when the interview is and, while AI interviews are open, whether to
+   practice now. The host dialog (mounted in the dashboard layout) registers here. */
+type InterviewPrompt = (lead: JobLead) => void;
+let interviewPrompt: InterviewPrompt | null = null;
+export function setInterviewPromptHost(fn: InterviewPrompt | null) {
+  interviewPrompt = fn;
 }
 function useStoredNotifications(): WorkspaceData["notifications"] {
   return useWs("storedNotifications", getStoredNotifications);
@@ -469,10 +470,10 @@ export async function setLeadStatus(
 ) {
   const before = findLead(leadId)?.status;
   try {
-    await setLeadStatusAction(leadId, status, closeOutcome);
+    await setLeadStatusAction(leadId, status, closeOutcome, viewerTimeZone());
     await refresh();
     const lead = findLead(leadId);
-    if (status === "interview" && before !== "interview" && practice.open && lead && practicePrompt) practicePrompt(lead);
+    if (status === "interview" && before !== "interview" && lead && interviewPrompt) interviewPrompt(lead);
     else statusToast(status, closeOutcome);
   } catch (e) {
     toast.error("Couldn't update lead", e instanceof Error ? e.message : undefined);
@@ -480,6 +481,19 @@ export async function setLeadStatus(
 }
 
 /** Discard from a card in one tap; the toast's Undo puts it back. */
+/** Set or clear when the real interview is. Returns whether it saved. */
+export async function setInterviewDate(leadId: string, at: string | null): Promise<boolean> {
+  try {
+    await setInterviewDateAction({ leadId, at, timeZone: viewerTimeZone() });
+    await refresh();
+    toast.success(at ? "Interview date saved" : "Interview date removed");
+    return true;
+  } catch (e) {
+    toast.error("Couldn't save the date", e instanceof Error ? e.message : undefined);
+    return false;
+  }
+}
+
 export async function discardLead(leadId: string, from: LeadStatus) {
   try {
     await setLeadStatusAction(leadId, "discarded", null);
@@ -1099,6 +1113,7 @@ export type TimelineKind =
   | "reminder-resolved"
   | "auto"
   | "practice"
+  | "interview"
   | "status";
 
 export interface TimelineEvent {
@@ -1178,6 +1193,16 @@ export function useLeadTimeline(leadId: string): TimelineEvent[] {
       date: a.date,
       title: a.reason,
       detail: a.undone ? "You undid this" : undefined,
+    });
+  }
+
+  // The real interview, once the user has given its date (roadmap item 7).
+  if (lead?.interviewAt) {
+    events.push({
+      id: "interview",
+      kind: "interview",
+      date: lead.interviewAt.slice(0, 10),
+      title: new Date(lead.interviewAt).getTime() > Date.now() ? "Interview coming up" : "Interview",
     });
   }
 

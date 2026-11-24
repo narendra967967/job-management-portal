@@ -25,8 +25,10 @@ import {
   Sparkles,
   Target,
   Upload,
+  WandSparkles,
   type LucideIcon,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MarkdownEditor } from "@/components/ui/markdown-editor";
 import { ChipInput } from "@/components/ui/chip-input";
@@ -34,7 +36,7 @@ import { InfoTip } from "@/components/ui/info-tip";
 import { SearchSelect } from "@/components/ui/search-select";
 import { toast } from "@/components/ui/toast";
 import { useLeadDetail, useLeads, useResumes } from "@/lib/mock-store";
-import { bookAiInterviewAction, updateAiBookingAction } from "@/actions/mock-interviews";
+import { bookAiInterviewAction, suggestTopicsAction, updateAiBookingAction } from "@/actions/mock-interviews";
 import { closeCheckoutAction, verifyCheckoutAction } from "@/actions/payments";
 import { openRazorpay } from "@/lib/razorpay-checkout";
 import type { AiCheckoutStart } from "@/lib/payments/ai-interview-orders";
@@ -43,10 +45,13 @@ import { getMyBillingAction, saveMyBillingAction } from "@/actions/billing-detai
 import { EMPTY_BILLING, type BillingDetails } from "@/lib/invoices/billing-details";
 import type { BookingSetup } from "@/lib/mock-interviews/data";
 import {
+  DEFAULT_TOPICS,
   DIFFICULTIES,
   DISCUSSION_CATEGORIES,
   INDUSTRIES,
+  TOPIC_SUGGESTIONS,
   aiInterviewQuote,
+  guessIndustry,
   allowanceLeft,
   plannedQuestions,
   rupees,
@@ -66,16 +71,6 @@ import { CATEGORY_ICON } from "@/components/mock-interviews/category-icons";
 
 const LIMITS = { role: 100, paste: 20_000, minJd: 100, minResume: 300, topics: 10, fileMb: 5 };
 
-const TOPIC_SUGGESTIONS: Partial<Record<string, string[]>> = {
-  "Project management": ["Risk management", "Stakeholder management", "Estimation", "Agile and Scrum", "Budget tracking"],
-  "Product management": ["Prioritization", "Roadmaps", "Metrics", "User research", "Go-to-market"],
-  "Behavioral interview": ["Conflict", "Failure and learning", "Leadership", "Teamwork", "Pressure and deadlines"],
-  "Technical interview": ["Architecture", "Debugging", "Performance", "Testing", "Code review"],
-  "System design": ["Scalability", "Caching", "Databases", "APIs", "Trade-offs"],
-  Coding: ["Data structures", "Algorithms", "Complexity", "Problem breakdown"],
-  "Data analytics": ["SQL", "Metrics", "A/B testing", "Dashboards", "Data cleaning"],
-};
-const DEFAULT_TOPICS = ["Past projects", "Strengths and weaknesses", "Why this role", "Teamwork", "Problem-solving"];
 
 type ResumeMode = "saved" | "upload" | "paste";
 type JdMode = "lead" | "paste" | "general";
@@ -107,7 +102,13 @@ export function NewInterviewForm({
   const fromLead = leadId ? leads.find((l) => l.id === leadId) : undefined;
 
   const [role, setRole] = useState(editing?.role ?? fromLead?.title ?? "");
-  const [industry, setIndustry] = useState(editing?.industry ?? "");
+  // Booking from a lead: guess the industry from its job description (roadmap item 9).
+  const fromLeadDetail = useLeadDetail(fromLead?.id ?? "");
+  const [guessedIndustry] = useState(() =>
+    !editing && fromLead ? guessIndustry(`${fromLead.title}\n${fromLeadDetail?.jdText ?? ""}\n${fromLeadDetail?.aiSummary ?? ""}`) : null,
+  );
+  const [industry, setIndustry] = useState<string>(editing?.industry ?? guessedIndustry ?? "");
+  const [industryGuessed, setIndustryGuessed] = useState(!!guessedIndustry);
   // Picking Other asks what they meant (admin Customers → Other answers).
   const [industryOther, setIndustryOther] = useState(editing?.industryOther ?? "");
   const [category, setCategory] = useState(editing?.category ?? "");
@@ -128,6 +129,9 @@ export function NewInterviewForm({
   const [topics, setTopics] = useState<string[]>(editing?.topics ?? []);
   // "Cover all topics" is the default: no topics sent, so the questions span the whole role.
   const [topicMode, setTopicMode] = useState<"all" | "pick">(editing?.topics?.length ? "pick" : "all");
+  // "Suggest topics from this job": what was added and how it was found.
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestNote, setSuggestNote] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [starting, setStarting] = useState(false);
   // A paid booking needs billing details first (invoices spec I4): asked once, then booking carries on.
@@ -183,6 +187,36 @@ export function NewInterviewForm({
     if (jdMode === "paste" && jdText.trim().length < LIMITS.minJd)
       e.jd = `Paste the job description (at least ${LIMITS.minJd} characters), or choose General preparation.`;
     return e;
+  }
+
+  // The lead whose job description the topics come from.
+  const topicLeadId = jdMode === "lead" && jdLeadId ? jdLeadId : (fromLead?.id ?? "");
+
+  async function suggestTopics() {
+    if (!topicLeadId) return;
+    setSuggesting(true);
+    try {
+      const r = await suggestTopicsAction(topicLeadId, category);
+      if (!r.ok) {
+        toast.error("No suggestions", r.error);
+        return;
+      }
+      const next = [...topics];
+      for (const t of r.topics) if (next.length < LIMITS.topics && !next.some((x) => x.toLowerCase() === t.toLowerCase())) next.push(t);
+      const added = next.length - topics.length;
+      setTopics(next);
+      setTopicMode("pick");
+      const how = r.source === "ai" ? "using your AI key" : "by matching its keywords";
+      setSuggestNote(
+        added
+          ? `Added ${added} ${added === 1 ? "topic" : "topics"} from the job description, ${how}. Remove any you don't want.`
+          : "Those topics are already in your list.",
+      );
+    } catch {
+      toast.error("No suggestions", "Something went wrong. Try again in a moment.");
+    } finally {
+      setSuggesting(false);
+    }
   }
 
   function start() {
@@ -398,6 +432,7 @@ export function NewInterviewForm({
                   value={industry}
                   onChange={(v) => {
                     setIndustry(v);
+                    setIndustryGuessed(false);
                     // Straight to the box that asks which one.
                     if (v === "Other") setTimeout(() => document.getElementById("mi-industry-other")?.focus(), 0);
                   }}
@@ -423,6 +458,9 @@ export function NewInterviewForm({
                       className="h-11 sm:h-10"
                     />
                   </>
+                )}
+                {industryGuessed && industry === guessedIndustry && (
+                  <p className="text-xs text-muted-foreground">Guessed from the job description. Change it if that&apos;s not right.</p>
                 )}
                 {err("industry")}
               </div>
@@ -707,6 +745,17 @@ export function NewInterviewForm({
                   { value: "pick", label: "Choose topics", icon: Target },
                 ]}
               />
+              {topicLeadId && (
+                <div className="flex flex-col gap-1.5 rounded-lg border border-dashed border-primary/30 bg-primary/5 p-2.5 sm:flex-row sm:items-center">
+                  <p className="min-w-0 flex-1 text-xs text-muted-foreground">
+                    {suggestNote || "Not sure what to practice? Get topics from this lead's job description."}
+                  </p>
+                  <Button type="button" variant="outline" size="lg" disabled={suggesting} onClick={suggestTopics} className="shrink-0 bg-background">
+                    {suggesting ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : <WandSparkles className="size-4" aria-hidden />}
+                    {suggesting ? "Suggesting…" : "Suggest topics from this job"}
+                  </Button>
+                </div>
+              )}
               {topicMode === "all" ? (
                 <p className="text-xs text-muted-foreground">
                   The interviewer spreads the questions across the whole role, the job description and your resume.

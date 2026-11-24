@@ -49,3 +49,13 @@ Each practice is an entry on the lead's Timeline tab. A scored one reads like "P
 Interview history and each report show "For Role at Company · Open lead". History can be filtered by company, including "Not for a lead", and the search box matches the lead's name too. In a row's ⋯ menu, **Book a similar one** fills the form from the same lead. There's no Open lead link once the lead is deleted, or while the user's plan has ended, because lead pages are locked then. The name still shows.
 
 There's nothing for an admin to set here. Everything comes from the lead stored on each booking.
+
+## Interview dates, the practice to-do and smarter booking
+
+Moving a lead to Interview now opens a small window asking when the interview is (optional), with **Practice now** while AI interviews are open. The date can also be added or changed on the lead page, and in the When column of Interviews coming up, which lists dated interviews first, soonest first.
+
+A lead whose interview is still ahead never goes stale, and the daily rules and old-lead cleanup leave it alone. Once the date passes, the usual rules apply again. Less than a day before the interview, the bell shows one reminder (sent by the mock interview upkeep job, which runs every 5 minutes). Changing the date earns a fresh reminder.
+
+Reaching Interview also adds a "Practice for Role at Company" to-do (kind Practice), due the day before the interview when there's a date. It ticks itself off when a practice for that lead gets its report. It's only added while AI interviews are open.
+
+Booking from a lead guesses the industry from the job description when it's clear, and **Suggest topics from this job** fills in topics. It uses the user's own AI key when they have one, and plain keyword matching when they don't or the AI reply can't be used. Each booking keeps the lead's company. The interviewer is told it, and admins can use `{{company}}` in Module settings → Prompts.

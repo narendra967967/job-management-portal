@@ -84,6 +84,7 @@ import {
 import { cn, formatDateTime } from "@/lib/utils";
 import { useMounted } from "@/lib/use-mounted";
 import { PracticePanel } from "@/components/leads/lead-practice";
+import { InterviewDateRow } from "@/components/leads/interview-date";
 
 interface Props {
   lead: JobLead;
@@ -268,6 +269,7 @@ export function LeadDetailContent({
 
         <AutoActionNote lead={{ id: lead.id, status }} className="mt-3 text-xs" />
 
+        <InterviewDateRow lead={lead} status={status} className="mt-2" />
         <PracticePanel lead={lead} status={status} className="mt-3" />
 
         {/* Why this lead is closed / discarded — prominent on the detail view. */}

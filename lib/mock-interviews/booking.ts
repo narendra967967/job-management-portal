@@ -49,6 +49,8 @@ export type Setup = z.infer<typeof setupSchema>;
 type Material = {
   leadId: string | null;
   leadLabel: string | null;
+  /** The lead's company, for {{company}} and the history's company filter. */
+  company: string | null;
   resumeId: string | null;
   resumeSource: "saved" | "upload" | "paste";
   resumeLabel: string;
@@ -64,6 +66,7 @@ type Material = {
 export async function material(userId: string, v: Setup, file: File | null): Promise<Material | { error: string; field: string }> {
   // Lead the interview is for (optional), with a label that outlives the lead.
   let leadLabel: string | null = null;
+  let company: string | null = null;
   const leadId = v.leadId ?? (v.jdMode === "lead" ? v.jdLeadId : null);
   if (leadId) {
     const [l] = await db
@@ -72,6 +75,7 @@ export async function material(userId: string, v: Setup, file: File | null): Pro
       .where(and(eq(jobLeads.id, leadId), eq(jobLeads.userId, userId)));
     if (!l) return { error: "That lead isn't available.", field: "jd" };
     leadLabel = `${l.title} at ${l.company}`;
+    company = l.company;
   }
 
   let resumeText = "";
@@ -123,6 +127,7 @@ export async function material(userId: string, v: Setup, file: File | null): Pro
   return {
     leadId,
     leadLabel,
+    company,
     resumeId: v.resumeMode === "saved" ? v.resumeId : null,
     resumeSource: v.resumeMode,
     resumeLabel,

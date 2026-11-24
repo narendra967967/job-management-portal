@@ -249,6 +249,7 @@ export const leadStatusSchema = z.object({
   closeOutcome: zEnum(Object.keys(CLOSE_OUTCOME_LABELS), "Unknown outcome.").nullable(),
 });
 
+
 /** Star / unstar a lead as a Top Choice. */
 export const topChoiceSchema = z.object({
   leadId: zId,
@@ -386,3 +387,16 @@ export function parseInput<T>(schema: z.ZodType<T>, raw: unknown): T {
   }
   return result.data;
 }
+
+/** Set or clear when the real interview is (lead ↔ interview link, item 7). */
+export const interviewDateSchema = z.object({
+  leadId: zId,
+  // An instant (ISO with offset). Not in the past, and not absurdly far ahead.
+  at: z
+    .string()
+    .datetime({ offset: true, message: "Pick a date and time." })
+    .refine((v) => new Date(v).getTime() > Date.now() - 5 * 60_000, "Pick a date and time that hasn't passed yet.")
+    .refine((v) => new Date(v).getTime() < Date.now() + 2 * 365 * 86_400_000, "Pick a date within the next two years.")
+    .nullable(),
+  timeZone: zTimeZone,
+});

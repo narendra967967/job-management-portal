@@ -369,7 +369,7 @@ export async function listInterviews(userId: string): Promise<InterviewSummary[]
             lead: {
               id: leadLive ? i.leadId : null,
               label: i.leadLabel,
-              company: (leadLive ? companyOf.get(i.leadId!) : companyFromLabel(i.leadLabel)) ?? "",
+              company: (leadLive ? companyOf.get(i.leadId!) : (i.company ?? companyFromLabel(i.leadLabel))) ?? "",
             },
           }
         : {}),

@@ -241,6 +241,7 @@ export async function loadWorkspace(userId: string): Promise<WorkspaceData> {
     hasDueReminder: dueByLead.has(l.id),
     hasOutreach: outreachByLead.has(l.id),
     practiced: leadReadiness(practice.byLead[l.id]).practiced > 0,
+    interviewAt: l.interviewAt ? l.interviewAt.toISOString() : null,
   }));
 
   const details: Record<string, JobLeadDetail> = {};

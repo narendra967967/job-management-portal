@@ -110,12 +110,13 @@ export const CLOSE_OUTCOME_LABELS: Record<CloseOutcome, string> = {
 
 // A To-do item. Always tied to a job; optionally linked to a reminder (when it
 // was spawned by a follow-up) — standalone/manual tasks have reminderId null.
-export type TaskKind = "follow-up" | "decision" | "manual";
+export type TaskKind = "follow-up" | "decision" | "manual" | "practice";
 
 export const TASK_KIND_LABELS: Record<TaskKind, string> = {
   "follow-up": "Follow-up",
   decision: "Decision",
   manual: "Task",
+  practice: "Practice",
 };
 
 export interface Task {
@@ -199,6 +200,14 @@ export interface JobLead {
   /** At least one practice interview for this lead is done (scored, or its
    *  report is on its way). Always false while AI interviews are Coming soon. */
   practiced: boolean;
+  /** When the real interview is (ISO instant), if the user said. */
+  interviewAt: string | null;
+}
+
+/** The lead has an interview date still ahead (owner, November 24, 2026: it
+ *  doesn't go stale until then; without a date the usual rules apply). */
+export function interviewAhead(lead: Pick<JobLead, "interviewAt">, now = Date.now()): boolean {
+  return !!lead.interviewAt && new Date(lead.interviewAt).getTime() > now;
 }
 
 /** A status change the system made on its own (Timeline + the card's message). */
@@ -255,6 +264,7 @@ export function isLeadStale(lead: JobLead, cutoff: string): boolean {
   return (
     STALE_LEAD_STATUSES.includes(lead.status) &&
     !lead.hasDueReminder &&
+    !interviewAhead(lead) &&
     lead.lastActiveAt < cutoff
   );
 }
@@ -282,7 +292,7 @@ const ymdDay = (ymd: string) => {
  * `staleDays`); null when it can't go stale, isn't close yet, or already is.
  */
 export function staleWarning(lead: JobLead, staleDays: number, today: string): StaleWarning | null {
-  if (!STALE_LEAD_STATUSES.includes(lead.status) || lead.hasDueReminder || staleDays < 1) return null;
+  if (!STALE_LEAD_STATUSES.includes(lead.status) || lead.hasDueReminder || interviewAhead(lead) || staleDays < 1) return null;
   const quietDays = ymdDay(today) - ymdDay(lead.lastActiveAt);
   if (quietDays > staleDays) return null;
   const share = quietDays / staleDays;

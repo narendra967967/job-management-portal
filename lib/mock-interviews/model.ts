@@ -35,6 +35,44 @@ export const INDUSTRIES = [
   "Other",
 ] as const;
 
+/** Suggested topics per kind of interview (the booking form's chips, and the
+ *  fallback when "Suggest topics" finds little in a job description). */
+export const TOPIC_SUGGESTIONS: Partial<Record<string, string[]>> = {
+  "Project management": ["Risk management", "Stakeholder management", "Estimation", "Agile and Scrum", "Budget tracking"],
+  "Product management": ["Prioritization", "Roadmaps", "Metrics", "User research", "Go-to-market"],
+  "Behavioral interview": ["Conflict", "Failure and learning", "Leadership", "Teamwork", "Pressure and deadlines"],
+  "Technical interview": ["Architecture", "Debugging", "Performance", "Testing", "Code review"],
+  "System design": ["Scalability", "Caching", "Databases", "APIs", "Trade-offs"],
+  Coding: ["Data structures", "Algorithms", "Complexity", "Problem breakdown"],
+  "Data analytics": ["SQL", "Metrics", "A/B testing", "Dashboards", "Data cleaning"],
+};
+export const DEFAULT_TOPICS = ["Past projects", "Strengths and weaknesses", "Why this role", "Teamwork", "Problem-solving"];
+
+/** Words that point to each industry, for guessing one from a lead's job description. */
+const INDUSTRY_WORDS: [Exclude<(typeof INDUSTRIES)[number], "Other">, RegExp][] = [
+  ["Banking and finance", /\bbank(s|ing)?\b|\bfintech\b|\bfinancial services\b|\binsurance\b|\bnbfc\b|\blending\b|\bpayments?\b|\bwealth\b|\bcapital markets\b/gi],
+  ["Healthcare", /\bhealth ?care\b|\bhospitals?\b|\bpharma\w*|\bclinical\b|\bmedical\b|\bpatients?\b|\blife sciences\b/gi],
+  ["E-commerce and retail", /\be-?commerce\b|\bretail\b|\bmarketplace\b|\bd2c\b|\bomnichannel\b|\bmerchandis\w*/gi],
+  ["Telecom", /\btelecom\w*|\b5g\b|\bnetwork operators?\b|\bmobile operators?\b|\bisp\b/gi],
+  ["Manufacturing", /\bmanufactur\w*|\bfactory\b|\bplants?\b|\bautomotive\b|\bproduction lines?\b|\bshop floor\b/gi],
+  ["Education", /\beducation\b|\bedtech\b|\bschools?\b|\buniversit(y|ies)\b|\bstudents?\b|\blearners?\b/gi],
+  ["Media and entertainment", /\bmedia\b|\bentertainment\b|\bott\b|\bstreaming\b|\bpublishing\b|\bbroadcast\w*/gi],
+  ["Government and public sector", /\bgovernment\b|\bpublic sector\b|\bministry\b|\bpsu\b|\bmunicipal\b/gi],
+  ["Consulting", /\bconsult(ing|ancy)\b|\badvisory\b|\bclient engagements?\b/gi],
+  ["Information technology", /\bsoftware\b|\bsaas\b|\bcloud\b|\bit services\b|\btechnology company\b|\bproduct engineering\b/gi],
+];
+
+/**
+ * The industry a job description most likely belongs to, or null when it can't
+ * tell: the winner needs two mentions and a clear lead over the next one.
+ */
+export function guessIndustry(text: string): (typeof INDUSTRIES)[number] | null {
+  if (!text.trim()) return null;
+  const counts = INDUSTRY_WORDS.map(([name, re]) => ({ name, n: (text.match(re) ?? []).length })).sort((a, b) => b.n - a.n);
+  const [first, second] = counts;
+  return first.n >= 2 && first.n > second.n ? first.name : null;
+}
+
 /** The industry to show and give the AI: what the candidate typed when they picked Other. */
 export const industryShown = (industry: string, other: string | null | undefined) => (industry === "Other" && other ? other : industry);
 
@@ -251,7 +289,7 @@ export const DEFAULT_PROMPTS: ModuleSettings["prompts"] = {
     "Score the candidate 1 to 10 on communication, technical knowledge, confidence and clarity, problem-solving and answer relevance. For each written part give a short headline and the full text. Base everything on the transcript.",
 };
 
-export const PROMPT_PLACEHOLDERS = ["{{role}}", "{{industry}}", "{{category}}", "{{difficulty}}", "{{question_count}}", "{{topics}}", "{{resume}}", "{{job_description}}", "{{career_profile}}"];
+export const PROMPT_PLACEHOLDERS = ["{{role}}", "{{company}}", "{{industry}}", "{{category}}", "{{difficulty}}", "{{question_count}}", "{{topics}}", "{{resume}}", "{{job_description}}", "{{career_profile}}"];
 
 /* ---------------- what the candidate screens read ---------------- */
 

@@ -19,6 +19,18 @@ export interface PromptValues {
   job_description: string;
   /** The candidate's career profile (target roles, skills, experience), or "". */
   career_profile: string;
+  /** The company of the lead it was booked for, or NO_COMPANY. */
+  company: string;
+}
+
+/** What {{company}} becomes when the interview isn't for a lead. */
+export const NO_COMPANY = "not given (practice for the role in general)";
+
+/** For the interviewer's turns, which don't see the material block: who they
+ *  interview for, when the booking came from a lead. Empty otherwise. */
+export function companyNote(company: string): string {
+  if (!company || company === NO_COMPANY) return "";
+  return `You are interviewing the candidate for a role at ${company}. You may refer to the company by name and to what the job description says about it, but don't invent facts about it.`;
 }
 
 /**
@@ -38,6 +50,9 @@ const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n)}…` : s
 export function materialBlock(v: PromptValues): string {
   return [
     `Role: ${v.role}`,
+    // The interviewer plays someone from this company: questions can touch its
+    // field and what the job description says about it, without inventing facts.
+    ...(v.company && v.company !== NO_COMPANY ? [`Company the candidate is interviewing with: ${v.company}`] : []),
     `Industry: ${v.industry}`,
     `Kind of interview: ${v.category}`,
     `Difficulty: ${v.difficulty}`,

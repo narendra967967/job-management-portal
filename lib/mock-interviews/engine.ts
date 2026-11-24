@@ -10,13 +10,16 @@ import { greetingName } from "@/lib/email-templates-model";
 import { absoluteUrl } from "@/lib/site-url";
 import { careerBriefFor } from "@/lib/career-data";
 import { getModuleSettings } from "./config";
+import { closePracticeTasks, sendInterviewReminders } from "@/lib/lead-interview";
 import { industryShown, overallScore, plannedQuestions, type PlannedQuestion } from "./model";
 import {
   evaluationFormat,
   evaluationSchema,
   fillPrompt,
   materialBlock,
+  NO_COMPANY,
   NO_TOPICS,
+  companyNote,
   parseJsonObject,
   planFormat,
   planSchema,
@@ -154,6 +157,7 @@ function promptValues(i: Row, plan: PlannedQuestion[] | null): PromptValues {
     resume: i.resumeText,
     job_description: i.jobDescription,
     career_profile: "",
+    company: i.company?.trim() || NO_COMPANY,
   };
 }
 
@@ -477,7 +481,9 @@ async function interviewerTurn(i: Row, plan: PlannedQuestion[], history: ChatTur
   // the provider can serve them from its cache; only the note on the latest
   // answer changes. The whole conversation is sent (an hour is ~60 messages):
   // trimming its start would change the prefix and lose the cache.
-  const system = `${fillPrompt(s.prompts.interviewer, promptValues(i, plan))}\n\nThe planned questions:\n${planText}\n\n${turnRules(MAX_FOLLOW_UPS)}`;
+  const turnValues = promptValues(i, plan);
+  const note = companyNote(turnValues.company);
+  const system = `${fillPrompt(s.prompts.interviewer, turnValues)}${note ? `\n\n${note}` : ""}\n\nThe planned questions:\n${planText}\n\n${turnRules(MAX_FOLLOW_UPS)}`;
   const turns = history.slice(-120);
   const last = turns.at(-1);
   if (last?.role === "user") turns[turns.length - 1] = { ...last, content: `${last.content}\n\n${turnNote(state)}` };
@@ -707,6 +713,8 @@ export async function evaluateInterview(id: string): Promise<boolean> {
         .returning({ id: interviewEvaluations.id });
       if (inserted.length) {
         await logEvent(db, id, "evaluation", `Report written (overall ${overall})`, i.activeSeconds);
+        // Practiced for its lead: the "Practice for …" to-do is done (roadmap item 6).
+        if (i.leadId) await closePracticeTasks(i.userId, i.leadId).catch((err) => console.error("[mock-interviews] closing the practice to-do failed:", err));
         await sendReportEmail(i, overall).catch((err) => console.error("[mock-interviews] report email failed:", err instanceof Error ? err.message : err));
       }
       return true;
@@ -737,7 +745,7 @@ async function sendReportEmail(i: Row, overall: number) {
  * reminders and clear unpaid bookings. Safe to run twice.
  */
 export async function runMockInterviewJob(): Promise<Record<string, number>> {
-  const out = { settled: 0, reports: 0, expired: 0, reminders: 0, unpaidCleared: 0 };
+  const out = { settled: 0, reports: 0, expired: 0, reminders: 0, unpaidCleared: 0, interviewReminders: 0 };
   const now = new Date();
 
   // 1. Dropped connections and closed windows.
@@ -832,5 +840,12 @@ export async function runMockInterviewJob(): Promise<Record<string, number>> {
     )
     .returning({ id: aiInterviews.id });
   out.unpaidCleared = cleared.length;
+
+  // 6. "Your interview is less than a day away" for leads with an interview date
+  // (lead ↔ interview link, item 7). Its own failure never stops the rest.
+  out.interviewReminders = await sendInterviewReminders(now).catch((err) => {
+    console.error("[mock-interviews] interview reminders failed:", err instanceof Error ? err.message : err);
+    return 0;
+  });
   return out;
 }

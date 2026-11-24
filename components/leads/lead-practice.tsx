@@ -6,14 +6,13 @@
 // "Interviews coming up". All of it reads the workspace's practice slice and
 // hides while AI interviews are Coming soon.
 
-import { useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowDownRight, ArrowRight, ArrowUpRight, CalendarClock, FileText, Hourglass, MessagesSquare, PlayCircle, Plus } from "lucide-react";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { TableBox, TablePagination, usePagination } from "@/components/ui/data-table";
 import { buttonVariants } from "@/components/ui/button";
-import { toast } from "@/components/ui/toast";
 import { CtaGlow, ctaClass } from "@/components/mock-interviews/cta";
 import { LevelTag, ScoreRing, bandTone } from "@/components/mock-interviews/visual-kit";
 import {
@@ -27,10 +26,11 @@ import {
   type PracticeState,
 } from "@/lib/lead-practice";
 import { scoreBand, shortDate, type Difficulty } from "@/lib/mock-interviews/model";
-import { setPracticePromptHost, useLeadPractice, useLeads, usePractice } from "@/lib/mock-store";
+import { useLeadPractice, useLeads, usePractice } from "@/lib/mock-store";
 import { useLimitedMode } from "@/lib/access-mode";
 import { useMounted } from "@/lib/use-mounted";
-import { isJobOpen, type JobLead, type LeadStatus } from "@/lib/types";
+import { interviewAhead, isJobOpen, type JobLead, type LeadStatus } from "@/lib/types";
+import { InterviewDateDialog, interviewIn, interviewWhen } from "@/components/leads/interview-date";
 import { cn } from "@/lib/utils";
 
 /* ---------------- small pieces ---------------- */
@@ -265,25 +265,6 @@ export function PracticePanel({ lead, status, className }: { lead: JobLead; stat
   );
 }
 
-/* ---------------- prompt on moving to Interview ---------------- */
-
-/** Mounted once in the dashboard layout: when a lead moves to Interview, a
- *  toast asks to practice for it (every time, owner decision). Its close
- *  button is the "not now". */
-export function PracticePromptHost() {
-  const router = useRouter();
-  useEffect(() => {
-    setPracticePromptHost((lead) => {
-      toast.info("Moved to Interview", `Practice for ${lead.title} at ${lead.company} now?`, {
-        label: "Practice now",
-        onClick: () => router.push(newPracticeHref(lead.id)),
-      });
-    });
-    return () => setPracticePromptHost(null);
-  }, [router]);
-  return null;
-}
-
 /* ---------------- interviews coming up ---------------- */
 
 function PracticeStatus({ r }: { r: LeadReadiness }) {
@@ -302,16 +283,27 @@ function PracticeStatus({ r }: { r: LeadReadiness }) {
   return <span className="text-xs text-muted-foreground">Not practiced yet</span>;
 }
 
-/** Interview-stage leads with where their practice stands. Until leads carry
- *  an interview date, the most recently active comes first. `compact` is the
- *  short version for Ready to action. */
+/** Upcoming dates first, soonest first; then leads without a date (most
+ *  recently active first); then dates that have passed. */
+function comingUpOrder(a: JobLead, b: JobLead): number {
+  const rank = (l: JobLead) => (interviewAhead(l) ? 0 : l.interviewAt ? 2 : 1);
+  const ra = rank(a);
+  const rb = rank(b);
+  if (ra !== rb) return ra - rb;
+  if (ra === 0) return a.interviewAt!.localeCompare(b.interviewAt!);
+  if (ra === 2) return b.interviewAt!.localeCompare(a.interviewAt!);
+  return b.lastActiveAt.localeCompare(a.lastActiveAt);
+}
+
+/** Interview-stage leads with when the interview is and where their practice
+ *  stands. `compact` is the short version for Ready to action. */
 export function InterviewsComingUp({ compact = false, className }: { compact?: boolean; className?: string }) {
   const { open, byLead } = usePractice();
   const leads = useLeads();
   const limited = useLimitedMode();
-  const list = leads
-    .filter((l) => l.status === "interview")
-    .sort((a, b) => b.lastActiveAt.localeCompare(a.lastActiveAt));
+  const mounted = useMounted();
+  const [dateFor, setDateFor] = useState<JobLead | null>(null);
+  const list = leads.filter((l) => l.status === "interview").sort(comingUpOrder);
   const paging = usePagination(list, "");
   if (!open || list.length === 0) return null;
   const shown = compact ? list.slice(0, 3) : paging.paged;
@@ -331,11 +323,12 @@ export function InterviewsComingUp({ compact = false, className }: { compact?: b
           </Link>
         )}
       </div>
-      <TableBox minWidth={420}>
+      <TableBox minWidth={540}>
         <thead className="border-b bg-white/40 text-left text-xs text-muted-foreground">
           <tr>
             <th className="w-32 px-3 py-2 font-medium">Action</th>
             <th className="min-w-40 px-3 py-2 font-medium">Job</th>
+            <th className="px-3 py-2 font-medium">When</th>
             <th className="px-3 py-2 font-medium">Practice</th>
           </tr>
         </thead>
@@ -370,6 +363,24 @@ export function InterviewsComingUp({ compact = false, className }: { compact?: b
                   )}
                   <p className="text-xs text-muted-foreground">{l.company}</p>
                 </td>
+                <td className="px-3 py-2 text-xs whitespace-nowrap">
+                  {l.interviewAt ? (
+                    <>
+                      <p className="font-medium">{mounted ? interviewWhen(l.interviewAt) : " "}</p>
+                      <p className="text-muted-foreground">{mounted ? interviewIn(l.interviewAt) || "Passed" : " "}</p>
+                    </>
+                  ) : limited ? (
+                    <span className="text-muted-foreground">No date</span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setDateFor(l)}
+                      className="inline-flex min-h-11 items-center font-medium text-primary hover:underline sm:min-h-0"
+                    >
+                      Add the date
+                    </button>
+                  )}
+                </td>
                 <td className="px-3 py-2">
                   <PracticeStatus r={r} />
                 </td>
@@ -379,6 +390,7 @@ export function InterviewsComingUp({ compact = false, className }: { compact?: b
         </tbody>
       </TableBox>
       {!compact && list.length > paging.pageSize && <TablePagination paging={paging} />}
+      {dateFor && <InterviewDateDialog lead={dateFor} open onOpenChange={(o) => !o && setDateFor(null)} />}
     </section>
   );
 }

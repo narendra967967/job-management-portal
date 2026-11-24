@@ -40,7 +40,7 @@ import { LimitedModeProvider } from "@/lib/access-mode";
 import { FreshPage } from "@/lib/nav-reset";
 import { LeadAreaOnly } from "@/components/app-shell/use-nav-area";
 import { HideDuringInterview } from "@/components/mock-interviews/hide-during-interview";
-import { PracticePromptHost } from "@/components/leads/lead-practice";
+import { InterviewPromptHost } from "@/components/leads/interview-date";
 
 // Per-user, session-gated routes — never statically prerendered (no DB at build).
 export const dynamic = "force-dynamic";
@@ -160,8 +160,8 @@ export default async function DashboardLayout({
         <SupportWidget />
       </HideDuringInterview>
       <Toaster />
-      {/* "Practice for it now?" when a lead moves to Interview. */}
-      <PracticePromptHost />
+      {/* "When is it? Practice now?" when a lead moves to Interview. */}
+      <InterviewPromptHost />
       {/* First-login walkthrough + "Take the tour" (?tour=1 on /leads). */}
       <Suspense fallback={null}>
         <OnboardingTour autoStart={showTour} />

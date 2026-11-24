@@ -19,6 +19,7 @@ import {
   editLeadSchema,
   deleteLeadsSchema,
   leadStatusSchema,
+  interviewDateSchema,
   markSentSchema,
   parseInput,
   reminderOutcomeSchema,
@@ -38,6 +39,7 @@ import {
   type AutoStatusChange,
 } from "@/lib/auto-status";
 import { loadWorkspace, type WorkspaceData } from "@/lib/queries";
+import { ensurePracticeTask, syncPracticeTaskDue } from "@/lib/lead-interview";
 import {
   contacts as contactsT,
   jobLeads as leadsT,
@@ -128,16 +130,20 @@ export async function setLeadStatusAction(
   leadId: string,
   status: LeadStatus,
   closeOutcome: CloseOutcome | null = null,
+  timeZone?: string,
 ) {
   const userId = await getActiveUserId();
   const input = parseInput(leadStatusSchema, { leadId, status, closeOutcome });
+  const zone = parseInput(interviewDateSchema.shape.timeZone, timeZone);
   const next = input.status as LeadStatus;
+  let before: LeadStatus | null = null;
   await db.transaction(async (tx) => {
     const [current] = await tx
       .select({ status: leadsT.status })
       .from(leadsT)
       .where(and(eq(leadsT.id, input.leadId), eq(leadsT.userId, userId)));
     if (!current) throw new Error("Lead not found.");
+    before = current.status;
     // A deliberate move BACKWARDS in the open pipeline pins the lead so the
     // automatic status rules leave it alone; any other manual move unpins it.
     const fromRank = pipelineRank(current.status);
@@ -188,6 +194,34 @@ export async function setLeadStatusAction(
           ),
         );
     }
+  });
+  // Reaching Interview adds "Practice for …" to the To-do list (roadmap item 6).
+  if (next === "interview" && before !== "interview") await ensurePracticeTask(userId, input.leadId, zone);
+}
+
+/**
+ * Set or clear when the real interview is (roadmap item 7). Until it passes,
+ * the lead doesn't go stale and the daily rules and cleanup leave it alone; a
+ * day before, the bell reminds the user. Only for open leads.
+ */
+export async function setInterviewDateAction(input: { leadId: string; at: string | null; timeZone?: string }) {
+  const userId = await getActiveUserId();
+  const data = parseInput(interviewDateSchema, input);
+  const at = data.at ? new Date(data.at) : null;
+  await db.transaction(async (tx) => {
+    const [lead] = await tx
+      .select({ status: leadsT.status, interviewAt: leadsT.interviewAt })
+      .from(leadsT)
+      .where(and(eq(leadsT.id, data.leadId), eq(leadsT.userId, userId)));
+    if (!lead) throw new Error("Lead not found.");
+    if (!isJobOpen(lead.status)) throw new Error("Reopen this job to set its interview date.");
+    const same = (lead.interviewAt?.getTime() ?? null) === (at?.getTime() ?? null);
+    await tx
+      .update(leadsT)
+      // A new date gets its own reminder.
+      .set({ interviewAt: at, ...(same ? {} : { interviewRemindedAt: null }) })
+      .where(and(eq(leadsT.id, data.leadId), eq(leadsT.userId, userId)));
+    await syncPracticeTaskDue(tx, userId, data.leadId, at, data.timeZone);
   });
 }
 

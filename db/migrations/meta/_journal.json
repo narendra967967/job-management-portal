@@ -498,6 +498,13 @@
       "when": 1795469939716,
       "tag": "0070_other_answers",
       "breakpoints": true
+    },
+    {
+      "idx": 71,
+      "version": "7",
+      "when": 1795512904311,
+      "tag": "0071_lead_interview_link",
+      "breakpoints": true
     }
   ]
 }

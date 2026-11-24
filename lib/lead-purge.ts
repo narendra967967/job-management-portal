@@ -6,7 +6,7 @@ import "server-only";
 // lead_purge_log (per user, per-status counts) and the affected user is emailed
 // with the counts + the policy. Runs only via the cron route when purge is on.
 
-import { and, eq, inArray, lt } from "drizzle-orm";
+import { and, eq, inArray, lt, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { cronConfig, jobLeads as leadsT, leadPurgeLog, user as userT } from "@/db/schema";
 import { LEAD_STATUS_LABELS, type LeadStatus } from "@/lib/types";
@@ -87,12 +87,14 @@ export async function runLeadPurge(): Promise<PurgeRunResult> {
 
   const days = cfg.purgeDays ?? 90;
   const cutoff = new Date(Date.now() - days * 86_400_000);
+  // Never a lead whose interview is still ahead (lead ↔ interview link).
+  const noInterviewAhead = sql`(${leadsT.interviewAt} is null or ${leadsT.interviewAt} <= now())`;
 
   // Users who currently have purgeable leads.
   const users = await db
     .selectDistinct({ userId: leadsT.userId })
     .from(leadsT)
-    .where(and(inArray(leadsT.status, statuses), lt(leadsT.updatedAt, cutoff)));
+    .where(and(inArray(leadsT.status, statuses), lt(leadsT.updatedAt, cutoff), noInterviewAhead));
 
   const results: PurgeUserResult[] = [];
   let grandTotal = 0;
@@ -101,7 +103,7 @@ export async function runLeadPurge(): Promise<PurgeRunResult> {
     // Delete scoped to this user; return the statuses so we can count per status.
     const deleted = await db
       .delete(leadsT)
-      .where(and(eq(leadsT.userId, userId), inArray(leadsT.status, statuses), lt(leadsT.updatedAt, cutoff)))
+      .where(and(eq(leadsT.userId, userId), inArray(leadsT.status, statuses), lt(leadsT.updatedAt, cutoff), noInterviewAhead))
       .returning({ status: leadsT.status });
 
     if (deleted.length === 0) continue;

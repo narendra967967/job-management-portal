@@ -4,6 +4,7 @@ import Link from "next/link";
 import {
   Bot,
   MessagesSquare,
+  CalendarClock,
   Sparkles,
   UserPlus,
   Send,
@@ -31,6 +32,7 @@ const KIND_META: Record<
   },
   auto: { icon: Bot, dot: "bg-ai-muted text-ai" },
   practice: { icon: MessagesSquare, dot: "bg-primary/10 text-primary" },
+  interview: { icon: CalendarClock, dot: "bg-status-interview text-status-interview-foreground" },
   status: { icon: CircleDot, dot: "bg-muted text-muted-foreground" },
 };
 

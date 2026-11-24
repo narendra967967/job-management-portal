@@ -89,6 +89,8 @@ async function runForUser(userId: string): Promise<RuleDecision[]> {
         inArray(leadsT.status, RULE_STATUSES),
         eq(leadsT.topChoice, false),
         eq(leadsT.statusPinned, false),
+        // An interview still ahead keeps the lead as it is (lead ↔ interview link).
+        sql`(${leadsT.interviewAt} is null or ${leadsT.interviewAt} <= now())`,
       ),
     );
   if (!leads.length) return [];

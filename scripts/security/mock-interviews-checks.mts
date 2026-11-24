@@ -27,10 +27,15 @@ import path from "node:path";
 import nodemailer from "nodemailer";
 import pg from "pg";
 import { decryptSecret, encryptSecret } from "../../lib/crypto.ts";
-import { bookAiInterview, parseForm } from "../../lib/mock-interviews/booking.ts";
+import { bookAiInterview, material, parseForm } from "../../lib/mock-interviews/booking.ts";
 import { getModuleSettings, settingsSnapshot } from "../../lib/mock-interviews/config.ts";
 import { getBookingSetup, getBriefing, getReport, getSession, leadPracticeFor, listBookings, listInterviews } from "../../lib/mock-interviews/data.ts";
 import { leadReadiness } from "../../lib/lead-practice.ts";
+import { keywordTopics, parseTopics, suggestTopicsForLead } from "../../lib/mock-interviews/topic-suggest.ts";
+import { closePracticeTasks, practiceDueDay, sendInterviewReminders } from "../../lib/lead-interview.ts";
+import { guessIndustry } from "../../lib/mock-interviews/model.ts";
+import { interviewAhead, isLeadStale, staleWarning, type JobLead } from "../../lib/types.ts";
+import { NO_COMPANY, companyNote } from "../../lib/mock-interviews/prompts.ts";
 import { endInterview, evaluateInterview, heartbeat, leaveInterview, startInterview, submitAnswer } from "../../lib/mock-interviews/engine.ts";
 import { INDUSTRIES, METRICS, overallScore } from "../../lib/mock-interviews/model.ts";
 import { evaluationSchema, materialBlock, NO_TOPICS, parseJsonObject, planFormat, toWriting } from "../../lib/mock-interviews/prompts.ts";
@@ -340,6 +345,9 @@ async function main() {
       "creditAiInterviewAction",
       "listOtherAnswersAction",
       "markOtherAnswersAction",
+      "suggestTopicsAction",
+      "setLeadStatusAction",
+      "setInterviewDateAction",
     ];
     // A dev server writes the manifest as it compiles, so give it a moment.
     for (let i = 0; i < 15; i++) {
@@ -876,7 +884,7 @@ async function main() {
     {
       const none = planFormat(15, []);
       const some = planFormat(15, ["Planning"]);
-      const block = materialBlock({ role: "PM", industry: "IT", category: CATEGORY, difficulty: "Easy", question_count: 15, topics: "", resume: "", job_description: "", career_profile: "" });
+      const block = materialBlock({ role: "PM", industry: "IT", category: CATEGORY, difficulty: "Easy", question_count: 15, topics: "", resume: "", job_description: "", career_profile: "", company: "" });
       check(
         "T1",
         "no topics → the plan asks for questions across the whole role; topics → each is covered",
@@ -952,6 +960,125 @@ async function main() {
         "the lead page shows its practice panel; another user's lead shows nothing of theirs",
         p.status === 200 && p.html.includes(`id="practice-title"`) && p.html.includes("Start booked practice") && !p2.html.includes("Elsewhere Ltd"),
         `${p.status} / ${p2.status}`,
+      );
+    }
+
+    /* ---- P: phases 3 and 4 of the lead ↔ interview link ---- */
+    {
+      const JD =
+        "We are a leading bank building digital banking and payments products. You will manage stakeholders across lending and payments teams, run Agile sprints, track budgets and manage delivery risks. SQL dashboards are a plus.";
+      await q("insert into job_lead_details (user_id, lead_id, jd_text) values ($1, $2, $3)", [u.id, ownLead, JD]);
+
+      // Item 9: industry guess and topic suggestions.
+      const kw = keywordTopics(JD, "Project management");
+      check(
+        "P1",
+        "keyword matching picks topics the job description mentions; the industry guess needs a clear winner",
+        kw.includes("Stakeholder management") && kw.includes("Agile and Scrum") && kw.length <= 6 && guessIndustry(JD) === "Banking and finance" && guessIndustry("A role in a team.") === null,
+        kw.join(", "),
+      );
+      check(
+        "P2",
+        "an AI reply is cleaned into short, distinct topics; junk gives none",
+        JSON.stringify(parseTopics('{"topics":["- SQL","sql","Stakeholder management","x","' + "y".repeat(60) + '"]}')) === '["SQL","Stakeholder management"]' &&
+          parseTopics("not json").length === 0,
+      );
+      const callsBefore = aiCalls.length;
+      aiReplies.push(JSON.stringify({ topics: ["Payments domain", "Risk management"] }));
+      const viaAi = await suggestTopicsForLead(u.id, ownLead, "Project management");
+      aiReplies.push("Sorry, no JSON here");
+      const fallback = await suggestTopicsForLead(u.id, ownLead, "Project management");
+      const [{ key }] = await q<{ key: boolean }>("select ai_key_ciphertext is not null key from user_settings where user_id = $1", [u.id]);
+      check(
+        "P3",
+        "suggestions use the user's own AI key when there is one, and fall back to keywords when the reply is unusable",
+        key
+          ? viaAi.ok && viaAi.source === "ai" && viaAi.topics[0] === "Payments domain" && fallback.ok && fallback.source === "keywords" && aiCalls.length - callsBefore === 2
+          : viaAi.ok && viaAi.source === "keywords" && aiCalls.length === callsBefore,
+        key ? `${aiCalls.length - callsBefore} AI calls` : "ui-test has no AI key: keywords only, no AI call",
+      );
+      while (aiReplies.length) aiReplies.shift();
+      const foreign = await suggestTopicsForLead(u.id, otherLead, "Coding");
+      const viaHttp = await action("suggestTopicsAction", [otherLead, "Coding"], userCookie);
+      check("P4", "suggestions refuse another user's lead", !foreign.ok && refused(viaHttp) && !val(viaHttp).includes("topics\":["));
+
+      // Item 11: the company goes on the booking and into the prompts.
+      // What a booking from this lead stores (the same material both booking and editing save).
+      const parsedSetup = parseForm(form(setup({ leadId: ownLead })));
+      const mat = "setup" in parsedSetup ? await material(u.id, parsedSetup.setup, null) : null;
+      const company = mat && "company" in mat ? mat.company : null;
+      const noLead = "setup" in parsedSetup ? await material(u.id, { ...parsedSetup.setup, leadId: null }, null) : null;
+      check(
+        "P5",
+        "a booking from a lead keeps its company; the interviewer is told it, and nothing when there's none",
+        company === "Check Co" && !!noLead && "company" in noLead && noLead.company === null &&
+          companyNote("Check Co").includes("Check Co") && companyNote(NO_COMPANY) === "" &&
+          materialBlock({ role: "PM", industry: "IT", category: CATEGORY, difficulty: "Easy", question_count: 5, topics: "", resume: "", job_description: "", career_profile: "", company: "Check Co" }).includes("Check Co"),
+        `company ${company}`,
+      );
+
+      // Items 6 and 7: the practice to-do, the interview date and its reminder.
+      await action("setLeadStatusAction", [ownLead, "applied", null, "Asia/Kolkata"], userCookie);
+      await action("setLeadStatusAction", [ownLead, "interview", null, "Asia/Kolkata"], userCookie);
+      await action("setLeadStatusAction", [ownLead, "applied", null, "Asia/Kolkata"], userCookie);
+      await action("setLeadStatusAction", [ownLead, "interview", null, "Asia/Kolkata"], userCookie);
+      const tasksOf = () => q<{ status: string; due_date: string | null; kind: string }>("select status, due_date::text, kind from tasks where job_id = $1 and kind = 'practice'", [ownLead]);
+      const t1 = await tasksOf();
+      check("P6", "moving a lead to Interview adds one practice to-do (never two)", t1.length === 1 && t1[0].status === "open" && t1[0].due_date === null, `${t1.length} to-dos`);
+
+      const soon = new Date(Date.now() + 10 * 3_600_000);
+      const past = await action("setInterviewDateAction", [{ leadId: ownLead, at: new Date(Date.now() - 3_600_000).toISOString(), timeZone: "Asia/Kolkata" }], userCookie);
+      await action("setInterviewDateAction", [{ leadId: otherLead, at: soon.toISOString(), timeZone: "Asia/Kolkata" }], userCookie);
+      const [otherRow] = await q<{ interview_at: Date | null }>("select interview_at from job_leads where id = $1", [otherLead]);
+      const [afterPast] = await q<{ interview_at: Date | null }>("select interview_at from job_leads where id = $1", [ownLead]);
+      await q("update job_leads set interview_reminded_at = now() where id = $1", [ownLead]);
+      await action("setInterviewDateAction", [{ leadId: ownLead, at: soon.toISOString(), timeZone: "Asia/Kolkata" }], userCookie);
+      const [own] = await q<{ interview_at: Date | null; interview_reminded_at: Date | null; updated_at: Date }>("select interview_at, interview_reminded_at, updated_at from job_leads where id = $1", [ownLead]);
+      const t2 = await tasksOf();
+      check(
+        "P7",
+        "an interview date in the past or on another user's lead is refused; a new date clears the reminder mark and dates the to-do",
+        own.interview_at?.getTime() === soon.getTime() && own.interview_reminded_at === null && otherRow.interview_at === null &&
+          afterPast.interview_at === null && t2[0]?.due_date === practiceDueDay(soon, "Asia/Kolkata"),
+        `to-do due ${t2[0]?.due_date}; past attempt: ${val(past).slice(0, 50)}`,
+      );
+
+      const far = await newLead(u.id, "far", "Later Co");
+      await q("update job_leads set interview_at = now() + interval '3 days' where id = $1", [far]);
+      const before = own.updated_at.getTime();
+      const sent1 = await sendInterviewReminders();
+      const sent2 = await sendInterviewReminders();
+      const notes = await q<{ href: string }>("select href from notifications where user_id = $1 and type = 'interview_soon' and created_at >= $2", [u.id, startedAt]);
+      const [after] = await q<{ updated_at: Date; interview_reminded_at: Date | null }>("select updated_at, interview_reminded_at from job_leads where id = $1", [ownLead]);
+      check(
+        "P8",
+        "a day before the interview the bell reminds once; further runs and later dates send nothing; the lead isn't marked active",
+        sent1 >= 1 && sent2 === 0 && notes.length === 1 && notes[0].href === `/leads/${ownLead}` && !!after.interview_reminded_at && after.updated_at.getTime() === before,
+        `${sent1} then ${sent2}`,
+      );
+
+      await closePracticeTasks(other.id, ownLead);
+      const t3 = await tasksOf();
+      await closePracticeTasks(u.id, ownLead);
+      const t4 = await tasksOf();
+      check("P9", "a scored practice closes the lead's practice to-do, only for its owner", t3[0]?.status === "open" && t4[0]?.status === "done");
+
+      const lead = (over: Partial<JobLead>): JobLead => ({
+        id: "x", title: "", company: "", location: "", remote: false, tags: [], postedRelative: "", canonicalJobUrl: "", linkedinJobId: "",
+        status: "applied", source: "other" as JobLead["source"], origin: "manual", topChoice: false, capturedAt: "2026-01-01", lastActiveAt: "2026-01-01",
+        contactCount: 0, hasDueReminder: false, hasOutreach: false, practiced: false, interviewAt: null, ...over,
+      });
+      const ahead = lead({ interviewAt: new Date(Date.now() + 86_400_000).toISOString() });
+      const gone = lead({ interviewAt: new Date(Date.now() - 86_400_000).toISOString() });
+      const [{ n: purgeable }] = await q<{ n: number }>(
+        "select count(*)::int n from job_leads where id = $1 and (interview_at is null or interview_at <= now())",
+        [far],
+      );
+      check(
+        "P10",
+        "an interview still ahead keeps a quiet lead from going stale or being cleaned up; once it passes, the usual rules apply",
+        interviewAhead(ahead) && !isLeadStale(ahead, "2026-06-01") && staleWarning(ahead, 14, "2026-01-12") === null &&
+          isLeadStale(gone, "2026-06-01") && isLeadStale(lead({}), "2026-06-01") && purgeable === 0,
       );
     }
 
@@ -1075,6 +1202,7 @@ async function main() {
       client.release();
     }
     await q("delete from ai_interviews where id = any($1::uuid[])", [ids]);
+    await q("delete from notifications where type = 'interview_soon' and created_at >= $1 and user_id in ($2, $3)", [startedAt, u.id, other.id]);
     await q("delete from job_leads where linkedin_job_id like $1", [`${LEAD_MARK}-%`]);
     if (!billingBefore) await q("delete from billing_profiles where user_id = $1", [u.id]);
     await q("delete from sent_email_log where sent_at >= $1 and to_address = $2 and template_key like 'mock_interview%'", [startedAt, u.email]);
