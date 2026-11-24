@@ -22,6 +22,8 @@ import { ConfirmDialog } from "@/components/admin/ui/confirm-dialog";
 import { toast } from "@/components/admin/ui/toast";
 import { Field, SubHead, Toggle, selectCls } from "@/components/admin/settings/form-bits";
 import { InfoTip } from "@/components/ui/info-tip";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/admin/ui/dialog";
+import { KIND_ICONS, KIND_ICON_KEYS, categoryIcon, kindIconKey, type KindIconKey } from "@/components/mock-interviews/category-icons";
 import { saveModuleSettingsAction, testModuleAiAction } from "@/actions/admin-mock-interviews";
 import {
   AI_DURATIONS,
@@ -399,8 +401,62 @@ function NumberField({
   );
 }
 
+const NEW = "\u0000new";
+
+/** A grid of the icons a kind of interview can use (category-icons.ts). */
+function IconPicker({
+  open,
+  title,
+  current,
+  onPick,
+  onClose,
+}: {
+  open: boolean;
+  title: string;
+  current: KindIconKey | null;
+  onPick: (key: KindIconKey) => void;
+  onClose: () => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle className="pr-8">{title}</DialogTitle>
+        </DialogHeader>
+        <ul className="grid grid-cols-4 gap-2 sm:grid-cols-6">
+          {KIND_ICON_KEYS.map((key) => {
+            const { icon: Icon, label } = KIND_ICONS[key];
+            const on = key === current;
+            return (
+              <li key={key}>
+                <button
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => onPick(key)}
+                  className={cn(
+                    "flex min-h-16 w-full flex-col items-center justify-center gap-1 rounded-lg border px-1 py-2 text-[11px] leading-tight transition-colors",
+                    on ? "border-primary bg-primary/10 text-primary" : "bg-white/60 text-muted-foreground hover:border-primary/40 hover:text-foreground",
+                  )}
+                >
+                  <Icon className="size-5" aria-hidden />
+                  <span className="max-w-full truncate">{label}</span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function Rules({ s, set }: SectionProps) {
   const [newCat, setNewCat] = useState("");
+  // The icon for the kind being added: admin's pick, else the default for that name.
+  const [newIcon, setNewIcon] = useState<KindIconKey | null>(null);
+  // Whose icon the picker is choosing: a kind's name, or NEW for the one being added.
+  const [picking, setPicking] = useState<string | null>(null);
+  const shownNewIcon = newIcon ?? kindIconKey(newCat.trim());
   const ranges: [number, number, number][] = [
     [s.minutesPerQuestion, 1, 5],
     [s.wrapUpMinutes, 0, 20],
@@ -413,42 +469,84 @@ function Rules({ s, set }: SectionProps) {
     const c = newCat.trim();
     if (!c || c.length > 40 || s.categories.some((x) => x.toLowerCase() === c.toLowerCase())) return;
     set("categories", [...s.categories, c]);
+    if (newIcon) set("categoryIcons", { ...s.categoryIcons, [c]: newIcon });
     setNewCat("");
+    setNewIcon(null);
   }
+  function removeCat(c: string) {
+    set("categories", s.categories.filter((x) => x !== c));
+    const { [c]: _gone, ...rest } = s.categoryIcons;
+    void _gone;
+    set("categoryIcons", rest);
+  }
+  function chooseIcon(key: KindIconKey) {
+    if (picking === NEW) setNewIcon(key);
+    else if (picking) set("categoryIcons", { ...s.categoryIcons, [picking]: key });
+    setPicking(null);
+  }
+  const NewIcon = KIND_ICONS[shownNewIcon].icon;
   return (
     <section className={cardCls}>
       <h2 className="text-base font-semibold">Interview rules</h2>
 
       <SubHead>Kinds of interview</SubHead>
       <ul className="flex flex-wrap gap-2">
-        {s.categories.map((c) => (
-          <li key={c} className="inline-flex items-center gap-1 rounded-full border bg-white/60 py-1 pr-1 pl-3 text-sm">
-            {c}
-            <button
-              type="button"
-              aria-label={`Remove ${c}`}
-              onClick={() => set("categories", s.categories.filter((x) => x !== c))}
-              className="inline-flex size-9 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground sm:size-6"
-            >
-              <X className="size-3.5" aria-hidden />
-            </button>
-          </li>
-        ))}
+        {s.categories.map((c) => {
+          const Icon = categoryIcon(c, s.categoryIcons);
+          return (
+            <li key={c} className="inline-flex max-w-full items-center gap-1 rounded-full border bg-white/60 py-1 pr-1 pl-1 text-sm">
+              <button
+                type="button"
+                aria-label={`Change the icon for ${c}`}
+                title="Change icon"
+                onClick={() => setPicking(c)}
+                className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary transition-colors hover:bg-primary/20 sm:size-7"
+              >
+                <Icon className="size-4" aria-hidden />
+              </button>
+              <span className="min-w-0 truncate pl-1">{c}</span>
+              <button
+                type="button"
+                aria-label={`Remove ${c}`}
+                onClick={() => removeCat(c)}
+                className="inline-flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground sm:size-6"
+              >
+                <X className="size-3.5" aria-hidden />
+              </button>
+            </li>
+          );
+        })}
       </ul>
-      <div className="mt-2 flex gap-2">
+      <div className="mt-2 flex flex-wrap gap-2">
+        <button
+          type="button"
+          aria-label="Choose an icon for the new kind"
+          title="Choose icon"
+          onClick={() => setPicking(NEW)}
+          className="inline-flex size-11 shrink-0 items-center justify-center rounded-lg border bg-white/60 text-primary transition-colors hover:border-primary/40 sm:size-9"
+        >
+          <NewIcon className="size-4" aria-hidden />
+        </button>
         <Input
           value={newCat}
           onChange={(e) => setNewCat(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addCat())}
           placeholder="Add a kind of interview"
           maxLength={40}
-          className="h-11 max-w-xs sm:h-9"
+          className="h-11 min-w-0 flex-1 sm:h-9 sm:max-w-xs sm:flex-none"
         />
         <Button variant="outline" onClick={addCat} disabled={!newCat.trim()}>
           <Plus className="size-4" aria-hidden />
           Add
         </Button>
       </div>
+      <IconPicker
+        open={picking !== null}
+        title={picking === NEW ? `Icon for ${newCat.trim() || "the new kind"}` : `Icon for ${picking ?? ""}`}
+        current={picking === NEW ? shownNewIcon : picking ? kindIconKey(picking, s.categoryIcons) : null}
+        onPick={chooseIcon}
+        onClose={() => setPicking(null)}
+      />
 
       <SubHead>Lengths candidates can pick</SubHead>
       <div className="flex flex-wrap gap-2">
@@ -487,6 +585,7 @@ function Rules({ s, set }: SectionProps) {
         payload={() => ({
           section: "rules",
           categories: s.categories,
+          categoryIcons: s.categoryIcons,
           durations: s.durations,
           minutesPerQuestion: s.minutesPerQuestion,
           wrapUpMinutes: s.wrapUpMinutes,

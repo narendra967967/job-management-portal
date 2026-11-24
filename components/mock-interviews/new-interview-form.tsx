@@ -17,7 +17,6 @@ import {
   FileUp,
   Loader2,
   Lock,
-  MessagesSquare,
   Rocket,
   SignalHigh,
   SignalLow,
@@ -64,7 +63,7 @@ import { OTHER_FIELDS, OTHER_MAX, cleanOther, otherError } from "@/lib/other-ans
 import { scrollIntoMain } from "@/components/mock-interviews/scroll-into-main";
 import { LeadPicker } from "@/components/mock-interviews/lead-picker";
 import { CtaGlow, ctaClass } from "@/components/mock-interviews/cta";
-import { CATEGORY_ICON } from "@/components/mock-interviews/category-icons";
+import { categoryIcon } from "@/components/mock-interviews/category-icons";
 
 // New AI interview (spec D10, D11). R1.2: the form validates on the client and
 // "starts" a sample session; R1.5 wires the allowance, payment and the AI.
@@ -77,6 +76,8 @@ type JdMode = "lead" | "paste" | "general";
 
 export interface FormOptions {
   categories: string[];
+  /** Icon admin chose per kind; kinds left out get the default. */
+  categoryIcons: Record<string, string>;
   durations: number[];
   minutesPerQuestion: number;
   wrapUpMinutes: number;
@@ -481,7 +482,7 @@ export function NewInterviewForm({
                 )}
               >
                 {options.categories.map((c) => {
-                  const Icon = CATEGORY_ICON[c] ?? MessagesSquare;
+                  const Icon = categoryIcon(c, options.categoryIcons);
                   const on = category === c;
                   return (
                     <button

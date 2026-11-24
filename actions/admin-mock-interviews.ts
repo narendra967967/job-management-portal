@@ -15,6 +15,7 @@ import { aiInterviewEvents, aiInterviews, mockInterviewConfig } from "@/db/schem
 import { getModuleSettings, settingsSnapshot } from "@/lib/mock-interviews/config";
 import { DEFAULT_PROMPTS, DIFFICULTIES, METRICS, type ModuleSettings } from "@/lib/mock-interviews/model";
 import type { SessionEvent } from "@/lib/mock-interviews/admin-model";
+import { KIND_ICON_KEYS } from "@/components/mock-interviews/category-icons";
 
 type Result = { ok: true } | { ok: false; error: string };
 
@@ -58,6 +59,8 @@ const sectionSchema = z.discriminatedUnion("section", [
       .array(z.string().trim().min(1).max(40, "Kinds of interview: 40 characters at most."))
       .min(1, "Keep at least one kind of interview.")
       .max(40),
+    // Icon per kind; only keys from the picker are accepted.
+    categoryIcons: z.record(z.string().max(40), z.enum(KIND_ICON_KEYS)).optional().default({}),
     durations: z.array(z.union([z.literal(15), z.literal(30), z.literal(45), z.literal(60)])).min(1, "Allow at least one length."),
     minutesPerQuestion: z.number().min(1, "Minutes per question: at least 1.").max(5, "Minutes per question: at most 5.").multipleOf(0.5, "Minutes per question: steps of 0.5."),
     wrapUpMinutes: whole(0, 20, "Wrap-up extension"),
@@ -115,8 +118,11 @@ export async function saveModuleSettingsAction(input: unknown): Promise<Result &
     case "rules": {
       const seen = new Set<string>();
       const categories = v.categories.filter((c) => !seen.has(c.toLowerCase()) && seen.add(c.toLowerCase()));
+      // Keep icons only for kinds still in the list.
+      const categoryIcons = Object.fromEntries(categories.flatMap((c) => (v.categoryIcons[c] ? [[c, v.categoryIcons[c]]] : [])));
       Object.assign(next, {
         categories,
+        categoryIcons,
         durations: [...new Set(v.durations)].sort((a, b) => a - b),
         minutesPerQuestion: v.minutesPerQuestion,
         wrapUpMinutes: v.wrapUpMinutes,
@@ -153,6 +159,7 @@ export async function saveModuleSettingsAction(input: unknown): Promise<Result &
     aiCachedInputCostPerMTokPaise: next.cachedInputCostPerMTokPaise,
     aiOutputCostPerMTokPaise: next.outputCostPerMTokPaise,
     categories: next.categories,
+    categoryIcons: next.categoryIcons,
     durations: next.durations,
     minutesPerQuestion: next.minutesPerQuestion,
     wrapUpMinutes: next.wrapUpMinutes,

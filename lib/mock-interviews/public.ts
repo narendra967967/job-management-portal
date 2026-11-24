@@ -11,6 +11,8 @@ import { aiInterviews } from "@/db/schema";
 
 export interface PublicAiInterviews {
   categories: string[];
+  /** Icon admin chose per kind; kinds left out get the default. */
+  categoryIcons: Record<string, string>;
   durations: number[];
   /** Per level: the rate per minute and its discount when switched on. Paise. */
   levels: {
@@ -55,6 +57,7 @@ export async function getPublicAiInterviews(): Promise<PublicAiInterviews | null
     const exampleMin = s.durations.includes(30) ? 30 : s.durations[0];
     return {
       categories: s.categories,
+      categoryIcons: s.categoryIcons,
       durations: s.durations,
       levels: DIFFICULTIES.map((d) => ({
         difficulty: d,

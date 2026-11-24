@@ -279,6 +279,8 @@ export interface ModuleSettings {
   cachedInputCostPerMTokPaise: number;
   outputCostPerMTokPaise: number;
   categories: string[];
+  /** Icon key admin chose per kind (components/mock-interviews/category-icons.ts); missing = the default. */
+  categoryIcons: Record<string, string>;
   durations: number[];
   minutesPerQuestion: number;
   wrapUpMinutes: number;

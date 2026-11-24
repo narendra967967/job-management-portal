@@ -505,6 +505,13 @@
       "when": 1795512904311,
       "tag": "0071_lead_interview_link",
       "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "7",
+      "when": 1795525103706,
+      "tag": "0072_mock_interview_kind_icons",
+      "breakpoints": true
     }
   ]
 }

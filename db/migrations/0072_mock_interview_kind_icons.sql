@@ -1,0 +1,1 @@
+ALTER TABLE "mock_interview_config" ADD COLUMN "category_icons" jsonb DEFAULT '{}'::jsonb NOT NULL;

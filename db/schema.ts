@@ -1857,6 +1857,9 @@ export const mockInterviewConfig = pgTable(
     // Input the provider served from its cache (much cheaper). 0 = charge it at the input price.
     aiCachedInputCostPerMTokPaise: integer("ai_cached_input_cost_per_mtok_paise").notNull().default(0),
     categories: text("categories").array().notNull().default(sql`'{}'::text[]`),
+    // The icon admin picked for each kind, by name → icon key
+    // (components/mock-interviews/category-icons.ts). Kinds left out use the default.
+    categoryIcons: jsonb("category_icons").$type<Record<string, string>>().notNull().default(sql`'{}'::jsonb`),
     durations: integer("durations").array().notNull().default(sql`'{15,30,45,60}'::integer[]`),
     minutesPerQuestion: real("minutes_per_question").notNull().default(2),
     wrapUpMinutes: integer("wrap_up_minutes").notNull().default(10),

@@ -21,6 +21,7 @@ export default async function NewAiInterviewPage({ searchParams }: { searchParam
       allowance={allowance}
       options={{
         categories: settings.categories,
+        categoryIcons: settings.categoryIcons,
         durations: settings.durations,
         minutesPerQuestion: settings.minutesPerQuestion,
         wrapUpMinutes: settings.wrapUpMinutes,

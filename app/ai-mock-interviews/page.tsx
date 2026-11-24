@@ -324,7 +324,7 @@ export default async function AiMockInterviewsPage() {
             </div>
             <ul className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
               {ai.categories.map((c) => {
-                const Icon = categoryIcon(c);
+                const Icon = categoryIcon(c, ai.categoryIcons);
                 const talk = (DISCUSSION_CATEGORIES as readonly string[]).includes(c);
                 return (
                   <li key={c} className="glass flex min-h-16 min-w-0 items-center gap-2 rounded-2xl p-2.5 sm:gap-3 sm:p-3 transition-transform duration-200 hover:-translate-y-0.5 motion-reduce:hover:translate-y-0">
