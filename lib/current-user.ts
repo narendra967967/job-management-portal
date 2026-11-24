@@ -4,9 +4,21 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { authAdmin } from "@/lib/auth-admin";
+import { safeNextPath } from "@/lib/safe-next";
 
 // The acting user for data-layer reads/writes. Login is email+password
 // (Better Auth), always enforced — no external dependency, so no dev bypass.
+
+/**
+ * Send a signed-out visitor to the login page, coming back afterwards to the
+ * page they asked for (x-return-to, set by middleware on dashboard routes).
+ * Covers a session that expired while its cookie was still there, which the
+ * middleware's cookie check lets through.
+ */
+export async function redirectToLogin(): Promise<never> {
+  const back = safeNextPath((await headers()).get("x-return-to"));
+  redirect(back ? `/login?next=${encodeURIComponent(back)}` : "/login");
+}
 
 /** The signed-in user's id, or null when there's no valid session. */
 export async function getSessionUserId(): Promise<string | null> {
@@ -23,7 +35,7 @@ export async function getSessionUserId(): Promise<string | null> {
  *  admin session instead of redirecting, so there's no loop. */
 export async function getCurrentUserId(): Promise<string> {
   const id = await getSessionUserId();
-  if (!id) redirect("/login");
+  if (!id) return redirectToLogin();
   return id;
 }
 
@@ -79,7 +91,7 @@ export function allowedInLimitedMode(pathname: string): boolean {
  *  Account, help and payment actions use getCurrentUserId / getSessionUser. */
 export async function getActiveUserId(): Promise<string> {
   const u = await getSessionUser();
-  if (!u) redirect("/login");
+  if (!u) return redirectToLogin();
   const state = accessState(u);
   if (state === "expired") throw new Error("Your plan has ended. Pick a plan on Upgrade Plan to keep going.");
   if (state === "deactivated") throw new Error("This account is deactivated.");

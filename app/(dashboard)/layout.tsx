@@ -24,7 +24,7 @@ import { ContactSupportProvider, SupportIconButton } from "@/components/support/
 import { SupportWidget } from "@/components/support/support-widget";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
-import { getSessionUser, accessState, allowedInLimitedMode } from "@/lib/current-user";
+import { getSessionUser, accessState, allowedInLimitedMode, redirectToLogin } from "@/lib/current-user";
 import { guardMaintenance } from "@/lib/maintenance";
 import { getAppName } from "@/lib/branding";
 import { loadWorkspace } from "@/lib/queries";
@@ -60,7 +60,7 @@ export default async function DashboardLayout({
   // support, guides, Settings (Help + Account) and Mock interviews open; lead
   // feature Server Actions refuse them too (getActiveUserId).
   const u = await getSessionUser();
-  if (!u) redirect("/login");
+  if (!u) return redirectToLogin();
   const state = accessState(u);
   if (state === "deactivated") redirect("/deactivated");
   const limited = state === "expired";
