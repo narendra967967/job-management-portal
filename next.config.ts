@@ -85,11 +85,12 @@ const nextConfig: NextConfig = {
   // disk by path), and pdfkit's built-in Helvetica and friends, which pdfkit
   // loads through its package "imports" alias (#standard-fonts/*). Without the
   // second, invoices fail on preprod/prod with "Cannot find module
-  // …/pdfkit/js/standard-fonts/Helvetica.cjs" while working locally.
+  // …/pdfkit/js/standard-fonts/Helvetica.cjs" while working locally. The font
+  // files each load a shared helper from standard-fonts/chunks/, hence **.
   outputFileTracingIncludes: {
     "/**": [
       "./node_modules/@fontsource/noto-sans-devanagari/files/noto-sans-devanagari-latin-ext-*-normal.woff",
-      "./node_modules/pdfkit/js/standard-fonts/*.cjs",
+      "./node_modules/pdfkit/js/standard-fonts/**/*.cjs",
     ],
   },
   experimental: {
