@@ -86,6 +86,12 @@ const nextConfig: NextConfig = {
     "/**": ["./node_modules/@fontsource/noto-sans-devanagari/files/noto-sans-devanagari-latin-ext-*-normal.woff"],
   },
   experimental: {
+    // Next 15.5's dev-only segment explorer wraps every layout and page in extra
+    // components in the browser, which shifts React's useId values there: every
+    // menu, popover and input id then differs from the server's HTML, and dev
+    // logs a hydration warning on each page. Production never has it. Off here
+    // until Next fixes it (re-check on the next Next.js upgrade).
+    devtoolSegmentExplorer: false,
     serverActions: {
       // Résumé uploads go through a Server Action (default cap: 1 MB). The app
       // allows files up to 5 MB (RESUME_MAX_BYTES); leave room for the
