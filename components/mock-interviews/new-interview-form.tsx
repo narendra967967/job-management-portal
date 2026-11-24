@@ -32,6 +32,7 @@ import { MarkdownEditor } from "@/components/ui/markdown-editor";
 import { ChipInput } from "@/components/ui/chip-input";
 import { InfoTip } from "@/components/ui/info-tip";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchSelect } from "@/components/ui/search-select";
 import { toast } from "@/components/ui/toast";
 import { useLeadDetail, useLeads, useResumes } from "@/lib/mock-store";
 import { bookAiInterviewAction, updateAiBookingAction } from "@/actions/mock-interviews";
@@ -371,7 +372,7 @@ export function NewInterviewForm({
           <Step n={1} title="The interview" done={stepDone.interview}>
             <div className="grid gap-4 sm:grid-cols-2">
               <div id="field-role" className="space-y-1.5">
-                <label htmlFor="mi-role" className="text-sm font-medium">
+                <label htmlFor="mi-role" className="block text-sm font-medium">
                   Role you&apos;re interviewing for
                 </label>
                 <div className="relative">
@@ -389,29 +390,23 @@ export function NewInterviewForm({
                 {err("role")}
               </div>
               <div id="field-industry" className="space-y-1.5">
-                <span className="flex items-center gap-1.5 text-sm font-medium">Industry</span>
-                <Select
+                <label htmlFor="mi-industry" className="block text-sm font-medium">
+                  Industry
+                </label>
+                <SearchSelect
+                  id="mi-industry"
                   value={industry}
-                  onValueChange={(v) => {
-                    setIndustry(String(v ?? ""));
+                  onChange={(v) => {
+                    setIndustry(v);
                     // Straight to the box that asks which one.
                     if (v === "Other") setTimeout(() => document.getElementById("mi-industry-other")?.focus(), 0);
                   }}
-                >
-                  <SelectTrigger aria-label="Industry" aria-invalid={!!errors.industry} className="h-11 w-full sm:h-10">
-                    <span className="flex min-w-0 items-center gap-2">
-                      <Building2 className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-                      <SelectValue placeholder="Pick one" />
-                    </span>
-                  </SelectTrigger>
-                  <SelectContent className="w-auto min-w-(--anchor-width)">
-                    {INDUSTRIES.map((i) => (
-                      <SelectItem key={i} value={i}>
-                        {i}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  options={INDUSTRIES}
+                  placeholder="Pick or search"
+                  icon={Building2}
+                  invalid={!!errors.industry}
+                  emptyText="No industry matches that. Pick Other and type yours in."
+                />
                 {industry === "Other" && (
                   <>
                     <label htmlFor="mi-industry-other" className="sr-only">
