@@ -80,10 +80,17 @@ const nextConfig: NextConfig = {
   // the email libraries. mailauth bundled spends ~1 minute on a DKIM check that
   // takes 0.4 s unbundled; mailparser goes with it.
   serverExternalPackages: ["mammoth", "nodemailer", "mailauth", "mailparser"],
-  // Invoice PDFs (lib/invoices/pdf.tsx) read the rupee font from disk by path,
-  // which the standalone trace can't see; list it so the server image has it.
+  // Invoice PDFs (lib/invoices/pdf.tsx) load fonts the standalone trace can't
+  // see, so they're listed here for the server image: the rupee font (read from
+  // disk by path), and pdfkit's built-in Helvetica and friends, which pdfkit
+  // loads through its package "imports" alias (#standard-fonts/*). Without the
+  // second, invoices fail on preprod/prod with "Cannot find module
+  // …/pdfkit/js/standard-fonts/Helvetica.cjs" while working locally.
   outputFileTracingIncludes: {
-    "/**": ["./node_modules/@fontsource/noto-sans-devanagari/files/noto-sans-devanagari-latin-ext-*-normal.woff"],
+    "/**": [
+      "./node_modules/@fontsource/noto-sans-devanagari/files/noto-sans-devanagari-latin-ext-*-normal.woff",
+      "./node_modules/pdfkit/js/standard-fonts/*.cjs",
+    ],
   },
   experimental: {
     // Next 15.5's dev-only segment explorer wraps every layout and page in extra
