@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, count, desc, eq, inArray, isNotNull, ne, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, isNotNull, ne, notInArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { aiInterviewMessages, aiInterviews, interviewEvaluations, jobLeads, paymentOrders, plans, resumes, user } from "@/db/schema";
 import { careerCompletionFor } from "@/lib/career-data";
@@ -20,7 +20,9 @@ import type {
   PlannedQuestion,
   ReportWriting,
 } from "./model";
-import { industryShown } from "./model";
+import { companyFromLabel, industryShown } from "./model";
+import { candidateAiOpen } from "./config";
+import { NO_PRACTICE, type LeadPracticeRun, type PracticeState, type WorkspacePractice } from "@/lib/lead-practice";
 
 // What the candidate's Mock interviews screens read. Every query is scoped to
 // the signed-in user (callers pass getCurrentUserId()).
@@ -339,8 +341,18 @@ export async function listInterviews(userId: string): Promise<InterviewSummary[]
     .where(and(eq(aiInterviews.userId, userId), isNotNull(aiInterviews.startedAt)))
     .orderBy(desc(aiInterviews.startedAt));
   const reports = await reportsFor(list.map((i) => i.id));
+  // The leads still there, for "Open lead" and the company filter.
+  const leadIds = [...new Set(list.map((i) => i.leadId).filter((id): id is string => !!id))];
+  const leadRows = leadIds.length
+    ? await db
+        .select({ id: jobLeads.id, company: jobLeads.company })
+        .from(jobLeads)
+        .where(and(eq(jobLeads.userId, userId), inArray(jobLeads.id, leadIds)))
+    : [];
+  const companyOf = new Map(leadRows.map((l) => [l.id, l.company]));
   return list.map((i) => {
     const report = reports.get(i.id);
+    const leadLive = !!i.leadId && companyOf.has(i.leadId);
     return {
       id: i.id,
       source: "ai",
@@ -352,6 +364,15 @@ export async function listInterviews(userId: string): Promise<InterviewSummary[]
       date: i.startedAt!.toISOString(),
       status: historyStatus(i, report),
       ...(report ? { scores: scoresOf(report), overall: report.overall ?? 0 } : {}),
+      ...(i.leadLabel
+        ? {
+            lead: {
+              id: leadLive ? i.leadId : null,
+              label: i.leadLabel,
+              company: (leadLive ? companyOf.get(i.leadId!) : companyFromLabel(i.leadLabel)) ?? "",
+            },
+          }
+        : {}),
     };
   });
 }
@@ -435,4 +456,76 @@ export async function getReadiness(userId: string): Promise<Readiness> {
     },
     paymentAvailable,
   };
+}
+
+/* ---------------- practices by lead (lead ↔ interview link) ---------------- */
+
+function practiceState(i: Pick<InterviewRow, "status">, report: EvaluationRow | undefined): PracticeState {
+  switch (i.status) {
+    case "ready":
+      return "booked";
+    case "in_progress":
+      return "in_progress";
+    case "interrupted":
+      return "paused";
+    case "completed":
+    case "stopped":
+      return report ? "completed" : "awaiting_report";
+    default:
+      return "ended";
+  }
+}
+
+/**
+ * The user's practices grouped by the lead they were booked for, for the lead
+ * screens (loaded with the workspace). Empty while AI interviews are Coming
+ * soon, so nothing practice-related shows on the lead side then. Unpaid and
+ * expired bookings are left out.
+ */
+export async function leadPracticeFor(userId: string): Promise<WorkspacePractice> {
+  let open = false;
+  try {
+    open = await candidateAiOpen();
+  } catch {
+    return NO_PRACTICE;
+  }
+  if (!open) return NO_PRACTICE;
+  const rows = await db
+    .select({
+      id: aiInterviews.id,
+      leadId: aiInterviews.leadId,
+      status: aiInterviews.status,
+      difficulty: aiInterviews.difficulty,
+      durationMin: aiInterviews.durationMin,
+      validUntil: aiInterviews.validUntil,
+      startedAt: aiInterviews.startedAt,
+      createdAt: aiInterviews.createdAt,
+    })
+    .from(aiInterviews)
+    .where(
+      and(
+        eq(aiInterviews.userId, userId),
+        isNotNull(aiInterviews.leadId),
+        notInArray(aiInterviews.status, ["pending_payment", "expired"]),
+      ),
+    );
+  const now = Date.now();
+  const live = rows.filter((r) => r.status !== "ready" || r.validUntil.getTime() > now);
+  const reports = await reportsFor(live.map((r) => r.id));
+  const byLead: Record<string, LeadPracticeRun[]> = {};
+  for (const r of live) {
+    const report = reports.get(r.id);
+    const state = practiceState(r, report);
+    (byLead[r.leadId!] ??= []).push({
+      id: r.id,
+      state,
+      difficulty: r.difficulty,
+      durationMin: r.durationMin,
+      date: (r.startedAt ?? r.createdAt).toISOString(),
+      score: state === "completed" ? (report?.overall ?? null) : null,
+      fixes: state === "completed" ? (report?.writing?.improvements ?? []).slice(0, 2).map((p) => p.headline) : [],
+    });
+  }
+  for (const list of Object.values(byLead)) list.sort((a, b) => b.date.localeCompare(a.date));
+  return { open: true, byLead };
 }

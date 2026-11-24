@@ -16,6 +16,7 @@ import {
   type LeadSource,
 } from "@/lib/types";
 import { countryOf } from "@/lib/geo";
+import { usePractice } from "@/lib/mock-store";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -32,11 +33,14 @@ export type DateRange = "all" | "7d" | "30d" | "90d" | "custom";
 export type TopChoiceFilter = "all" | "top";
 export type SourceFilter = "all" | LeadSource;
 export type OriginFilter = "all" | LeadOrigin;
+export type PracticeFilter = "all" | "practiced" | "not";
 
 export interface LeadMetaFilter {
   topChoice?: TopChoiceFilter;
   source?: SourceFilter;
   origin?: OriginFilter;
+  /** Only offered while AI interviews are open. */
+  practice?: PracticeFilter;
 }
 
 /** Missing keys (filters saved before these existed) count as "all". */
@@ -44,6 +48,8 @@ export function matchesLeadMeta(l: JobLead, f: LeadMetaFilter): boolean {
   if (f.topChoice === "top" && !l.topChoice) return false;
   if (f.source && f.source !== "all" && l.source !== f.source) return false;
   if (f.origin && f.origin !== "all" && l.origin !== f.origin) return false;
+  if (f.practice === "practiced" && !l.practiced) return false;
+  if (f.practice === "not" && l.practiced) return false;
   return true;
 }
 
@@ -51,9 +57,16 @@ export function countLeadMetaFilters(f: LeadMetaFilter): number {
   return (
     (f.topChoice === "top" ? 1 : 0) +
     (f.source && f.source !== "all" ? 1 : 0) +
-    (f.origin && f.origin !== "all" ? 1 : 0)
+    (f.origin && f.origin !== "all" ? 1 : 0) +
+    (f.practice && f.practice !== "all" ? 1 : 0)
   );
 }
+
+export const PRACTICE_OPTIONS = [
+  { value: "all", label: "All leads" },
+  { value: "practiced", label: "Practiced" },
+  { value: "not", label: "Not practiced yet" },
+];
 
 export const TOP_CHOICE_OPTIONS = [
   { value: "all", label: "All leads" },
@@ -93,6 +106,7 @@ export const EMPTY_LEAD_FILTERS: LeadFilterValue = {
   topChoice: "all",
   source: "all",
   origin: "all",
+  practice: "all",
   location: "all",
   country: "all",
   title: "all",
@@ -155,6 +169,7 @@ export function LeadFilters({
   onChange: (next: LeadFilterValue) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const { open: practiceOpen } = usePractice();
   const set = (patch: Partial<LeadFilterValue>) => onChange({ ...value, ...patch });
   const activeCount = countActiveLeadFilters(value);
   const resultCount = useMemo(
@@ -267,6 +282,14 @@ export function LeadFilters({
                   onValueChange={(v) => set({ origin: v as OriginFilter })}
                   options={ORIGIN_OPTIONS}
                 />
+                {practiceOpen && (
+                  <DrawerSelect
+                    label="Interview practice"
+                    value={value.practice ?? "all"}
+                    onValueChange={(v) => set({ practice: v as PracticeFilter })}
+                    options={PRACTICE_OPTIONS}
+                  />
+                )}
                 <DrawerSelect
                   label="Workplace"
                   value={value.location}

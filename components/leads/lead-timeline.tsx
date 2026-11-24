@@ -1,7 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import {
   Bot,
+  MessagesSquare,
   Sparkles,
   UserPlus,
   Send,
@@ -28,6 +30,7 @@ const KIND_META: Record<
     dot: "bg-status-applied text-status-applied-foreground",
   },
   auto: { icon: Bot, dot: "bg-ai-muted text-ai" },
+  practice: { icon: MessagesSquare, dot: "bg-primary/10 text-primary" },
   status: { icon: CircleDot, dot: "bg-muted text-muted-foreground" },
 };
 
@@ -67,6 +70,18 @@ export function LeadTimeline({ leadId }: { leadId: string }) {
                 <p className="truncate text-xs text-muted-foreground">
                   {e.detail}
                 </p>
+              )}
+              {e.points && e.points.length > 0 && (
+                <ul className="mt-0.5 list-disc space-y-0.5 pl-4 text-xs text-muted-foreground">
+                  {e.points.map((p) => (
+                    <li key={p}>{p}</li>
+                  ))}
+                </ul>
+              )}
+              {e.href && (
+                <Link href={e.href} className="mt-0.5 inline-flex min-h-11 items-center text-xs font-medium text-primary hover:underline sm:min-h-6">
+                  {e.hrefLabel ?? "Open"}
+                </Link>
               )}
               {showDate && (
                 <p className="mt-0.5 text-[11px] tabular-nums text-muted-foreground">

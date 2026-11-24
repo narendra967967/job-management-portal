@@ -156,6 +156,8 @@ const answered: [string, string][] = [
   ["How do I refund a yearly plan?", "online plan payments"],
   ["How do I issue an invoice to a customer?", "invoices"],
   ["What do users type when they pick Other?", "Other answers"],
+  ["What does the Practiced chip on a lead card mean?", "Interview practice on leads"],
+  ["How does a user practice for an interview from a lead?", "Interview practice on leads"],
   ["How do I switch email sending to Amazon SES?", "Amazon SES"],
   ["SES test connection says sandbox", "Amazon SES"],
   ["discarding a lead", "discarding"],

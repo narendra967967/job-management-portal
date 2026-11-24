@@ -64,9 +64,9 @@ export async function updateAiBookingAction(id: unknown, form: FormData): Promis
   return { ok: true, id: bookingId.data };
 }
 
-/** Whether candidates can use AI interviews now (for client screens that link to them). */
-export async function aiInterviewsOpenAction(): Promise<boolean> {
-  await getCurrentUserId();
+/** Whether candidates can use AI interviews now. Not exported: the lead screens
+ *  read this from the workspace, so the browser has no need to call it. */
+async function aiInterviewsOpenNow(): Promise<boolean> {
   return aiInterviewsOpen(await getModuleSettings());
 }
 
@@ -79,7 +79,7 @@ async function interviewGate(id: unknown): Promise<{ userId: string; id: string 
   const userId = await getCurrentUserId();
   const p = interviewId.safeParse(id);
   if (!p.success) return { error: "That interview isn't available." };
-  if (!(await aiInterviewsOpenAction())) return { error: "AI interviews aren't open right now." };
+  if (!(await aiInterviewsOpenNow())) return { error: "AI interviews aren't open right now." };
   return { userId, id: p.data };
 }
 

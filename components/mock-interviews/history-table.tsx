@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Bot, Clock3, FileText, Hourglass, LifeBuoy, PlayCircle, Plus, RotateCcw, Search, Trophy, UserRound, type LucideIcon } from "lucide-react";
+import { Bot, Briefcase, Clock3, FileText, Hourglass, LifeBuoy, PlayCircle, Plus, RotateCcw, Search, Trophy, UserRound, type LucideIcon } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
@@ -18,6 +18,8 @@ import { LevelTag, ScoreRing, SourceTag, Sparkline, bandTone } from "@/component
 import type { InterviewStatus, InterviewSummary } from "@/lib/mock-interviews/model";
 import { scoreBand, shortDate } from "@/lib/mock-interviews/model";
 import { useMounted } from "@/lib/use-mounted";
+import { useLimitedMode } from "@/lib/access-mode";
+import { LeadLink } from "@/components/mock-interviews/lead-link";
 import { cn } from "@/lib/utils";
 
 // Interview history (spec D49, D53): every AI and human interview, newest first,
@@ -51,6 +53,13 @@ export function HistoryTable({ interviews }: { interviews: InterviewSummary[] })
   const [query, setQuery] = useState("");
   const [type, setType] = useState<TypeFilter>("all");
   const [status, setStatus] = useState<"all" | InterviewStatus>("all");
+  // "" = every interview, "-" = not booked for a lead, otherwise a company.
+  const [company, setCompany] = useState("");
+  const limited = useLimitedMode();
+  const companies = useMemo(
+    () => [...new Set(interviews.map((i) => i.lead?.company).filter((c): c is string => !!c))].sort((a, b) => a.localeCompare(b)),
+    [interviews],
+  );
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -58,11 +67,12 @@ export function HistoryTable({ interviews }: { interviews: InterviewSummary[] })
       (i) =>
         (type === "all" || i.source === type) &&
         (status === "all" || i.status === status) &&
-        (!q || `${i.role} ${i.category} ${i.industry} ${i.interviewer ?? ""}`.toLowerCase().includes(q)),
+        (!company || (company === "-" ? !i.lead : i.lead?.company === company)) &&
+        (!q || `${i.role} ${i.category} ${i.industry} ${i.interviewer ?? ""} ${i.lead?.label ?? ""}`.toLowerCase().includes(q)),
     );
-  }, [interviews, query, type, status]);
+  }, [interviews, query, type, status, company]);
 
-  const paging = usePagination(rows, `${query}|${type}|${status}`);
+  const paging = usePagination(rows, `${query}|${type}|${status}|${company}`);
 
   const scored = [...interviews].filter((i) => i.scores).sort((a, b) => a.date.localeCompare(b.date));
   const recent = scored.slice(-6);
@@ -141,7 +151,7 @@ export function HistoryTable({ interviews }: { interviews: InterviewSummary[] })
           <label className="relative min-w-0 flex-1 basis-56">
             <span className="sr-only">Search interviews</span>
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
-            <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search role, kind or interviewer" className="h-11 pl-9 sm:h-9" />
+            <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search role, company or interviewer" className="h-11 pl-9 sm:h-9" />
           </label>
           <select aria-label="Type" className={cn(tableSelectCls, "h-11 sm:h-9")} value={type} onChange={(e) => setType(e.target.value as TypeFilter)}>
             <option value="all">All types</option>
@@ -156,6 +166,17 @@ export function HistoryTable({ interviews }: { interviews: InterviewSummary[] })
               </option>
             ))}
           </select>
+          {companies.length > 0 && (
+            <select aria-label="Company" className={cn(tableSelectCls, "h-11 max-w-full sm:h-9")} value={company} onChange={(e) => setCompany(e.target.value)}>
+              <option value="">All companies</option>
+              {companies.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+              <option value="-">Not for a lead</option>
+            </select>
+          )}
         </div>
 
         {rows.length === 0 ? (
@@ -188,6 +209,7 @@ export function HistoryTable({ interviews }: { interviews: InterviewSummary[] })
                   key={i.id}
                   i={i}
                   mounted={mounted}
+                  limited={limited}
                   onOpen={(href) => router.push(href)}
                 />
               ))}
@@ -247,10 +269,12 @@ function Tile({
 function HistoryRow({
   i,
   mounted,
+  limited,
   onOpen,
 }: {
   i: InterviewSummary;
   mounted: boolean;
+  limited: boolean;
   onOpen: (href: string) => void;
 }) {
   const overall = scoreOf(i);
@@ -300,6 +324,7 @@ function HistoryRow({
         <p className="text-xs text-muted-foreground">
           {i.category} · {i.industry}
         </p>
+        {i.lead && <LeadLink lead={i.lead} limited={limited} className="mt-0.5" />}
       </td>
       <td className="px-3 py-2">
         <SourceTag source={i.source} name={i.interviewer} />
@@ -320,8 +345,14 @@ function HistoryRow({
               {i.status === "completed" ? "View report" : "View details"}
             </DropdownMenuItem>
           )}
+          {i.lead?.id && !limited && (
+            <DropdownMenuItem onClick={() => onOpen(`/leads/${i.lead!.id}`)}>
+              <Briefcase className="size-4" aria-hidden />
+              Open lead
+            </DropdownMenuItem>
+          )}
           {i.source === "ai" && (
-            <DropdownMenuItem onClick={() => onOpen("/mock-interviews/ai/new")}>
+            <DropdownMenuItem onClick={() => onOpen(i.lead?.id ? `/mock-interviews/ai/new?lead=${encodeURIComponent(i.lead.id)}` : "/mock-interviews/ai/new")}>
               <RotateCcw className="size-4" aria-hidden />
               Book a similar one
             </DropdownMenuItem>

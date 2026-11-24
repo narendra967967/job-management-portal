@@ -1,6 +1,7 @@
 # Linking leads and mock interviews: roadmap
 
-Status: **draft for owner review** (November 24, 2026). Nothing here is built yet.
+Status: **phases 1 and 2 built** (November 24, 2026). Phases 3 and 4 follow once the owner
+signs off on 1 and 2, built together.
 
 ## Goal
 
@@ -36,7 +37,7 @@ All twelve options, shipped in phases, smallest first:
 ## Ground rules for every phase
 
 - **Only while AI interviews are open.** Everything on the lead side hides when Module settings
-  say Coming soon, like today's Prepare box (`candidateAiOpen` / `aiInterviewsOpenAction`).
+  say Coming soon (`candidateAiOpen`, read once into the workspace as `practice.open`).
 - **Per user.** Every read goes through the session user; a lead's practices are the user's own
   `ai_interviews` rows with that `lead_id`.
 - **Limited mode.** Lead pages are locked when a plan ends, so the lead-side entry points are
@@ -85,8 +86,8 @@ Coming soon; the badge numbers match the reports.
 
 - **Item 9, smarter pre-fill.** Booking from a lead fills the role, the job description and,
   where it can tell, the industry. "Suggest topics" offers topics drawn from the job
-  description and the fit-score explanation. Open decision: plain matching (free, rougher)
-  or one AI call on the module key (better, costs the platform a little per use).
+  description and the fit-score explanation: an AI call on the user's own key, keyword matching
+  without one or if it fails (owner decision 2).
 - **Item 11, company-aware interviewer.** A new `{{company}}` placeholder for the admin
   prompts, filled from the lead. The company should be kept on the booking itself (a new
   `ai_interviews.company` column) so it survives the lead being deleted. That's a one-table
@@ -97,26 +98,45 @@ Coming soon; the badge numbers match the reports.
 - **Item 7, interview date.** A new optional `job_leads.interview_at` (date and time),
   set on the lead page and asked for in the item 5 prompt. Reminders before it suggest a
   practice through the existing reminders, and any new email goes through Email templates.
-  Item 8 then orders by date.
+  Item 8 then orders by date. A lead with an upcoming date doesn't go stale until it passes
+  (owner decision 4); without one, the usual stale rules apply.
 - **Item 6, automatic to-do.** Needs a new task kind ("practice") in the `task_kind` enum.
   Created when a lead moves to Interview, closed automatically when a practice for that lead
   completes, and left alone if the user deleted it.
 
 Both touch the schema (two tables in total), so this phase needs sign-off before it starts.
 
-## Open decisions for the owner
+## Owner decisions (November 24, 2026)
 
-1. **Readiness (item 12):** show the latest score or the best one? Suggestion: the latest,
-   with its date, because it reflects where the candidate is now.
-2. **Topic suggestions (item 9):** plain matching or an AI call on the module key?
-3. **Prompt on Interview (item 5):** once per lead, or every time a lead enters Interview?
-4. **Interview date (item 7):** should it also stop a lead going stale until the date passes?
+1. **Readiness (item 12):** the latest score, with an up or down arrow and the change from the
+   previous scored practice in percent of that score (60 → 72 is "↑ 20%"). Built.
+2. **Topic suggestions (item 9):** an AI call on the **user's own AI key** when they have one
+   (this is the lead side); plain keyword matching when they don't or the call fails.
+3. **Prompt on Interview (item 5):** every time a lead enters Interview. Built.
+4. **Interview date (item 7):** yes, a lead with an upcoming interview date doesn't go stale
+   until the date passes; without a date the usual stale rules apply.
+
+## How phases 1 and 2 were built
+
+- `leadPracticeFor` (lib/mock-interviews/data.ts) loads the user's practices grouped by lead
+  into the workspace as `practice` (`{ open, byLead }`, empty while Coming soon). Unpaid and
+  expired bookings are left out. `JobLead.practiced` drives the filter.
+- `lib/lead-practice.ts` holds the shared model: states, `leadReadiness`, the links.
+- `components/leads/lead-practice.tsx`: PracticePanel (replaces the Prepare box), PracticeChip,
+  PracticeMenuItem, PracticePromptHost (mounted in the dashboard layout; `setLeadStatus` calls
+  it after a manual move to Interview) and InterviewsComingUp (AI page, and compact on Ready to
+  action). Timeline entries come from `useLeadTimeline`.
+- History and reports: `InterviewSummary.lead` ({ id, label, company }), `LeadLink`, a company
+  filter. "Book a similar one" pre-fills from the lead.
+- `aiInterviewsOpenAction` is no longer a server action (nothing in the browser needs it).
+- Checks L1–L6 and G3 in scripts/security/mock-interviews-checks.mts; KB article
+  docs/knowledge-base/leads/interview-practice-on-leads.md.
 
 ## Progress
 
 | Phase | Status |
 |---|---|
-| 1 | Not started |
-| 2 | Not started |
+| 1 | Done (November 24, 2026) |
+| 2 | Done (November 24, 2026) |
 | 3 | Not started |
 | 4 | Not started |

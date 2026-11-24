@@ -45,6 +45,8 @@ import {
   type ReportWriting,
 } from "@/lib/mock-interviews/model";
 import { useMounted } from "@/lib/use-mounted";
+import { useLimitedMode } from "@/lib/access-mode";
+import { LeadLink } from "@/components/mock-interviews/lead-link";
 import { Sparkline, bandTone } from "@/components/mock-interviews/visual-kit";
 import { cn } from "@/lib/utils";
 
@@ -231,6 +233,7 @@ function Header({
   interview: InterviewSummary;
   mounted: boolean;
 }) {
+  const limited = useLimitedMode();
   return (
     <div className="rounded-2xl border bg-card p-4 md:p-5">
       <SourceBadge interview={interview} />
@@ -242,6 +245,7 @@ function Header({
         min
         {mounted ? ` · ${longDate(interview.date)}` : ""}
       </p>
+      {interview.lead && <LeadLink lead={interview.lead} limited={limited} className="mt-1" />}
     </div>
   );
 }
@@ -261,6 +265,7 @@ function Hero({
   recent: InterviewSummary[];
   mounted: boolean;
 }) {
+  const limited = useLimitedMode();
   const tone = bandTone(overall);
   const prevOverall = previous?.scores
     ? (previous.overall ?? null)
@@ -351,6 +356,7 @@ function Hero({
                 {scoreBand(overall)}
               </span>
             </div>
+            {interview.lead && <LeadLink lead={interview.lead} limited={limited} className="mt-2" />}
           </div>
         </div>
       </div>

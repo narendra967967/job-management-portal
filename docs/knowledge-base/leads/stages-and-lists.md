@@ -12,7 +12,7 @@ Every lead sits in one stage. Five are open, meaning the job is still being work
 | List | What's in it |
 |---|---|
 | Leads | Every open lead that isn't stale, as a list or a board |
-| Ready to action | Shortlisted and Applied leads that aren't stale. Nothing else is checked: no description or contact needed |
+| Ready to action | Shortlisted and Applied leads that aren't stale. Nothing else is checked: no description or contact needed. While AI interviews are open, the first three Interview-stage leads sit on top under "Interviews coming up" |
 | Outreached | Open leads with a message marked as sent. A saved draft doesn't count |
 | Archive | Closed, discarded and stale leads |
 

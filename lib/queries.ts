@@ -33,6 +33,8 @@ import { listNotifications, type NotificationRow } from "@/lib/notifications";
 import { getFeatureAccess, type FeatureAccess } from "@/lib/entitlements";
 import { getIntakeConfig, getOrCreateForwarding, loadSenders } from "@/lib/email-intake-data";
 import { acceptedSites, gmailFilterFrom, type MyForwarding } from "@/lib/email-intake-model";
+import { leadPracticeFor } from "@/lib/mock-interviews/data";
+import { leadReadiness, type WorkspacePractice } from "@/lib/lead-practice";
 import type {
   LeadAutoAction,
   AiSettings,
@@ -113,6 +115,8 @@ export interface WorkspaceData {
   notifications: NotificationRow[];
   /** Email intake: the admin switches + this user's forwarding address. */
   intake: WorkspaceIntake;
+  /** Practice interviews by lead (empty while AI interviews are Coming soon). */
+  practice: WorkspacePractice;
 }
 
 export interface WorkspaceIntake {
@@ -161,6 +165,7 @@ export async function loadWorkspace(userId: string): Promise<WorkspaceData> {
     errorRows,
     fitScoreRows,
     notificationRows,
+    practice,
   ] = await Promise.all([
     db.select().from(leadsT).where(eq(leadsT.userId, userId)),
     db.select().from(detailsT).where(eq(detailsT.userId, userId)),
@@ -199,6 +204,7 @@ export async function loadWorkspace(userId: string): Promise<WorkspaceData> {
       .limit(20),
     db.select().from(fitScoresT).where(eq(fitScoresT.userId, userId)),
     listNotifications(userId),
+    leadPracticeFor(userId),
   ]);
 
   // Per-lead derived fields (contactCount, hasDueReminder) — computed in JS
@@ -234,6 +240,7 @@ export async function loadWorkspace(userId: string): Promise<WorkspaceData> {
     contactCount: contactCountByLead.get(l.id) ?? 0,
     hasDueReminder: dueByLead.has(l.id),
     hasOutreach: outreachByLead.has(l.id),
+    practiced: leadReadiness(practice.byLead[l.id]).practiced > 0,
   }));
 
   const details: Record<string, JobLeadDetail> = {};
@@ -443,5 +450,6 @@ export async function loadWorkspace(userId: string): Promise<WorkspaceData> {
     },
     fitScores,
     notifications: notificationRows,
+    practice,
   };
 }

@@ -303,6 +303,15 @@ export interface InterviewSummary {
   scores?: MetricScores;
   overall?: number;
   interviewer?: string; // human interviews only
+  /** The lead it was booked for. id is null once the lead is deleted; the
+   *  label ("Role at Company") is kept with the interview. */
+  lead?: { id: string | null; label: string; company: string };
+}
+
+/** The company from a kept lead label ("Role at Company"), for leads since deleted. */
+export function companyFromLabel(label: string): string {
+  const at = label.lastIndexOf(" at ");
+  return at >= 0 ? label.slice(at + 4).trim() : "";
 }
 
 export interface ChatMessage {

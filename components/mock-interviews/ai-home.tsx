@@ -42,6 +42,7 @@ import {
 } from "@/lib/mock-interviews/model";
 import { useMounted } from "@/lib/use-mounted";
 import { GetReady } from "@/components/mock-interviews/get-ready";
+import { InterviewsComingUp } from "@/components/leads/lead-practice";
 import type { Readiness } from "@/lib/mock-interviews/data";
 import { emailMyInvoicesAction } from "@/actions/my-payments";
 import { LEVEL_TAG } from "@/components/mock-interviews/visual-kit";
@@ -207,6 +208,9 @@ export function AiHome({
           </div>
         </section>
       )}
+
+      {/* Interview-stage leads and where their practice stands (hidden when there are none). */}
+      <InterviewsComingUp />
 
       <section className="space-y-3 rounded-2xl border bg-card p-4 shadow-sm md:p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">

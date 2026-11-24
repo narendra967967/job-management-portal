@@ -20,6 +20,7 @@ import {
 } from "@/lib/types";
 import { setLeadTopChoice, undoAutoAction, useAutoActions, useFeatures } from "@/lib/mock-store";
 import { SalaryInsightDialog } from "@/components/leads/salary-insight";
+import { PracticeMenuItem } from "@/components/leads/lead-practice";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -114,6 +115,7 @@ export function LeadCardMenu({
             Salary insight
             {!hasSalary && <Lock className="ml-auto size-3.5 opacity-60" aria-label="Not on your plan" />}
           </DropdownMenuItem>
+          <PracticeMenuItem leadId={lead.id} />
           <DropdownMenuItem
             onClick={() => window.open(lead.canonicalJobUrl, "_blank", "noopener")}
           >

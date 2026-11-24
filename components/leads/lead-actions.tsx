@@ -74,6 +74,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { openPostingLabel } from "@/components/leads/lead-meta";
+import { PracticeMenuItem } from "@/components/leads/lead-practice";
 import { cn } from "@/lib/utils";
 
 type DialogKind = "contact" | "reminder" | "outreach" | "edit" | null;
@@ -208,6 +209,7 @@ export function LeadActions({
             <Send className="size-4" aria-hidden />
             Draft outreach
           </DropdownMenuItem>
+          <PracticeMenuItem leadId={lead.id} />
           <DropdownMenuSeparator />
           <DropdownMenuItem
             onClick={() =>

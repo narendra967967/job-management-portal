@@ -61,6 +61,7 @@ import {
 import { useSearchQuery } from "@/lib/search-store";
 import { fitBand } from "@/lib/fit";
 import { StatusBadge } from "@/components/leads/status-badge";
+import { PracticeChip } from "@/components/leads/lead-practice";
 import { LeadDetailDialog } from "@/components/leads/lead-detail-dialog";
 import {
   LeadFilters,
@@ -673,6 +674,7 @@ function KanbanCard({
             Due
           </Badge>
         )}
+        <PracticeChip leadId={lead.id} className="px-1.5 text-[10px]" />
         {staleSoon && <StaleChip warning={staleSoon} className="px-1.5 text-[10px]" />}
         {lead.contactCount > 0 && (
           <Badge className="bg-muted text-muted-foreground">

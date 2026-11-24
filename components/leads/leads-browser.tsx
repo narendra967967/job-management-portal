@@ -44,6 +44,7 @@ import {
 import { StatusBadge } from "@/components/leads/status-badge";
 import { countryOf } from "@/lib/geo";
 import { useLeadActionDialogs } from "@/components/leads/lead-actions";
+import { PracticeChip } from "@/components/leads/lead-practice";
 import { LeadDetailDialog } from "@/components/leads/lead-detail-dialog";
 import { LeadRemindersDialog } from "@/components/leads/lead-reminders-dialog";
 import {
@@ -55,6 +56,8 @@ import {
   type OriginFilter,
   type SourceFilter,
   type TopChoiceFilter,
+  type PracticeFilter,
+  PRACTICE_OPTIONS,
 } from "@/components/leads/lead-filters";
 import {
   LeadCardMenu,
@@ -82,6 +85,7 @@ import {
   discardLead,
   setLeadStatus,
   deleteLeads,
+  usePractice,
 } from "@/lib/mock-store";
 import { Input } from "@/components/ui/input";
 import {
@@ -311,6 +315,8 @@ export function LeadsBrowser({ scope = "all" }: { scope?: LeadsScope }) {
   const [titleFilter, setTitleFilter] = useState<string>("all");
   const [tagFilter, setTagFilter] = useState<string>("all");
   const [topChoiceFilter, setTopChoiceFilter] = useState<TopChoiceFilter>("all");
+  const [practiceFilter, setPracticeFilter] = useState<PracticeFilter>("all");
+  const { open: practiceOpen } = usePractice();
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
   const [originFilter, setOriginFilter] = useState<OriginFilter>("all");
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -338,6 +344,7 @@ export function LeadsBrowser({ scope = "all" }: { scope?: LeadsScope }) {
             v.statusFilter === "all" ? "all" : (normalizeLeadStatus(v.statusFilter) ?? "all"),
           );
         if (typeof v.topChoiceFilter === "string") setTopChoiceFilter(v.topChoiceFilter as TopChoiceFilter);
+        if (typeof v.practiceFilter === "string") setPracticeFilter(v.practiceFilter as PracticeFilter);
         if (typeof v.sourceFilter === "string") setSourceFilter(v.sourceFilter as SourceFilter);
         if (typeof v.originFilter === "string") setOriginFilter(v.originFilter as OriginFilter);
         if (typeof v.bucketFilter === "string") setBucketFilter(v.bucketFilter as ArchiveBucket | "all");
@@ -368,6 +375,7 @@ export function LeadsBrowser({ scope = "all" }: { scope?: LeadsScope }) {
           titleFilter,
           tagFilter,
           topChoiceFilter,
+          practiceFilter,
           sourceFilter,
           originFilter,
           dateRange,
@@ -389,6 +397,7 @@ export function LeadsBrowser({ scope = "all" }: { scope?: LeadsScope }) {
     titleFilter,
     tagFilter,
     topChoiceFilter,
+    practiceFilter,
     sourceFilter,
     originFilter,
     dateRange,
@@ -494,6 +503,8 @@ export function LeadsBrowser({ scope = "all" }: { scope?: LeadsScope }) {
         topChoice: topChoiceFilter,
         source: sourceFilter,
         origin: originFilter,
+        // A saved "practiced" filter does nothing while interviews are closed.
+        practice: practiceOpen ? practiceFilter : "all",
       }),
     );
     const q = search.trim().toLowerCase();
@@ -566,14 +577,14 @@ export function LeadsBrowser({ scope = "all" }: { scope?: LeadsScope }) {
         out.sort(newest);
     }
     return out;
-  }, [leads, scope, statusFilter, bucketFilter, locationFilter, countryFilter, titleFilter, tagFilter, topChoiceFilter, sourceFilter, originFilter, search, dateBounds, sort, fitScores, resumeChoice, defaultResumeId, staleCutoff]);
+  }, [leads, scope, statusFilter, bucketFilter, locationFilter, countryFilter, titleFilter, tagFilter, topChoiceFilter, practiceFilter, practiceOpen, sourceFilter, originFilter, search, dateBounds, sort, fitScores, resumeChoice, defaultResumeId, staleCutoff]);
 
   // Reset to the first page (and clear any selection) whenever the result set
   // changes.
   useEffect(() => {
     setPage(1);
     setSelected(new Set());
-  }, [scope, statusFilter, bucketFilter, locationFilter, countryFilter, titleFilter, tagFilter, topChoiceFilter, sourceFilter, originFilter, search, dateBounds, sort]);
+  }, [scope, statusFilter, bucketFilter, locationFilter, countryFilter, titleFilter, tagFilter, topChoiceFilter, practiceFilter, sourceFilter, originFilter, search, dateBounds, sort]);
 
   const activeFilterCount =
     ((scope === "archive" ? bucketFilter !== "all" : statusFilter !== "all")
@@ -587,6 +598,7 @@ export function LeadsBrowser({ scope = "all" }: { scope?: LeadsScope }) {
       topChoice: topChoiceFilter,
       source: sourceFilter,
       origin: originFilter,
+      practice: practiceOpen ? practiceFilter : "all",
     }) +
     (dateRange !== "all" ? 1 : 0);
 
@@ -598,6 +610,7 @@ export function LeadsBrowser({ scope = "all" }: { scope?: LeadsScope }) {
     setTitleFilter("all");
     setTagFilter("all");
     setTopChoiceFilter("all");
+    setPracticeFilter("all");
     setSourceFilter("all");
     setOriginFilter("all");
     setDateRange("all");
@@ -818,6 +831,14 @@ export function LeadsBrowser({ scope = "all" }: { scope?: LeadsScope }) {
                   onValueChange={(v) => setTopChoiceFilter(v as TopChoiceFilter)}
                   options={TOP_CHOICE_OPTIONS}
                 />
+                {practiceOpen && (
+                  <DrawerSelect
+                    label="Interview practice"
+                    value={practiceFilter}
+                    onValueChange={(v) => setPracticeFilter(v as PracticeFilter)}
+                    options={PRACTICE_OPTIONS}
+                  />
+                )}
                 <DrawerSelect
                   label="Source"
                   value={sourceFilter}
@@ -1518,6 +1539,7 @@ function LeadCard({
               Ready
             </span>
           )}
+          <PracticeChip leadId={lead.id} />
           {lead.hasDueReminder && (
             <span className="inline-flex items-center gap-1 rounded-md bg-status-shortlisted px-2 py-0.5 text-[11px] font-medium text-status-shortlisted-foreground">
               <Clock className="size-3" aria-hidden />

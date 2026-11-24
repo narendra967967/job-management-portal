@@ -29,7 +29,8 @@ import pg from "pg";
 import { decryptSecret, encryptSecret } from "../../lib/crypto.ts";
 import { bookAiInterview, parseForm } from "../../lib/mock-interviews/booking.ts";
 import { getModuleSettings, settingsSnapshot } from "../../lib/mock-interviews/config.ts";
-import { getBookingSetup, getBriefing, getReport, getSession, listBookings, listInterviews } from "../../lib/mock-interviews/data.ts";
+import { getBookingSetup, getBriefing, getReport, getSession, leadPracticeFor, listBookings, listInterviews } from "../../lib/mock-interviews/data.ts";
+import { leadReadiness } from "../../lib/lead-practice.ts";
 import { endInterview, evaluateInterview, heartbeat, leaveInterview, startInterview, submitAnswer } from "../../lib/mock-interviews/engine.ts";
 import { INDUSTRIES, METRICS, overallScore } from "../../lib/mock-interviews/model.ts";
 import { evaluationSchema, materialBlock, NO_TOPICS, parseJsonObject, planFormat, toWriting } from "../../lib/mock-interviews/prompts.ts";
@@ -47,6 +48,7 @@ const ADMIN = { email: process.env.LOCAL_TEST_ADMIN_EMAIL ?? "", password: proce
 const RUN = Math.random().toString(36).slice(2, 8);
 const MARK = `SEC check ${RUN}`; // role on every booking this script makes
 const OTHER_MARK = `SEC other ${RUN}`; // role on the other account's bookings
+const LEAD_MARK = `lead-check-${RUN}`; // job id of the leads the L checks make
 const KEY_SECRET = "sec-test-key-secret-not-real";
 const WEBHOOK_SECRET = "sec-test-webhook-secret-not-real";
 const DAY = 86_400_000;
@@ -316,7 +318,7 @@ async function main() {
       `/mock-interviews/ai/prepare/${warmId}`,
       `/mock-interviews/ai/session/${warmId}`,
       "/mock-interviews/history",
-      `/leads/${warmId}`, // a lead's "Prepare for interview" box asks aiInterviewsOpenAction
+      `/leads/${warmId}`, // a lead's practice panel
     ])
       await page(p, userCookie);
     const adminWarm: string[] = [];
@@ -327,7 +329,6 @@ async function main() {
     const NEEDED = [
       "bookAiInterviewAction",
       "updateAiBookingAction",
-      "aiInterviewsOpenAction",
       "startInterviewAction",
       "interviewHeartbeatAction",
       "answerInterviewAction",
@@ -385,7 +386,6 @@ async function main() {
     }
     {
       const names = [
-        "aiInterviewsOpenAction",
         "startInterviewAction",
         "interviewHeartbeatAction",
         "answerInterviewAction",
@@ -414,8 +414,9 @@ async function main() {
     }
 
     {
-      const r = await action("aiInterviewsOpenAction", [], userCookie);
-      check("H1", "signed in, the action call works (sanity)", r.value === true, `${r.status} ${val(r)}`);
+      // Signed in, the call gets past the session check to the input check (sends nothing).
+      const r = await action("emailMyInvoicesAction", [[]], userCookie);
+      check("H1", "signed in, the action call works (sanity)", val(r).includes("Pick between"), `${r.status} ${val(r).slice(0, 60)}`);
     }
     {
       const before = (await q<{ updated_at: Date }>("select updated_at from mock_interview_config where id = 'app'"))[0].updated_at.getTime();
@@ -883,6 +884,77 @@ async function main() {
       );
     }
 
+    /* ---- L: practice on the lead side (docs/lead-interview-link/roadmap.md) ---- */
+    // Every dashboard page carries the user's leads, and G1 looks for MARK on the
+    // Coming soon pages, so these leads carry LEAD_MARK instead (cleanup finds them by it).
+    const newLead = async (userId: string, suffix: string, company: string) =>
+      (
+        await q<{ id: string }>(
+          `insert into job_leads (user_id, linkedin_job_id, title, company, location, posted_relative, canonical_job_url, status)
+           values ($1, $2, 'Lead check role', $3, 'Pune, India', 'today', 'https://example.com/check', 'interview') returning id`,
+          [userId, `${LEAD_MARK}-${suffix}`, company],
+        )
+      )[0].id;
+    const ownLead = await newLead(u.id, "own", "Check Co");
+    const otherLead = await newLead(other.id, "other", "Elsewhere Ltd");
+    {
+      const label = "Lead check role at Check Co";
+      const booked = await insertInterview(u.id, MARK, "ready", { lead_id: ownLead, lead_label: label });
+      const paused = await insertInterview(u.id, MARK, "interrupted", { lead_id: ownLead, lead_label: label, started_at: new Date(Date.now() - 5 * 60_000) });
+      await insertInterview(u.id, MARK, "expired", { lead_id: ownLead, lead_label: label });
+      await insertInterview(u.id, MARK, "pending_payment", { lead_id: ownLead, lead_label: label });
+      // The other account's interviews, one even pointing at our lead: never ours to see.
+      await insertInterview(other.id, OTHER_MARK, "ready", { lead_id: ownLead, lead_label: label });
+      await insertInterview(other.id, OTHER_MARK, "ready", { lead_id: otherLead, lead_label: "Other" });
+      const mine = await leadPracticeFor(u.id);
+      const runs = mine.byLead[ownLead] ?? [];
+      const ids = runs.map((r) => r.id).sort();
+      check(
+        "L1",
+        "a lead's practices are the user's own bookings for it, without unpaid or expired ones",
+        mine.open && JSON.stringify(ids) === JSON.stringify([booked, paused].sort()) && !mine.byLead[otherLead],
+        `${runs.length} runs: ${runs.map((r) => r.state).join(", ")}`,
+      );
+      const theirs = await leadPracticeFor(other.id);
+      check("L2", "another account never sees this user's practices", !(theirs.byLead[ownLead] ?? []).some((r) => r.id === booked || r.id === paused) && !!theirs.byLead[otherLead]);
+      const states = Object.fromEntries(runs.map((r) => [r.id, r.state]));
+      check("L3", "booked and paused practices read as such, with no score", states[booked] === "booked" && states[paused] === "paused" && runs.every((r) => r.score === null));
+
+      const run = (score: number, day: number) => ({ id: String(day), state: "completed" as const, difficulty: "Easy", durationMin: 15, date: `2026-11-${String(day).padStart(2, "0")}T10:00:00Z`, score, fixes: [] });
+      const up = leadReadiness([run(60, 1), run(72, 2)]);
+      const down = leadReadiness([run(80, 3), run(60, 1), run(70, 9)]);
+      const one = leadReadiness([run(55, 4)]);
+      check(
+        "L4",
+        "readiness is the latest score, with the change in percent from the one before",
+        up.latest?.score === 72 && up.previous === 60 && up.changePct === 20 && down.latest?.score === 70 && down.previous === 80 && down.changePct === -13 && one.changePct === null && one.previous === null,
+        `${up.changePct}%, ${down.changePct}%`,
+      );
+
+      // History and reports: the lead link, and the label once the lead is gone.
+      const done = await insertInterview(u.id, MARK, "failed", { lead_id: ownLead, lead_label: label, started_at: new Date(Date.now() - 60 * 60_000), end_reason: "abandoned" });
+      const withLead = (await listInterviews(u.id)).find((i) => i.id === done);
+      await q("update ai_interviews set lead_id = null where id = $1", [done]);
+      const gone = (await listInterviews(u.id)).find((i) => i.id === done);
+      check(
+        "L5",
+        "history shows the lead it was for, and keeps the label (no link) once the lead is gone",
+        withLead?.lead?.id === ownLead && withLead.lead.company === "Check Co" && gone?.lead?.id === null && gone.lead.label === label && gone.lead.company === "Check Co",
+      );
+
+      // Earlier checks may leave the plan ended (limited mode locks lead pages);
+      // the user row is put back exactly at the end.
+      await q(`update "user" set plan_expires_at = now() + interval '30 days' where id = $1`, [u.id]);
+      const p = await page(`/leads/${ownLead}`, userCookie);
+      const p2 = await page(`/leads/${otherLead}`, userCookie);
+      check(
+        "L6",
+        "the lead page shows its practice panel; another user's lead shows nothing of theirs",
+        p.status === 200 && p.html.includes(`id="practice-title"`) && p.html.includes("Start booked practice") && !p2.html.includes("Elsewhere Ltd"),
+        `${p.status} / ${p2.status}`,
+      );
+    }
+
     /* ---- F: the module key never reaches the browser ---- */
     {
       const clientFiles = [...walk("components"), ...walk("app")].filter((f) => /\.(tsx?|jsx?)$/.test(f) && /^["']use client["']/m.test(readFileSync(f, "utf8")));
@@ -946,6 +1018,15 @@ async function main() {
       check("G1", "Coming soon → every AI interview page shows Coming soon, not the feature", open.length === 0, open.join(", ") || "7 pages");
     }
     {
+      const closed = await leadPracticeFor(u.id);
+      const p = await page(`/leads/${ownLead}`, userCookie);
+      check(
+        "G3",
+        "Coming soon → nothing practice-related on the lead side",
+        !closed.open && Object.keys(closed.byLead).length === 0 && p.status === 200 && !p.html.includes(`id="practice-title"`) && !p.html.includes("Practice interview"),
+      );
+    }
+    {
       const before = await rowOf(ownReady.id);
       const [{ n: countBefore }] = await q<{ n: number }>("select count(*)::int n from ai_interviews where user_id = $1", [u.id]);
       const results = [
@@ -955,7 +1036,6 @@ async function main() {
         await action("interviewHeartbeatAction", [ownReady.id], userCookie),
         await action("answerInterviewAction", [ownReady.id, "An answer"], userCookie),
         await action("endInterviewAction", [ownReady.id], userCookie),
-        await action("aiInterviewsOpenAction", [], userCookie),
       ];
       const direct = await bookAiInterview(u.id, form(setup()));
       const after = await rowOf(ownReady.id);
@@ -995,6 +1075,7 @@ async function main() {
       client.release();
     }
     await q("delete from ai_interviews where id = any($1::uuid[])", [ids]);
+    await q("delete from job_leads where linkedin_job_id like $1", [`${LEAD_MARK}-%`]);
     if (!billingBefore) await q("delete from billing_profiles where user_id = $1", [u.id]);
     await q("delete from sent_email_log where sent_at >= $1 and to_address = $2 and template_key like 'mock_interview%'", [startedAt, u.email]);
     for (const id of tempPlanIds) await q("delete from plans where id = $1", [id]);

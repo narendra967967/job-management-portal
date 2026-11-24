@@ -196,6 +196,9 @@ export interface JobLead {
   /** A job description has been saved for this lead. */
   /** At least one outreach message exists for this lead. */
   hasOutreach: boolean;
+  /** At least one practice interview for this lead is done (scored, or its
+   *  report is on its way). Always false while AI interviews are Coming soon. */
+  practiced: boolean;
 }
 
 /** A status change the system made on its own (Timeline + the card's message). */

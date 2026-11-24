@@ -1,4 +1,5 @@
 import { LeadsBrowser } from "@/components/leads/leads-browser";
+import { InterviewsComingUp } from "@/components/leads/lead-practice";
 
 export default function ReadyPage() {
   return (
@@ -9,6 +10,7 @@ export default function ReadyPage() {
           Your shortlisted and applied jobs.
         </p>
       </div>
+      <InterviewsComingUp compact />
       <LeadsBrowser scope="ready" />
     </div>
   );

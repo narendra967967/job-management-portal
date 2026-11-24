@@ -91,6 +91,7 @@ import type {
 } from "@/lib/types";
 import type { GmailConfigData, WorkspaceData, WorkspaceIntake } from "@/lib/queries";
 import { DEFAULT_LEAD_RULES, type LeadRules } from "@/lib/lead-rules-model";
+import { NO_PRACTICE, practiceHref, type LeadPracticeRun, type WorkspacePractice } from "@/lib/lead-practice";
 import type { MyForwardingState } from "@/actions/email-intake";
 
 export interface AppSettings {
@@ -171,6 +172,7 @@ let intake: WorkspaceIntake = {
   filterFrom: "",
   acceptedSites: [],
 };
+let practice: WorkspacePractice = NO_PRACTICE;
 let hydrated = false;
 
 const listeners = new Set<() => void>();
@@ -216,6 +218,7 @@ function stateFrom(data: WorkspaceData) {
     storedNotifications: data.notifications,
     promoOptOut: data.promoOptOut,
     intake: data.intake,
+    practice: data.practice,
   };
 }
 type StoreState = ReturnType<typeof stateFrom>;
@@ -245,6 +248,7 @@ function apply(data: WorkspaceData) {
   storedNotifications = st.storedNotifications;
   promoOptOut = st.promoOptOut;
   intake = st.intake;
+  practice = st.practice;
 }
 
 /** Per-request workspace for server renders (and the browser's hydration pass,
@@ -323,6 +327,26 @@ export function useFeatures(): WorkspaceData["features"] {
 
 export function useLeads(): JobLead[] {
   return useWs("leads", getLeads);
+}
+
+const getPractice = () => practice;
+/** Practice interviews by lead, and whether AI interviews are open at all. */
+export function usePractice(): WorkspacePractice {
+  return useWs("practice", getPractice);
+}
+const NO_RUNS: LeadPracticeRun[] = [];
+/** One lead's practices, newest first. */
+export function useLeadPractice(leadId: string): LeadPracticeRun[] {
+  return usePractice().byLead[leadId] ?? NO_RUNS;
+}
+
+/* Moving a lead to Interview asks "Practice for it now?" every time (owner,
+   November 24, 2026). The host component (mounted in the dashboard layout)
+   registers here, since showing it needs the router. */
+type PracticePrompt = (lead: JobLead) => void;
+let practicePrompt: PracticePrompt | null = null;
+export function setPracticePromptHost(fn: PracticePrompt | null) {
+  practicePrompt = fn;
 }
 function useStoredNotifications(): WorkspaceData["notifications"] {
   return useWs("storedNotifications", getStoredNotifications);
@@ -443,10 +467,13 @@ export async function setLeadStatus(
   status: LeadStatus,
   closeOutcome: CloseOutcome | null = null,
 ) {
+  const before = findLead(leadId)?.status;
   try {
     await setLeadStatusAction(leadId, status, closeOutcome);
     await refresh();
-    statusToast(status, closeOutcome);
+    const lead = findLead(leadId);
+    if (status === "interview" && before !== "interview" && practice.open && lead && practicePrompt) practicePrompt(lead);
+    else statusToast(status, closeOutcome);
   } catch (e) {
     toast.error("Couldn't update lead", e instanceof Error ? e.message : undefined);
   }
@@ -1071,6 +1098,7 @@ export type TimelineKind =
   | "reminder"
   | "reminder-resolved"
   | "auto"
+  | "practice"
   | "status";
 
 export interface TimelineEvent {
@@ -1079,6 +1107,11 @@ export interface TimelineEvent {
   date: string;
   title: string;
   detail?: string;
+  /** Extra short lines under the detail (a practice's things to work on). */
+  points?: string[];
+  /** Where the entry opens (a practice's report). */
+  href?: string;
+  hrefLabel?: string;
 }
 
 export function useLeadTimeline(leadId: string): TimelineEvent[] {
@@ -1088,6 +1121,8 @@ export function useLeadTimeline(leadId: string): TimelineEvent[] {
   const lead = useLead(leadId);
   const { status, closeOutcome } = useLeadStatus(leadId);
   const allAutoActions = useAutoActions();
+  const practiceRuns = useLeadPractice(leadId);
+  const { open: practiceOpen } = usePractice();
 
   const events: TimelineEvent[] = [];
 
@@ -1144,6 +1179,33 @@ export function useLeadTimeline(leadId: string): TimelineEvent[] {
       title: a.reason,
       detail: a.undone ? "You undid this" : undefined,
     });
+  }
+
+  // Practice interviews for this lead (roadmap item 10), built from the
+  // interview and report rows: nothing extra is stored.
+  if (practiceOpen) {
+    for (const p of practiceRuns) {
+      const what = `${p.difficulty}, ${p.durationMin} min`;
+      const base = { id: `practice-${p.id}`, kind: "practice" as const, date: p.date.slice(0, 10), href: practiceHref(p) };
+      if (p.state === "completed")
+        events.push({
+          ...base,
+          title: `Practiced: ${what}, scored ${p.score}`,
+          detail: p.fixes.length ? "To work on:" : undefined,
+          points: p.fixes,
+          hrefLabel: "View report",
+        });
+      else if (p.state === "awaiting_report")
+        events.push({ ...base, title: `Practiced: ${what}`, detail: "Report on its way", hrefLabel: "Open" });
+      else if (p.state === "ended")
+        events.push({ ...base, title: `Practice ended early: ${what}`, hrefLabel: "History" });
+      else
+        events.push({
+          ...base,
+          title: p.state === "booked" ? `Practice booked: ${what}` : `Practice paused: ${what}`,
+          hrefLabel: p.state === "booked" ? "Start" : "Resume",
+        });
+    }
   }
 
   events.push({

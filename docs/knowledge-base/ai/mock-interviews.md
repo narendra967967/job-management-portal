@@ -26,7 +26,9 @@ When it's open, the AI mock interviews page starts with a **Get ready** checklis
 
 Once everything is ready and they have bookings, it folds into one line.
 
-The same switch hides "Prepare for this interview" on leads at the Interview stage.
+Below the counts, **Interviews coming up** lists the user's Interview-stage leads with where each one's practice stands.
+
+The same switch hides everything practice-related on the lead side: the practice panel on each lead, the Practiced chip and filter, the Practice interview menu item and the prompt when a lead moves to Interview. The article on interview practice on leads covers those.
 
 ## Module settings
 

@@ -83,7 +83,7 @@ import {
 } from "@/lib/mock-store";
 import { cn, formatDateTime } from "@/lib/utils";
 import { useMounted } from "@/lib/use-mounted";
-import { PrepareForInterview } from "@/components/mock-interviews/prepare-for-interview";
+import { PracticePanel } from "@/components/leads/lead-practice";
 
 interface Props {
   lead: JobLead;
@@ -268,7 +268,7 @@ export function LeadDetailContent({
 
         <AutoActionNote lead={{ id: lead.id, status }} className="mt-3 text-xs" />
 
-        {status === "interview" && <PrepareForInterview leadId={lead.id} className="mt-3" />}
+        <PracticePanel lead={lead} status={status} className="mt-3" />
 
         {/* Why this lead is closed / discarded — prominent on the detail view. */}
         {status === "closed" &&
