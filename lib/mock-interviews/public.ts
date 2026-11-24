@@ -1,6 +1,6 @@
 import "server-only";
 
-import { aiInterviewQuote, lowestRatePerMinute, plannedQuestions, DIFFICULTIES, type Difficulty, type DifficultyPricing } from "./model";
+import { aiInterviewQuote, cheapestInterview, lowestRatePerMinute, plannedQuestions, DIFFICULTIES, type Difficulty, type DifficultyPricing } from "./model";
 import { aiInterviewsOpen, getModuleSettings } from "./config";
 import { db } from "@/lib/db";
 import { aiInterviews } from "@/db/schema";
@@ -27,8 +27,8 @@ export interface PublicAiInterviews {
   questions: Record<number, number>;
   /** The lowest per-minute rate after discounts ("from ₹X a minute"). Paise. */
   fromPerMinutePaise: number;
-  /** An example: Medium for 30 minutes (or the nearest length offered). */
-  example: { difficulty: Difficulty; durationMin: number; pricePaise: number };
+  /** The cheapest booking possible (shortest length, cheapest level after discounts). */
+  cheapest: { durationMin: number; pricePaise: number };
   bookingValidDays: number;
   resumeWindowMinutes: number;
 }
@@ -54,7 +54,6 @@ export async function getPublicAiInterviews(): Promise<PublicAiInterviews | null
     const s = await getModuleSettings();
     if (!aiInterviewsOpen(s)) return null;
     const perMinute = (p: DifficultyPricing) => (p.ratePerMinutePaise * (100 - (p.discountOn ? Math.min(100, Math.max(0, p.discountPercent)) : 0))) / 100;
-    const exampleMin = s.durations.includes(30) ? 30 : s.durations[0];
     return {
       categories: s.categories,
       categoryIcons: s.categoryIcons,
@@ -71,7 +70,7 @@ export async function getPublicAiInterviews(): Promise<PublicAiInterviews | null
       })),
       questions: Object.fromEntries(s.durations.map((m) => [m, plannedQuestions(m, s.minutesPerQuestion)])),
       fromPerMinutePaise: lowestRatePerMinute(s.pricing),
-      example: { difficulty: "Medium", durationMin: exampleMin, pricePaise: aiInterviewQuote(exampleMin, s.pricing.Medium).final },
+      cheapest: cheapestInterview(s.durations, s.pricing),
       bookingValidDays: s.bookingValidDays,
       resumeWindowMinutes: s.resumeWindowMinutes,
     };

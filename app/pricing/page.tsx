@@ -115,7 +115,7 @@ export default async function PricingPage() {
             a: `You pay per minute for the length you book: ${ai.levels
               .map((l) => `${rupees(l.finalPerMinutePaise)} for ${l.difficulty}${l.discountPercent ? ` (${l.discountPercent}% off ${rupees(l.ratePerMinutePaise)})` : ""}`)
               .join(", ")
-              .replace(/, ([^,]*)$/, " and $1")}. A ${ai.example.durationMin}-minute ${ai.example.difficulty} interview is ${rupees(ai.example.pricePaise)}. ${
+              .replace(/, ([^,]*)$/, " and $1")}. The shortest, a ${ai.cheapest.durationMin}-minute interview, starts at ${rupees(ai.cheapest.pricePaise)}. ${
               plans.some((p) => p.aiInterviewsIncluded > 0)
                 ? "Plans that include interviews are marked in the comparison above; those are booked at no charge until they're used. "
                 : ""

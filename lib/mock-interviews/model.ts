@@ -171,6 +171,21 @@ export function aiInterviewQuote(durationMin: number, p: DifficultyPricing): AiI
   return { full, percent, final };
 }
 
+/**
+ * The cheapest interview a candidate can book: every offered length at every
+ * level, after discounts, exactly as booking charges it. For "a 15-minute one
+ * starts at ₹11" (no level named).
+ */
+export function cheapestInterview(durations: number[], pricing: PricingByDifficulty): { durationMin: number; pricePaise: number } {
+  let best = { durationMin: durations[0] ?? 15, pricePaise: Number.POSITIVE_INFINITY };
+  for (const m of durations)
+    for (const d of DIFFICULTIES) {
+      const price = aiInterviewQuote(m, pricing[d]).final;
+      if (price < best.pricePaise) best = { durationMin: m, pricePaise: price };
+    }
+  return Number.isFinite(best.pricePaise) ? best : { durationMin: best.durationMin, pricePaise: 0 };
+}
+
 /** The lowest per-minute rate after discounts, for "from ₹3 a minute". Paise. */
 export function lowestRatePerMinute(pricing: PricingByDifficulty): number {
   return Math.min(

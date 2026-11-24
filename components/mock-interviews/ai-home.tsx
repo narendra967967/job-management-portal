@@ -28,7 +28,7 @@ import { toast } from "@/components/ui/toast";
 import { RowActions, TableBox, TablePagination, tableSelectCls, usePagination } from "@/components/ui/data-table";
 import {
   DIFFICULTIES,
-  aiInterviewQuote,
+  cheapestInterview,
   allowanceLeft,
   longDate,
   lowestRatePerMinute,
@@ -98,10 +98,13 @@ export function AiHome({
   bookedId,
   readiness,
   plansInclude = false,
+  durations = [15, 30, 45, 60],
 }: {
   allowance: AllowanceState;
   bookings: BookingRow[];
   pricing: PricingByDifficulty;
+  /** Lengths admin offers, for the cheapest-interview example. */
+  durations?: number[];
   bookedId?: string;
   readiness: Readiness;
   /** A paid plan on the pricing page includes AI interviews. */
@@ -160,7 +163,7 @@ export function AiHome({
           right, the same height. Narrower: title, then the counts (four across from 1024px). */}
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]">
         <div className="min-w-0">
-          <Hero allowance={allowance} pricing={pricing} mounted={mounted} plansInclude={plansInclude} />
+          <Hero allowance={allowance} pricing={pricing} durations={durations} mounted={mounted} plansInclude={plansInclude} />
         </div>
 
         {/* Stat tiles: each one filters the list; click again to go back to "To do". */}
@@ -354,9 +357,22 @@ export function AiHome({
 
 /* ---------------- pieces ---------------- */
 
-function Hero({ allowance, pricing, mounted, plansInclude }: { allowance: AllowanceState; pricing: PricingByDifficulty; mounted: boolean; plansInclude: boolean }) {
+function Hero({
+  allowance,
+  pricing,
+  durations,
+  mounted,
+  plansInclude,
+}: {
+  allowance: AllowanceState;
+  pricing: PricingByDifficulty;
+  durations: number[];
+  mounted: boolean;
+  plansInclude: boolean;
+}) {
   const rate = rupees(lowestRatePerMinute(pricing));
-  const example = aiInterviewQuote(30, pricing.Medium).final;
+  // The cheapest booking possible, so the example never names a level.
+  const cheapest = cheapestInterview(durations, pricing);
   const left = allowanceLeft(allowance);
   const from = <strong className="font-semibold text-foreground">from {rate} a minute</strong>;
   // The subtitle says what booking costs this user right now (it used to be a box beside the title).
@@ -388,7 +404,7 @@ function Hero({ allowance, pricing, mounted, plansInclude }: { allowance: Allowa
     line = (
       <>
         {allowance.kind === "free" ? "Your free interview is used. Book another " : "Book an interview "}
-        {from} (a 30-minute Medium one is {rupees(example)}), start it when you&apos;re ready, and get a scored report.
+        {from} (a {cheapest.durationMin}-minute one starts at {rupees(cheapest.pricePaise)}), start it when you&apos;re ready, and get a scored report.
         {plansInclude ? " Some paid plans include interviews." : ""}
       </>
     );
