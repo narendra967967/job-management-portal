@@ -151,21 +151,19 @@ export function AiHome({
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
-      {/* Wide screens (1280px+): the title on the left and the counts as a 2 × 2 grid on the right, the
-          same height; Get ready below them, full width (a thin bar once everything's done,
-          the list while there's something to do). Phones and tablets: title, Get ready,
-          counts, in one column (the counts four across from 1024px). */}
+      {/* Get ready comes first: a thin "all set" bar once everything's done, the list while
+          there's something to do. */}
+      <GetReady readiness={readiness} allowance={allowance} pricing={pricing} hasBookings={bookings.length > 0} />
+
+      {/* Wide screens (1280px+): the title on the left and the counts as a 2 × 2 grid on the
+          right, the same height. Narrower: title, then the counts (four across from 1024px). */}
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]">
         <div className="min-w-0">
           <Hero allowance={allowance} pricing={pricing} mounted={mounted} plansInclude={plansInclude} />
         </div>
 
-        <div className="order-2 min-w-0 xl:order-3 xl:col-span-2">
-          <GetReady readiness={readiness} allowance={allowance} pricing={pricing} hasBookings={bookings.length > 0} />
-        </div>
-
         {/* Stat tiles: each one filters the list; click again to go back to "To do". */}
-        <div className="order-3 grid grid-cols-2 gap-3 lg:grid-cols-4 xl:order-2 xl:grid-cols-2 xl:grid-rows-2">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 xl:grid-cols-2 xl:grid-rows-2">
           <Tile icon={PlayCircle} tone="indigo" label="Ready to start" value={counts.ready} active={view === "ready"} onClick={() => toggle("ready")} />
           <Tile icon={Timer} tone="sky" label="In progress" value={counts.progress} active={view === "in_progress"} onClick={() => toggle("in_progress")} />
           <Tile icon={AlarmClock} tone="amber" label="Expiring soon" value={counts.expiring} active={view === "expiring"} onClick={() => toggle("expiring")} />
@@ -601,24 +599,38 @@ function HowItWorks() {
     { icon: PlayCircle, title: "Start when ready", text: "Your booking waits here. Change the setup until you start; difficulty and length stay as booked." },
     { icon: FileText, title: "Read your report", text: "Scores for five skills, what went well, what to fix and better ways to answer." },
   ];
+  // A timeline: across from 1024px wide (a line joins the three circles), down
+  // the left on phones and tablets. The last step, the report, is the payoff, so it's green.
   return (
     <section className="rounded-2xl border bg-card p-4 md:p-5">
       <h2 className="text-sm font-semibold">How it works</h2>
-      <ol className="mt-3 grid gap-3 sm:grid-cols-3">
-        {steps.map(({ icon: Icon, title, text }, i) => (
-          <li key={title} className="flex gap-3 rounded-xl bg-muted/40 p-3">
-            <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-violet-600 text-xs font-bold text-white">
-              {i + 1}
-            </span>
-            <div>
-              <p className="flex items-center gap-1.5 text-sm font-semibold">
-                <Icon className="size-3.5 text-primary" aria-hidden />
-                {title}
-              </p>
-              <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{text}</p>
-            </div>
-          </li>
-        ))}
+      <ol className="mt-4 grid gap-5 lg:grid-cols-3 lg:gap-4">
+        {steps.map(({ icon: Icon, title, text }, i) => {
+          const last = i === steps.length - 1;
+          return (
+            <li key={title} className="relative flex gap-3 lg:flex-col lg:items-center lg:gap-2 lg:text-center">
+              {!last && (
+                <span
+                  aria-hidden
+                  className="absolute top-5 -bottom-5 left-5 w-0.5 -translate-x-1/2 bg-gradient-to-b from-primary/60 to-violet-500/40 lg:bottom-auto lg:left-1/2 lg:h-0.5 lg:w-[calc(100%+1rem)] lg:translate-x-0 lg:-translate-y-1/2 lg:bg-gradient-to-r"
+                />
+              )}
+              <span
+                className={cn(
+                  "relative z-10 flex size-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br text-white shadow-md ring-4 ring-card",
+                  last ? "from-emerald-500 to-teal-600" : "from-primary to-violet-600",
+                )}
+              >
+                <Icon className="size-5" aria-hidden />
+              </span>
+              <div className="min-w-0 pt-0.5 lg:max-w-xs lg:pt-1">
+                <p className={cn("text-[11px] font-semibold tracking-wide uppercase", last ? "text-emerald-700" : "text-primary")}>Step {i + 1}</p>
+                <p className="text-sm font-semibold">{title}</p>
+                <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{text}</p>
+              </div>
+            </li>
+          );
+        })}
       </ol>
     </section>
   );
