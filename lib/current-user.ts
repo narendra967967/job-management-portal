@@ -11,12 +11,16 @@ import { authAdmin } from "@/lib/auth-admin";
 /** The signed-in user's id, or null when there's no valid session. */
 export async function getSessionUserId(): Promise<string | null> {
   const s = await auth.api.getSession({ headers: await headers() });
+  // An admin account never counts as signed in to the user app, even with a
+  // session left over from before admin sign-ins were refused (lib/auth-role-guard.ts).
+  if ((s?.user as { role?: string } | undefined)?.role === "admin") return null;
   return s?.user?.id ?? null;
 }
 
 /** The signed-in user's id, redirecting to the login page when unauthenticated.
- *  Use in dashboard reads and Server Actions. (Admin accounts are kept out of the
- *  user app at the login step, not here, to avoid redirect loops with "/".) */
+ *  Use in dashboard reads and Server Actions. Admin accounts are refused at
+ *  sign-in and treated as signed out here; the login page shows its form to an
+ *  admin session instead of redirecting, so there's no loop. */
 export async function getCurrentUserId(): Promise<string> {
   const id = await getSessionUserId();
   if (!id) redirect("/login");
@@ -39,7 +43,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
   const u = s?.user as
     | { id?: string; name?: string; email?: string; mobile?: string | null; role?: string; status?: string; planExpiresAt?: string | Date | null }
     | undefined;
-  if (!u?.id) return null;
+  if (!u?.id || u.role === "admin") return null;
   return {
     id: u.id,
     name: u.name ?? "",

@@ -24,6 +24,7 @@ import { SMTP_NOT_CONFIGURED } from "@/lib/email";
 import { sendTemplateEmail } from "@/lib/email-templates";
 import { greetingName } from "@/lib/email-templates-model";
 import { getSessionLengthSeconds } from "@/lib/session-length";
+import { refuseWrongSide, roleAllowed, roleById } from "@/lib/auth-role-guard";
 
 // Read once at init: drives BOTH the DB session expiry and the cookie max-age so
 // they always match. Changing Settings → Security applies on new logins after a
@@ -83,6 +84,8 @@ export const auth = betterAuth({
     // Admin-provisioned accounts that have never logged in get a WELCOME email
     // (with the same set-password link); existing users get the reset copy.
     sendResetPassword: async ({ user: recipient, url }) => {
+      // The user app never resets an admin account's password; the request still looks successful.
+      if (!roleAllowed(await roleById(recipient.id), "user")) return;
       let isNew = false;
       try {
         const [row] = await db
@@ -204,6 +207,8 @@ export const auth = betterAuth({
     before: createAuthMiddleware(async (ctx) => {
       // reCAPTCHA on sign-in / forgot / reset (no-op while it's switched off).
       await captchaGuard(ctx, USER_CAPTCHA_PATHS);
+      // Admin accounts sign in on the admin panel only (lib/auth-role-guard.ts).
+      if (ctx.path === "/sign-in/email") await refuseWrongSide(ctx.body?.email, "user");
       if (ctx.path !== "/link-social" && !ctx.path.startsWith("/callback/")) return;
       if (!(await gmailLinkingAllowed())) {
         throw new APIError("FORBIDDEN", { message: "Connect Gmail is turned off." });
@@ -229,6 +234,10 @@ export const auth = betterAuth({
     },
     session: {
       create: {
+        // Backstop for every sign-in route: no user-app session for an admin account.
+        before: async (s) => {
+          if (!roleAllowed(await roleById(s.userId), "user")) return false;
+        },
         // Record the login time so "last login" survives logout/expiry.
         after: async (s) => {
           await db.update(user).set({ lastLoginAt: new Date() }).where(eq(user.id, s.userId));

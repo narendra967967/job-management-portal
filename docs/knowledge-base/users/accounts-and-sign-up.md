@@ -33,3 +33,9 @@ Admin **Users** marks anyone still unconfirmed with *not verified* next to their
 | A security check error | reCAPTCHA is failing. See the reCAPTCHA lockout runbook |
 
 Signing in has its own limit of 5 attempts a minute from one address.
+
+## Admin accounts and user accounts stay apart
+
+An admin account signs in only at the admin panel (`/jmp-admin`), and a user account only at the user sign-in page. Trying the wrong one gets "Invalid email or password", exactly as a wrong password would, so the form never reveals which emails belong to admins. The server refuses it, so it holds whichever way the sign-in is attempted. An admin session can't be used to open the user app either; it's treated as signed out. **Forgot password** on the user sign-in page sends nothing to an admin's email, although the page still says to check your inbox.
+
+To use the product as a customer, an admin needs a separate user account with a different email address.

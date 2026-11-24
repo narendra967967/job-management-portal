@@ -13,6 +13,7 @@ import { db } from "@/lib/db";
 import { account, session, user, verification } from "@/db/schema";
 import { hashPassword, verifyPassword } from "@/lib/password";
 import { getSessionLengthSeconds } from "@/lib/session-length";
+import { refuseWrongSide, roleAllowed, roleById } from "@/lib/auth-role-guard";
 
 // Same session length as the user side (Settings → Security), read once at init
 // so the admin session + cookie expire together. Applies on new logins after a
@@ -34,6 +35,8 @@ export const authAdmin = betterAuth({
   hooks: {
     before: createAuthMiddleware(async (ctx) => {
       await captchaGuard(ctx, ADMIN_CAPTCHA_PATHS);
+      // Only admin accounts sign in here (lib/auth-role-guard.ts).
+      if (ctx.path === "/sign-in/email") await refuseWrongSide(ctx.body?.email, "admin");
     }),
   },
   rateLimit: {
@@ -70,6 +73,10 @@ export const authAdmin = betterAuth({
   databaseHooks: {
     session: {
       create: {
+        // Backstop for every sign-in route: no admin-panel session for a user account.
+        before: async (s) => {
+          if (!roleAllowed(await roleById(s.userId), "admin")) return false;
+        },
         after: async (s) => {
           await db.update(user).set({ lastLoginAt: new Date() }).where(eq(user.id, s.userId));
         },
