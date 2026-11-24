@@ -126,6 +126,8 @@ export function NewInterviewForm({
   const [jdLeadId, setJdLeadId] = useState(editing?.jobDescriptionSource === "lead" ? (editing.leadId ?? "") : (fromLead?.id ?? ""));
   const [jdText, setJdText] = useState(editing?.jobDescription ?? "");
   const [topics, setTopics] = useState<string[]>(editing?.topics ?? []);
+  // "Cover all topics" is the default: no topics sent, so the questions span the whole role.
+  const [topicMode, setTopicMode] = useState<"all" | "pick">(editing?.topics?.length ? "pick" : "all");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [starting, setStarting] = useState(false);
   // A paid booking needs billing details first (invoices spec I4): asked once, then booking carries on.
@@ -209,7 +211,7 @@ export function NewInterviewForm({
         category,
         difficulty,
         durationMin: duration,
-        topics,
+        topics: topicMode === "pick" ? topics : [],
         leadId: leadId && fromLead ? leadId : null,
         resumeMode,
         resumeId: resumeMode === "saved" ? resumeId || null : null,
@@ -309,7 +311,7 @@ export function NewInterviewForm({
   const stepDone = {
     interview: !problems.role && !problems.industry && !problems.category,
     job: !problems.resume && !problems.jd,
-    topics: topics.length > 0,
+    topics: topicMode === "all" || topics.length > 0,
   };
   const startLabel = editing ? "Save changes" : included ? "Book interview" : `Pay ${rupees(price)} and book`;
 
@@ -695,20 +697,35 @@ export function NewInterviewForm({
           </Step>
 
           {/* ---- Step 3: topics ---- */}
-          <Step n={3} title="Topics to cover (optional)" done={stepDone.topics}>
-            <div id="field-topics" className="space-y-1.5">
-              <ChipInput
-                value={topics}
-                onChange={setTopics}
-                max={LIMITS.topics}
-                suggestions={TOPIC_SUGGESTIONS[category] ?? DEFAULT_TOPICS}
-                placeholder="Type a topic and press Enter"
-                ariaLabel="Topics to cover"
+          <Step n={3} title="Topics to cover" done={stepDone.topics}>
+            <div id="field-topics" className="space-y-2">
+              <Segmented
+                value={topicMode}
+                onChange={(v) => setTopicMode(v as "all" | "pick")}
+                options={[
+                  { value: "all", label: "Cover all topics", icon: Sparkles },
+                  { value: "pick", label: "Choose topics", icon: Target },
+                ]}
               />
-              <p className="text-xs text-muted-foreground">
-                Add up to {LIMITS.topics} and the interviewer makes sure they come up. Leave it empty and you get questions across
-                the whole role.
-              </p>
+              {topicMode === "all" ? (
+                <p className="text-xs text-muted-foreground">
+                  The interviewer spreads the questions across the whole role, the job description and your resume.
+                </p>
+              ) : (
+                <>
+                  <ChipInput
+                    value={topics}
+                    onChange={setTopics}
+                    max={LIMITS.topics}
+                    suggestions={TOPIC_SUGGESTIONS[category] ?? DEFAULT_TOPICS}
+                    placeholder="Type a topic and press Enter"
+                    ariaLabel="Topics to cover"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Type your own or tap a suggestion, up to {LIMITS.topics}. The interviewer makes sure each one comes up.
+                  </p>
+                </>
+              )}
             </div>
           </Step>
         </div>
