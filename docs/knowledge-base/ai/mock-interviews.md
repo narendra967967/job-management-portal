@@ -44,6 +44,8 @@ Each section has its own **Save changes** button and only saves that section.
 | Scoring | The weight of each of the five skills in the overall score. They must add up to 100% |
 | Prompts | The question plan, interviewer and evaluation prompts. **Reset to default** puts the built-in wording back |
 
+**Kinds of interview** should all be rounds that work as a spoken one-on-one conversation, because that's what the interviewer does: no code editor, whiteboard or uploads during the interview. Coding, System design, Data analytics and Case study were taken out on November 24, 2026 for that reason. The list for new environments is HR interview, Recruiter screen, Behavioral interview, Managerial interview, Technical concepts, Product management, Project management, Leadership, Stakeholder and client communication, Sales and account management, Customer success and support, Guesstimates and problem-solving, Salary and offer discussion, and Final round. The name is passed to the interviewer as written, so a descriptive name gets better questions. Each of these has its own icon and suggested topics; a kind you add yourself gets a speech-bubble icon and the general topics.
+
 **Changes never touch existing bookings.** When a candidate books, the booking keeps a copy of the timing rules, its level's price and the weights in force at that moment. So raising a price or changing the wrap-up time only affects bookings made after you save.
 
 The module key is separate from users' own AI keys and from the knowledge base key, so mock interview usage and cost are tracked on their own. Candidates don't need an AI key of their own for mock interviews.

@@ -2,24 +2,33 @@
 // Client-safe: no server imports. Used by the screens now and by the database and
 // wiring phases later, so nothing here is sample data.
 
+/**
+ * The default kinds of interview for a new environment (admin edits the live
+ * list in Module settings). Owner decision, November 24, 2026: only rounds that
+ * work as a spoken one-on-one conversation. Coding, System design, Data
+ * analytics and Case study were dropped because the real rounds need code, a
+ * diagram or a chart.
+ */
 export const INTERVIEW_CATEGORIES = [
   "HR interview",
-  "Technical interview",
+  "Recruiter screen",
   "Behavioral interview",
   "Managerial interview",
+  "Technical concepts",
   "Product management",
   "Project management",
-  "System design",
-  "Coding",
-  "Data analytics",
   "Leadership",
-  "Case study",
+  "Stakeholder and client communication",
+  "Sales and account management",
+  "Customer success and support",
+  "Guesstimates and problem-solving",
+  "Salary and offer discussion",
   "Final round",
 ] as const;
 export type InterviewCategory = (typeof INTERVIEW_CATEGORIES)[number];
 
-/** Coding and System Design run as discussion interviews (D12). */
-export const DISCUSSION_CATEGORIES: readonly InterviewCategory[] = ["Coding", "System design"];
+/** Coding and System Design run as discussion interviews (D12), if an admin adds them back. */
+export const DISCUSSION_CATEGORIES: readonly string[] = ["Coding", "System design"];
 
 export const INDUSTRIES = [
   "Information technology",
@@ -41,6 +50,17 @@ export const TOPIC_SUGGESTIONS: Partial<Record<string, string[]>> = {
   "Project management": ["Risk management", "Stakeholder management", "Estimation", "Agile and Scrum", "Budget tracking"],
   "Product management": ["Prioritization", "Roadmaps", "Metrics", "User research", "Go-to-market"],
   "Behavioral interview": ["Conflict", "Failure and learning", "Leadership", "Teamwork", "Pressure and deadlines"],
+  "Technical concepts": ["Past technical work", "Architecture choices", "Debugging approach", "Trade-offs", "Explaining to non-technical people"],
+  "Recruiter screen": ["About yourself", "Why you're moving", "Notice period", "Expected CTC", "Why this company"],
+  "Managerial interview": ["Team management", "Delegation", "Difficult conversations", "Hiring", "Performance issues"],
+  Leadership: ["Vision and direction", "Influence", "Developing people", "Tough decisions", "Change management"],
+  "Stakeholder and client communication": ["Managing expectations", "Saying no", "Escalations", "Difficult clients", "Status updates"],
+  "Sales and account management": ["Your pitch", "Handling objections", "Pipeline and targets", "Closing", "Account growth"],
+  "Customer success and support": ["Upset customers", "Escalations", "Renewals", "Onboarding", "Customer feedback"],
+  "Guesstimates and problem-solving": ["Market sizing", "Estimation", "Structured thinking", "Root cause", "Prioritization"],
+  "Salary and offer discussion": ["Expected CTC", "Current CTC", "Negotiating an offer", "Notice period", "Competing offers"],
+  "HR interview": ["About yourself", "Strengths and weaknesses", "Career gaps", "Why this role", "Notice period"],
+  // Earlier kinds, kept for older bookings.
   "Technical interview": ["Architecture", "Debugging", "Performance", "Testing", "Code review"],
   "System design": ["Scalability", "Caching", "Databases", "APIs", "Trade-offs"],
   Coding: ["Data structures", "Algorithms", "Complexity", "Problem breakdown"],

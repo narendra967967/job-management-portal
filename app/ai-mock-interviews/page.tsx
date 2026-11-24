@@ -327,11 +327,11 @@ export default async function AiMockInterviewsPage() {
                 const Icon = categoryIcon(c);
                 const talk = (DISCUSSION_CATEGORIES as readonly string[]).includes(c);
                 return (
-                  <li key={c} className="glass flex min-h-16 items-center gap-3 rounded-2xl p-3 transition-transform duration-200 hover:-translate-y-0.5 motion-reduce:hover:translate-y-0">
-                    <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary/15 to-[oklch(0.62_0.21_330_/_0.14)] text-primary ring-1 ring-white/70">
+                  <li key={c} className="glass flex min-h-16 min-w-0 items-center gap-2 rounded-2xl p-2.5 sm:gap-3 sm:p-3 transition-transform duration-200 hover:-translate-y-0.5 motion-reduce:hover:translate-y-0">
+                    <span className="flex size-8 shrink-0 sm:size-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary/15 to-[oklch(0.62_0.21_330_/_0.14)] text-primary ring-1 ring-white/70">
                       <Icon className="size-5" aria-hidden />
                     </span>
-                    <span className="min-w-0 text-sm leading-tight font-medium">
+                    <span className="min-w-0 text-[13px] leading-tight font-medium break-words sm:text-sm">
                       {c}
                       {talk && <span className="mt-0.5 block text-[11px] font-normal text-muted-foreground">Talked through</span>}
                     </span>

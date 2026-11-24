@@ -490,7 +490,7 @@ export function NewInterviewForm({
                       aria-pressed={on}
                       onClick={() => setCategory(c)}
                       className={cn(
-                        "flex min-h-14 items-center gap-2.5 rounded-xl border px-3 py-2 text-left text-sm transition-all focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+                        "flex min-h-14 min-w-0 items-center gap-1.5 rounded-xl border px-2.5 py-2 text-left text-[13px] sm:gap-2.5 sm:px-3 sm:text-sm transition-all focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
                         on
                           ? "border-primary bg-primary/5 shadow-sm ring-1 ring-primary/30"
                           : "bg-white/60 hover:-translate-y-px hover:border-primary/40 hover:shadow-sm motion-reduce:hover:translate-y-0",
@@ -498,14 +498,14 @@ export function NewInterviewForm({
                     >
                       <span
                         className={cn(
-                          "flex size-8 shrink-0 items-center justify-center rounded-lg transition-colors",
+                          "flex size-7 shrink-0 items-center justify-center rounded-lg transition-colors sm:size-8",
                           on ? "bg-gradient-to-br from-primary to-violet-600 text-white" : "bg-muted text-muted-foreground",
                         )}
                       >
                         <Icon className="size-4" aria-hidden />
                       </span>
                       <span className="min-w-0">
-                        <span className={cn("block leading-tight", on && "font-semibold text-primary")}>{c}</span>
+                        <span className={cn("block leading-tight break-words", on && "font-semibold text-primary")}>{c}</span>
                         {(DISCUSSION_CATEGORIES as readonly string[]).includes(c) && <span className="text-[10px] text-muted-foreground">Discussion</span>}
                       </span>
                     </button>
